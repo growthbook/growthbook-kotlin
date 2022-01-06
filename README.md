@@ -1,2 +1,1 @@
-# growthbook-kotlin
-GrowthBook Kotlin SDK
+# GrowhBook-Kotlin
