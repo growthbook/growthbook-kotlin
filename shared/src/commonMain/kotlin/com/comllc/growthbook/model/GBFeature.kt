@@ -1,5 +1,7 @@
 package com.comllc.growthbook.model
 
+import com.comllc.growthbook.Configurations.Constants
+
 
 /*
     A Feature object consists of possible values plus rules for how to assign values to users.
@@ -21,21 +23,17 @@ class GBFeatureRule<T>(
     /// Run an experiment (A/B test) and randomly choose between these variations
     val variations: ArrayList<T>,
     /// The globally unique tracking key for the experiment (default to the feature key)
-    val trackingKey: String,
+    val trackingKey: String?,
     /// How to weight traffic between variations. Must add to 1.
     val weights: List<Float>,
     /// A tuple that contains the namespace identifier, plus a range of coverage for the experiment.
-    val namespace : GBNameSpace,
+    val namespace : GBNameSpace?,
     /// What user attribute should be used to assign variations (defaults to id)
-    val hashAttribute: String
+    val hashAttribute: String = Constants.idAttributeKey
 )
 
-/*
-    TODO - Targeting condition based on MongoDB query syntax.
-    For details on parsing and evaluating these conditions, view the reference Typescript implementation
-    https://github.com/growthbook/growthbook/tree/main/packages/sdk-js/src/mongrule.ts
- */
-class GBCondition()
+
+
 
 enum class GBFeatureSource {
     unknownFeature, defaultValue, force, experiment

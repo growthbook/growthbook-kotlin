@@ -1,6 +1,7 @@
 package com.comllc.growthbook
 
 import com.comllc.growthbook.Configurations.Constants
+import com.comllc.growthbook.Utils.FNV
 import com.comllc.growthbook.model.*
 import io.ktor.http.*
 
@@ -10,15 +11,12 @@ import io.ktor.http.*
     It exposes two main methods: feature and run.
  */
 
-
 class GrowthBookSDK<T>(val gbContext : GBContext<T>) {
 
     /*
     The feature method takes a single string argument, which is the unique identifier for the feature and returns a FeatureResult object.
      */
     fun feature(id: String) : GBFeatureResult<T> {
-
-        /// TODO There are a few ordered steps to evaluate a feature
 
         try {
             val targetFeature : GBFeature<T> = gbContext.features.getValue(id)
@@ -42,10 +40,11 @@ class GrowthBookSDK<T>(val gbContext : GBContext<T>) {
                             if (attributeValue.isEmpty())
                                 continue
                             else {
-                                /// TODO Compute a hash using the Fowler–Noll–Vo algorithm (specifically fnv32-1a)
-                                val hashFNV : Float = 0.0F
+                                /// Compute a hash using the Fowler–Noll–Vo algorithm (specifically fnv32-1a)
+                                val hashFNV =
+                                    (FNV().fnv1a_32(attributeValue + id)?.rem(1000))?.div(1000);
                                 /// If the hash is greater than rule.coverage, skip the rule
-                                if (hashFNV > rule.coverage) {
+                                if (hashFNV != null && hashFNV > rule.coverage) {
                                     continue
                                 }
                             }
@@ -57,8 +56,7 @@ class GrowthBookSDK<T>(val gbContext : GBContext<T>) {
 
                     } else {
                         /// Otherwise, convert the rule to an Experiment object
-                            /// TODO assign featureKey if rule.trackingKey doesn't exist
-                        val exp = GBExperiment(rule.trackingKey,
+                        val exp = GBExperiment(rule.trackingKey ?: id,
                             variations = rule.variations,
                             coverage = rule.coverage,
                             weights = rule.weights,
@@ -94,7 +92,6 @@ class GrowthBookSDK<T>(val gbContext : GBContext<T>) {
     The run method takes an Experiment object and returns an ExperimentResult
      */
     fun run(experiment: GBExperiment<T>) : GBExperimentResult<T> {
-        /// TODO There are a bunch of ordered steps to run an experiment
 
         /// If experiment.variations has fewer than 2 variations, return immediately (not in experiment, variationId 0)
         //
@@ -135,13 +132,15 @@ class GrowthBookSDK<T>(val gbContext : GBContext<T>) {
         }
 
         /// Get the user hash attribute and value (context.attributes[experiment.hashAttribute || "id"]) and if empty, return immediately (not in experiment, variationId 0)
-        val attributeValue = gbContext.attributes.get(experiment.trackingKey) as? String ?: gbContext.attributes.get(Constants.idAttributeKey) as? String ?: ""
+        val id = gbContext.attributes.get(Constants.idAttributeKey) as? String ?: ""
+        val attributeValue = gbContext.attributes.get(experiment.hashAttribute) as? String ?: id
         if (attributeValue.isEmpty()) {
             return GBExperimentResult(inExperiment = false, variationId = 0)
         }
 
-        /// TODO If experiment.namespace is set, check if hash value is included in the range and if not, return immediately (not in experiment, variationId 0)
-        if (experiment.namespace != null) {
+        /// If experiment.namespace is set, check if hash value is included in the range and if not, return immediately (not in experiment, variationId 0)
+        val hashValue = attributeValue.toIntOrNull()
+        if (experiment.namespace != null && hashValue != null && (experiment.namespace.rangeStart > hashValue || hashValue > experiment.namespace.rangeEnd)) {
             return GBExperimentResult(inExperiment = false, variationId = 0)
         }
 
@@ -183,18 +182,24 @@ class GrowthBookSDK<T>(val gbContext : GBContext<T>) {
         val ranges = experiment.weights?.map { weight ->
             val start = cumulative
             cumulative += weight
-            arrayListOf<Float>(start, start + (coverage * weight))
+            GBNameSpace("", start, start + (coverage * weight))
         }
 
-        /// TODO Compute a hash using the Fowler–Noll–Vo algorithm (specifically fnv32-1a) and assign a variation
-//        n = (fnv32_1a(id + experiment.key) % 1000) / 1000;
-//
-        val assigned = -1;
-//        ranges.forEach((range, i) => {
-//            if (n >= range[0] && n < range[1]) {
-//                assigned = i;
-//            }
-//        });
+        /// Compute a hash using the Fowler–Noll–Vo algorithm (specifically fnv32-1a) and assign a variation
+        val hashFNV =
+            (FNV().fnv1a_32(id + experiment.trackingKey)?.rem(1000))?.div(1000);
+
+        var assigned = -1;
+        if (hashFNV != null && ranges != null) {
+            var counter = 0
+            ranges.forEach { range ->
+                if (hashFNV >= range.rangeStart && hashFNV < range.rangeEnd) {
+                    assigned = counter
+                }
+                counter++
+            }
+        }
+
 
         /// If not assigned a variation (assigned === -1), return immediately (not in experiment, variationId 0)
         if (assigned == -1) {

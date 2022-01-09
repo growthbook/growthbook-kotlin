@@ -24,11 +24,11 @@ class GBExperiment<T>(
 
 ) : GBExperimentOverride(weights = weights, active = active, coverage = coverage, condition = condition, force = force)
 
-// TODO RANGE HANDLING to be checked in run method
+// Namespace Range Handling
 class GBNameSpace (
     val id: String,
-    val rangeStart: Number,
-    val rangeEnd : Number
+    val rangeStart: Float,
+    val rangeEnd : Float
     )
 
 /*

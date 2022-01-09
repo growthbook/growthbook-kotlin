@@ -39,6 +39,7 @@ kotlin {
                 implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
                 implementation("io.ktor:ktor-client-cio:$ktorVersion")
                 implementation("io.ktor:ktor-client-serialization:$ktorVersion")
+                implementation("com.ionspin.kotlin:bignum:0.3.3")
             }
         }
         val commonTest by getting {
