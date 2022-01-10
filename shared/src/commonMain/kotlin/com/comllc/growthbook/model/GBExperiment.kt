@@ -45,8 +45,11 @@ class GBExperimentResult<T>(
     val hashAttribute: String? = null,
     ///  The value of that attribute
     val hashValue: String? = null
+
 )
 
+// TODO "status", "groups", "url" key check
+// TODO condition, coverage & force key check
 open class GBExperimentOverride(
     /// How to weight traffic between variations. Must add to 1.
     var weights : List<Float>? = null,

@@ -1,4 +1,4 @@
 package com.comllc.growthbook.Experiments
 
-class ExperimentsDataSource {
+class ConfigsViewModel {
 }
