@@ -6,7 +6,7 @@ import com.sdk.growthbook.Network.CoreNetworkClient
 import com.sdk.growthbook.Network.NetworkDispatcher
 import kotlinx.serialization.decodeFromString
 
-class FeaturesDataSource(val dispatcher: NetworkDispatcher = CoreNetworkClient()) {
+internal class FeaturesDataSource(val dispatcher: NetworkDispatcher = CoreNetworkClient()) {
 
     private val apiUrl = GrowthBookSDK.gbContext.url + Constants.featurePath + GrowthBookSDK.gbContext.apiKey
 

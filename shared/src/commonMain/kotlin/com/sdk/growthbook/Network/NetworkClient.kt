@@ -16,15 +16,11 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
-class APITimeError : Exception() {
-
-}
-
 interface NetworkDispatcher {
     val JSONParser : Json
         get() = Json { prettyPrint = true; isLenient = true; ignoreUnknownKeys = true }
 
-    fun consumeGETRequest(request: String, onSuccess: (HttpResponse, String) -> Unit, onError: (APITimeError) -> Unit)
+    fun consumeGETRequest(request: String, onSuccess: (HttpResponse, String) -> Unit, onError: (Throwable) -> Unit)
 }
 
 class CoreNetworkClient : NetworkDispatcher {
@@ -42,7 +38,7 @@ class CoreNetworkClient : NetworkDispatcher {
     override fun consumeGETRequest(
         request: String,
         onSuccess: (HttpResponse, String) -> Unit,
-        onError: (APITimeError) -> Unit
+        onError: (Throwable) -> Unit
     ) {
 
         GlobalScope.launch(ApplicationDispatcher) {
@@ -53,8 +49,7 @@ class CoreNetworkClient : NetworkDispatcher {
                 print(result)
                 onSuccess(result, result.receive())
             } catch (ex: Exception) {
-                val trace = ex.stackTraceToString()
-                onError(APITimeError())
+                onError(ex)
             }
 
         }

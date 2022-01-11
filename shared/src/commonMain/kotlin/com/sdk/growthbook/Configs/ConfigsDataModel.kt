@@ -1,12 +1,10 @@
 package com.sdk.growthbook.Configs
 
-import com.sdk.growthbook.model.GBExperiment
-import com.sdk.growthbook.model.GBExperimentOverride
+import com.sdk.growthbook.Utils.GBOverrides
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class ConfigsDataModel(
+internal data class ConfigsDataModel(
     val status : Int,
-    val overrides : HashMap<String, GBExperimentOverride>,
-    val experiments : HashMap<String, GBExperiment>
+    val overrides : GBOverrides
 )

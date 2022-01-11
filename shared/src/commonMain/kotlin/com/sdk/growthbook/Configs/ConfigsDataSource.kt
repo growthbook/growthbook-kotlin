@@ -9,7 +9,7 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
 
-class ConfigsDataSource(val dispatcher: NetworkDispatcher = CoreNetworkClient()) {
+internal class ConfigsDataSource(val dispatcher: NetworkDispatcher = CoreNetworkClient()) {
 
     private val apiUrl = GrowthBookSDK.gbContext.url + Constants.configPath + GrowthBookSDK.gbContext.apiKey
 

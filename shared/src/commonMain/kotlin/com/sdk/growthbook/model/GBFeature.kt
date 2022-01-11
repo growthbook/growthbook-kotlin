@@ -2,6 +2,7 @@ package com.sdk.growthbook.model
 
 import com.sdk.growthbook.Utils.Constants
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 
 /*
@@ -10,10 +11,9 @@ import kotlinx.serialization.Serializable
 @Serializable
 class GBFeature(
     /// The default value (should use null if not specified)
-    // TODO Handle Any
-    val defaultValue : String? = null,
+    val defaultValue : JsonElement,
     /// Array of Rule objects that determine when and how the defaultValue gets overridden
-    val rules: List<GBFeatureRule>
+    val rules: List<GBFeatureRule>? = null
 )
 
 @Serializable
@@ -23,13 +23,11 @@ class GBFeatureRule(
     /// What percent of users should be included in the experiment (between 0 and 1, inclusive)
     val coverage : Float? = null,
     ///  Immediately force a specific value (ignore every other option besides condition and coverage)
-    // TODO Handle Any
-    val force : String? = null,
+    val force : JsonElement? = null,
     /// Run an experiment (A/B test) and randomly choose between these variations
-    // TODO Handle Any
-    val variations: ArrayList<String>,
+    val variations: ArrayList<JsonElement>,
     /// The globally unique tracking key for the experiment (default to the feature key)
-    val trackingKey: String? = null,
+    val key: String? = null,
     /// How to weight traffic between variations. Must add to 1.
     val weights: List<Float>,
     /// A tuple that contains the namespace identifier, plus a range of coverage for the experiment.
@@ -45,6 +43,7 @@ enum class GBFeatureSource {
     unknownFeature, defaultValue, force, experiment
 }
 
+//TODO Result Value Generics
 class GBFeatureResult(
     /// The assigned value of the feature
     val value : Any?,

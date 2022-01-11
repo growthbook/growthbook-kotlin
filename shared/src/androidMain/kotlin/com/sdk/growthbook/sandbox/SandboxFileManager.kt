@@ -20,7 +20,7 @@ actual inline fun <reified T> SandboxFileManager.saveSandbox(fileName: String, v
 
     file.createNewFile()
 
-    val json = Json {  }.encodeToString(value)
+    val json = Json { prettyPrint = true; isLenient = true; ignoreUnknownKeys = true }.encodeToString(value)
 
     file.appendText(json)
 
@@ -31,7 +31,7 @@ actual inline fun <reified T> SandboxFileManager.getSandbox(fileName: String) : 
 
     if (file.exists()) {
         val inputAsString = FileInputStream(file).bufferedReader().use { it.readText() }
-        return Json {  }.decodeFromString<T>(inputAsString)
+        return Json { prettyPrint = true; isLenient = true; ignoreUnknownKeys = true }.decodeFromString<T>(inputAsString)
     }
 
     return null

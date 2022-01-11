@@ -1,11 +1,12 @@
 package com.sdk.growthbook
 
 import com.sdk.growthbook.sandbox.SandboxFileManager
-import com.sdk.growthbook.Utils.Constants
 import com.sdk.growthbook.Configs.ConfigsFlowDelegate
 import com.sdk.growthbook.Configs.ConfigsViewModel
 import com.sdk.growthbook.Features.FeaturesFlowDelegate
 import com.sdk.growthbook.Features.FeaturesViewModel
+import com.sdk.growthbook.Utils.*
+import com.sdk.growthbook.Utils.Constants
 import com.sdk.growthbook.Utils.FNV
 import com.sdk.growthbook.model.*
 import io.ktor.http.*
@@ -20,10 +21,11 @@ class GBSDKBuilder(
     val attributes: HashMap<String, Any>,
     val appInstance : SandboxFileManager,
     val trackingCallback : (GBExperiment, GBExperimentResult) -> Unit
-) : ConfigsFlowDelegate, FeaturesFlowDelegate {
+) {
 
     var qaMode: Boolean = false;
     var enabled: Boolean = true;
+    var refreshHandler : GBCacheRefreshHandler? = null
 
     fun setQAMode(isEnabled : Boolean) : GBSDKBuilder {
         this.qaMode = isEnabled
@@ -35,36 +37,19 @@ class GBSDKBuilder(
         return this
     }
 
+    fun setRefreshHandler(refreshHandler : GBCacheRefreshHandler) : GBSDKBuilder{
+        this.refreshHandler = refreshHandler
+        return this
+    }
+
     fun initialize() : GrowthBookSDK{
 
         val gbContext = GBContext(apiKey = apiKey, enabled = enabled, attributes = attributes, url = hostURL, qaMode = qaMode, trackingCallback = trackingCallback)
 
-        val sdkInstance = GrowthBookSDK(gbContext, appInstance)
-
-        val configVM = ConfigsViewModel(this)
-        configVM.fetchConfigs()
-
-        val featureVM = FeaturesViewModel(this)
-        featureVM.fetchFeatures()
+        val sdkInstance = GrowthBookSDK(gbContext, appInstance, refreshHandler)
 
         return sdkInstance
 
-    }
-
-    override fun configsFetchedSuccessfully() {
-        // TODO("Not yet implemented")
-    }
-
-    override fun configsFetchFailed() {
-        // TODO("Not yet implemented")
-    }
-
-    override fun featuresFetchedSuccessfully() {
-        // TODO("Not yet implemented")
-    }
-
-    override fun featuresFetchFailed() {
-        // TODO("Not yet implemented")
     }
 }
 
@@ -74,20 +59,69 @@ class GBSDKBuilder(
     It exposes two main methods: feature and run.
  */
 
-class GrowthBookSDK() {
+class GrowthBookSDK() : ConfigsFlowDelegate, FeaturesFlowDelegate {
+
+    private val configVM = ConfigsViewModel(this)
+    private val featureVM = FeaturesViewModel(this)
+
+    private var refreshHandler : GBCacheRefreshHandler? = null
 
     internal companion object {
         lateinit var gbContext: GBContext
         lateinit var appInstance: SandboxFileManager
     }
 
-    internal constructor(context : GBContext, instance : SandboxFileManager) : this(){
+    internal constructor(context : GBContext, instance : SandboxFileManager, refreshHandler : GBCacheRefreshHandler?) : this(){
         gbContext = context
         appInstance = instance
+        this.refreshHandler = refreshHandler
+
+        refreshCache()
+    }
+
+    fun refreshCache(){
+        configVM.fetchConfigs()
+        featureVM.fetchFeatures()
     }
 
     fun getGBContext() : GBContext {
         return gbContext
+    }
+
+    fun getOverrides() : GBOverrides {
+        return gbContext.overrides
+    }
+
+    fun getFeatures() : GBFeatures {
+        return gbContext.features
+    }
+
+    override fun configsFetchedSuccessfully(configs: GBOverrides, isRemote: Boolean) {
+        gbContext.overrides = configs
+        if (isRemote) {
+            this.refreshHandler?.let { it(true) }
+        }
+    }
+
+    override fun configsFetchFailed(error: GBError, isRemote: Boolean) {
+        if (isRemote) {
+            this.refreshHandler?.let { it(false) }
+        }
+    }
+
+    override fun featuresFetchedSuccessfully(features : GBFeatures, isRemote: Boolean) {
+        gbContext.features = features
+        if (isRemote) {
+            this.refreshHandler?.let { it(true) }
+        }
+    }
+
+    override fun featuresFetchFailed(error: GBError, isRemote: Boolean) {
+
+        if (isRemote) {
+            this.refreshHandler?.let { it(false) }
+        }
+
     }
 
     /*
@@ -99,9 +133,10 @@ class GrowthBookSDK() {
             val targetFeature : GBFeature = gbContext.features.getValue(id)
 
             /// Loop through the feature rules (if any)
-            if (targetFeature.rules.size > 0) {
+            val rules = targetFeature.rules
+            if (rules != null && rules.size > 0) {
 
-                for (rule in targetFeature.rules) {
+                for (rule in rules) {
 
                     /// TODO If the rule has a condition and it evaluates to false, skip this rule and continue to the next one
 
@@ -133,7 +168,7 @@ class GrowthBookSDK() {
 
                     } else {
                         /// Otherwise, convert the rule to an Experiment object
-                        val exp = GBExperiment(rule.trackingKey ?: id,
+                        val exp = GBExperiment(rule.key ?: id,
                             variations = rule.variations,
                             coverage = rule.coverage,
                             weights = rule.weights,
@@ -197,8 +232,7 @@ class GrowthBookSDK() {
             val overrideExp = gbContext.overrides.getValue(experiment.trackingKey)
 
             experiment.weights = overrideExp.weights
-            experiment.active = overrideExp.active
-            experiment.condition = overrideExp.condition
+            experiment.active = overrideExp.status == GBExperimentStatus.running
             experiment.coverage = overrideExp.coverage
             experiment.force = overrideExp.force
         }

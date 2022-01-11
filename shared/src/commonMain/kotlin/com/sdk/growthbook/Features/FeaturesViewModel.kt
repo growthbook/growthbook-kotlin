@@ -1,46 +1,42 @@
 package com.sdk.growthbook.Features
 
-import com.sdk.growthbook.Configs.ConfigsDataModel
-import com.sdk.growthbook.Configs.ConfigsDataSource
 import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.Utils.Constants
+import com.sdk.growthbook.Utils.GBError
+import com.sdk.growthbook.Utils.GBFeatures
 import com.sdk.growthbook.sandbox.CachingManager
 
 
-interface FeaturesFlowDelegate{
-    fun featuresFetchedSuccessfully()
-    fun featuresFetchFailed()
+internal interface FeaturesFlowDelegate{
+    fun featuresFetchedSuccessfully(features : GBFeatures, isRemote: Boolean)
+    fun featuresFetchFailed(error: GBError, isRemote: Boolean)
 }
 
-class FeaturesViewModel(val delegate: FeaturesFlowDelegate) {
+internal class FeaturesViewModel(val delegate: FeaturesFlowDelegate, val dataSource : FeaturesDataSource = FeaturesDataSource()) {
 
     val manager = CachingManager(GrowthBookSDK.appInstance)
 
     fun fetchFeatures(){
-        val dataModel = manager.getContent<FeaturesDataModel>(Constants.featureCache)
 
-        if (dataModel != null) {
-            print(dataModel)
-            this.delegate.featuresFetchedSuccessfully()
+        try {
+            val dataModel = manager.getContent<FeaturesDataModel>(Constants.featureCache)
+
+            if (dataModel != null) {
+                this.delegate.featuresFetchedSuccessfully(features = dataModel.features, isRemote = false)
+            }
+        } catch (error : Throwable){
+            this.delegate.featuresFetchFailed(error as GBError, false)
         }
-        val dataSource = FeaturesDataSource()
+
         dataSource.fetchFeatures(success = {dataModel -> prepareFeaturesData(dataModel = dataModel)},
-            failure = {handleError()})
+            failure = {error ->  this.delegate.featuresFetchFailed(error as GBError, true)})
 
 
     }
 
     fun prepareFeaturesData(dataModel : FeaturesDataModel) {
-
         manager.saveContent(Constants.featureCache, dataModel)
-
-        // TODO Map dataModel to UIModel
-        // TODO Call Success Delegate Method
-    }
-
-    fun handleError(){
-        // TODO Prepare Error UI Model
-        // TODO Call Error Delegate Method
+        this.delegate.featuresFetchedSuccessfully(features = dataModel.features, isRemote = true)
     }
 
 }

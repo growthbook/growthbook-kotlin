@@ -1,6 +1,10 @@
 package com.sdk.growthbook.Utils
 
-class Constants {
+import com.sdk.growthbook.model.GBExperimentOverride
+import com.sdk.growthbook.model.GBFeature
+import io.ktor.util.*
+
+internal class Constants {
 
     companion object {
         val idAttributeKey = "id"
@@ -13,4 +17,15 @@ class Constants {
         val featurePath = "api/features/"
     }
 
+}
+
+typealias GBOverrides = HashMap<String, GBExperimentOverride>
+
+typealias GBFeatures = HashMap<String, GBFeature>
+
+typealias GBCacheRefreshHandler = (Boolean) -> Unit
+
+class GBError : Exception() {
+    val errorMessage = this.message
+    val stackTrace = this.stackTraceToString()
 }

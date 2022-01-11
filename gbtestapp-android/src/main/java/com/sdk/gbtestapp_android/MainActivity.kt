@@ -18,7 +18,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(com.sdk.gbtestapp_android.R.layout.activity_main)
 
-        GBSDKBuilder(apiKey = "key_5d5f97321c8d5e59",
+        GBSDKBuilder(apiKey = "key_5d5f97321c8d5e59",//key_486336ff87c125f4 // key_5d5f97321c8d5e59
             hostURL = "https://cdn.growthbook.io/",
             attributes = HashMap(),
             appInstance = this.applicationContext as ContextWrapper,

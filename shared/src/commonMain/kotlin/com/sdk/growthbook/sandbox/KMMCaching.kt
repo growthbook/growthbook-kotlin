@@ -2,7 +2,7 @@ package com.sdk.growthbook.sandbox
 
 import kotlinx.serialization.Serializable
 
-class CachingManager(val context : SandboxFileManager) {
+internal class CachingManager(val context : SandboxFileManager) {
 
     inline fun <reified T> saveContent(fileName: String, content: @Serializable T){
         context.saveSandbox(fileName, content)

@@ -5,7 +5,7 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
 /*
     Fowler-Noll-Vo hash - 32 bit
  */
-class FNV {
+internal class FNV {
     private val INIT32 = BigInteger(0x811c9dc5)
     private val PRIME32 = BigInteger(0x01000193)
     private val MOD32 = BigInteger(2).pow(32)
