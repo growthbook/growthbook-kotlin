@@ -1,9 +1,72 @@
 package com.comllc.growthbook
 
-import com.comllc.growthbook.Configurations.Constants
+import com.comllc.cachinglibrary_kmm.sandbox.SandboxFileManager
+import com.comllc.growthbook.Utils.Constants
+import com.comllc.growthbook.Configs.ConfigsFlowDelegate
+import com.comllc.growthbook.Configs.ConfigsViewModel
+import com.comllc.growthbook.Features.FeaturesFlowDelegate
+import com.comllc.growthbook.Features.FeaturesViewModel
 import com.comllc.growthbook.Utils.FNV
 import com.comllc.growthbook.model.*
 import io.ktor.http.*
+
+
+/*
+    SDKBuilder - to pass APIKey, HostURL, UserAttributes, QAMode, Enabled
+ */
+class GBSDKBuilder(
+    val apiKey: String,
+    val hostURL: String,
+    val attributes: HashMap<String, Any>,
+    val appInstance : SandboxFileManager,
+    val trackingCallback : (GBExperiment, GBExperimentResult) -> Unit
+) : ConfigsFlowDelegate, FeaturesFlowDelegate {
+
+    var qaMode: Boolean = false;
+    var enabled: Boolean = true;
+
+    fun setQAMode(isEnabled : Boolean) : GBSDKBuilder {
+        this.qaMode = isEnabled
+        return this
+    }
+
+    fun setEnabled(isEnabled : Boolean) : GBSDKBuilder {
+        this.enabled = isEnabled
+        return this
+    }
+
+    fun initialize() : GrowthBookSDK{
+
+        val gbContext = GBContext(apiKey = apiKey, enabled = enabled, attributes = attributes, url = hostURL, qaMode = qaMode, trackingCallback = trackingCallback)
+
+        val sdkInstance = GrowthBookSDK(gbContext, appInstance)
+
+        val configVM = ConfigsViewModel(this)
+        configVM.fetchConfigs()
+
+        val featureVM = FeaturesViewModel(this)
+        featureVM.fetchFeatures()
+
+        return sdkInstance
+
+    }
+
+    override fun configsFetchedSuccessfully() {
+        // TODO("Not yet implemented")
+    }
+
+    override fun configsFetchFailed() {
+        // TODO("Not yet implemented")
+    }
+
+    override fun featuresFetchedSuccessfully() {
+        // TODO("Not yet implemented")
+    }
+
+    override fun featuresFetchFailed() {
+        // TODO("Not yet implemented")
+    }
+}
 
 /*
     The main export of the libraries is a simple GrowthBook wrapper class that takes a Context object in the constructor.
@@ -11,15 +74,29 @@ import io.ktor.http.*
     It exposes two main methods: feature and run.
  */
 
-class GrowthBookSDK<T>(val gbContext : GBContext<T>) {
+class GrowthBookSDK() {
+
+    internal companion object {
+        lateinit var gbContext: GBContext
+        lateinit var appInstance: SandboxFileManager
+    }
+
+    internal constructor(context : GBContext, instance : SandboxFileManager) : this(){
+        gbContext = context
+        appInstance = instance
+    }
+
+    fun getGBContext() : GBContext {
+        return gbContext
+    }
 
     /*
     The feature method takes a single string argument, which is the unique identifier for the feature and returns a FeatureResult object.
      */
-    fun feature(id: String) : GBFeatureResult<T> {
+    fun feature(id: String) : GBFeatureResult {
 
         try {
-            val targetFeature : GBFeature<T> = gbContext.features.getValue(id)
+            val targetFeature : GBFeature = gbContext.features.getValue(id)
 
             /// Loop through the feature rules (if any)
             if (targetFeature.rules.size > 0) {
@@ -91,7 +168,7 @@ class GrowthBookSDK<T>(val gbContext : GBContext<T>) {
     /*
     The run method takes an Experiment object and returns an ExperimentResult
      */
-    fun run(experiment: GBExperiment<T>) : GBExperimentResult<T> {
+    fun run(experiment: GBExperiment) : GBExperimentResult {
 
         /// If experiment.variations has fewer than 2 variations, return immediately (not in experiment, variationId 0)
         //

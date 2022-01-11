@@ -1,13 +1,17 @@
 package com.comllc.growthbook.model
 
+import kotlinx.serialization.Serializable
+
 /*
     Defines a single experiment
  */
-class GBExperiment<T>(
+@Serializable
+class GBExperiment(
     /// The globally unique tracking key for the experiment
     val trackingKey: String,
     /// The different variations to choose between
-    val variations : List<T>,
+    // TODO Handle Any
+    val variations : List<String> = ArrayList(),
 
     /// A callback that returns true if the user should be part of the experiment and false if they should not be
     val include : (() -> Boolean)? = null,
@@ -16,15 +20,23 @@ class GBExperiment<T>(
     /// All users included in the experiment will be forced into the specific variation index
     val hashAttribute: String? = null,
 
-    weights : List<Float>? = null,
-    active : Boolean? = null,
-    coverage : Float? = null,
-    condition: String? = null,
-    force : Int? = null
+    /// How to weight traffic between variations. Must add to 1.
+    var weights : List<Float>? = null,
+    /// If set to false, always return the control (first variation)
+    var active : Boolean? = null,
+    /// What percent of users should be included in the experiment (between 0 and 1, inclusive)
+    var coverage : Float? = null,
 
-) : GBExperimentOverride(weights = weights, active = active, coverage = coverage, condition = condition, force = force)
+    /// TODO - Optional targeting condition
+    var condition: GBCondition? = null,
+
+    /// All users included in the experiment will be forced into the specific variation index
+    var force : Int? = null
+
+)
 
 // Namespace Range Handling
+@Serializable
 class GBNameSpace (
     val id: String,
     val rangeStart: Float,
@@ -34,13 +46,13 @@ class GBNameSpace (
 /*
     The result of running an Experiment given a specific Context
  */
-class GBExperimentResult<T>(
+class GBExperimentResult(
     /// Whether or not the user is part of the experiment
     val inExperiment: Boolean,
     /// The array index of the assigned variation
     val variationId: Int,
     /// The array value of the assigned variation
-    val value: T? = null,
+    val value: Any? = null,
     /// The user attribute used to assign a variation
     val hashAttribute: String? = null,
     ///  The value of that attribute
@@ -50,7 +62,8 @@ class GBExperimentResult<T>(
 
 // TODO "status", "groups", "url" key check
 // TODO condition, coverage & force key check
-open class GBExperimentOverride(
+@Serializable
+class GBExperimentOverride(
     /// How to weight traffic between variations. Must add to 1.
     var weights : List<Float>? = null,
     /// If set to false, always return the control (first variation)
@@ -59,7 +72,7 @@ open class GBExperimentOverride(
     var coverage : Float? = null,
 
     /// TODO - Optional targeting condition
-    var condition: String? = null,
+    var condition: GBCondition? = null,
 
     /// All users included in the experiment will be forced into the specific variation index
     var force : Int? = null

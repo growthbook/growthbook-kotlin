@@ -1,9 +1,10 @@
 package com.comllc.growthbook.Features
 
 import com.comllc.growthbook.model.GBFeature
+import kotlinx.serialization.Serializable
 
-
-data class FeaturesDataModel<T>(
+@Serializable
+data class FeaturesDataModel(
     val status : Int,
-    val features : HashMap<String, GBFeature<T>>
+    val features : HashMap<String, GBFeature>
 )

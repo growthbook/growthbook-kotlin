@@ -2,14 +2,18 @@ package com.comllc.growthbook.Network
 
 import com.comllc.growthbook.ApplicationDispatcher
 import io.ktor.client.*
+import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.features.*
 import io.ktor.client.features.json.*
 import io.ktor.client.features.json.serializer.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
+import io.ktor.util.Identity.decode
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
 class APITimeError : Exception() {
@@ -17,7 +21,10 @@ class APITimeError : Exception() {
 }
 
 interface NetworkDispatcher {
-    fun consumeGETRequest(request: HttpRequestBuilder, onSuccess: (HttpResponse) -> Unit, onError: (APITimeError) -> Unit)
+    val JSONParser : Json
+        get() = Json { prettyPrint = true; isLenient = true; ignoreUnknownKeys = true }
+
+    fun consumeGETRequest(request: String, onSuccess: (HttpResponse, String) -> Unit, onError: (APITimeError) -> Unit)
 }
 
 class CoreNetworkClient : NetworkDispatcher {
@@ -33,22 +40,25 @@ class CoreNetworkClient : NetworkDispatcher {
     }
 
     override fun consumeGETRequest(
-        request: HttpRequestBuilder,
-        onSuccess: (HttpResponse) -> Unit,
+        request: String,
+        onSuccess: (HttpResponse, String) -> Unit,
         onError: (APITimeError) -> Unit
     ) {
 
         GlobalScope.launch(ApplicationDispatcher) {
 
             try {
-                client.get<HttpResponse>(request).also(onSuccess)
+                val result = client.get<HttpResponse>(request)
+
+                print(result)
+                onSuccess(result, result.receive())
             } catch (ex: Exception) {
+                val trace = ex.stackTraceToString()
                 onError(APITimeError())
             }
 
         }
 
     }
-
 
 }
