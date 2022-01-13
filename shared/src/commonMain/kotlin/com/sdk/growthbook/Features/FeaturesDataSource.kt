@@ -13,7 +13,7 @@ internal class FeaturesDataSource(val dispatcher: NetworkDispatcher = CoreNetwor
     fun fetchFeatures(
         success: (FeaturesDataModel) -> Unit, failure: (Throwable?) -> Unit) {
         dispatcher.consumeGETRequest(apiUrl,
-            onSuccess = { httpResponse, rawContent ->
+            onSuccess = { rawContent ->
                 val result : FeaturesDataModel = dispatcher.JSONParser.decodeFromString(rawContent)
                 result.also(success)
             },

@@ -3,6 +3,7 @@ package com.sdk.growthbook.Utils
 import com.sdk.growthbook.model.GBExperimentOverride
 import com.sdk.growthbook.model.GBFeature
 import io.ktor.util.*
+import kotlinx.serialization.json.JsonElement
 
 internal class Constants {
 
@@ -23,9 +24,18 @@ typealias GBOverrides = HashMap<String, GBExperimentOverride>
 
 typealias GBFeatures = HashMap<String, GBFeature>
 
+typealias GBCondition = HashMap<String, JsonElement>
+
 typealias GBCacheRefreshHandler = (Boolean) -> Unit
 
-class GBError : Exception() {
-    val errorMessage = this.message
-    val stackTrace = this.stackTraceToString()
+class GBError(error: Throwable?) {
+    lateinit var errorMessage: String
+    lateinit var stackTrace: String
+
+    init {
+        if (error != null) {
+            errorMessage = error.message ?: ""
+            stackTrace = error.stackTraceToString()
+        }
+    }
 }

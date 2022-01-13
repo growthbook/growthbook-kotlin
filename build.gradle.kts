@@ -25,3 +25,7 @@ allprojects {
 tasks.register("clean", Delete::class) {
     delete(rootProject.buildDir)
 }
+
+plugins {
+    id("org.jetbrains.kotlinx.kover") version "0.5.0-RC"
+}

@@ -1,5 +1,6 @@
 package com.sdk.growthbook.model
 
+import com.sdk.growthbook.Utils.GBCondition
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 

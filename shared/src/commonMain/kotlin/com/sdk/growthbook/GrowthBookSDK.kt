@@ -1,6 +1,5 @@
 package com.sdk.growthbook
 
-import com.sdk.growthbook.sandbox.SandboxFileManager
 import com.sdk.growthbook.Configs.ConfigsFlowDelegate
 import com.sdk.growthbook.Configs.ConfigsViewModel
 import com.sdk.growthbook.Features.FeaturesFlowDelegate
@@ -19,7 +18,6 @@ class GBSDKBuilder(
     val apiKey: String,
     val hostURL: String,
     val attributes: HashMap<String, Any>,
-    val appInstance : SandboxFileManager,
     val trackingCallback : (GBExperiment, GBExperimentResult) -> Unit
 ) {
 
@@ -46,7 +44,7 @@ class GBSDKBuilder(
 
         val gbContext = GBContext(apiKey = apiKey, enabled = enabled, attributes = attributes, url = hostURL, qaMode = qaMode, trackingCallback = trackingCallback)
 
-        val sdkInstance = GrowthBookSDK(gbContext, appInstance, refreshHandler)
+        val sdkInstance = GrowthBookSDK(gbContext, refreshHandler)
 
         return sdkInstance
 
@@ -61,25 +59,22 @@ class GBSDKBuilder(
 
 class GrowthBookSDK() : ConfigsFlowDelegate, FeaturesFlowDelegate {
 
-    private val configVM = ConfigsViewModel(this)
-    private val featureVM = FeaturesViewModel(this)
-
     private var refreshHandler : GBCacheRefreshHandler? = null
 
     internal companion object {
         lateinit var gbContext: GBContext
-        lateinit var appInstance: SandboxFileManager
     }
 
-    internal constructor(context : GBContext, instance : SandboxFileManager, refreshHandler : GBCacheRefreshHandler?) : this(){
+    internal constructor(context : GBContext, refreshHandler : GBCacheRefreshHandler?) : this(){
         gbContext = context
-        appInstance = instance
         this.refreshHandler = refreshHandler
 
         refreshCache()
     }
 
     fun refreshCache(){
+        val configVM = ConfigsViewModel(this)
+        val featureVM = FeaturesViewModel(this)
         configVM.fetchConfigs()
         featureVM.fetchFeatures()
     }
@@ -169,7 +164,7 @@ class GrowthBookSDK() : ConfigsFlowDelegate, FeaturesFlowDelegate {
                     } else {
                         /// Otherwise, convert the rule to an Experiment object
                         val exp = GBExperiment(rule.key ?: id,
-                            variations = rule.variations,
+                            variations = rule.variations ?: ArrayList(),
                             coverage = rule.coverage,
                             weights = rule.weights,
                             hashAttribute = rule.hashAttribute,

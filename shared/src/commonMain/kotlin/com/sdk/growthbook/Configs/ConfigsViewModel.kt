@@ -4,7 +4,9 @@ import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.Utils.Constants
 import com.sdk.growthbook.Utils.GBError
 import com.sdk.growthbook.Utils.GBOverrides
-import com.sdk.growthbook.sandbox.CachingManager
+import com.sdk.growthbook.sandbox.CachingImpl
+import com.sdk.growthbook.sandbox.getData
+import com.sdk.growthbook.sandbox.putData
 
 internal interface ConfigsFlowDelegate{
     fun configsFetchedSuccessfully(configs: GBOverrides, isRemote: Boolean)
@@ -13,28 +15,28 @@ internal interface ConfigsFlowDelegate{
 
 internal class ConfigsViewModel(val delegate: ConfigsFlowDelegate, val dataSource : ConfigsDataSource = ConfigsDataSource()) {
 
-    val manager = CachingManager(GrowthBookSDK.appInstance)
+    val manager = CachingImpl
 
     fun fetchConfigs(){
 
         try {
-            val dataModel = manager.getContent<ConfigsDataModel>(Constants.configCache)
+            val dataModel = manager.getLayer().getData<ConfigsDataModel>(Constants.configCache)
 
             if (dataModel != null) {
                 this.delegate.configsFetchedSuccessfully(configs = dataModel.overrides, isRemote = false)
             }
         } catch (error : Throwable){
-            delegate.configsFetchFailed(error as GBError, false)
+            delegate.configsFetchFailed(GBError(error), false)
         }
 
         dataSource.fetchConfig(success = {dataModel -> prepareConfigsData(dataModel = dataModel)},
-        failure = {error -> delegate.configsFetchFailed(error as GBError, true)})
+        failure = {error -> delegate.configsFetchFailed(GBError(error), true)})
 
 
     }
 
     fun prepareConfigsData(dataModel : ConfigsDataModel) {
-        manager.saveContent(Constants.configCache, dataModel)
+        manager.getLayer().putData(Constants.configCache, dataModel)
         delegate.configsFetchedSuccessfully(configs = dataModel.overrides, isRemote = true)
     }
 

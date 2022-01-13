@@ -17,7 +17,7 @@ internal class ConfigsDataSource(val dispatcher: NetworkDispatcher = CoreNetwork
         success: (ConfigsDataModel) -> Unit, failure: (Throwable?) -> Unit) {
 
         dispatcher.consumeGETRequest(apiUrl,
-            onSuccess = { httpResponse, rawContent ->
+            onSuccess = { rawContent ->
                 val result : ConfigsDataModel = dispatcher.JSONParser.decodeFromString(rawContent)
                 result.also(success)
             },

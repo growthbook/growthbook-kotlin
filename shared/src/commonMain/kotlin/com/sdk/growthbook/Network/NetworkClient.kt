@@ -20,7 +20,7 @@ interface NetworkDispatcher {
     val JSONParser : Json
         get() = Json { prettyPrint = true; isLenient = true; ignoreUnknownKeys = true }
 
-    fun consumeGETRequest(request: String, onSuccess: (HttpResponse, String) -> Unit, onError: (Throwable) -> Unit)
+    fun consumeGETRequest(request: String, onSuccess: (String) -> Unit, onError: (Throwable) -> Unit)
 }
 
 class CoreNetworkClient : NetworkDispatcher {
@@ -37,7 +37,7 @@ class CoreNetworkClient : NetworkDispatcher {
 
     override fun consumeGETRequest(
         request: String,
-        onSuccess: (HttpResponse, String) -> Unit,
+        onSuccess: (String) -> Unit,
         onError: (Throwable) -> Unit
     ) {
 
@@ -45,9 +45,7 @@ class CoreNetworkClient : NetworkDispatcher {
 
             try {
                 val result = client.get<HttpResponse>(request)
-
-                print(result)
-                onSuccess(result, result.receive())
+                onSuccess(result.receive())
             } catch (ex: Exception) {
                 onError(ex)
             }
