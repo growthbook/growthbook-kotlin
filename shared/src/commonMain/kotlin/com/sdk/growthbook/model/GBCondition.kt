@@ -5,9 +5,14 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 
 /*
-    TODO - Targeting condition based on MongoDB query syntax.
-    For details on parsing and evaluating these conditions, view the reference Typescript implementation
-    https://github.com/growthbook/growthbook/tree/main/packages/sdk-js/src/mongrule.ts
+    TODO - Replace JSON{} parsing to HashMap or Listing with JsonObject OR JSONArray
+ */
+
+/*
+    Both experiments and features can define targeting conditions using a syntax modeled after MongoDB queries.
+
+    These conditions can have arbitrary nesting levels and evaluating them requires recursion.
+    There are a handful of functions to define, and be aware that some of them may reference function definitions further below.
  */
 
 typealias TestedObj = HashMap<String, Any>
@@ -22,31 +27,231 @@ enum class GBAttributeType {
  */
 class GBConditionEvaluator(val gbCondition : GBCondition){
 
+
+    /*
+        This is the main function used to evaluate a condition.
+     */
+    fun evalCondition(attributes : JsonElement, conditionObj : JsonElement) : Boolean {
+
+        if (conditionObj is JsonArray) {
+            return false
+        } else {
+
+            // If conditionObj has a key $or, return evalOr(attributes, condition["$or"])
+            var targetItems = conditionObj.jsonObject["\$or"] as? JsonArray
+            if (targetItems != null) {
+                return evalOr(attributes, targetItems)
+            }
+
+            // If conditionObj has a key $nor, return !evalOr(attributes, condition["$nor"])
+            targetItems = conditionObj.jsonObject["\$nor"] as? JsonArray
+            if (targetItems != null) {
+                return !evalOr(attributes, targetItems)
+            }
+
+            // If conditionObj has a key $and, return !evalAnd(attributes, condition["$and"])
+            targetItems = conditionObj.jsonObject["\$and"] as? JsonArray
+            if (targetItems != null) {
+                return evalAnd(attributes, targetItems)
+            }
+
+            // If conditionObj has a key $not, return !evalCondition(attributes, condition["$not"])
+            targetItems = conditionObj.jsonObject["\$not"] as? JsonArray
+            if (targetItems != null) {
+                return !evalAnd(attributes, targetItems)
+            }
+
+            // Loop through the conditionObj key/value pairs
+            for (key in conditionObj.jsonObject.keys) {
+                val element = getPath(attributes, key)
+                if (element != null){
+                    // If evalConditionValue(value, getPath(attributes, key)) is false, break out of loop and return false
+                    return evalCondition(attributes, element)
+                }
+            }
+
+        }
+
+        // Return true
+        return true
+    }
+
+    /*
+        conditionObjs is an array of parsed condition objects
+
+     */
+    fun evalOr(attributes : JsonElement, conditionObjs : JsonArray): Boolean {
+        // If conditionObjs is empty, return true
+        if (conditionObjs.isEmpty()) {
+            return true
+        } else {
+            // Loop through the conditionObjects
+            for (item in conditionObjs) {
+                // If evalCondition(attributes, conditionObjs[i]) is true, break out of the loop and return true
+                if (evalCondition(attributes, item)) {
+                    return true
+                }
+            }
+        }
+        // Return false
+        return false
+    }
+
+    /*
+        conditionObjs is an array of parsed condition objects
+
+     */
+    fun evalAnd(attributes : JsonElement, conditionObjs : JsonArray): Boolean {
+
+        // Loop through the conditionObjects
+        for (item in conditionObjs) {
+            // If evalCondition(attributes, conditionObjs[i]) is false, break out of the loop and return false
+            if (!evalCondition(attributes, item)) {
+                return false
+            }
+        }
+
+        // Return true
+        return true
+    }
+
+
     /*
         This accepts a parsed JSON object as input and returns true if every key in the object starts with $
      */
     fun isOperatorObject(obj : JsonElement) : Boolean {
         var isOperator = true
-
-        val hashMap = Json {  }.decodeFromJsonElement<HashMap<String, Any>>(obj)
-
-        for (key in hashMap.keys){
-            if (!key.startsWith("$")){
-                isOperator = false
-                break
+        if (obj is JsonObject && obj.keys.isNotEmpty()) {
+            for (key in obj.keys){
+                if (!key.startsWith("$")){
+                    isOperator = false
+                    break
+                }
             }
+        } else {
+            isOperator = false
         }
-
         return isOperator
     }
 
-    fun getType(attributeValue: JsonElement) : GBAttributeType {
+    /*
+        TODO Is it needed - This returns the data type of the passed in argument.
+     */
+    /*
+    fun getType(obj: JsonElement?) : GBAttributeType {
+
+        val hashMap = Json {  }.decodeFromJsonElement<HashMap<String, Any>>(obj)
 
 
+        if (!hashMap.containsKey(key)){
+            return GBAttributeType.gbUndefined
+        }
 
-        return GBAttributeType.gbUndefined
+        val value = obj ?: return GBAttributeType.gbNull
+
+        if (value.jsonPrimitive.isString) {
+            return GBAttributeType.gbString
+        }
+
+        if (value is List<*>) {
+            return GBAttributeType.gbArray
+        }
+
+        if (value is Number) {
+            return GBAttributeType.gbNumber
+        }
+
+        if (value is Boolean) {
+            return GBAttributeType.gbBoolean
+        }
+
+        if (value is HashMap<*, *>) {
+            return GBAttributeType.gbObject
+        }
+
+        return GBAttributeType.gbUnknown
+    }
+     */
+
+    /*
+        Given attributes and a dot-separated path string, return the value at that path (or null/undefined if the path doesn't exist)
+     */
+    fun getPath(obj: JsonElement, key: String) : JsonElement? {
+
+        val paths = key.split(".")
+
+        var element : JsonElement? = obj
+
+        for (path in paths) {
+            if (element == null || element is JsonArray) {
+                return null
+            }
+
+            element = element.jsonObject[path]
+        }
+
+        return null
     }
 
+    fun evalConditionValue(conditionValue : JsonElement, attributeValue : JsonElement) : Boolean {
+
+        // If conditionValue is a string, number, boolean, return true if it's "equal" to attributeValue and false if not.
+        if (conditionValue is JsonPrimitive && attributeValue is JsonPrimitive) {
+            return conditionValue.content == attributeValue.content
+        }
+
+        // If conditionValue is array, return true if it's "equal" - "equal" should do a deep comparison for arrays.
+        if (conditionValue is JsonArray && attributeValue is JsonArray) {
+            // TODO deep comparison to be done
+            return conditionValue == attributeValue
+        }
+
+        // If conditionValue is an object, loop over each key/value pair:
+        if (conditionValue is JsonObject) {
+
+            for (key in  conditionValue.keys) {
+                // If evalOperatorCondition(key, attributeValue, value) is false, return false
+                if (!evalOperatorCondition(key, attributeValue, conditionValue[key]!!)) {
+                    return false
+                }
+            }
+
+        }
+
+        // Return true
+        return true
+    }
+
+    /*
+        This checks if attributeValue is an array, and if so at least one of the array items must match the condition
+     */
+    fun elemMatch(condition: JsonElement, attributeValue: JsonElement) : Boolean {
+
+        if (attributeValue is JsonArray) {
+            // Loop through items in attributeValue
+            for (item in attributeValue) {
+                // If isOperatorObject(condition)
+                if (isOperatorObject(condition)) {
+                    // If evalConditionValue(condition, item), break out of loop and return true
+                    if (evalConditionValue(condition, item)) {
+                        return true
+                    }
+                    // Else if evalCondition(item, condition), break out of loop and return true
+                    else if (evalCondition(item, condition)) {
+                        return true
+                    }
+                }
+            }
+        }
+
+        // If attributeValue is not an array, return false
+        return false
+    }
+
+    /*
+        This function is just a case statement that handles all the possible operators
+        There are basic comparison operators in the form attributeValue {op} conditionValue
+     */
     fun evalOperatorCondition(operator : String, attributeValue : JsonElement, conditionValue : JsonElement) : Boolean {
 
 
@@ -64,8 +269,15 @@ class GBConditionEvaluator(val gbCondition : GBCondition){
                 "\$all" -> {
 
                     if (attributeValue is JsonArray) {
-                        //TODO Loop through conditionValue array
+                        // Loop through conditionValue array
                             // If none of the elements in the attributeValue array pass evalConditionValue(conditionValue[i], attributeValue[j]), return false
+                       for (con in conditionValue) {
+                           for (attr in attributeValue) {
+                                if (evalConditionValue(con, attr)) {
+                                    return true
+                                }
+                           }
+                       }
                         return true
                     } else {
                         // If attributeValue is not an array, return false
