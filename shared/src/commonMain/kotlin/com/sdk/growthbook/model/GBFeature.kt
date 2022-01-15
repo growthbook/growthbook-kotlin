@@ -44,7 +44,6 @@ enum class GBFeatureSource {
     unknownFeature, defaultValue, force, experiment
 }
 
-//TODO Result Value Generics
 class GBFeatureResult(
     /// The assigned value of the feature
     val value : Any?,

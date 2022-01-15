@@ -53,12 +53,16 @@ kotlin {
                 implementation("androidx.core:core-ktx:1.6.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:$coroutineVersion")
                 implementation("io.ktor:ktor-client-android:$ktorVersion")
+
+                implementation("androidx.startup:startup-runtime:1.1.0")
             }
         }
         val androidTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
                 implementation("junit:junit:4.13.2")
+
+                implementation ("org.mockito:mockito-core:4.2.0")
             }
         }
         val iosX64Main by getting

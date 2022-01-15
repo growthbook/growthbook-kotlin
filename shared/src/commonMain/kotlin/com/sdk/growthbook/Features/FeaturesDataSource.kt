@@ -1,9 +1,9 @@
 package com.sdk.growthbook.Features
 
 import com.sdk.growthbook.GrowthBookSDK
-import com.sdk.growthbook.Utils.Constants
 import com.sdk.growthbook.Network.CoreNetworkClient
 import com.sdk.growthbook.Network.NetworkDispatcher
+import com.sdk.growthbook.Utils.Constants
 import kotlinx.serialization.decodeFromString
 
 internal class FeaturesDataSource(val dispatcher: NetworkDispatcher = CoreNetworkClient()) {

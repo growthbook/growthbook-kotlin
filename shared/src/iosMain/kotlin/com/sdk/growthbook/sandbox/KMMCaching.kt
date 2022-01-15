@@ -1,6 +1,5 @@
 package com.sdk.growthbook.sandbox
 
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
 actual object CachingImpl {

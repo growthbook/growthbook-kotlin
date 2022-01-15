@@ -1,12 +1,9 @@
 package com.sdk.growthbook.Configs
 
-import com.sdk.growthbook.ApplicationDispatcher
 import com.sdk.growthbook.GrowthBookSDK
-import com.sdk.growthbook.Utils.Constants
 import com.sdk.growthbook.Network.CoreNetworkClient
 import com.sdk.growthbook.Network.NetworkDispatcher
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
+import com.sdk.growthbook.Utils.Constants
 import kotlinx.serialization.decodeFromString
 
 internal class ConfigsDataSource(val dispatcher: NetworkDispatcher = CoreNetworkClient()) {

@@ -1,8 +1,5 @@
 package com.sdk.growthbook.Configs
 
-import com.sdk.growthbook.Features.FeaturesDataSource
-import com.sdk.growthbook.Features.FeaturesViewModel
-import com.sdk.growthbook.GBSDKBuilder
 import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.MockNetworkClient
 import com.sdk.growthbook.Utils.GBError

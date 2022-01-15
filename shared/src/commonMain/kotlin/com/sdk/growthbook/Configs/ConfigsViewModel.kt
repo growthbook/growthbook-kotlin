@@ -1,6 +1,5 @@
 package com.sdk.growthbook.Configs
 
-import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.Utils.Constants
 import com.sdk.growthbook.Utils.GBError
 import com.sdk.growthbook.Utils.GBOverrides

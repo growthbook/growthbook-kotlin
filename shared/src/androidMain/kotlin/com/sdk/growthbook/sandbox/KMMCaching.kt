@@ -1,8 +1,6 @@
 package com.sdk.growthbook.sandbox
 
-import android.app.Activity
 import android.content.Context
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json

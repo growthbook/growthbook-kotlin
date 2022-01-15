@@ -1,6 +1,5 @@
 package com.sdk.growthbook.Features
 
-import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.Utils.Constants
 import com.sdk.growthbook.Utils.GBError
 import com.sdk.growthbook.Utils.GBFeatures

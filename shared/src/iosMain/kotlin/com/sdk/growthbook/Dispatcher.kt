@@ -1,8 +1,11 @@
 package com.sdk.growthbook
 
-import kotlin.coroutines.*
-import kotlinx.coroutines.*
-import platform.darwin.*
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Runnable
+import platform.darwin.dispatch_async
+import platform.darwin.dispatch_get_main_queue
+import platform.darwin.dispatch_queue_t
+import kotlin.coroutines.CoroutineContext
 
 // 1
 internal actual val ApplicationDispatcher: CoroutineDispatcher =

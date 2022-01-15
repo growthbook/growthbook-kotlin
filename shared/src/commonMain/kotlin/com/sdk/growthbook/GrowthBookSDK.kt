@@ -5,10 +5,10 @@ import com.sdk.growthbook.Configs.ConfigsViewModel
 import com.sdk.growthbook.Features.FeaturesFlowDelegate
 import com.sdk.growthbook.Features.FeaturesViewModel
 import com.sdk.growthbook.Utils.*
-import com.sdk.growthbook.Utils.Constants
-import com.sdk.growthbook.Utils.FNV
 import com.sdk.growthbook.model.*
 import io.ktor.http.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.encodeToJsonElement
 
 
 /*
@@ -133,17 +133,23 @@ class GrowthBookSDK() : ConfigsFlowDelegate, FeaturesFlowDelegate {
 
                 for (rule in rules) {
 
-                    /// TODO If the rule has a condition and it evaluates to false, skip this rule and continue to the next one
+                    /// If the rule has a condition and it evaluates to false, skip this rule and continue to the next one
 
+                    if (rule.condition != null) {
+                        val attr = Json {  }.encodeToJsonElement(gbContext.attributes)
+                        if (!GBConditionEvaluator().evalCondition(attr, rule.condition)) {
+                            continue
+                        }
+                    }
 
                     /// If rule.force is set
                     if (rule.force != null) {
                         /// If rule.coverage is set
                         if (rule.coverage != null){
 
-                            /// Get the user hash value (context.attributes[experiment.hashAttribute || "id"]) and if empty, skip the rule
-                                /// TODO check for experiment too
-                            val attributeValue = gbContext.attributes.get(Constants.idAttributeKey) as? String ?: ""
+                            val key = rule.hashAttribute ?: Constants.idAttributeKey
+                            /// Get the user hash value (context.attributes[rule.hashAttribute || "id"]) and if empty, skip the rule
+                            val attributeValue = gbContext.attributes.get(key) as? String ?: ""
                             if (attributeValue.isEmpty())
                                 continue
                             else {
@@ -207,7 +213,7 @@ class GrowthBookSDK() : ConfigsFlowDelegate, FeaturesFlowDelegate {
             return GBExperimentResult(inExperiment = false, variationId = 0)
         }
 
-        /// If context.url contains a querystring {experiment.trackingKey}=[0-9]+, return immediately (not in experiment, variationId from querystring)
+        /// TODO If context.url contains a querystring {experiment.trackingKey}=[0-9]+, return immediately (not in experiment, variationId from querystring)
         val url = Url(gbContext.url)
 
         if (url.parameters.contains(experiment.trackingKey)) {
@@ -262,9 +268,12 @@ class GrowthBookSDK() : ConfigsFlowDelegate, FeaturesFlowDelegate {
             }
         }
 
-        /// TODO If experiment.condition is set and the condition evaluates to false, return immediately (not in experiment, variationId 0)
+        /// If experiment.condition is set and the condition evaluates to false, return immediately (not in experiment, variationId 0)
         if (experiment.condition != null) {
-            return GBExperimentResult(inExperiment = false, variationId = 0)
+            val attr = Json {  }.encodeToJsonElement(gbContext.attributes)
+            if (!GBConditionEvaluator().evalCondition(attr, experiment.condition!!)) {
+                return GBExperimentResult(inExperiment = false, variationId = 0)
+            }
         }
 
 

@@ -28,7 +28,7 @@ class GBExperiment(
     /// What percent of users should be included in the experiment (between 0 and 1, inclusive)
     var coverage : Float? = null,
 
-    /// TODO - Optional targeting condition
+    /// Optional targeting condition
     var condition: GBCondition? = null,
 
     /// All users included in the experiment will be forced into the specific variation index
@@ -47,8 +47,6 @@ class GBNameSpace (
 /*
     The result of running an Experiment given a specific Context
  */
-//TODO Result Value Generics
-//TODO variationId recheck
 class GBExperimentResult(
     /// Whether or not the user is part of the experiment
     val inExperiment: Boolean,
