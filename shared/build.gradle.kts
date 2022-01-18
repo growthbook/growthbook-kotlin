@@ -36,8 +36,6 @@ kotlin {
                     "org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
                 implementation("io.ktor:ktor-client-core:$ktorVersion")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.3.1")
-                implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
-                implementation("io.ktor:ktor-client-cio:$ktorVersion")
                 implementation("io.ktor:ktor-client-serialization:$ktorVersion")
                 implementation("com.ionspin.kotlin:bignum:0.3.3")
             }
@@ -46,6 +44,9 @@ kotlin {
             dependencies {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
+                implementation(
+                    "org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
+                implementation("io.ktor:ktor-client-serialization:$ktorVersion")
             }
         }
         val androidMain by getting {

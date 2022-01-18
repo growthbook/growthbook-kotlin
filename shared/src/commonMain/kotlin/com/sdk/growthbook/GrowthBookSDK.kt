@@ -1,9 +1,13 @@
 package com.sdk.growthbook
 
+import com.sdk.growthbook.Configs.ConfigsDataSource
 import com.sdk.growthbook.Configs.ConfigsFlowDelegate
 import com.sdk.growthbook.Configs.ConfigsViewModel
+import com.sdk.growthbook.Features.FeaturesDataSource
 import com.sdk.growthbook.Features.FeaturesFlowDelegate
 import com.sdk.growthbook.Features.FeaturesViewModel
+import com.sdk.growthbook.Network.CoreNetworkClient
+import com.sdk.growthbook.Network.NetworkDispatcher
 import com.sdk.growthbook.Utils.*
 import com.sdk.growthbook.model.*
 import io.ktor.http.*
@@ -24,6 +28,7 @@ class GBSDKBuilder(
     var qaMode: Boolean = false;
     var enabled: Boolean = true;
     var refreshHandler : GBCacheRefreshHandler? = null
+    var networkDispatcher: NetworkDispatcher = CoreNetworkClient()
 
     fun setQAMode(isEnabled : Boolean) : GBSDKBuilder {
         this.qaMode = isEnabled
@@ -40,11 +45,16 @@ class GBSDKBuilder(
         return this
     }
 
+    fun setNetworkDispatcher(networkDispatcher: NetworkDispatcher) : GBSDKBuilder {
+        this.networkDispatcher = networkDispatcher
+        return this
+    }
+
     fun initialize() : GrowthBookSDK{
 
         val gbContext = GBContext(apiKey = apiKey, enabled = enabled, attributes = attributes, url = hostURL, qaMode = qaMode, trackingCallback = trackingCallback)
 
-        val sdkInstance = GrowthBookSDK(gbContext, refreshHandler)
+        val sdkInstance = GrowthBookSDK(gbContext, refreshHandler, networkDispatcher)
 
         return sdkInstance
 
@@ -60,21 +70,23 @@ class GBSDKBuilder(
 class GrowthBookSDK() : ConfigsFlowDelegate, FeaturesFlowDelegate {
 
     private var refreshHandler : GBCacheRefreshHandler? = null
+    private lateinit var networkDispatcher: NetworkDispatcher
 
     internal companion object {
         lateinit var gbContext: GBContext
     }
 
-    internal constructor(context : GBContext, refreshHandler : GBCacheRefreshHandler?) : this(){
+    internal constructor(context : GBContext, refreshHandler : GBCacheRefreshHandler?, networkDispatcher: NetworkDispatcher = CoreNetworkClient()) : this(){
         gbContext = context
         this.refreshHandler = refreshHandler
+        this.networkDispatcher = networkDispatcher
 
         refreshCache()
     }
 
     fun refreshCache(){
-        val configVM = ConfigsViewModel(this)
-        val featureVM = FeaturesViewModel(this)
+        val configVM = ConfigsViewModel(this, ConfigsDataSource(networkDispatcher))
+        val featureVM = FeaturesViewModel(this, FeaturesDataSource(networkDispatcher))
         configVM.fetchConfigs()
         featureVM.fetchFeatures()
     }

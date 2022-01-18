@@ -12,8 +12,32 @@ import kotlinx.serialization.json.*
 
 typealias TestedObj = HashMap<String, Any>
 
-enum class GBAttributeType {
-    gbString, gbNumber, gbBoolean, gbArray, gbObject, gbNull, gbUndefined, gbUnknown
+enum class  GBAttributeType {
+    gbString{
+        override fun toString(): String = "string"
+    },
+    gbNumber{
+        override fun toString(): String = "number"
+    },
+    gbBoolean{
+        override fun toString(): String = "boolean"
+    },
+    gbArray{
+        override fun toString(): String = "array"
+    },
+    gbObject{
+        override fun toString(): String = "object"
+    },
+    gbNull{
+        override fun toString(): String = "null"
+    },
+    gbUndefined{
+        override fun toString(): String = "undefined"
+    },
+    gbUnknown{
+        override fun toString(): String = "unknown"
+    }
+
 }
 
 /*
@@ -51,17 +75,20 @@ class GBConditionEvaluator{
             }
 
             // If conditionObj has a key $not, return !evalCondition(attributes, condition["$not"])
-            targetItems = conditionObj.jsonObject["\$not"] as? JsonArray
-            if (targetItems != null) {
-                return !evalAnd(attributes, targetItems)
+            var targetItem = conditionObj.jsonObject["\$not"]
+            if (targetItem != null) {
+                return !evalCondition(attributes, targetItem)
             }
 
             // Loop through the conditionObj key/value pairs
             for (key in conditionObj.jsonObject.keys) {
                 val element = getPath(attributes, key)
-                if (element != null){
+                val value = conditionObj.jsonObject[key]
+                if (value != null){
                     // If evalConditionValue(value, getPath(attributes, key)) is false, break out of loop and return false
-                    return evalCondition(attributes, element)
+                    if(!evalConditionValue(value, element)) {
+                        return false
+                    }
                 }
             }
 
@@ -135,7 +162,11 @@ class GBConditionEvaluator{
 
     fun getType(obj: JsonElement?) : GBAttributeType {
 
-        val value = obj ?: return GBAttributeType.gbNull
+        if (obj == JsonNull) {
+            return GBAttributeType.gbNull
+        }
+
+        val value = obj
 
         if (value is JsonPrimitive) {
 
@@ -169,7 +200,14 @@ class GBConditionEvaluator{
      */
     fun getPath(obj: JsonElement, key: String) : JsonElement? {
 
-        val paths = key.split(".")
+        var paths : ArrayList<String>
+
+        if (key.contains(".")) {
+            paths = key.split(".") as ArrayList<String>
+        } else {
+            paths = ArrayList()
+            paths.add(key)
+        }
 
         var element : JsonElement? = obj
 
@@ -177,14 +215,17 @@ class GBConditionEvaluator{
             if (element == null || element is JsonArray) {
                 return null
             }
-
-            element = element.jsonObject[path]
+            if (element is JsonObject) {
+                element = element.get(path)
+            } else {
+                return null
+            }
         }
 
-        return null
+        return element
     }
 
-    fun evalConditionValue(conditionValue : JsonElement, attributeValue : JsonElement) : Boolean {
+    fun evalConditionValue(conditionValue : JsonElement, attributeValue : JsonElement?) : Boolean {
 
         // If conditionValue is a string, number, boolean, return true if it's "equal" to attributeValue and false if not.
         if (conditionValue is JsonPrimitive && attributeValue is JsonPrimitive) {
@@ -192,12 +233,20 @@ class GBConditionEvaluator{
         }
 
         // If conditionValue is array, return true if it's "equal" - "equal" should do a deep comparison for arrays.
-        if (conditionValue is JsonArray && attributeValue is JsonArray && conditionValue.size == attributeValue.size) {
+        if (conditionValue is JsonArray) {
 
-            val conditionArray = Json {  }.decodeFromJsonElement<Array<Any>>(conditionValue)
-            val attributeArray = Json {  }.decodeFromJsonElement<Array<Any>>(attributeValue)
+            if (attributeValue is JsonArray) {
+                if (conditionValue.size == attributeValue.size) {
+                    val conditionArray = Json {  }.decodeFromJsonElement<Array<JsonElement>>(conditionValue)
+                    val attributeArray = Json {  }.decodeFromJsonElement<Array<JsonElement>>(attributeValue)
 
-            return conditionArray.contentDeepEquals(attributeArray)
+                    return conditionArray.contentDeepEquals(attributeArray)
+                } else {
+                    return false
+                }
+            } else {
+                return false
+            }
         }
 
         // If conditionValue is an object, loop over each key/value pair:
@@ -219,7 +268,7 @@ class GBConditionEvaluator{
     /*
         This checks if attributeValue is an array, and if so at least one of the array items must match the condition
      */
-    fun elemMatch(condition: JsonElement, attributeValue: JsonElement) : Boolean {
+    fun elemMatch(attributeValue: JsonElement, condition: JsonElement) : Boolean {
 
         if (attributeValue is JsonArray) {
             // Loop through items in attributeValue
@@ -230,10 +279,10 @@ class GBConditionEvaluator{
                     if (evalConditionValue(condition, item)) {
                         return true
                     }
-                    // Else if evalCondition(item, condition), break out of loop and return true
-                    else if (evalCondition(item, condition)) {
-                        return true
-                    }
+                }
+                // Else if evalCondition(item, condition), break out of loop and return true
+                else if (evalCondition(item, condition)) {
+                    return true
                 }
             }
         }
@@ -246,14 +295,23 @@ class GBConditionEvaluator{
         This function is just a case statement that handles all the possible operators
         There are basic comparison operators in the form attributeValue {op} conditionValue
      */
-    fun evalOperatorCondition(operator : String, attributeValue : JsonElement, conditionValue : JsonElement) : Boolean {
+    fun evalOperatorCondition(operator : String, attributeValue : JsonElement?, conditionValue : JsonElement) : Boolean {
 
         if (operator == "\$type") {
-            return  getType(attributeValue) == getType(conditionValue)
+            return  getType(attributeValue).toString() == conditionValue.jsonPrimitive.content
         }
 
         if (operator == "\$not") {
             return  !evalConditionValue(conditionValue, attributeValue)
+        }
+
+        if (operator == "\$exists") {
+            val targetPrimitiveValue = conditionValue.jsonPrimitive.content
+            if (targetPrimitiveValue == "false" && attributeValue == null){
+                return true
+            } else if (targetPrimitiveValue == "true" && attributeValue != null) {
+                return true
+            }
         }
 
         /// There are three operators where conditionValue is an array
@@ -273,10 +331,14 @@ class GBConditionEvaluator{
                         // Loop through conditionValue array
                             // If none of the elements in the attributeValue array pass evalConditionValue(conditionValue[i], attributeValue[j]), return false
                        for (con in conditionValue) {
+                           var result = false
                            for (attr in attributeValue) {
                                 if (evalConditionValue(con, attr)) {
-                                    return true
+                                    result = true
                                 }
+                           }
+                           if (!result) {
+                               return result
                            }
                        }
                         return true
@@ -291,10 +353,10 @@ class GBConditionEvaluator{
 
             when (operator) {
                 "\$elemMatch" -> {
-                    return  elemMatch(conditionValue, attributeValue)
+                    return  elemMatch(attributeValue, conditionValue)
                 }
                 "\$size" -> {
-                    return  conditionValue.jsonPrimitive.content == attributeValue.size.toString()
+                    return evalConditionValue(conditionValue, JsonPrimitive(attributeValue.size))
                 }
             }
 
@@ -310,28 +372,40 @@ class GBConditionEvaluator{
                     return  sourcePrimitiveValue != targetPrimitiveValue
                 }
                 "\$lt" -> {
+                    if (attributeValue.doubleOrNull != null && conditionValue.doubleOrNull != null){
+                        return (attributeValue.doubleOrNull!! < conditionValue.doubleOrNull!!)
+                    }
                     return  sourcePrimitiveValue < targetPrimitiveValue
                 }
                 "\$lte" -> {
+                    if (attributeValue.doubleOrNull != null && conditionValue.doubleOrNull != null){
+                        return (attributeValue.doubleOrNull!! <= conditionValue.doubleOrNull!!)
+                    }
                     return  sourcePrimitiveValue <= targetPrimitiveValue
                 }
                 "\$gt" -> {
+                    if (attributeValue.doubleOrNull != null && conditionValue.doubleOrNull != null){
+                        return (attributeValue.doubleOrNull!! > conditionValue.doubleOrNull!!)
+                    }
                     return  sourcePrimitiveValue > targetPrimitiveValue
                 }
                 "\$gte" -> {
+                    if (attributeValue.doubleOrNull != null && conditionValue.doubleOrNull != null){
+                        return (attributeValue.doubleOrNull!! >= conditionValue.doubleOrNull!!)
+                    }
                     return  sourcePrimitiveValue >= targetPrimitiveValue
                 }
                 "\$regex" -> {
-                    val regex = Regex(targetPrimitiveValue)
-                    return  regex.matches(sourcePrimitiveValue)
-                }
-                "\$exists" -> {
-                    // TODO Unit Test This
-                    if (targetPrimitiveValue == "false" && (sourcePrimitiveValue == "null" || sourcePrimitiveValue == "undefined")){
-                        return true
-                    } else if (targetPrimitiveValue == "true" && (sourcePrimitiveValue != "null" && sourcePrimitiveValue != "undefined")) {
-                        return true
+
+                    try {
+
+                        val regex = Regex(targetPrimitiveValue)
+                        return  regex.containsMatchIn(sourcePrimitiveValue)
+                    }catch (error : Throwable){
+                        return false
                     }
+
+
                 }
             }
 

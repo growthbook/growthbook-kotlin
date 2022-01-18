@@ -3,7 +3,6 @@ package com.sdk.growthbook.Network
 import com.sdk.growthbook.ApplicationDispatcher
 import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.engine.cio.*
 import io.ktor.client.features.json.*
 import io.ktor.client.features.json.serializer.*
 import io.ktor.client.request.*
@@ -21,7 +20,7 @@ interface NetworkDispatcher {
 
 class CoreNetworkClient : NetworkDispatcher {
 
-    val client = HttpClient(CIO) {
+    val client = HttpClient {
         install(JsonFeature){
             serializer = KotlinxSerializer(kotlinx.serialization.json.Json {
                 prettyPrint = true
