@@ -1,5 +1,6 @@
 package com.sdk.growthbook.Utils
 
+import com.ionspin.kotlin.bignum.BigNumber
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /*
@@ -18,5 +19,12 @@ internal class FNV {
             hash = hash.multiply(PRIME32).mod(MOD32)
         }
         return hash
+    }
+
+    fun hashValue(data: String) : Float? {
+        val hash = this.fnv1a_32(data)
+        val remainder = hash?.remainder(BigInteger(1000))
+        val value = remainder?.toString()?.toFloatOrNull()?.div(1000f)
+        return value
     }
 }

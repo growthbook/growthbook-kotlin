@@ -3,6 +3,7 @@ package com.sdk.growthbook.model
 import com.sdk.growthbook.Utils.Constants
 import com.sdk.growthbook.Utils.GBCondition
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 
 
@@ -12,7 +13,7 @@ import kotlinx.serialization.json.JsonElement
 @Serializable
 class GBFeature(
     /// The default value (should use null if not specified)
-    val defaultValue : JsonElement,
+    val defaultValue : JsonElement? = null,
     /// Array of Rule objects that determine when and how the defaultValue gets overridden
     val rules: List<GBFeatureRule>? = null
 )
@@ -32,13 +33,10 @@ class GBFeatureRule(
     /// How to weight traffic between variations. Must add to 1.
     val weights: List<Float>? = null,
     /// A tuple that contains the namespace identifier, plus a range of coverage for the experiment.
-    val namespace : GBNameSpace? = null,
+    val namespace : JsonArray? = null,
     /// What user attribute should be used to assign variations (defaults to id)
-    val hashAttribute: String? = Constants.idAttributeKey
+    val hashAttribute: String? = null
 )
-
-
-
 
 enum class GBFeatureSource {
     unknownFeature, defaultValue, force, experiment
@@ -48,9 +46,9 @@ class GBFeatureResult(
     /// The assigned value of the feature
     val value : Any?,
     /// The assigned value cast to a boolean
-    val on : Boolean? = null,
+    val on : Boolean = false,
     /// The assigned value cast to a boolean and then negated
-    val off: Boolean? = null,
+    val off: Boolean = true,
     /// One of "unknownFeature", "defaultValue", "force", or "experiment"
     val source: GBFeatureSource,
     ///  When source is "experiment", this will be the Experiment object used

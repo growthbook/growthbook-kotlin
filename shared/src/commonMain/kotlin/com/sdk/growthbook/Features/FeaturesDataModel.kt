@@ -5,6 +5,5 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 internal data class FeaturesDataModel(
-    val status : Int,
     val features : GBFeatures
 )

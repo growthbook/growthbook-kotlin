@@ -2,6 +2,8 @@ package com.sdk.growthbook.model
 
 import com.sdk.growthbook.Utils.GBFeatures
 import com.sdk.growthbook.Utils.GBOverrides
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 /*
 Defines the GrowthBook context.

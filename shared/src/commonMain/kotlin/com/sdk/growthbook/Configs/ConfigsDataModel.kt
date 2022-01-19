@@ -5,6 +5,5 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 internal data class ConfigsDataModel(
-    val status : Int,
     val overrides : GBOverrides
 )

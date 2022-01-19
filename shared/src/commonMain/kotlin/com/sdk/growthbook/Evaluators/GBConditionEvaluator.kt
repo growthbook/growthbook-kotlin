@@ -1,4 +1,4 @@
-package com.sdk.growthbook.model
+package com.sdk.growthbook.Evaluators
 
 import com.sdk.growthbook.Utils.GBCondition
 import kotlinx.serialization.json.*
@@ -9,8 +9,6 @@ import kotlinx.serialization.json.*
     These conditions can have arbitrary nesting levels and evaluating them requires recursion.
     There are a handful of functions to define, and be aware that some of them may reference function definitions further below.
  */
-
-typealias TestedObj = HashMap<String, Any>
 
 enum class  GBAttributeType {
     gbString{
@@ -44,7 +42,7 @@ enum class  GBAttributeType {
     This function is just a case statement that handles all the possible operators
     There are basic comparison operators in the form attributeValue {op} conditionValue
  */
-class GBConditionEvaluator{
+internal class GBConditionEvaluator{
 
 
     /*
@@ -252,13 +250,18 @@ class GBConditionEvaluator{
         // If conditionValue is an object, loop over each key/value pair:
         if (conditionValue is JsonObject) {
 
-            for (key in  conditionValue.keys) {
-                // If evalOperatorCondition(key, attributeValue, value) is false, return false
-                if (!evalOperatorCondition(key, attributeValue, conditionValue[key]!!)) {
-                    return false
+            if (isOperatorObject(conditionValue)) {
+                for (key in  conditionValue.keys) {
+                    // If evalOperatorCondition(key, attributeValue, value) is false, return false
+                    if (!evalOperatorCondition(key, attributeValue, conditionValue[key]!!)) {
+                        return false
+                    }
                 }
+            } else if (attributeValue != null) {
+                return conditionValue.equals(attributeValue)
+            } else {
+                return false
             }
-
         }
 
         // Return true
