@@ -8,7 +8,7 @@ import kotlinx.serialization.decodeFromString
 
 internal class FeaturesDataSource(val dispatcher: NetworkDispatcher = CoreNetworkClient()) {
 
-    private val apiUrl = GrowthBookSDK.gbContext.url + Constants.featurePath + GrowthBookSDK.gbContext.apiKey
+    private val apiUrl = GrowthBookSDK.gbContext.hostURL + Constants.featurePath + GrowthBookSDK.gbContext.apiKey
 
     fun fetchFeatures(
         success: (FeaturesDataModel) -> Unit, failure: (Throwable?) -> Unit) {

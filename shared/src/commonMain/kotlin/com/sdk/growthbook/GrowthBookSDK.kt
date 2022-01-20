@@ -1,8 +1,5 @@
 package com.sdk.growthbook
 
-import com.sdk.growthbook.Configs.ConfigsDataSource
-import com.sdk.growthbook.Configs.ConfigsFlowDelegate
-import com.sdk.growthbook.Configs.ConfigsViewModel
 import com.sdk.growthbook.Evaluators.GBConditionEvaluator
 import com.sdk.growthbook.Evaluators.GBExperimentEvaluator
 import com.sdk.growthbook.Evaluators.GBFeatureEvaluator
@@ -31,12 +28,14 @@ class GBSDKBuilder(
 ) {
 
     var qaMode: Boolean = false;
+    var forcedVariations: HashMap<String, Int> = HashMap()
     var enabled: Boolean = true;
     var refreshHandler : GBCacheRefreshHandler? = null
     var networkDispatcher: NetworkDispatcher = CoreNetworkClient()
 
-    fun setQAMode(isEnabled : Boolean) : GBSDKBuilder {
-        this.qaMode = isEnabled
+    fun enableQAMode(forcedVariations: HashMap<String, Int> = HashMap()) : GBSDKBuilder {
+        this.qaMode = true
+        this.forcedVariations = forcedVariations
         return this
     }
 
@@ -57,7 +56,7 @@ class GBSDKBuilder(
 
     fun initialize() : GrowthBookSDK{
 
-        val gbContext = GBContext(apiKey = apiKey, enabled = enabled, attributes = attributes, url = hostURL, qaMode = qaMode, trackingCallback = trackingCallback)
+        val gbContext = GBContext(apiKey = apiKey, enabled = enabled, attributes = attributes, hostURL = hostURL, qaMode = qaMode, forcedVariations = forcedVariations, trackingCallback = trackingCallback)
 
         val sdkInstance = GrowthBookSDK(gbContext, refreshHandler, networkDispatcher)
 
@@ -72,7 +71,7 @@ class GBSDKBuilder(
     It exposes two main methods: feature and run.
  */
 
-class GrowthBookSDK() : ConfigsFlowDelegate, FeaturesFlowDelegate {
+class GrowthBookSDK() : FeaturesFlowDelegate {
 
     private var refreshHandler : GBCacheRefreshHandler? = null
     private lateinit var networkDispatcher: NetworkDispatcher
@@ -90,9 +89,7 @@ class GrowthBookSDK() : ConfigsFlowDelegate, FeaturesFlowDelegate {
     }
 
     fun refreshCache(){
-        val configVM = ConfigsViewModel(this, ConfigsDataSource(networkDispatcher))
         val featureVM = FeaturesViewModel(this, FeaturesDataSource(networkDispatcher))
-        configVM.fetchConfigs()
         featureVM.fetchFeatures()
     }
 
@@ -100,25 +97,8 @@ class GrowthBookSDK() : ConfigsFlowDelegate, FeaturesFlowDelegate {
         return gbContext
     }
 
-    fun getOverrides() : GBOverrides {
-        return gbContext.overrides
-    }
-
     fun getFeatures() : GBFeatures {
         return gbContext.features
-    }
-
-    override fun configsFetchedSuccessfully(configs: GBOverrides, isRemote: Boolean) {
-        gbContext.overrides = configs
-        if (isRemote) {
-            this.refreshHandler?.let { it(true) }
-        }
-    }
-
-    override fun configsFetchFailed(error: GBError, isRemote: Boolean) {
-        if (isRemote) {
-            this.refreshHandler?.let { it(false) }
-        }
     }
 
     override fun featuresFetchedSuccessfully(features : GBFeatures, isRemote: Boolean) {

@@ -1,5 +1,6 @@
-package com.sdk.growthbook
+package com.sdk.growthbook.tests
 
+import com.sdk.growthbook.GBSDKBuilder
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import kotlin.test.BeforeTest
@@ -29,7 +30,7 @@ class GrowthBookSDKBuilderTests {
 
         assertTrue(sdkInstance.getGBContext().apiKey == testApiKey)
         assertTrue(sdkInstance.getGBContext().enabled)
-        assertTrue(sdkInstance.getGBContext().url == testHostURL)
+        assertTrue(sdkInstance.getGBContext().hostURL == testHostURL)
         assertFalse(sdkInstance.getGBContext().qaMode)
         assertTrue(sdkInstance.getGBContext().attributes == testAttributes)
 
@@ -42,11 +43,11 @@ class GrowthBookSDKBuilderTests {
                 gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
 
 
-        }).setEnabled(false).setQAMode(true).setRefreshHandler {  }.initialize()
+        }).setEnabled(false).enableQAMode(HashMap()).setRefreshHandler {  }.initialize()
 
         assertTrue(sdkInstance.getGBContext().apiKey == testApiKey)
         assertFalse(sdkInstance.getGBContext().enabled)
-        assertTrue(sdkInstance.getGBContext().url == testHostURL)
+        assertTrue(sdkInstance.getGBContext().hostURL == testHostURL)
         assertTrue(sdkInstance.getGBContext().qaMode)
         assertTrue(sdkInstance.getGBContext().attributes == testAttributes)
 
@@ -59,11 +60,11 @@ class GrowthBookSDKBuilderTests {
                 gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
 
 
-        }).setNetworkDispatcher(MockNetworkClient(MockResponse.successResponse, null)).setEnabled(false).setQAMode(true).setRefreshHandler {  }.initialize()
+        }).setNetworkDispatcher(MockNetworkClient(MockResponse.successResponse, null)).setEnabled(false).enableQAMode(HashMap()).setRefreshHandler {  }.initialize()
 
         assertTrue(sdkInstance.getGBContext().apiKey == testApiKey)
         assertFalse(sdkInstance.getGBContext().enabled)
-        assertTrue(sdkInstance.getGBContext().url == testHostURL)
+        assertTrue(sdkInstance.getGBContext().hostURL == testHostURL)
         assertTrue(sdkInstance.getGBContext().qaMode)
         assertTrue(sdkInstance.getGBContext().attributes == testAttributes)
 
@@ -108,10 +109,7 @@ class GrowthBookSDKBuilderTests {
         assertTrue(isRefreshed)
 
         assertTrue(sdkInstance.getFeatures().containsKey("onboarding"))
-        assertTrue(sdkInstance.getOverrides().containsKey("onboarding"))
-
         assertFalse(sdkInstance.getFeatures().containsKey("fwrfewrfe"))
-        assertFalse(sdkInstance.getOverrides().containsKey("ferfverfe"))
 
     }
 

@@ -2,6 +2,7 @@ package com.sdk.growthbook.model
 
 import com.sdk.growthbook.Utils.Constants
 import com.sdk.growthbook.Utils.GBCondition
+import com.sdk.growthbook.Utils.GBNameSpace
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -52,5 +53,7 @@ class GBFeatureResult(
     /// One of "unknownFeature", "defaultValue", "force", or "experiment"
     val source: GBFeatureSource,
     ///  When source is "experiment", this will be the Experiment object used
-    val experiment: GBExperiment? = null
+    val experiment: GBExperiment? = null,
+    /// When source is "experiment", this will be an ExperimentResult object
+    val experimentResult: GBExperimentResult? = null
 )

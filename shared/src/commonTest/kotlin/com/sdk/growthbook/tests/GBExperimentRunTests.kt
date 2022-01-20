@@ -1,4 +1,4 @@
-package com.sdk.growthbook
+package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.Evaluators.GBExperimentEvaluator
 import com.sdk.growthbook.Utils.toHashMap
@@ -18,7 +18,6 @@ class GBExperimentRunTests {
     @BeforeTest
     fun setUp() {
         evalConditions = TestData.getRunExperimentData()
-
     }
 
     @Test
@@ -33,10 +32,11 @@ class GBExperimentRunTests {
 
                 val attributes = testContext.attributes.jsonObject.toHashMap()
 
-                val gbContext = GBContext("", testContext.enabled,
-                    attributes, testContext.url ?: "", testContext.forcedVariations ?: HashMap(), testContext.qaMode, { _, _ ->
+                val gbContext = GBContext("", hostURL = "",
+                    enabled = testContext.enabled, attributes = attributes, forcedVariations = testContext.forcedVariations ?: HashMap(),
+                    qaMode = testContext.qaMode, trackingCallback = { _, _ ->
 
-                })
+                    })
 
                 val evaluator = GBExperimentEvaluator()
                 val result = evaluator.evaluateExperiment(gbContext, experiment)

@@ -1,4 +1,4 @@
-package com.sdk.growthbook
+package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.Evaluators.GBFeatureEvaluator
 import com.sdk.growthbook.Utils.toHashMap
@@ -29,8 +29,9 @@ class GBFeatureValueTests {
 
                 val attributes = testData.attributes.jsonObject.toHashMap()
 
-                val gbContext = GBContext("",
-                    enabled = true, attributes = attributes, "", forcedVariations = HashMap(), false, { _, _ ->
+                val gbContext = GBContext("", hostURL = "",
+                    enabled = true, attributes = attributes, forcedVariations = HashMap(),
+                    qaMode = false, trackingCallback = { _, _ ->
 
                     })
                 if (testData.features != null) {
@@ -49,16 +50,22 @@ class GBFeatureValueTests {
                         "\nOn - " + expectedResult.on.toString() +
                         "\nOff - " + expectedResult.off.toString() +
                         "\nSource - " + expectedResult.source +
+                        "\nExperiment - " + expectedResult.experiment?.key +
+                        "\nExperiment Result - " + expectedResult.experimentResult?.variationId +
                         "\nActual result - " +
                         "\nValue - " + result.value.toString() +
                         "\nOn - " + result.on.toString() +
                         "\nOff - " + result.off.toString() +
-                        "\nSource - " + result.source + "\n\n"
+                        "\nSource - " + result.source +
+                        "\nExperiment - " + result.experiment?.key +
+                        "\nExperiment Result - " + result.experimentResult?.variationId + "\n\n"
 
                 if (result.value.toString() == expectedResult.value.toString() &&
                     result.on.toString() == expectedResult.on.toString() &&
                     result.off.toString() == expectedResult.off.toString() &&
-                    result.source.toString() == expectedResult.source ) {
+                    result.source.toString() == expectedResult.source &&
+                    result.experiment?.key == expectedResult.experiment?.key &&
+                    result.experimentResult?.variationId == expectedResult.experimentResult?.variationId ) {
                     passedScenarios.add(status)
                 } else {
                     failedScenarios.add(status)

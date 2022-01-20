@@ -1,11 +1,9 @@
-package com.sdk.growthbook.Configs
+package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.Features.FeaturesDataSource
 import com.sdk.growthbook.Features.FeaturesFlowDelegate
 import com.sdk.growthbook.Features.FeaturesViewModel
 import com.sdk.growthbook.GrowthBookSDK
-import com.sdk.growthbook.MockNetworkClient
-import com.sdk.growthbook.MockResponse
 import com.sdk.growthbook.Utils.GBError
 import com.sdk.growthbook.Utils.GBFeatures
 import com.sdk.growthbook.model.GBContext
@@ -20,9 +18,11 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
 
     @BeforeTest
     fun setUp() {
-        GrowthBookSDK.gbContext = GBContext("", true, HashMap(), "", HashMap(), false, { _, _ ->
+        GrowthBookSDK.gbContext = GBContext("", hostURL = "",
+            enabled = true, attributes = HashMap(), forcedVariations = HashMap(),
+            qaMode = false, trackingCallback = { _, _ ->
 
-        })
+            })
     }
 
     @Test

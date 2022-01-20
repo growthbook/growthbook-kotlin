@@ -3,6 +3,7 @@ package com.sdk.growthbook.Evaluators
 import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.Utils.Constants
 import com.sdk.growthbook.Utils.FNV
+import com.sdk.growthbook.Utils.GBUtils
 import com.sdk.growthbook.Utils.toJsonElement
 import com.sdk.growthbook.model.*
 import io.ktor.http.*
@@ -42,7 +43,7 @@ internal class GBFeatureEvaluator {
                                 continue
                             else {
                                 /// Compute a hash using the Fowler–Noll–Vo algorithm (specifically fnv32-1a)
-                                val hashFNV = FNV().hashValue(attributeValue + featureKey)
+                                val hashFNV = GBUtils.hash(attributeValue + featureKey)
                                 /// If the hash is greater than rule.coverage, skip the rule
                                 if (hashFNV != null && hashFNV > rule.coverage) {
                                     continue
@@ -66,7 +67,7 @@ internal class GBFeatureEvaluator {
                         /// Run the experiment.
                         val result = GBExperimentEvaluator().evaluateExperiment(context, exp)
                         if (result.inExperiment) {
-                            return prepareResult(value = result.value, source = GBFeatureSource.experiment)
+                            return prepareResult(value = result.value, source = GBFeatureSource.experiment, experiment = exp, experimetResult = result)
                         } else {
                             /// If result.inExperiment is false, skip this rule and continue to the next one.
                             continue
@@ -88,11 +89,13 @@ internal class GBFeatureEvaluator {
         
     }
 
-    private fun prepareResult(value : Any?, source: GBFeatureSource) : GBFeatureResult {
+    /// This is a helper method to create a FeatureResult object.
+    /// Besides the passed-in arguments, there are two derived values - on and off, which are just the value cast to booleans.
+    private fun prepareResult(value : Any?, source: GBFeatureSource, experiment: GBExperiment? = null, experimetResult: GBExperimentResult? = null) : GBFeatureResult {
 
         val isFalsy = value == null || value.toString() == "false" || value.toString().isEmpty() || value.toString() == "0"
 
-        return GBFeatureResult(value = value, on = !isFalsy, off = isFalsy, source = source)
+        return GBFeatureResult(value = value, on = !isFalsy, off = isFalsy, source = source, experiment = experiment, experimentResult = experimetResult)
 
     }
     

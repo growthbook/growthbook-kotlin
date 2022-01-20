@@ -1,4 +1,4 @@
-package com.sdk.growthbook
+package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.Network.NetworkDispatcher
 

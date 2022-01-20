@@ -1,9 +1,14 @@
 package com.sdk.growthbook.model
 
 import com.sdk.growthbook.Utils.GBCondition
+import com.sdk.growthbook.Utils.GBNameSpace
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Serializer
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.floatOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 /*
     Defines a single experiment
@@ -39,33 +44,10 @@ class GBExperimentResult(
     /// The array index of the assigned variation
     val variationId: Int,
     /// The array value of the assigned variation
-    val value: Any? = null,
+    val value: Any,
     /// The user attribute used to assign a variation
     val hashAttribute: String? = null,
     ///  The value of that attribute
     val hashValue: String? = null
 
-)
-
-@Serializable
-enum class GBExperimentStatus {
-    draft, running, stopped
-}
-
-// TODO "status", "groups", "url" key check
-// TODO condition, coverage & force key check
-@Serializable
-class GBExperimentOverride(
-    /// Either "draft", "running", or "stopped". Stopped experiments are only included in the response if a non-control variation won.
-    var status : GBExperimentStatus,
-    /// How to weight traffic between variations. Must add to 1.
-    var weights : List<Float>? = null,
-    /// A float from 0 to 1 (inclusive) which specifies what percent of users to include in the experiment.
-    var coverage : Float? = null,
-    /// An array of user groups who are eligible for the experiment
-    var groups : List<String>? = null,
-    /// A regex for which URLs the experiment should run on
-    val url : String? = null,
-    /// All users included in the experiment will be forced into the specific variation index
-    var force : Int? = null
 )
