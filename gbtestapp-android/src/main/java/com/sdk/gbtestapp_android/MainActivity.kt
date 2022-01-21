@@ -5,6 +5,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.sdk.growthbook.GBSDKBuilder
 
 
+
 /*
 We use custom dimensions to pull experiment results. The value of the dimension must be in the format: [experiment][delimiter][variation]. For example, button-colors:blue.
  */
@@ -19,7 +20,7 @@ class MainActivity : AppCompatActivity() {
             attributes = HashMap(),
             trackingCallback = { gbExperiment, gbExperimentResult ->
 
-        }).initialize()
+        }).setEnabled(true).initialize()
 
     }
 }

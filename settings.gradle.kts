@@ -7,5 +7,5 @@ pluginManagement {
 }
 
 rootProject.name = "GrowthBook"
-include(":shared")
+include(":GrowthBook")
 include(":gbtestapp-android")

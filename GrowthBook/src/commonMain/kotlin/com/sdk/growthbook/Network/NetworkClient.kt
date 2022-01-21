@@ -1,0 +1,52 @@
+package com.sdk.growthbook.Network
+
+import com.sdk.growthbook.ApplicationDispatcher
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.features.json.*
+import io.ktor.client.features.json.serializer.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+
+interface NetworkDispatcher {
+    val JSONParser : Json
+        get() = Json { prettyPrint = true; isLenient = true; ignoreUnknownKeys = true }
+
+    fun consumeGETRequest(request: String, onSuccess: (String) -> Unit, onError: (Throwable) -> Unit)
+}
+
+internal class CoreNetworkClient : NetworkDispatcher {
+
+    val client = HttpClient {
+        install(JsonFeature){
+            serializer = KotlinxSerializer(kotlinx.serialization.json.Json {
+                prettyPrint = true
+                isLenient = true
+                ignoreUnknownKeys = true
+            })
+        }
+    }
+
+    override fun consumeGETRequest(
+        request: String,
+        onSuccess: (String) -> Unit,
+        onError: (Throwable) -> Unit
+    ) {
+
+        GlobalScope.launch(ApplicationDispatcher) {
+
+            try {
+                val result = client.get<HttpResponse>(request)
+                onSuccess(result.receive())
+            } catch (ex: Exception) {
+                onError(ex)
+            }
+
+        }
+
+    }
+
+}
