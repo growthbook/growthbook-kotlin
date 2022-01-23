@@ -7,17 +7,25 @@ import io.ktor.client.features.json.*
 import io.ktor.client.features.json.serializer.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
+/**
+ * Network Dispatcher Interface for API Consumption
+ * Implement this intterface to define specific implementation for Network Calls - to be made by SDK
+ */
 interface NetworkDispatcher {
     val JSONParser : Json
         get() = Json { prettyPrint = true; isLenient = true; ignoreUnknownKeys = true }
-
+    @DelicateCoroutinesApi
     fun consumeGETRequest(request: String, onSuccess: (String) -> Unit, onError: (Throwable) -> Unit)
 }
 
+/**
+ * Default Ktor Implementation for Network Dispatcher
+ */
 internal class CoreNetworkClient : NetworkDispatcher {
 
     val client = HttpClient {
@@ -30,6 +38,7 @@ internal class CoreNetworkClient : NetworkDispatcher {
         }
     }
 
+    @DelicateCoroutinesApi
     override fun consumeGETRequest(
         request: String,
         onSuccess: (String) -> Unit,

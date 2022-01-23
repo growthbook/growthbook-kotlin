@@ -3,6 +3,9 @@ package com.sdk.growthbook.Utils
 import kotlinx.serialization.json.*
 
 
+/**
+ * Extension over JsonObject class to convert that into HashMap
+ */
 internal fun JsonObject.toHashMap() : HashMap<String, Any> {
     val map: HashMap<String, Any> = HashMap()
     this.forEach {
@@ -16,6 +19,10 @@ internal fun JsonObject.toHashMap() : HashMap<String, Any> {
     return map
 }
 
+
+/**
+ * Extension over JsonArray class to convert that into List
+ */
 internal fun JsonArray.toList() : List<*> {
     val list: MutableList<Any> = mutableListOf()
     this.forEach {
@@ -28,6 +35,10 @@ internal fun JsonArray.toList() : List<*> {
     return list
 }
 
+
+/**
+ * Extension over List class to convert that into JsonArray
+ */
 internal fun List<*>.toJsonElement(): JsonElement {
     val list: MutableList<JsonElement> = mutableListOf()
     this.forEach {
@@ -41,6 +52,10 @@ internal fun List<*>.toJsonElement(): JsonElement {
     return JsonArray(list)
 }
 
+
+/**
+ * Extension over Map class to convert that into JsonObject
+ */
 internal fun Map<*, *>.toJsonElement(): JsonElement {
     val map: MutableMap<String, JsonElement> = mutableMapOf()
     this.forEach {

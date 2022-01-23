@@ -106,53 +106,150 @@ fun getFeatures() : GBFeatures
 ## Models
 
 ```kotlin
-/*
-    A Feature object consists of possible values plus rules for how to assign values to users.
+/**
+ * Defines the GrowthBook context.
  */
+class GBContext(
+    /**
+     * Registered API Key for GrowthBook SDK
+     */
+    val apiKey: String,
+    /**
+     * Host URL for GrowthBook
+     */
+    val hostURL : String,
+    /**
+     * Switch to globally disable all experiments. Default true.
+     */
+    val enabled : Boolean,
+    /**
+     * Map of user attributes that are used to assign variations
+     */
+    val attributes: HashMap<String, Any>,
+    /**
+     * Force specific experiments to always assign a specific variation (used for QA)
+     */
+    val forcedVariations: HashMap<String, Int>,
+    /**
+     * If true, random assignment is disabled and only explicitly forced variations are used.
+     */
+    val qaMode : Boolean,
+    /**
+     * A function that takes experiment and result as arguments.
+     */
+    val trackingCallback : (GBExperiment, GBExperimentResult) -> Unit
+)
+```
 
+
+
+```kotlin
+/**
+ * A Feature object consists of possible values plus rules for how to assign values to users.
+ */
+@Serializable
 class GBFeature(
-    /// The default value (should use null if not specified)
+    /**
+     * The default value (should use null if not specified)
+     */
     val defaultValue : JsonElement? = null,
-    /// Array of Rule objects that determine when and how the defaultValue gets overridden
+    /**
+     * Array of Rule objects that determine when and how the defaultValue gets overridden
+     */
     val rules: List<GBFeatureRule>? = null
 )
 
-
+/**
+ * Rule object consists of various definitions to apply to calculate feature value
+ */
+@Serializable
 class GBFeatureRule(
-    /// Optional targeting condition
+    /**
+     * Optional targeting condition
+     */
     val condition : GBCondition? = null,
-    /// What percent of users should be included in the experiment (between 0 and 1, inclusive)
+    /**
+     * What percent of users should be included in the experiment (between 0 and 1, inclusive)
+     */
     val coverage : Float? = null,
-    ///  Immediately force a specific value (ignore every other option besides condition and coverage)
+    /**
+     * Immediately force a specific value (ignore every other option besides condition and coverage)
+     */
     val force : JsonElement? = null,
-    /// Run an experiment (A/B test) and randomly choose between these variations
+    /**
+     * Run an experiment (A/B test) and randomly choose between these variations
+     */
     val variations: ArrayList<JsonElement>? = null,
-    /// The globally unique tracking key for the experiment (default to the feature key)
+    /**
+     * The globally unique tracking key for the experiment (default to the feature key)
+     */
     val key: String? = null,
-    /// How to weight traffic between variations. Must add to 1.
+    /**
+     * How to weight traffic between variations. Must add to 1.
+     */
     val weights: List<Float>? = null,
-    /// A tuple that contains the namespace identifier, plus a range of coverage for the experiment.
+    /**
+     * A tuple that contains the namespace identifier, plus a range of coverage for the experiment.
+     */
     val namespace : JsonArray? = null,
-    /// What user attribute should be used to assign variations (defaults to id)
+    /**
+     * What user attribute should be used to assign variations (defaults to id)
+     */
     val hashAttribute: String? = null
 )
 
+/**
+ * Enum For defining feature value source
+ */
 enum class GBFeatureSource {
-    unknownFeature, defaultValue, force, experiment
+    /**
+     * Queried Feature doesn't exist in GrowthBook
+     */
+    unknownFeature,
+
+    /**
+     * Default Value for the Feature is being processed
+     */
+    defaultValue,
+
+    /**
+     * Forced Value for the Feature is being processed
+     */
+    force,
+
+    /**
+     * Experiment Value for the Feature is being processed
+     */
+    experiment
 }
 
+/**
+ * Result for Feature
+ */
 class GBFeatureResult(
-    /// The assigned value of the feature
+    /**
+     * The assigned value of the feature
+     */
     val value : Any?,
-    /// The assigned value cast to a boolean
+    /**
+     * The assigned value cast to a boolean
+     */
     val on : Boolean = false,
-    /// The assigned value cast to a boolean and then negated
+    /**
+     * The assigned value cast to a boolean and then negated
+     */
     val off: Boolean = true,
-    /// One of "unknownFeature", "defaultValue", "force", or "experiment"
+    /**
+     * One of "unknownFeature", "defaultValue", "force", or "experiment"
+     */
     val source: GBFeatureSource,
-    ///  When source is "experiment", this will be the Experiment object used
+    /**
+     * When source is "experiment", this will be the Experiment object used
+     */
     val experiment: GBExperiment? = null,
-    /// When source is "experiment", this will be an ExperimentResult object
+    /**
+     * When source is "experiment", this will be an ExperimentResult object
+     */
     val experimentResult: GBExperimentResult? = null
 )
 ```
@@ -163,40 +260,69 @@ class GBFeatureResult(
 /*
     Defines a single experiment
  */
+@Serializable
 class GBExperiment(
-    /// The globally unique tracking key for the experiment
+    /**
+     * The globally unique tracking key for the experiment
+     */
     val key: String,
-    /// The different variations to choose between
+    /**
+     * The different variations to choose between
+     */
     val variations : List<JsonElement> = ArrayList(),
-    /// A tuple that contains the namespace identifier, plus a range of coverage for the experiment
+    /**
+     * A tuple that contains the namespace identifier, plus a range of coverage for the experiment
+     */
     val namespace : JsonArray? = null,
-    /// All users included in the experiment will be forced into the specific variation index
+    /**
+     * All users included in the experiment will be forced into the specific variation index
+     */
     val hashAttribute: String? = null,
-    /// How to weight traffic between variations. Must add to 1.
+    /**
+     * How to weight traffic between variations. Must add to 1.
+     */
     var weights : List<Float>? = null,
-    /// If set to false, always return the control (first variation)
+    /**
+     * If set to false, always return the control (first variation)
+     */
     var active : Boolean = true,
-    /// What percent of users should be included in the experiment (between 0 and 1, inclusive)
+    /**
+     * What percent of users should be included in the experiment (between 0 and 1, inclusive)
+     */
     var coverage : Float? = null,
-    /// Optional targeting condition
+    /**
+     * Optional targeting condition
+     */
     var condition: GBCondition? = null,
-    /// All users included in the experiment will be forced into the specific variation index
+    /**
+     * All users included in the experiment will be forced into the specific variation index
+     */
     var force : Int? = null
 )
 
-/*
-    The result of running an Experiment given a specific Context
+/**
+ * The result of running an Experiment given a specific Context
  */
 class GBExperimentResult(
-    /// Whether or not the user is part of the experiment
+    /**
+     * Whether or not the user is part of the experiment
+     */
     val inExperiment: Boolean,
-    /// The array index of the assigned variation
+    /**
+     * The array index of the assigned variation
+     */
     val variationId: Int,
-    /// The array value of the assigned variation
+    /**
+     * The array value of the assigned variation
+     */
     val value: Any,
-    /// The user attribute used to assign a variation
+    /**
+     * The user attribute used to assign a variation
+     */
     val hashAttribute: String? = null,
-    ///  The value of that attribute
+    /**
+     * The value of that attribute
+     */
     val hashValue: String? = null
 
 )
@@ -204,24 +330,25 @@ class GBExperimentResult(
 
 
 
-```kotlin
-/*
-Defines the GrowthBook context.
- */
-class GBContext(
-    val apiKey: String,
-    val hostURL : String,
-    /// Switch to globally disable all experiments. Default true.
-    val enabled : Boolean,
-    /// Map of user attributes that are used to assign variations
-    val attributes: HashMap<String, Any>,
-    ///  Force specific experiments to always assign a specific variation (used for QA)
-    val forcedVariations: HashMap<String, Int>,
-    ///  If true, random assignment is disabled and only explicitly forced variations are used.
-    val qaMode : Boolean,
-    /// A function that takes experiment and result as arguments.
-    val trackingCallback : (GBExperiment, GBExperimentResult) -> Unit
-)
+## Proguard
+
+If you're using ProGuard, you may need to add rules to your configuration file to make it compatible with Obfuscation & Shriniking tools. These rules are guidelines only and some projects require more to work. You can modify those rules and adapt them to your project, but be aware that we do not support custom rules.
+
+
+
+```
+# Core SDK
+-keep class com.sdk.growthbook.** { *; }
+
+-keepattributes *Annotation*, InnerClasses
+-dontnote kotlinx.serialization.SerializationKt
+-keep,includedescriptorclasses class com.sdk.growthbook.**$$serializer { *; }
+-keepclassmembers class com.sdk.growthbook.** {
+    *** Companion;
+}
+-keepclasseswithmembers class com.sdk.growthbook.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
 ```
 
 

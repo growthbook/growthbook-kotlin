@@ -10,7 +10,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "1.0.3"
+version = "1.0.4"
 
 kotlin {
 
@@ -38,11 +38,9 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 implementation("org.jetbrains.kotlin:kotlin-stdlib-common")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutineVersion")
                 implementation(
                     "org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
                 implementation("io.ktor:ktor-client-core:$ktorVersion")
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.3.1")
                 implementation("io.ktor:ktor-client-serialization:$ktorVersion")
                 implementation("com.ionspin.kotlin:bignum:0.3.3")
             }
@@ -58,10 +56,7 @@ kotlin {
         }
         val androidMain by getting {
             dependencies {
-                implementation("androidx.core:core-ktx:1.6.0")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:$coroutineVersion")
                 implementation("io.ktor:ktor-client-android:$ktorVersion")
-
                 implementation("androidx.startup:startup-runtime:1.1.0")
             }
         }
@@ -126,8 +121,8 @@ val javadocJar = tasks.register<Jar>("javadocJar") {
     from(dokkaOutputDir)
 }
 
-val sonatypeUsername: String? = project.properties["SONATYPE_USERNAME"] as String?
-val sonatypePassword: String? = project.properties["SONATYPE_PASSWORD"] as String?
+val sonatypeUsername: String? = System.getenv("GB_SONATYPE_USERNAME")
+val sonatypePassword: String? = System.getenv("GB_SONATYPE_PASSWORD")
 
 publishing {
     repositories {

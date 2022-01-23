@@ -19,7 +19,8 @@ class MainActivity : AppCompatActivity() {
             hostURL = "https://cdn.growthbook.io/",
             attributes = HashMap(),
             trackingCallback = { gbExperiment, gbExperimentResult ->
-
+                print(gbExperiment.toString())
+                print(gbExperimentResult.toString())
         }).setEnabled(true).initialize()
 
     }
