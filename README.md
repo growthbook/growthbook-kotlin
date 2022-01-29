@@ -1,18 +1,24 @@
 ![](https://docs.growthbook.io/images/hero.png)
 
-# Growth Book - Android
+# Growth Book - SDK
+
+ ![](https://camo.githubusercontent.com/b1d9ad56ab51c4ad1417e9a5ad2a8fe63bcc4755e584ec7defef83755c23f923/687474703a2f2f696d672e736869656c64732e696f2f62616467652f706c6174666f726d2d616e64726f69642d3645444238442e7376673f7374796c653d666c6174) ![](https://camo.githubusercontent.com/1fec6f0d044c5e1d73656bfceed9a78fd4121b17e82a2705d2a47f6fd1f0e3e5/687474703a2f2f696d672e736869656c64732e696f2f62616467652f706c6174666f726d2d696f732d4344434443442e7376673f7374796c653d666c6174)
 
 
 
 - **Lightweight and fast**
-- **Supports both Kotlin & JAVA based apps.**
-- **Android SDK 26 & Above**
+- **Supports iOS & Android apps**
+  - **Android version 26 & above**
+  - **iOS version 12 & Above**
+
 - **Use your existing event tracking (GA, Segment, Mixpanel, custom)**
 - **Adjust variation weights and targeting without deploying new code**
 
 
 
 ## Installation
+
+##### Android 
 
 ```kotlin
 repositories {
@@ -22,6 +28,12 @@ repositories {
 dependencies {
     implementation 'io.growthbook.sdk:GrowthBook:1.0.3'
 }
+```
+
+##### iOS - CocoaPods 
+
+```kotlin
+pod 'GrowthBook'
 ```
 
 
@@ -36,7 +48,7 @@ Integration is super easy:
 Now you can start/stop tests, adjust coverage and variation weights, and apply a winning variation to 100% of traffic, all within the Growth Book App without deploying code changes to your site.
 
 ```kotlin
-GBSDKBuilder(apiKey = <API_KEY>,
+GBSDKBuilderApp(apiKey = <API_KEY>,
     hostURL = <GrowthBook_URL>,
     attributes = <Hashmap>,
     trackingCallback = { gbExperiment, gbExperimentResult ->
@@ -47,19 +59,19 @@ GBSDKBuilder(apiKey = <API_KEY>,
 There are additional properties which can be setup at the time of initialization
 
 ```kotlin
-GBSDKBuilder(apiKey = <API_KEY>,
+GBSDKBuilderApp(apiKey = <API_KEY>,
     hostURL = <GrowthBook_URL>,
     attributes = <Hashmap>,
     trackingCallback = { gbExperiment, gbExperimentResult ->
 
 })
-    .setEnabled(true) // Enable / Disable experiments
-    .setQAMode(true) // Enable / Disable QA Mode
-    .setForcedVariations(<HashMap>) // Pass Forced Variations
-    .setRefreshHandler { isRefreshed ->
+		.setRefreshHandler { isRefreshed ->
         
     } // Get Callbacks when SDK refreshed its cache
     .setNetworkDispatcher(<Network Dispatcher>) // Pass Network cliet to be used for API Calls
+    .setEnabled(true) // Enable / Disable experiments
+    .setQAMode(true) // Enable / Disable QA Mode
+    .setForcedVariations(<HashMap>) // Pass Forced Variations
     .initialize()
 ```
 

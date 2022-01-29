@@ -17,31 +17,30 @@ import com.sdk.growthbook.model.GBFeatureResult
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlin.native.concurrent.ThreadLocal
 
+typealias GBTrackingCallback = (GBExperiment, GBExperimentResult) -> Unit
+
 
 /**
- * SDKBuilder - Initializer for GrowthBook SDK
+ * SDKBuilder - Root Class for SDK Initializers for GrowthBook SDK
  * APIKey - API Key
  * HostURL - Server URL
  * UserAttributes - User Attributes
  * Tracking Callback - Track Events for Experiments
  */
-class GBSDKBuilder(
+abstract class SDKBuilder(
     val apiKey: String,
     val hostURL: String,
-    val attributes: HashMap<String, Any>,
-    val trackingCallback : (GBExperiment, GBExperimentResult) -> Unit
+    val attributes: Map<String, Any>,
+    val trackingCallback : GBTrackingCallback
 ) {
-
-    private var qaMode: Boolean = false;
-    private var forcedVariations: HashMap<String, Int> = HashMap()
-    private var enabled: Boolean = true;
-    private var refreshHandler : GBCacheRefreshHandler? = null
-    private var networkDispatcher: NetworkDispatcher = CoreNetworkClient()
+    internal var qaMode: Boolean = false;
+    internal var forcedVariations: Map<String, Int> = HashMap()
+    internal var enabled: Boolean = true;
 
     /**
      * Set Forced Variations - Default Empty
      */
-    fun setForcedVariations(forcedVariations: HashMap<String, Int> = HashMap()) : GBSDKBuilder {
+    fun setForcedVariations(forcedVariations: Map<String, Int>) : SDKBuilder {
         this.forcedVariations = forcedVariations
         return this
     }
@@ -49,7 +48,7 @@ class GBSDKBuilder(
     /**
      * Set QA Mode - Default Disabled
      */
-    fun setQAMode(isEnabled: Boolean) : GBSDKBuilder {
+    fun setQAMode(isEnabled: Boolean) : SDKBuilder {
         this.qaMode = isEnabled
         return this
     }
@@ -57,15 +56,39 @@ class GBSDKBuilder(
     /**
      * Set Enabled - Default Disabled - If Enabled - then experiments will be disabled
      */
-    fun setEnabled(isEnabled : Boolean) : GBSDKBuilder {
+    fun setEnabled(isEnabled : Boolean) : SDKBuilder {
         this.enabled = isEnabled
         return this
     }
 
     /**
+     * This method is open to be overridden by subclasses
+     */
+    @DelicateCoroutinesApi
+    abstract fun initialize() : GrowthBookSDK
+}
+
+/**
+ * SDKBuilder - Initializer for GrowthBook SDK for Apps
+ * APIKey - API Key
+ * HostURL - Server URL
+ * UserAttributes - User Attributes
+ * Tracking Callback - Track Events for Experiments
+ */
+class GBSDKBuilderApp(apiKey: String, hostURL: String, attributes: Map<String, Any>,
+                       trackingCallback: GBTrackingCallback
+) : SDKBuilder(apiKey, hostURL,
+    attributes, trackingCallback
+) {
+
+    private var refreshHandler : GBCacheRefreshHandler? = null
+
+    private var networkDispatcher: NetworkDispatcher = CoreNetworkClient()
+
+    /**
      * Set Refresh Handler - Will be called when cache is refreshed
      */
-    fun setRefreshHandler(refreshHandler : GBCacheRefreshHandler) : GBSDKBuilder{
+    fun setRefreshHandler(refreshHandler : GBCacheRefreshHandler) : GBSDKBuilderApp{
         this.refreshHandler = refreshHandler
         return this
     }
@@ -74,25 +97,26 @@ class GBSDKBuilder(
      * Set Network Client - Network Client for Making API Calls
      * Default is KTOR - integrated in SDK
      */
-    fun setNetworkDispatcher(networkDispatcher: NetworkDispatcher) : GBSDKBuilder {
+    fun setNetworkDispatcher(networkDispatcher: NetworkDispatcher) : SDKBuilder {
         this.networkDispatcher = networkDispatcher
         return this
     }
 
     /**
-     * Initialize the SDK
+     * Initialize the JAVA SDK
      */
     @DelicateCoroutinesApi
-    fun initialize() : GrowthBookSDK{
+    override fun initialize() : GrowthBookSDK {
 
         val gbContext = GBContext(apiKey = apiKey, enabled = enabled, attributes = attributes, hostURL = hostURL, qaMode = qaMode, forcedVariations = forcedVariations, trackingCallback = trackingCallback)
 
-        val sdkInstance = GrowthBookSDK(gbContext, refreshHandler, networkDispatcher)
+        val sdkInstance = GrowthBookSDK(gbContext, refreshHandler, networkDispatcher, features = null)
 
         return sdkInstance
 
     }
 }
+
 
 /**
  * The main export of the libraries is a simple GrowthBook wrapper class that takes a Context object in the constructor.
@@ -109,12 +133,21 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     }
 
     @DelicateCoroutinesApi
-    internal constructor(context : GBContext, refreshHandler : GBCacheRefreshHandler?, networkDispatcher: NetworkDispatcher = CoreNetworkClient()) : this(){
+    internal constructor(context : GBContext, refreshHandler : GBCacheRefreshHandler?, networkDispatcher: NetworkDispatcher = CoreNetworkClient(), features: GBFeatures?) : this(){
         gbContext = context
         this.refreshHandler = refreshHandler
         this.networkDispatcher = networkDispatcher
 
-        refreshCache()
+        /**
+         * JAVA Consumers preset Features
+         * SDK will not call API to fetch Features List
+         */
+        if (features != null) {
+            gbContext.features = features
+        } else {
+            refreshCache()
+        }
+
     }
 
     /**

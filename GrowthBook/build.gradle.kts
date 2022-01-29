@@ -10,26 +10,26 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "1.0.4"
+version = "1.0.6"
+val iOSBinaryName = "GrowthBook"
+
 
 kotlin {
 
     val ktorVersion = "1.6.7"
     val serializationVersion = "1.3.2"
-    val coroutineVersion = "1.4.2"
 
     android {
         publishLibraryVariants("release")
     }
-    
+
+//    jvm()
+
     val xcf = XCFramework()
-    listOf(
-        iosX64(),
-        iosArm64(),
-        //iosSimulatorArm64() sure all ios dependencies support this target
-    ).forEach {
-        it.binaries.framework {
-            baseName = "GrowthBook"
+
+    ios {
+        binaries.framework {
+            baseName = iOSBinaryName
             xcf.add(this)
         }
     }
@@ -64,34 +64,21 @@ kotlin {
             dependencies {
                 implementation(kotlin("test-junit"))
                 implementation("junit:junit:4.13.2")
-
                 implementation ("org.mockito:mockito-core:4.2.0")
             }
         }
-        val iosX64Main by getting
-        val iosArm64Main by getting
-        //val iosSimulatorArm64Main by getting
 
-        val iosMain by creating {
-            dependsOn(commonMain)
+        val iosMain by getting {
             dependencies {
                 implementation("io.ktor:ktor-client-ios:$ktorVersion")
             }
-            iosX64Main.dependsOn(this)
-            iosArm64Main.dependsOn(this)
-            //iosSimulatorArm64Main.dependsOn(this)
         }
 
-        
-        val iosX64Test by getting
-        val iosArm64Test by getting
-        //val iosSimulatorArm64Test by getting
-        val iosTest by creating {
-            dependsOn(commonTest)
-            iosX64Test.dependsOn(this)
-            iosArm64Test.dependsOn(this)
-            //iosSimulatorArm64Test.dependsOn(this)
-        }
+        val iosTest by getting
+
+//        val jvmMain by getting
+//        val jvmTest by getting
+
     }
 
 }
@@ -178,3 +165,39 @@ signing {
     sign(publishing.publications)
 }
 
+
+tasks.register("publishiOSXCFramework") {
+    description = "Publish iOS framework to the Cocoa Repo"
+
+    // Create Release Framework for Xcode
+    dependsOn("assembleXCFramework")
+
+    // Replace
+    doLast {
+
+        delete("$rootDir/XCFramework")
+
+        copy {
+            from("$buildDir/XCFrameworks/release")
+            into("$rootDir/XCFramework")
+        }
+
+        val dir = File("$rootDir/$iOSBinaryName.podspec")
+        val tempFile = File("$rootDir/$iOSBinaryName.podspec.new")
+
+        val reader = dir.bufferedReader()
+        val writer = tempFile.bufferedWriter()
+        var currentLine: String?
+
+        while (reader.readLine().also { currLine -> currentLine = currLine } != null) {
+            if (currentLine?.trim()?.startsWith("spec.version") == true) {
+                writer.write("    spec.version       = \"${version}\"" + System.lineSeparator())
+            } else {
+                writer.write(currentLine + System.lineSeparator())
+            }
+        }
+        writer.close()
+        reader.close()
+        tempFile.renameTo(dir)
+    }
+}

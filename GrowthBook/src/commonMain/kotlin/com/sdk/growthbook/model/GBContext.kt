@@ -21,11 +21,11 @@ class GBContext(
     /**
      * Map of user attributes that are used to assign variations
      */
-    val attributes: HashMap<String, Any>,
+    val attributes: Map<String, Any>,
     /**
      * Force specific experiments to always assign a specific variation (used for QA)
      */
-    val forcedVariations: HashMap<String, Int>,
+    val forcedVariations: Map<String, Int>,
     /**
      * If true, random assignment is disabled and only explicitly forced variations are used.
      */

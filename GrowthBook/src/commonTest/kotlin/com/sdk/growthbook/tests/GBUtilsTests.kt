@@ -1,11 +1,9 @@
 package com.sdk.growthbook.tests
 
-import com.sdk.growthbook.Utils.GBBucketRange
-import com.sdk.growthbook.Utils.GBUtils
-import com.sdk.growthbook.Utils.toJsonElement
-import com.sdk.growthbook.Utils.toList
+import com.sdk.growthbook.Utils.*
 import kotlinx.serialization.json.*
 import kotlin.test.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class GBUtilsTests {
@@ -235,6 +233,23 @@ class GBUtilsTests {
 
         assertTrue(failedScenarios.size == 0)
 
+    }
+
+    @Test
+    fun testEdgeCases() {
+
+        GBUtils()
+        Constants()
+
+        assertTrue(Constants.featurePath == "api/features/")
+
+        assertFalse(GBUtils.inNamespace("4242", GBNameSpace("",0F,0F)))
+
+
+        val items = ArrayList<JsonPrimitive>()
+        items.add(JsonPrimitive(1))
+
+        assertTrue(GBUtils.getGBNameSpace(JsonArray(items)) == null)
     }
 
 }

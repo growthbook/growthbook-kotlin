@@ -46,10 +46,10 @@ internal class CachingAndroid : CachingLayer {
             // Create New File
             file.createNewFile()
 
-            val json = Json { prettyPrint = true; isLenient = true; ignoreUnknownKeys = true }.encodeToString(content)
+            val jsonContents = json.encodeToString(content)
 
             // Save contents in file
-            file.appendText(json)
+            file.appendText(jsonContents)
         }
 
 

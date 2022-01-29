@@ -1,0 +1,6 @@
+framework module GrowthBook {
+    umbrella header "GrowthBook.h"
+
+    export *
+    module * { export * }
+}
