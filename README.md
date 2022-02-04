@@ -34,12 +34,6 @@ dependencies {
 }
 ```
 
-- Add Internet Permission to your AndroidManifest.xml, if not already added
-
-  ```kotlin
-  <uses-permission android:name="android.permission.INTERNET" />
-  ```
-
 ##### iOS
 
 ###### CocoaPods 
