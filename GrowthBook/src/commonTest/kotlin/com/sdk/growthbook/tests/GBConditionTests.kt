@@ -1,9 +1,13 @@
 package com.sdk.growthbook.tests
 
+import com.sdk.growthbook.Evaluators.GBAttributeType
 import com.sdk.growthbook.Evaluators.GBConditionEvaluator
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class GBConditionTests {
@@ -43,5 +47,23 @@ class GBConditionTests {
 
         assertTrue(failedScenarios.size == 0)
 
+    }
+
+    @Test
+    fun testInValidConditionObj(){
+        val evaluator = GBConditionEvaluator()
+        assertFalse(evaluator.evalCondition(JsonObject(HashMap()), JsonArray(ArrayList())))
+
+        assertFalse(evaluator.isOperatorObject(JsonObject(HashMap())))
+
+        assertTrue(evaluator.getType(null).toString() == GBAttributeType.gbUnknown.toString())
+
+        assertTrue(evaluator.getPath(JsonPrimitive("test"), "key") == null)
+
+        assertTrue(evaluator.evalConditionValue(JsonObject(HashMap()), null) == false)
+
+        assertTrue(evaluator.evalOperatorCondition("${"$"}lte", JsonPrimitive("abc"), JsonPrimitive("abc")))
+
+        assertTrue(evaluator.evalOperatorCondition("${"$"}gte", JsonPrimitive("abc"), JsonPrimitive("abc")))
     }
 }

@@ -1,24 +1,69 @@
 package com.sdk.growthbook
 
 import android.content.Context
-import org.junit.Test
-import org.junit.runner.RunWith
+import com.sdk.growthbook.sandbox.CachingAndroid
+import com.sdk.growthbook.sandbox.CachingImpl
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
+import org.junit.Rule
+import org.junit.rules.TemporaryFolder
+import kotlin.test.assertTrue
 import org.mockito.Mock
-import org.mockito.junit.MockitoJUnitRunner
+import org.mockito.Mockito.`when`
+import org.mockito.MockitoAnnotations
+import kotlin.test.BeforeTest
+import kotlin.test.Test
 
-@RunWith(MockitoJUnitRunner::class)
-class AndroidGreetingTest {
+class AndroidCachingTest {
+
+    @Rule @JvmField
+    var mTempFolder = TemporaryFolder()
 
     @Mock
-    private lateinit var mockContext: Context
+    private val mMockContext: Context? = null
+
+    @BeforeTest
+    fun setUp() {
+        MockitoAnnotations.openMocks(this)
+
+        `when`(mMockContext!!.filesDir).thenReturn(mTempFolder.newFolder())
+
+        CachingAndroid.context = mMockContext
+    }
+
 
     @Test
-    fun testExample() {
+    fun testActualLayer() {
 
-        // Given a mocked Context injected into the object under test...
-//        `when`(mockContext.getString(R.string.name_label))
-//            .thenReturn(FAKE_STRING)
+        val cachingMgr = CachingImpl
 
-//        assertTrue("Check Android is mentioned", Greeting().greeting().contains("Android"))
+        assertTrue(cachingMgr.getLayer() is CachingAndroid)
+
     }
+
+    @Test
+    fun testCachingAndroidFileName() {
+        val manager = CachingAndroid()
+
+        val fileName = "gb-features.txt"
+
+        val file = manager.getTargetFile(fileName)
+
+        assertTrue(file != null)
+    }
+
+    @Test
+    fun testCachingAndroid() {
+        val manager = CachingAndroid()
+
+        val fileName = "gb-features.txt"
+
+        manager.saveContent(fileName, JsonPrimitive("GrowthBook"))
+
+        val fileContents = manager.getContent(fileName)
+
+        assertTrue(fileContents != null)
+        assertTrue(fileContents.jsonPrimitive.content == "GrowthBook")
+    }
+
 }
