@@ -117,7 +117,6 @@ class GBSDKBuilderApp(apiKey: String, hostURL: String, attributes: Map<String, A
     }
 }
 
-
 /**
  * The main export of the libraries is a simple GrowthBook wrapper class that takes a Context object in the constructor.
  * It exposes two main methods: feature and run.
@@ -147,7 +146,6 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         } else {
             refreshCache()
         }
-
     }
 
     /**

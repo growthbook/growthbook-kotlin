@@ -24,6 +24,7 @@ kotlin {
 
 //    jvm()
 
+
     val xcf = XCFramework()
     listOf(
         iosX64(),
@@ -92,7 +93,6 @@ kotlin {
 
         val watchosMain by getting
 
-
         val iosMain by creating {
             dependsOn(commonMain)
             dependencies {
@@ -110,6 +110,7 @@ kotlin {
         val iosX64Test by getting
         val iosArm64Test by getting
         val iosSimulatorArm64Test by getting
+
         val iosTest by creating {
             dependsOn(commonTest)
             iosX64Test.dependsOn(this)
@@ -120,7 +121,6 @@ kotlin {
 
 //        val jvmMain by getting
 //        val jvmTest by getting
-
     }
 
 }
@@ -139,6 +139,7 @@ val dokkaOutputDir = "$buildDir/dokka"
 tasks.dokkaHtml {
     outputDirectory.set(file(dokkaOutputDir))
 }
+
 
 /**
  * This task deletes older documents
@@ -208,6 +209,7 @@ publishing {
     }
 }
 
+
 /**
  * Signing JAR using GPG Keys
  */
@@ -218,7 +220,6 @@ signing {
     )
     sign(publishing.publications)
 }
-
 
 /**
  * This task execution requires - pod trunk to be setup

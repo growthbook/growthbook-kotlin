@@ -8,13 +8,13 @@
 
 
 
+
 - **Lightweight and fast**
 - **Supports iOS & Android apps**
   - **Android version 26 & above**
   - **iOS version 12 & Above**
   - **Apple TvOS version 13 & Above**
   - **Apple WatchOS version 7 & Above**
-  
 - **Use your existing event tracking (GA, Segment, Mixpanel, custom)**
 - **Adjust variation weights and targeting without deploying new code**
 
@@ -87,7 +87,6 @@ binary "https://github.com/growthbook/growthbook-kotlin/blob/main/Carthage/Growt
 ```swift
 carthage update --use-xcframework
 ```
-
 
 
 ## Integration
@@ -393,7 +392,6 @@ class GBExperimentResult(
 
 )
 ```
-
 
 
 ## Proguard (Android)
