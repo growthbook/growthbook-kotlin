@@ -210,8 +210,8 @@ publishing {
                 }
                 developers {
                     developer {
-                        name.set("Nicholas Pearson")
-                        email.set("nicholaspearson918@gmail.com")
+                        name.set("GrowthBook DEV")
+                        email.set("sdk-dev@growthbook.io")
                     }
                 }
             }
