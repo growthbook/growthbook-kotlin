@@ -141,4 +141,38 @@ class GrowthBookSDKBuilderTests {
         assertTrue(expValue.variationId == 0)
     }
 
+//    @Test
+//    fun testSDKInitializationJAVA() {
+//
+//        val sdkInstance = GBSDKBuilderJAVA(testApiKey, testHostURL, attributes = testAttributes, features = HashMap(), trackingCallback = {
+//                gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
+//
+//
+//        }).initialize()
+//
+//        assertTrue(sdkInstance.getGBContext().apiKey == testApiKey)
+//        assertTrue(sdkInstance.getGBContext().hostURL == testHostURL)
+//        assertTrue(sdkInstance.getGBContext().attributes == testAttributes)
+//
+//
+//    }
+//
+//    @Test
+//    fun testSDKFeaturesDataJAVA() {
+//
+//        val features : GBFeatures = HashMap()
+//        features.put("onboarding", GBFeature())
+//
+//        val sdkInstance = GBSDKBuilderJAVA(testApiKey, testHostURL, attributes = testAttributes, features = features, trackingCallback = {
+//                gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
+//
+//
+//        }).initialize()
+//
+//        assertTrue(sdkInstance.getFeatures().containsKey("onboarding"))
+//        assertFalse(sdkInstance.getFeatures().containsKey("fwrfewrfe"))
+//
+//    }
+
+
 }
