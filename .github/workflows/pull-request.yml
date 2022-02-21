@@ -1,4 +1,4 @@
-name: Growth book kotlin SDK test coverage
+name: Test coverage
 
 on:
   pull_request:
@@ -54,9 +54,6 @@ jobs:
           echo "::set-output name=branch_coverage::$(awk -v covered="${{needs.collect_coverage.outputs.branch_covered}}" -v missed="${{needs.collect_coverage.outputs.branch_missed}}" 'BEGIN{print covered/(missed+covered) * 100}')"
           echo "::set-output name=method_coverage::$(awk -v covered="${{needs.collect_coverage.outputs.method_covered}}" -v missed="${{needs.collect_coverage.outputs.method_missed}}" 'BEGIN{print covered/(missed+covered) * 100}')"
           echo "::set-output name=class_coverage::$(awk -v covered="${{needs.collect_coverage.outputs.class_covered}}" -v missed="${{needs.collect_coverage.outputs.class_missed}}" 'BEGIN{print covered/(missed+covered) * 100}')"
-      - name: Check coverage
-        if: ${{(steps.caulculate_coverage_percentage.outputs.line_coverage) < 80}}
-        run: exit "Line coverage expected to be > 80 but was ${{steps.caulculate_coverage_percentage.outputs.line_coverage}}" // failure
       - name: Calculate coverage badges
         id: caulculate_coverage_badges
         run: |
@@ -68,11 +65,16 @@ jobs:
       - uses: mshick/add-pr-comment@v1
         with:
           message: |
-            |*Line*|${{(steps.caulculate_coverage_percentage.outputs.line_coverage)}}|${{(steps.caulculate_coverage_badges.outputs.line_coverage)}}|
-            |*Instruction*|${{(steps.caulculate_coverage_percentage.outputs.instruction_coverage)}}|${{(steps.caulculate_coverage_badges.outputs.instruction_coverage)}}|
-            |*Branch*|${{(steps.caulculate_coverage_percentage.outputs.branch_coverage)}}|${{(steps.caulculate_coverage_badges.outputs.branch_coverage)}}|
-            |*Method*|${{(steps.caulculate_coverage_percentage.outputs.method_coverage)}}|${{(steps.caulculate_coverage_badges.outputs.method_coverage)}}|
-            |*Class*|${{(steps.caulculate_coverage_percentage.outputs.class_coverage)}}|${{(steps.caulculate_coverage_badges.outputs.class_coverage)}}|
+            1|Area|Coverage(%)|Status|
+            2|---|--:|--:|
+            3|*Line*|${{(steps.caulculate_coverage_percentage.outputs.line_coverage)}}|${{(steps.caulculate_coverage_badges.outputs.line_coverage)}}|
+            4|*Instruction*|${{(steps.caulculate_coverage_percentage.outputs.instruction_coverage)}}|${{(steps.caulculate_coverage_badges.outputs.instruction_coverage)}}|
+            5|*Branch*|${{(steps.caulculate_coverage_percentage.outputs.branch_coverage)}}|${{(steps.caulculate_coverage_badges.outputs.branch_coverage)}}|
+            6|*Method*|${{(steps.caulculate_coverage_percentage.outputs.method_coverage)}}|${{(steps.caulculate_coverage_badges.outputs.method_coverage)}}|
+            7|*Class*|${{(steps.caulculate_coverage_percentage.outputs.class_coverage)}}|${{(steps.caulculate_coverage_badges.outputs.class_coverage)}}|
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           repo-token-user-login: 'github-actions[bot]'
           allow-repeats: false
+      - name: Check coverage
+        if: ${{(steps.caulculate_coverage_percentage.outputs.line_coverage) < 80}}
+        run: exit "Line coverage expected to be > 80 but was ${{steps.caulculate_coverage_percentage.outputs.line_coverage}}" // failure

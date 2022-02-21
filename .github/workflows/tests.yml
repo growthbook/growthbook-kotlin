@@ -1,4 +1,4 @@
-name: Growth book kotlin SDK tests
+name: Tests
 
 on:
   push:
