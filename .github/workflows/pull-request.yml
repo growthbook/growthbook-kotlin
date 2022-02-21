@@ -44,7 +44,7 @@ jobs:
         echo "::set-output name=class_missed::$(xmllint --xpath "string(/report/counter[@type='CLASS']/@missed)" build/reports/kover/project-xml/report.xml)"
   check_coverage:
     needs: collect_coverage
-    runs-on: [ self-hosted, build-runner ]
+    runs-on: ubuntu-latest
     steps:
       - name: Calculate coverage
         id: caulculate_coverage_percentage
