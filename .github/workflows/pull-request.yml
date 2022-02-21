@@ -65,13 +65,13 @@ jobs:
       - uses: mshick/add-pr-comment@v1
         with:
           message: |
-            1|Area|Coverage(%)|Status|
-            2|---|--:|--:|
-            3|*Line*|${{(steps.caulculate_coverage_percentage.outputs.line_coverage)}}|${{(steps.caulculate_coverage_badges.outputs.line_coverage)}}|
-            4|*Instruction*|${{(steps.caulculate_coverage_percentage.outputs.instruction_coverage)}}|${{(steps.caulculate_coverage_badges.outputs.instruction_coverage)}}|
-            5|*Branch*|${{(steps.caulculate_coverage_percentage.outputs.branch_coverage)}}|${{(steps.caulculate_coverage_badges.outputs.branch_coverage)}}|
-            6|*Method*|${{(steps.caulculate_coverage_percentage.outputs.method_coverage)}}|${{(steps.caulculate_coverage_badges.outputs.method_coverage)}}|
-            7|*Class*|${{(steps.caulculate_coverage_percentage.outputs.class_coverage)}}|${{(steps.caulculate_coverage_badges.outputs.class_coverage)}}|
+            1 | Area | Coverage(%) | Status | 
+            2 | --- | --: | --: | 
+            3 | *Line* | ${{(steps.caulculate_coverage_percentage.outputs.line_coverage)}} | ${{(steps.caulculate_coverage_badges.outputs.line_coverage)}} | 
+            4 | *Instruction* | ${{(steps.caulculate_coverage_percentage.outputs.instruction_coverage)}} | ${{(steps.caulculate_coverage_badges.outputs.instruction_coverage)}} | 
+            5 | *Branch* | ${{(steps.caulculate_coverage_percentage.outputs.branch_coverage)}} | ${{(steps.caulculate_coverage_badges.outputs.branch_coverage)}} | 
+            6 | *Method* | ${{(steps.caulculate_coverage_percentage.outputs.method_coverage)}} | ${{(steps.caulculate_coverage_badges.outputs.method_coverage)}} | 
+            7 | *Class* | ${{(steps.caulculate_coverage_percentage.outputs.class_coverage)}} | ${{(steps.caulculate_coverage_badges.outputs.class_coverage)}} |
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           repo-token-user-login: 'github-actions[bot]'
           allow-repeats: false
