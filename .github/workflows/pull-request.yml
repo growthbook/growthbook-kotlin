@@ -49,11 +49,11 @@ jobs:
       - name: Calculate coverage
         id: caulculate_coverage_percentage
         run: |
-          echo "::set-output name=line_coverage::$(awk -v covered="${{needs.collect_coverage.outputs.line_covered}}" -v missed="{{needs.collect_coverage.outputs.line_missed}}" 'BEGIN{print covered/(missed+covered) * 100}')"
-          echo "::set-output name=instruction_coverage::$(awk -v covered="${{needs.collect_coverage.outputs.instruction_covered}}" -v missed="{{needs.collect_coverage.outputs.instruction_missed}}" 'BEGIN{print covered/(missed+covered) * 100}')"
-          echo "::set-output name=branch_coverage::$(awk -v covered="${{needs.collect_coverage.outputs.branch_covered}}" -v missed="{{needs.collect_coverage.outputs.branch_missed}}" 'BEGIN{print covered/(missed+covered) * 100}')"
-          echo "::set-output name=method_coverage::$(awk -v covered="${{needs.collect_coverage.outputs.method_covered}}" -v missed="{{needs.collect_coverage.outputs.method_missed}}" 'BEGIN{print covered/(missed+covered) * 100}')"
-          echo "::set-output name=class_coverage::$(awk -v covered="${{needs.collect_coverage.outputs.class_covered}}" -v missed="{{needs.collect_coverage.outputs.class_missed}}" 'BEGIN{print covered/(missed+covered) * 100}')"
+          echo "::set-output name=line_coverage::$(awk -v covered="${{needs.collect_coverage.outputs.line_covered}}" -v missed="${{needs.collect_coverage.outputs.line_missed}}" 'BEGIN{print covered/(missed+covered) * 100}')"
+          echo "::set-output name=instruction_coverage::$(awk -v covered="${{needs.collect_coverage.outputs.instruction_covered}}" -v missed="${{needs.collect_coverage.outputs.instruction_missed}}" 'BEGIN{print covered/(missed+covered) * 100}')"
+          echo "::set-output name=branch_coverage::$(awk -v covered="${{needs.collect_coverage.outputs.branch_covered}}" -v missed="${{needs.collect_coverage.outputs.branch_missed}}" 'BEGIN{print covered/(missed+covered) * 100}')"
+          echo "::set-output name=method_coverage::$(awk -v covered="${{needs.collect_coverage.outputs.method_covered}}" -v missed="${{needs.collect_coverage.outputs.method_missed}}" 'BEGIN{print covered/(missed+covered) * 100}')"
+          echo "::set-output name=class_coverage::$(awk -v covered="${{needs.collect_coverage.outputs.class_covered}}" -v missed="${{needs.collect_coverage.outputs.class_missed}}" 'BEGIN{print covered/(missed+covered) * 100}')"
       - name: Check coverage
         if: ${{(steps.caulculate_coverage_percentage.outputs.line_coverage) < 80}}
         run: exit "Line coverage expected to be > 80 but was ${{steps.caulculate_coverage_percentage.outputs.line_coverage}}" // failure
