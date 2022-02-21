@@ -30,6 +30,8 @@ jobs:
     - name: Parse coverage
       id: parse_coverage
       run: |
+        sudo apt -y install libxml2-utils
+        xmllint --xpath "string(/report/counter[@type='LINE']/@covered)" build/reports/kover/project-xml/report.xml
         echo "::set-output name=line_covered::$(xmllint --xpath "string(/report/counter[@type='LINE']/@covered)" build/reports/kover/project-xml/report.xml)"
         echo "::set-output name=line_missed::$(xmllint --xpath "string(/report/counter[@type='LINE']/@missed)" build/reports/kover/project-xml/report.xml)"
         echo "::set-output name=instruction_covered::$(xmllint --xpath "string(/report/counter[@type='INSTRUCTION']/@covered)" build/reports/kover/project-xml/report.xml)"
