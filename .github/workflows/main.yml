@@ -32,7 +32,7 @@ jobs:
         useConfigFile: true
         configFilePath: ./.github/gitversion.yml
     - name: Build with Gradle
-      run: ./gradlew build
+      run: ./gradlew -Pversion=${{ steps.gitversion.outputs.SemVer }} build
     - name: release
       uses: actions/create-release@v1
       id: create_release
