@@ -9,57 +9,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - uses: actions/setup-java@v1
+    - uses: stevenleadbeater/kotlin-kover-action@main
+      id: kover-tests
       with:
-        java-version: 11
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
-    - name: Get coverage
-      run: ./gradlew koverReport
-    - name: Parse coverage
-      id: parse_coverage
-      run: |
-        sudo apt -y install libxml2-utils
-        xmllint --xpath "string(/report/counter[@type='LINE']/@covered)" build/reports/kover/project-xml/report.xml
-        echo "::set-output name=line_covered::$(xmllint --xpath "string(/report/counter[@type='LINE']/@covered)" build/reports/kover/project-xml/report.xml)"
-        echo "::set-output name=line_missed::$(xmllint --xpath "string(/report/counter[@type='LINE']/@missed)" build/reports/kover/project-xml/report.xml)"
-        echo "::set-output name=instruction_covered::$(xmllint --xpath "string(/report/counter[@type='INSTRUCTION']/@covered)" build/reports/kover/project-xml/report.xml)"
-        echo "::set-output name=instruction_missed::$(xmllint --xpath "string(/report/counter[@type='INSTRUCTION']/@missed)" build/reports/kover/project-xml/report.xml)"
-        echo "::set-output name=branch_covered::$(xmllint --xpath "string(/report/counter[@type='BRANCH']/@covered)" build/reports/kover/project-xml/report.xml)"
-        echo "::set-output name=branch_missed::$(xmllint --xpath "string(/report/counter[@type='BRANCH']/@missed)" build/reports/kover/project-xml/report.xml)"
-        echo "::set-output name=method_covered::$(xmllint --xpath "string(/report/counter[@type='METHOD']/@covered)" build/reports/kover/project-xml/report.xml)"
-        echo "::set-output name=method_missed::$(xmllint --xpath "string(/report/counter[@type='METHOD']/@missed)" build/reports/kover/project-xml/report.xml)"
-        echo "::set-output name=class_covered::$(xmllint --xpath "string(/report/counter[@type='CLASS']/@covered)" build/reports/kover/project-xml/report.xml)"
-        echo "::set-output name=class_missed::$(xmllint --xpath "string(/report/counter[@type='CLASS']/@missed)" build/reports/kover/project-xml/report.xml)"
-    - name: Calculate coverage
-      id: caulculate_coverage_percentage
-      run: |
-        echo "::set-output name=line_coverage::$(awk -v covered="${{steps.parse_coverage.outputs.line_covered}}" -v missed="${{steps.parse_coverage.outputs.line_missed}}" 'BEGIN{printf "%.0f", covered/(missed+covered) * 100}')"
-        echo "::set-output name=instruction_coverage::$(awk -v covered="${{steps.parse_coverage.outputs.instruction_covered}}" -v missed="${{steps.parse_coverage.outputs.instruction_missed}}" 'BEGIN{printf "%.0f", covered/(missed+covered) * 100}')"
-        echo "::set-output name=branch_coverage::$(awk -v covered="${{steps.parse_coverage.outputs.branch_covered}}" -v missed="${{steps.parse_coverage.outputs.branch_missed}}" 'BEGIN{printf "%.0f", covered/(missed+covered) * 100}')"
-        echo "::set-output name=method_coverage::$(awk -v covered="${{steps.parse_coverage.outputs.method_covered}}" -v missed="${{steps.parse_coverage.outputs.method_missed}}" 'BEGIN{printf "%.0f", covered/(missed+covered) * 100}')"
-        echo "::set-output name=class_coverage::$(awk -v covered="${{steps.parse_coverage.outputs.class_covered}}" -v missed="${{steps.parse_coverage.outputs.class_missed}}" 'BEGIN{printf "%.0f", covered/(missed+covered) * 100}')"
-    - name: Calculate coverage badges
-      id: caulculate_coverage_badges
-      run: |
-        echo "::set-output name=line_coverage_marker::$(if ((${{steps.caulculate_coverage_percentage.outputs.line_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)"
-        echo "::set-output name=instruction_coverage_marker::$(if ((${{steps.caulculate_coverage_percentage.outputs.instruction_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)"
-        echo "::set-output name=branch_coverage_marker::$(if ((${{steps.caulculate_coverage_percentage.outputs.branch_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)"
-        echo "::set-output name=method_coverage_marker::$(if ((${{steps.caulculate_coverage_percentage.outputs.method_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)"
-        echo "::set-output name=class_coverage_marker::$(if ((${{steps.caulculate_coverage_percentage.outputs.class_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)"
-    - uses: mshick/add-pr-comment@v1
-      with:
-        message: |
-          | Area  | Coverage(%) | Status |
-          | ------------- | ------------- | ------------- |
-          | **Line**  | ${{(steps.caulculate_coverage_percentage.outputs.line_coverage)}}  | ${{steps.caulculate_coverage_badges.outputs.line_coverage_marker}} |
-          | **Instruction**  | ${{(steps.caulculate_coverage_percentage.outputs.instruction_coverage)}}  | ${{steps.caulculate_coverage_badges.outputs.instruction_coverage_marker}}  |
-          | **Branch**  | ${{(steps.caulculate_coverage_percentage.outputs.branch_coverage)}}  | ${{steps.caulculate_coverage_badges.outputs.branch_coverage_marker}}  |
-          | **Method**  | ${{(steps.caulculate_coverage_percentage.outputs.method_coverage)}}  | ${{steps.caulculate_coverage_badges.outputs.method_coverage_marker}}  |
-          | **Class**  | ${{(steps.caulculate_coverage_percentage.outputs.class_coverage)}}  | ${{steps.caulculate_coverage_badges.outputs.class_coverage_marker}}  |
+        coverage-threshold: 80
         repo-token: ${{ secrets.GITHUB_TOKEN }}
-        repo-token-user-login: 'github-actions[bot]'
-        allow-repeats: false
     - name: Check coverage
-      if: ${{(steps.caulculate_coverage_percentage.outputs.line_coverage) < 80}}
-      run: exit "Line coverage expected to be > 80 but was ${{steps.caulculate_coverage_percentage.outputs.line_coverage}}" // failure
+      if: ${{(steps.kover-tests.outputs.line-coverage) < 80}}
+      shell: bash
+      run: exit "Line coverage expected to be > 80 but was ${{steps.kover-tests.outputs.line-coverage}}"
