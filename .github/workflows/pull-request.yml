@@ -52,11 +52,11 @@ jobs:
         message: |
           | Area  | Coverage(%) | Status |
           | ------------- | ------------- | ------------- |
-          | **Line**  | ${{(steps.caulculate_coverage_percentage.outputs.line_coverage)}}  | ${{(steps.caulculate_coverage_badges.outputs.line_coverage)}} |
-          | **Instruction**  | ${{(steps.caulculate_coverage_percentage.outputs.instruction_coverage)}}  | ${{(steps.caulculate_coverage_badges.outputs.instruction_coverage)}}  |
-          | **Branch**  | ${{(steps.caulculate_coverage_percentage.outputs.branch_coverage)}}  | ${{(steps.caulculate_coverage_badges.outputs.branch_coverage)}}  |
-          | **Method**  | ${{(steps.caulculate_coverage_percentage.outputs.method_coverage)}}  | ${{(steps.caulculate_coverage_badges.outputs.method_coverage)}}  |
-          | **Class**  | ${{(steps.caulculate_coverage_percentage.outputs.class_coverage)}}  | ${{(steps.caulculate_coverage_badges.outputs.class_coverage)}}  |
+          | **Line**  | ${{(steps.caulculate_coverage_percentage.outputs.line_coverage)}}  | ${{steps.caulculate_coverage_badges.outputs.line_coverage_marker}} |
+          | **Instruction**  | ${{(steps.caulculate_coverage_percentage.outputs.instruction_coverage)}}  | ${{steps.caulculate_coverage_badges.outputs.instruction_coverage_marker}}  |
+          | **Branch**  | ${{(steps.caulculate_coverage_percentage.outputs.branch_coverage)}}  | ${{steps.caulculate_coverage_badges.outputs.branch_coverage_marker}}  |
+          | **Method**  | ${{(steps.caulculate_coverage_percentage.outputs.method_coverage)}}  | ${{steps.caulculate_coverage_badges.outputs.method_coverage_marker}}  |
+          | **Class**  | ${{(steps.caulculate_coverage_percentage.outputs.class_coverage)}}  | ${{steps.caulculate_coverage_badges.outputs.class_coverage_marker}}  |
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         repo-token-user-login: 'github-actions[bot]'
         allow-repeats: false
