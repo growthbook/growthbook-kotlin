@@ -34,11 +34,11 @@ jobs:
     - name: Calculate coverage
       id: caulculate_coverage_percentage
       run: |
-        echo "::set-output name=line_coverage::$(awk -v covered="${{steps.parse_coverage.outputs.line_covered}}" -v missed="${{steps.parse_coverage.outputs.line_missed}}" 'BEGIN{print covered/(missed+covered) * 100}')"
-        echo "::set-output name=instruction_coverage::$(awk -v covered="${{steps.parse_coverage.outputs.instruction_covered}}" -v missed="${{steps.parse_coverage.outputs.instruction_missed}}" 'BEGIN{print covered/(missed+covered) * 100}')"
-        echo "::set-output name=branch_coverage::$(awk -v covered="${{steps.parse_coverage.outputs.branch_covered}}" -v missed="${{steps.parse_coverage.outputs.branch_missed}}" 'BEGIN{print covered/(missed+covered) * 100}')"
-        echo "::set-output name=method_coverage::$(awk -v covered="${{steps.parse_coverage.outputs.method_covered}}" -v missed="${{steps.parse_coverage.outputs.method_missed}}" 'BEGIN{print covered/(missed+covered) * 100}')"
-        echo "::set-output name=class_coverage::$(awk -v covered="${{steps.parse_coverage.outputs.class_covered}}" -v missed="${{steps.parse_coverage.outputs.class_missed}}" 'BEGIN{print covered/(missed+covered) * 100}')"
+        echo "::set-output name=line_coverage::$(awk -v covered="${{steps.parse_coverage.outputs.line_covered}}" -v missed="${{steps.parse_coverage.outputs.line_missed}}" 'BEGIN{print covered%(missed+covered) * 100}')"
+        echo "::set-output name=instruction_coverage::$(awk -v covered="${{steps.parse_coverage.outputs.instruction_covered}}" -v missed="${{steps.parse_coverage.outputs.instruction_missed}}" 'BEGIN{print covered%(missed+covered) * 100}')"
+        echo "::set-output name=branch_coverage::$(awk -v covered="${{steps.parse_coverage.outputs.branch_covered}}" -v missed="${{steps.parse_coverage.outputs.branch_missed}}" 'BEGIN{print covered%(missed+covered) * 100}')"
+        echo "::set-output name=method_coverage::$(awk -v covered="${{steps.parse_coverage.outputs.method_covered}}" -v missed="${{steps.parse_coverage.outputs.method_missed}}" 'BEGIN{print covered%(missed+covered) * 100}')"
+        echo "::set-output name=class_coverage::$(awk -v covered="${{steps.parse_coverage.outputs.class_covered}}" -v missed="${{steps.parse_coverage.outputs.class_missed}}" 'BEGIN{print covered%(missed+covered) * 100}')"
     - name: Calculate coverage badges
       id: caulculate_coverage_badges
       run: |
