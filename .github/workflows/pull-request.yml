@@ -39,16 +39,24 @@ jobs:
         echo "::set-output name=branch_coverage::$(awk -v covered="${{steps.parse_coverage.outputs.branch_covered}}" -v missed="${{steps.parse_coverage.outputs.branch_missed}}" 'BEGIN{printf "%.0f", covered/(missed+covered) * 100}')"
         echo "::set-output name=method_coverage::$(awk -v covered="${{steps.parse_coverage.outputs.method_covered}}" -v missed="${{steps.parse_coverage.outputs.method_missed}}" 'BEGIN{printf "%.0f", covered/(missed+covered) * 100}')"
         echo "::set-output name=class_coverage::$(awk -v covered="${{steps.parse_coverage.outputs.class_covered}}" -v missed="${{steps.parse_coverage.outputs.class_missed}}" 'BEGIN{printf "%.0f", covered/(missed+covered) * 100}')"
+    - name: Calculate coverage badges
+      id: caulculate_coverage_badges
+      run: |
+        echo "::set-output name=line_coverage_marker::"
+        echo "::set-output name=instruction_coverage_marker::$(if ((${{steps.caulculate_coverage_percentage.outputs.instruction_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)"
+        echo "::set-output name=branch_coverage_marker::$(if ((${{steps.caulculate_coverage_percentage.outputs.branch_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)"
+        echo "::set-output name=method_coverage_marker::$(if ((${{steps.caulculate_coverage_percentage.outputs.method_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)"
+        echo "::set-output name=class_coverage_marker::$(if ((${{steps.caulculate_coverage_percentage.outputs.class_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)"
     - uses: mshick/add-pr-comment@v1
       with:
         message: |
           | Area  | Coverage(%) | Status |
           | ------------- | ------------- | ------------- |
-          | **Line**  | ${{(steps.caulculate_coverage_percentage.outputs.line_coverage)}}  | $(if ((${{steps.caulculate_coverage_percentage.outputs.line_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi) |
-          | **Instruction**  | ${{(steps.caulculate_coverage_percentage.outputs.instruction_coverage)}}  | $(if ((${{steps.caulculate_coverage_percentage.outputs.instruction_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)  |
-          | **Branch**  | ${{(steps.caulculate_coverage_percentage.outputs.branch_coverage)}}  | $(if ((${{steps.caulculate_coverage_percentage.outputs.branch_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)  |
-          | **Method**  | ${{(steps.caulculate_coverage_percentage.outputs.method_coverage)}}  | $(if ((${{steps.caulculate_coverage_percentage.outputs.method_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)  |
-          | **Class**  | ${{(steps.caulculate_coverage_percentage.outputs.class_coverage)}}  | $(if ((${{steps.caulculate_coverage_percentage.outputs.class_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)  |
+          | **Line**  | ${{(steps.caulculate_coverage_percentage.outputs.line_coverage)}}  | ${{(steps.caulculate_coverage_badges.outputs.line_coverage)}} |
+          | **Instruction**  | ${{(steps.caulculate_coverage_percentage.outputs.instruction_coverage)}}  | ${{(steps.caulculate_coverage_badges.outputs.instruction_coverage)}}  |
+          | **Branch**  | ${{(steps.caulculate_coverage_percentage.outputs.branch_coverage)}}  | ${{(steps.caulculate_coverage_badges.outputs.branch_coverage)}}  |
+          | **Method**  | ${{(steps.caulculate_coverage_percentage.outputs.method_coverage)}}  | ${{(steps.caulculate_coverage_badges.outputs.method_coverage)}}  |
+          | **Class**  | ${{(steps.caulculate_coverage_percentage.outputs.class_coverage)}}  | ${{(steps.caulculate_coverage_badges.outputs.class_coverage)}}  |
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         repo-token-user-login: 'github-actions[bot]'
         allow-repeats: false
