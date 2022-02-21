@@ -28,7 +28,7 @@ jobs:
     - name: Get coverage
       run: ./gradlew koverReport
     - name: Parse coverage
-        - id: parse_coverage
+      id: parse_coverage
       run: |
         echo "::set-output name=line_covered::$(xmllint --xpath "string(/report/counter[@type='LINE']/@covered)" build/reports/kover/project-xml/report.xml)"
         echo "::set-output name=line_missed::$(xmllint --xpath "string(/report/counter[@type='LINE']/@missed)" build/reports/kover/project-xml/report.xml)"
