@@ -44,11 +44,11 @@ jobs:
         message: |
           | Area  | Coverage(%) | Status |
           | ------------- | ------------- | ------------- |
-          | **Line**  | ${{(steps.caulculate_coverage_percentage.outputs.line_coverage)}}  | if ((${{steps.caulculate_coverage_percentage.outputs.line_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi |
-          | **Instruction**  | ${{(steps.caulculate_coverage_percentage.outputs.instruction_coverage)}}  | if ((${{steps.caulculate_coverage_percentage.outputs.instruction_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi  |
-          | **Branch**  | ${{(steps.caulculate_coverage_percentage.outputs.branch_coverage)}}  | if ((${{steps.caulculate_coverage_percentage.outputs.branch_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi  |
-          | **Method**  | ${{(steps.caulculate_coverage_percentage.outputs.method_coverage)}}  | if ((${{steps.caulculate_coverage_percentage.outputs.method_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi  |
-          | **Class**  | ${{(steps.caulculate_coverage_percentage.outputs.class_coverage)}}  | if ((${{steps.caulculate_coverage_percentage.outputs.class_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi  |
+          | **Line**  | ${{(steps.caulculate_coverage_percentage.outputs.line_coverage)}}  | $(if ((${{steps.caulculate_coverage_percentage.outputs.line_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi) |
+          | **Instruction**  | ${{(steps.caulculate_coverage_percentage.outputs.instruction_coverage)}}  | $(if ((${{steps.caulculate_coverage_percentage.outputs.instruction_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)  |
+          | **Branch**  | ${{(steps.caulculate_coverage_percentage.outputs.branch_coverage)}}  | $(if ((${{steps.caulculate_coverage_percentage.outputs.branch_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)  |
+          | **Method**  | ${{(steps.caulculate_coverage_percentage.outputs.method_coverage)}}  | $(if ((${{steps.caulculate_coverage_percentage.outputs.method_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)  |
+          | **Class**  | ${{(steps.caulculate_coverage_percentage.outputs.class_coverage)}}  | $(if ((${{steps.caulculate_coverage_percentage.outputs.class_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)  |
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         repo-token-user-login: 'github-actions[bot]'
         allow-repeats: false
