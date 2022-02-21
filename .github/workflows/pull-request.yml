@@ -42,11 +42,11 @@ jobs:
     - name: Calculate coverage badges
       id: caulculate_coverage_badges
       run: |
-        echo "::set-output name=line_coverage_marker::$(if ((${{steps.caulculate_coverage_percentage.outputs.line_coverage}}>80)); then echo "heavy_check_mark"; else echo "x"; fi)"
-        echo "::set-output name=instruction_coverage_marker::$(if ((${{steps.caulculate_coverage_percentage.outputs.instruction_coverage}}>80)); then echo "heavy_check_mark"; else echo "x"; fi)"
-        echo "::set-output name=branch_coverage_marker::$(if ((${{steps.caulculate_coverage_percentage.outputs.branch_coverage}}>80)); then echo "heavy_check_mark"; else echo "x"; fi)"
-        echo "::set-output name=method_coverage_marker::$(if ((${{steps.caulculate_coverage_percentage.outputs.method_coverage}}>80)); then echo "heavy_check_mark"; else echo "x"; fi)"
-        echo "::set-output name=class_coverage_marker::$(if ((${{steps.caulculate_coverage_percentage.outputs.class_coverage}}>80)); then echo "heavy_check_mark"; else echo "x"; fi)"
+        echo "::set-output name=line_coverage_marker::$(if ((${{steps.caulculate_coverage_percentage.outputs.line_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)"
+        echo "::set-output name=instruction_coverage_marker::$(if ((${{steps.caulculate_coverage_percentage.outputs.instruction_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)"
+        echo "::set-output name=branch_coverage_marker::$(if ((${{steps.caulculate_coverage_percentage.outputs.branch_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)"
+        echo "::set-output name=method_coverage_marker::$(if ((${{steps.caulculate_coverage_percentage.outputs.method_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)"
+        echo "::set-output name=class_coverage_marker::$(if ((${{steps.caulculate_coverage_percentage.outputs.class_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)"
     - uses: mshick/add-pr-comment@v1
       with:
         message: |
