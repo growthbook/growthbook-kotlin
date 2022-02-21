@@ -7,17 +7,6 @@ jobs:
 
   collect_coverage:
     runs-on: ubuntu-latest
-    outputs:
-      line_covered: ${{ steps.parse_coverage.outputs.line_covered }}
-      line_missed: ${{ steps.parse_coverage.outputs.line_covered }}
-      instruction_covered: ${{ steps.parse_coverage.outputs.line_covered }}
-      instruction_missed: ${{ steps.parse_coverage.outputs.line_covered }}
-      branch_covered: ${{ steps.parse_coverage.outputs.line_covered }}
-      branch_missed: ${{ steps.parse_coverage.outputs.line_covered }}
-      method_covered: ${{ steps.parse_coverage.outputs.line_covered }}
-      method_missed: ${{ steps.parse_coverage.outputs.line_covered }}
-      class_covered: ${{ steps.parse_coverage.outputs.line_covered }}
-      class_missed: ${{ steps.parse_coverage.outputs.line_covered }}
     steps:
     - uses: actions/checkout@v2
     - uses: actions/setup-java@v1
@@ -42,39 +31,35 @@ jobs:
         echo "::set-output name=method_missed::$(xmllint --xpath "string(/report/counter[@type='METHOD']/@missed)" build/reports/kover/project-xml/report.xml)"
         echo "::set-output name=class_covered::$(xmllint --xpath "string(/report/counter[@type='CLASS']/@covered)" build/reports/kover/project-xml/report.xml)"
         echo "::set-output name=class_missed::$(xmllint --xpath "string(/report/counter[@type='CLASS']/@missed)" build/reports/kover/project-xml/report.xml)"
-  check_coverage:
-    needs: collect_coverage
-    runs-on: ubuntu-latest
-    steps:
-      - name: Calculate coverage
-        id: caulculate_coverage_percentage
-        run: |
-          echo "::set-output name=line_coverage::$(awk -v covered="${{needs.collect_coverage.outputs.line_covered}}" -v missed="${{needs.collect_coverage.outputs.line_missed}}" 'BEGIN{print covered/(missed+covered) * 100}')"
-          echo "::set-output name=instruction_coverage::$(awk -v covered="${{needs.collect_coverage.outputs.instruction_covered}}" -v missed="${{needs.collect_coverage.outputs.instruction_missed}}" 'BEGIN{print covered/(missed+covered) * 100}')"
-          echo "::set-output name=branch_coverage::$(awk -v covered="${{needs.collect_coverage.outputs.branch_covered}}" -v missed="${{needs.collect_coverage.outputs.branch_missed}}" 'BEGIN{print covered/(missed+covered) * 100}')"
-          echo "::set-output name=method_coverage::$(awk -v covered="${{needs.collect_coverage.outputs.method_covered}}" -v missed="${{needs.collect_coverage.outputs.method_missed}}" 'BEGIN{print covered/(missed+covered) * 100}')"
-          echo "::set-output name=class_coverage::$(awk -v covered="${{needs.collect_coverage.outputs.class_covered}}" -v missed="${{needs.collect_coverage.outputs.class_missed}}" 'BEGIN{print covered/(missed+covered) * 100}')"
-      - name: Calculate coverage badges
-        id: caulculate_coverage_badges
-        run: |
-          echo "::set-output name=line_coverage_marker::$(if ((${{steps.caulculate_coverage_percentage.outputs.line_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)"
-          echo "::set-output name=instruction_coverage_marker::$(if ((${{steps.caulculate_coverage_percentage.outputs.instruction_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)"
-          echo "::set-output name=branch_coverage_marker::$(if ((${{steps.caulculate_coverage_percentage.outputs.branch_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)"
-          echo "::set-output name=method_coverage_marker::$(if ((${{steps.caulculate_coverage_percentage.outputs.method_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)"
-          echo "::set-output name=class_coverage_marker::$(if ((${{steps.caulculate_coverage_percentage.outputs.class_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)"
-      - uses: mshick/add-pr-comment@v1
-        with:
-          message: |
-            1 | Area | Coverage(%) | Status | 
-            2 | --- | --: | --: | 
-            3 | *Line* | ${{(steps.caulculate_coverage_percentage.outputs.line_coverage)}} | ${{(steps.caulculate_coverage_badges.outputs.line_coverage)}} | 
-            4 | *Instruction* | ${{(steps.caulculate_coverage_percentage.outputs.instruction_coverage)}} | ${{(steps.caulculate_coverage_badges.outputs.instruction_coverage)}} | 
-            5 | *Branch* | ${{(steps.caulculate_coverage_percentage.outputs.branch_coverage)}} | ${{(steps.caulculate_coverage_badges.outputs.branch_coverage)}} | 
-            6 | *Method* | ${{(steps.caulculate_coverage_percentage.outputs.method_coverage)}} | ${{(steps.caulculate_coverage_badges.outputs.method_coverage)}} | 
-            7 | *Class* | ${{(steps.caulculate_coverage_percentage.outputs.class_coverage)}} | ${{(steps.caulculate_coverage_badges.outputs.class_coverage)}} |
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          repo-token-user-login: 'github-actions[bot]'
-          allow-repeats: false
-      - name: Check coverage
-        if: ${{(steps.caulculate_coverage_percentage.outputs.line_coverage) < 80}}
-        run: exit "Line coverage expected to be > 80 but was ${{steps.caulculate_coverage_percentage.outputs.line_coverage}}" // failure
+    - name: Calculate coverage
+      id: caulculate_coverage_percentage
+      run: |
+        echo "::set-output name=line_coverage::$(awk -v covered="${{steps.parse_coverage.outputs.line_covered}}" -v missed="${{steps.parse_coverage.outputs.line_missed}}" 'BEGIN{print covered/(missed+covered) * 100}')"
+        echo "::set-output name=instruction_coverage::$(awk -v covered="${{steps.parse_coverage.outputs.instruction_covered}}" -v missed="${{steps.parse_coverage.outputs.instruction_missed}}" 'BEGIN{print covered/(missed+covered) * 100}')"
+        echo "::set-output name=branch_coverage::$(awk -v covered="${{steps.parse_coverage.outputs.branch_covered}}" -v missed="${{steps.parse_coverage.outputs.branch_missed}}" 'BEGIN{print covered/(missed+covered) * 100}')"
+        echo "::set-output name=method_coverage::$(awk -v covered="${{steps.parse_coverage.outputs.method_covered}}" -v missed="${{steps.parse_coverage.outputs.method_missed}}" 'BEGIN{print covered/(missed+covered) * 100}')"
+        echo "::set-output name=class_coverage::$(awk -v covered="${{steps.parse_coverage.outputs.class_covered}}" -v missed="${{steps.parse_coverage.outputs.class_missed}}" 'BEGIN{print covered/(missed+covered) * 100}')"
+    - name: Calculate coverage badges
+      id: caulculate_coverage_badges
+      run: |
+        echo "::set-output name=line_coverage_marker::$(if ((${{steps.caulculate_coverage_percentage.outputs.line_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)"
+        echo "::set-output name=instruction_coverage_marker::$(if ((${{steps.caulculate_coverage_percentage.outputs.instruction_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)"
+        echo "::set-output name=branch_coverage_marker::$(if ((${{steps.caulculate_coverage_percentage.outputs.branch_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)"
+        echo "::set-output name=method_coverage_marker::$(if ((${{steps.caulculate_coverage_percentage.outputs.method_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)"
+        echo "::set-output name=class_coverage_marker::$(if ((${{steps.caulculate_coverage_percentage.outputs.class_coverage}}>80)); then echo ":heavy_check_mark:"; else echo ":x:"; fi)"
+    - uses: mshick/add-pr-comment@v1
+      with:
+        message: |
+          1 | Area | Coverage(%) | Status | 
+          2 | --- | --: | --: | 
+          3 | *Line* | ${{(steps.caulculate_coverage_percentage.outputs.line_coverage)}} | ${{(steps.caulculate_coverage_badges.outputs.line_coverage)}} | 
+          4 | *Instruction* | ${{(steps.caulculate_coverage_percentage.outputs.instruction_coverage)}} | ${{(steps.caulculate_coverage_badges.outputs.instruction_coverage)}} | 
+          5 | *Branch* | ${{(steps.caulculate_coverage_percentage.outputs.branch_coverage)}} | ${{(steps.caulculate_coverage_badges.outputs.branch_coverage)}} | 
+          6 | *Method* | ${{(steps.caulculate_coverage_percentage.outputs.method_coverage)}} | ${{(steps.caulculate_coverage_badges.outputs.method_coverage)}} | 
+          7 | *Class* | ${{(steps.caulculate_coverage_percentage.outputs.class_coverage)}} | ${{(steps.caulculate_coverage_badges.outputs.class_coverage)}} |
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        repo-token-user-login: 'github-actions[bot]'
+        allow-repeats: false
+    - name: Check coverage
+      if: ${{(steps.caulculate_coverage_percentage.outputs.line_coverage) < 80}}
+      run: exit "Line coverage expected to be > 80 but was ${{steps.caulculate_coverage_percentage.outputs.line_coverage}}" // failure
