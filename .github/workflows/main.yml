@@ -45,7 +45,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     - name: Publish to maven central
       run: |
-        GPG_PRIVATE_KEY="${{secrets.GPG_PRIVATE_KEY}}" GPG_PRIVATE_PASSWORD="${{secrets.GPG_PRIVATE_PASSWORD}}" GB_SONATYPE_USERNAME='${{secrets.GB_SONATYPE_USERNAME}}' GB_SONATYPE_PASSWORD='${{secrets.GB_SONATYPE_PASSWORD}}' ./gradlew publish
+        GPG_PRIVATE_KEY="${{secrets.GPG_PRIVATE_KEY}}" GPG_PRIVATE_PASSWORD="${{secrets.GPG_PRIVATE_PASSWORD}}" GB_SONATYPE_USERNAME='${{secrets.GB_SONATYPE_USERNAME}}' GB_SONATYPE_PASSWORD='${{secrets.GB_SONATYPE_PASSWORD}}' ./gradlew -Pversion=${{ steps.gitversion.outputs.SemVer }} publish
     - name: Upload binary
       uses: actions/upload-release-asset@v1
       env:
@@ -63,15 +63,6 @@ jobs:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: GrowthBook/build/libs/GrowthBook-kotlin-${{ steps.gitversion.outputs.SemVer }}-sources.jar
         asset_name: GrowthBook-kotlin-${{ steps.gitversion.outputs.SemVer }}-sources.jar
-        asset_content_type: application/x-jar
-    - name: Upload android sources
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: GrowthBook/build/libs/GrowthBook-android-${{ steps.gitversion.outputs.SemVer }}-sources.jar
-        asset_name: GrowthBook-android-${{ steps.gitversion.outputs.SemVer }}-sources.jar
         asset_content_type: application/x-jar
     - name: Upload metadata
       uses: actions/upload-release-asset@v1
