@@ -9,7 +9,7 @@ plugins {
     id("org.jetbrains.dokka") version "1.4.20"
 }
 
-group = "io.github.stevenleadbeater"
+group = "io.growthbook.sdk"
 val iOSBinaryName = "GrowthBook"
 
 kotlin {
