@@ -9,7 +9,7 @@ plugins {
     id("org.jetbrains.dokka") version "1.4.20"
 }
 
-group = "io.growthbook.sdk"
+group = "io.github.stevenleadbeater"
 val iOSBinaryName = "GrowthBook"
 
 kotlin {
@@ -55,7 +55,8 @@ kotlin {
             dependencies {
                 implementation("org.jetbrains.kotlin:kotlin-stdlib-common")
                 implementation(
-                    "org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
+                    "org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion"
+                )
                 implementation("io.ktor:ktor-client-core:$ktorVersion")
                 implementation("io.ktor:ktor-client-serialization:$ktorVersion")
                 implementation("com.ionspin.kotlin:bignum:0.3.3")
@@ -66,7 +67,8 @@ kotlin {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
                 implementation(
-                    "org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
+                    "org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion"
+                )
                 implementation("io.ktor:ktor-client-serialization:$ktorVersion")
             }
         }
@@ -80,7 +82,7 @@ kotlin {
             dependencies {
                 implementation(kotlin("test-junit"))
                 implementation("junit:junit:4.13.2")
-                implementation ("org.mockito:mockito-core:4.2.0")
+                implementation("org.mockito:mockito-core:4.2.0")
             }
         }
 
@@ -165,7 +167,7 @@ val sonatypePassword: String? = System.getenv("GB_SONATYPE_PASSWORD")
 publishing {
     repositories {
         maven {
-            name="kotlin"
+            name = "kotlin"
             val releasesRepoUrl = uri("https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/")
             val snapshotsRepoUrl = uri("https://s01.oss.sonatype.org/content/repositories/snapshots/")
             url = if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl
@@ -263,8 +265,8 @@ tasks.register("prepareReleaseOfiOSXCFramework") {
 
         while (cartreader.readLine().also { currLine -> cartcurrentLine = currLine } != null) {
             if (cartcurrentLine?.trim()?.startsWith("{") == true) {
-                cartwriter.write("{"+ System.lineSeparator())
-                cartwriter.write("    \"${version}\":\"https://github.com/growthbook/growthbook-kotlin/releases/download/${version}/${iOSBinaryName}.xcframework.zip\","+ System.lineSeparator())
+                cartwriter.write("{" + System.lineSeparator())
+                cartwriter.write("    \"${version}\":\"https://github.com/growthbook/growthbook-kotlin/releases/download/${version}/${iOSBinaryName}.xcframework.zip\"," + System.lineSeparator())
             } else if (cartcurrentLine?.trim()?.startsWith("\"${version}\"") == true) {
                 continue
             } else {
@@ -289,7 +291,6 @@ tasks.register("prepareReleaseOfiOSXCFramework") {
 
                 outputStream.toString()
             }
-
 
 
         val spmdir = File("$rootDir/Package.swift")
