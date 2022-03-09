@@ -19,8 +19,8 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "GrowthBook",
-    url: "https://github.com/growthbook/growthbook-kotlin/releases/download/1.1.0/GrowthBook.xcframework.zip",
-    checksum: "a9a05c2e5b1f197d7000bf4259264a0270a26196dc765bf58c5e0afb75f222cc"
+    url: "https://github.com/growthbook/growthbook-kotlin/releases/download/1.0.7/GrowthBook.xcframework.zip",
+    checksum: "89b4735fd947dd1c5c5e4dc65c540af2d2895856916fd440b7bfecb988533b5a"
         ),
     ]
 )
