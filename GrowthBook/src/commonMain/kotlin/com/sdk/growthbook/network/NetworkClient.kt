@@ -1,12 +1,12 @@
 package com.sdk.growthbook.network
 
 import com.sdk.growthbook.ApplicationDispatcher
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.features.json.*
-import io.ktor.client.features.json.serializer.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
+import io.ktor.client.HttpClient
+import io.ktor.client.call.receive
+import io.ktor.client.features.json.JsonFeature
+import io.ktor.client.features.json.serializer.KotlinxSerializer
+import io.ktor.client.request.get
+import io.ktor.client.statement.HttpResponse
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -17,10 +17,15 @@ import kotlinx.serialization.json.Json
  * Implement this intterface to define specific implementation for Network Calls - to be made by SDK
  */
 interface NetworkDispatcher {
-    val JSONParser : Json
+    val JSONParser: Json
         get() = Json { prettyPrint = true; isLenient = true; ignoreUnknownKeys = true }
+
     @DelicateCoroutinesApi
-    fun consumeGETRequest(request: String, onSuccess: (String) -> Unit, onError: (Throwable) -> Unit)
+    fun consumeGETRequest(
+        request: String,
+        onSuccess: (String) -> Unit,
+        onError: (Throwable) -> Unit
+    )
 }
 
 /**
@@ -29,7 +34,7 @@ interface NetworkDispatcher {
 internal class CoreNetworkClient : NetworkDispatcher {
 
     private val client = HttpClient {
-        install(JsonFeature){
+        install(JsonFeature) {
             serializer = KotlinxSerializer(kotlinx.serialization.json.Json {
                 prettyPrint = true
                 isLenient = true
@@ -55,7 +60,5 @@ internal class CoreNetworkClient : NetworkDispatcher {
             }
 
         }
-
     }
-
 }
