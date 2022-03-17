@@ -3,18 +3,18 @@ package com.sdk.growthbook
 
 import com.sdk.growthbook.Evaluators.GBExperimentEvaluator
 import com.sdk.growthbook.Evaluators.GBFeatureEvaluator
-import com.sdk.growthbook.features.FeaturesDataSource
-import com.sdk.growthbook.features.FeaturesFlowDelegate
-import com.sdk.growthbook.features.FeaturesViewModel
-import com.sdk.growthbook.network.CoreNetworkClient
-import com.sdk.growthbook.network.NetworkDispatcher
 import com.sdk.growthbook.Utils.GBCacheRefreshHandler
 import com.sdk.growthbook.Utils.GBError
 import com.sdk.growthbook.Utils.GBFeatures
+import com.sdk.growthbook.features.FeaturesDataSource
+import com.sdk.growthbook.features.FeaturesFlowDelegate
+import com.sdk.growthbook.features.FeaturesViewModel
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeatureResult
+import com.sdk.growthbook.network.CoreNetworkClient
+import com.sdk.growthbook.network.NetworkDispatcher
 import kotlinx.coroutines.DelicateCoroutinesApi
 
 typealias GBTrackingCallback = (GBExperiment, GBExperimentResult) -> Unit
@@ -155,7 +155,6 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     private var refreshHandler : GBCacheRefreshHandler? = null
     private lateinit var networkDispatcher: NetworkDispatcher
 
-    //@ThreadLocal
     internal companion object {
         internal lateinit var gbContext: GBContext
     }

@@ -3,7 +3,6 @@ package com.sdk.growthbook.features
 import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.network.CoreNetworkClient
 import com.sdk.growthbook.network.NetworkDispatcher
-import com.sdk.growthbook.Utils.Constants
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.serialization.decodeFromString
 
@@ -12,22 +11,22 @@ import kotlinx.serialization.decodeFromString
  */
 internal class FeaturesDataSource(val dispatcher: NetworkDispatcher = CoreNetworkClient()) {
 
-    private val apiUrl = "GrowthBookSDK.gbContext.hostURL + Constants.featurePath + GrowthBookSDK.gbContext.apiKey"
+    private val apiUrl = FeatureURLBuilder().buildUrl(GrowthBookSDK.gbContext)
 
     /**
      * Executes API Call to fetch features
      */
     @DelicateCoroutinesApi
     fun fetchFeatures(
-        success: (FeaturesDataModel) -> Unit, failure: (Throwable?) -> Unit) {
+        success: (FeaturesDataModel) -> Unit, failure: (Throwable?) -> Unit
+    ) {
         dispatcher.consumeGETRequest(apiUrl,
             onSuccess = { rawContent ->
-                val result : FeaturesDataModel = dispatcher.JSONParser.decodeFromString(rawContent)
+                val result: FeaturesDataModel = dispatcher.JSONParser.decodeFromString(rawContent)
                 result.also(success)
             },
-            onError = {apiTimeError ->
+            onError = { apiTimeError ->
                 apiTimeError.also(failure)
             })
     }
-
 }
