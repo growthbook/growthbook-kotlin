@@ -1,6 +1,8 @@
 package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.Utils.*
+import com.sdk.growthbook.features.FeatureURLBuilder
+import io.ktor.http.*
 import kotlinx.serialization.json.*
 import kotlin.test.Test
 import kotlin.test.assertFalse
@@ -241,15 +243,11 @@ class GBUtilsTests {
         GBUtils()
         Constants()
 
-        assertTrue(Constants.featurePath == "api/features/")
-
         assertFalse(GBUtils.inNamespace("4242", GBNameSpace("",0F,0F)))
-
 
         val items = ArrayList<JsonPrimitive>()
         items.add(JsonPrimitive(1))
 
         assertTrue(GBUtils.getGBNameSpace(JsonArray(items)) == null)
     }
-
 }

@@ -55,8 +55,7 @@ kotlin {
             dependencies {
                 implementation("org.jetbrains.kotlin:kotlin-stdlib-common")
                 implementation(
-                    "org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion"
-                )
+                    "org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
                 implementation("io.ktor:ktor-client-core:$ktorVersion")
                 implementation("io.ktor:ktor-client-serialization:$ktorVersion")
                 implementation("com.ionspin.kotlin:bignum:0.3.3")
@@ -67,15 +66,14 @@ kotlin {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
                 implementation(
-                    "org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion"
-                )
+                    "org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
                 implementation("io.ktor:ktor-client-serialization:$ktorVersion")
             }
         }
         val androidMain by getting {
             dependencies {
                 implementation("io.ktor:ktor-client-android:$ktorVersion")
-                implementation("androidx.startup:startup-runtime:1.1.0")
+                implementation("androidx.startup:startup-runtime:1.1.1")
             }
         }
         val androidTest by getting {

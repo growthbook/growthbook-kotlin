@@ -20,10 +20,6 @@ internal class Constants {
          */
         val featureCache = "FeatureCache"
 
-        /**
-         * Context Path for Fetching Feature Details - Web Service
-         */
-        val featurePath = "api/features/"
     }
 
 }

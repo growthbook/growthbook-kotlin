@@ -1,6 +1,6 @@
 package com.sdk.growthbook.tests
 
-import com.sdk.growthbook.Network.NetworkDispatcher
+import com.sdk.growthbook.network.NetworkDispatcher
 
 class MockNetworkClient (val succesResponse : String?, val error: Throwable?) : NetworkDispatcher {
     override fun consumeGETRequest(

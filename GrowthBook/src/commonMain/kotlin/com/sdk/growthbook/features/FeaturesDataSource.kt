@@ -1,8 +1,8 @@
-package com.sdk.growthbook.Features
+package com.sdk.growthbook.features
 
 import com.sdk.growthbook.GrowthBookSDK
-import com.sdk.growthbook.Network.CoreNetworkClient
-import com.sdk.growthbook.Network.NetworkDispatcher
+import com.sdk.growthbook.network.CoreNetworkClient
+import com.sdk.growthbook.network.NetworkDispatcher
 import com.sdk.growthbook.Utils.Constants
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.serialization.decodeFromString
@@ -12,7 +12,7 @@ import kotlinx.serialization.decodeFromString
  */
 internal class FeaturesDataSource(val dispatcher: NetworkDispatcher = CoreNetworkClient()) {
 
-    private val apiUrl = GrowthBookSDK.gbContext.hostURL + Constants.featurePath + GrowthBookSDK.gbContext.apiKey
+    private val apiUrl = "GrowthBookSDK.gbContext.hostURL + Constants.featurePath + GrowthBookSDK.gbContext.apiKey"
 
     /**
      * Executes API Call to fetch features
