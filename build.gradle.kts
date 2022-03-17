@@ -18,7 +18,7 @@ allprojects {
     repositories {
         google()
         mavenCentral()
-        maven("https://maven.pkg.jetbrains.space/public/p/kotlinx-html/maven")
+        jcenter()
     }
 }
 
@@ -27,5 +27,6 @@ tasks.register("clean", Delete::class) {
 }
 
 plugins {
-    id("org.jetbrains.kotlinx.kover") version "0.5.0"
+    id("org.jetbrains.kotlinx.kover") version "0.5.0-RC"
 }
+
