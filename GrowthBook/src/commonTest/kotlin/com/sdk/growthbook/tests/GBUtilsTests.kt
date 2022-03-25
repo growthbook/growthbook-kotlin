@@ -241,10 +241,7 @@ class GBUtilsTests {
         GBUtils()
         Constants()
 
-        assertTrue(Constants.featurePath == "api/features/")
-
         assertFalse(GBUtils.inNamespace("4242", GBNameSpace("",0F,0F)))
-
 
         val items = ArrayList<JsonPrimitive>()
         items.add(JsonPrimitive(1))
