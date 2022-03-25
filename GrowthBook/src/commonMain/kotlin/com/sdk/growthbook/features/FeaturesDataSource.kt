@@ -1,4 +1,4 @@
-package com.sdk.growthbook.Features
+package com.sdk.growthbook.features
 
 import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.Network.CoreNetworkClient

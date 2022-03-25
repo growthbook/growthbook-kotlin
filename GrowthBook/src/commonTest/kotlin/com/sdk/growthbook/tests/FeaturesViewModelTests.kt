@@ -1,8 +1,8 @@
 package com.sdk.growthbook.tests
 
-import com.sdk.growthbook.Features.FeaturesDataSource
-import com.sdk.growthbook.Features.FeaturesFlowDelegate
-import com.sdk.growthbook.Features.FeaturesViewModel
+import com.sdk.growthbook.features.FeaturesDataSource
+import com.sdk.growthbook.features.FeaturesFlowDelegate
+import com.sdk.growthbook.features.FeaturesViewModel
 import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.Utils.GBError
 import com.sdk.growthbook.Utils.GBFeatures
