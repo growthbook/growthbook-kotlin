@@ -75,7 +75,7 @@ kotlin {
         val androidMain by getting {
             dependencies {
                 implementation("io.ktor:ktor-client-android:$ktorVersion")
-                implementation("androidx.startup:startup-runtime:1.1.0")
+                implementation("androidx.startup:startup-runtime:1.1.1")
             }
         }
         val androidTest by getting {
@@ -130,7 +130,7 @@ android {
     compileSdk = 31
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
     defaultConfig {
-        minSdk = 26
+        minSdk = 21
         targetSdk = 31
     }
 }
