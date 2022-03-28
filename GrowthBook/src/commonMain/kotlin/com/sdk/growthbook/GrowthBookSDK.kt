@@ -133,7 +133,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     private var refreshHandler: GBCacheRefreshHandler? = null
     private lateinit var networkDispatcher: NetworkDispatcher
 
-    @ThreadLocal
+    //@ThreadLocal
     internal companion object {
         internal lateinit var gbContext: GBContext
     }
