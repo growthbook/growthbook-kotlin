@@ -11,7 +11,7 @@
 
 - **Lightweight and fast**
 - **Supports iOS & Android apps**
-  - **Android version 26 & above**
+  - **Android version 21 & above**
   - **iOS version 12 & Above**
   - **Apple TvOS version 13 & Above**
   - **Apple WatchOS version 7 & Above**
