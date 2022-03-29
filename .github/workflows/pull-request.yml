@@ -14,7 +14,6 @@ jobs:
       with:
         coverage-threshold: 80
         repo-token: ${{ secrets.GITHUB_TOKEN }}
-        proxy-url: https://add-pr-comment-proxy-94idvmwyie-uc.a.run.app
     - name: Check coverage
       if: ${{(steps.kover-tests.outputs.line-coverage) < 80}}
       shell: bash
