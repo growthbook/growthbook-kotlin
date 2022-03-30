@@ -11,8 +11,10 @@ import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBFeatureSource
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.floatOrNull
 import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 
 /**
@@ -148,13 +150,28 @@ internal class GBFeatureEvaluator {
         val isFalsy = value == null || value.toString() == "false" || value.toString()
             .isEmpty() || value.toString() == "0"
 
+
         return GBFeatureResult(
-            value = value,
+            value = convertToPrimitiveIfPossible(value),
             on = !isFalsy,
             off = isFalsy,
             source = source,
             experiment = experiment,
             experimentResult = experimentResult
         )
+    }
+
+    private fun convertToPrimitiveIfPossible(jsonElement: Any?): Any? {
+        return if (jsonElement is JsonPrimitive) {
+            jsonElement.intOrNull
+                ?: jsonElement.longOrNull
+                ?: jsonElement.doubleOrNull
+                ?: jsonElement.floatOrNull
+                ?: jsonElement.booleanOrNull
+                ?: jsonElement.contentOrNull
+                ?: jsonElement
+        } else {
+            jsonElement
+        }
     }
 }
