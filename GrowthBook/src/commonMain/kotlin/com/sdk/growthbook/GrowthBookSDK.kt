@@ -1,7 +1,7 @@
 package com.sdk.growthbook
 
-import com.sdk.growthbook.Evaluators.GBExperimentEvaluator
-import com.sdk.growthbook.Evaluators.GBFeatureEvaluator
+import com.sdk.growthbook.evaluators.GBExperimentEvaluator
+import com.sdk.growthbook.evaluators.GBFeatureEvaluator
 import com.sdk.growthbook.features.FeaturesDataSource
 import com.sdk.growthbook.features.FeaturesFlowDelegate
 import com.sdk.growthbook.features.FeaturesViewModel
