@@ -4,7 +4,12 @@ import com.sdk.growthbook.Utils.GBFeatures
 import com.sdk.growthbook.model.GBExperiment
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 
 class GBTestHelper {
 
@@ -72,7 +77,7 @@ class GBFeaturesTest(
 
 @Serializable
 class GBFeatureResultTest(
-    val value : JsonElement,
+    val value: JsonPrimitive,
     val on : Boolean,
     val off: Boolean,
     val source: String,
