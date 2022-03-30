@@ -63,7 +63,7 @@ class GBFeatureValueTests {
                         "\nExperiment - " + result.experiment?.key +
                         "\nExperiment Result - " + result.experimentResult?.variationId + "\n\n"
 
-                if (result.value.toString() == expectedResult.value.toString() &&
+                if (result.value.toString() == expectedResult.value.content &&
                     result.on.toString() == expectedResult.on.toString() &&
                     result.off.toString() == expectedResult.off.toString() &&
                     result.source.toString() == expectedResult.source &&
