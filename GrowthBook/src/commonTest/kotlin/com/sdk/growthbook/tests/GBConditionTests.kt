@@ -35,7 +35,6 @@ class GBConditionTests {
                 } else {
                     failedScenarios.add(status)
                 }
-
             }
         }
 
@@ -46,7 +45,6 @@ class GBConditionTests {
         print(failedScenarios)
 
         assertTrue(failedScenarios.size == 0)
-
     }
 
     @Test

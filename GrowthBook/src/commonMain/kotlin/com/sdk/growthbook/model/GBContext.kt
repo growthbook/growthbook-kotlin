@@ -13,11 +13,11 @@ class GBContext(
     /**
      * Host URL for GrowthBook
      */
-    val hostURL : String,
+    val hostURL: String,
     /**
      * Switch to globally disable all experiments. Default true.
      */
-    val enabled : Boolean,
+    val enabled: Boolean,
     /**
      * Map of user attributes that are used to assign variations
      */
@@ -29,12 +29,15 @@ class GBContext(
     /**
      * If true, random assignment is disabled and only explicitly forced variations are used.
      */
-    val qaMode : Boolean,
+    val qaMode: Boolean,
     /**
      * A function that takes experiment and result as arguments.
      */
-    val trackingCallback : (GBExperiment, GBExperimentResult) -> Unit
-){
+    val trackingCallback: (GBExperiment, GBExperimentResult) -> Unit
+) {
+
+    val localContext: GBLocalContext =
+        GBLocalContext(enabled, attributes, forcedVariations, qaMode)
 
     // Keys are unique identifiers for the features and the values are Feature objects.
     // Feature definitions - To be pulled from API / Cache

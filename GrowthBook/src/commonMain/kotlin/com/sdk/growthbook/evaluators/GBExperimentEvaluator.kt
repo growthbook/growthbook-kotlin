@@ -8,6 +8,7 @@ import com.sdk.growthbook.Utils.toJsonElement
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
+import com.sdk.growthbook.model.GBLocalContext
 
 /**
  * Experiment Evaluator Class
@@ -20,10 +21,7 @@ internal class GBExperimentEvaluator {
      */
     fun evaluateExperiment(context: GBContext, experiment: GBExperiment): GBExperimentResult {
         return evaluateExperiment(
-            context.attributes,
-            context.enabled,
-            context.forcedVariations,
-            context.qaMode,
+            context.localContext,
             experiment,
             context.trackingCallback
         )
@@ -33,40 +31,47 @@ internal class GBExperimentEvaluator {
      * Takes Context & Experiment & returns Experiment Result
      */
     fun evaluateExperiment(
-        attributes: Map<String, Any>,
-        enabled: Boolean,
-        forcedVariations: Map<String, Int>,
-        qaMode: Boolean,
+        context: GBLocalContext,
         experiment: GBExperiment,
         gBTrackingCallback: GBTrackingCallback = { _, _ -> },
     ): GBExperimentResult {
         // If experiment.variations has fewer than 2 variations, return immediately (not in experiment, variationId 0)
         //
         // If context.enabled is false, return immediately (not in experiment, variationId 0)
-        if (experiment.variations.size < 2 || !enabled) {
-            return getExperimentResult(experiment = experiment, attributes = attributes)
+        if (experiment.variations.size < 2 || !context.enabled) {
+            return getExperimentResult(
+                experiment = experiment,
+                attributes = context.attributes
+            )
         }
 
         // If context.forcedVariations[experiment.trackingKey] is defined, return immediately (not in experiment, forced variation)
-        val forcedVariation = forcedVariations[experiment.key]
+        val forcedVariation = context.forcedVariations[experiment.key]
         if (forcedVariation != null) {
             return getExperimentResult(
                 experiment = experiment,
                 variationIndex = forcedVariation,
-                attributes = attributes,
+                attributes = context.attributes,
             )
         }
 
         // If experiment.action is set to false, return immediately (not in experiment, variationId 0)
         if (!(experiment.active)) {
-            return getExperimentResult(experiment = experiment, attributes = attributes)
+            return getExperimentResult(
+                experiment = experiment,
+                attributes = context.attributes
+            )
         }
 
         // Get the user hash attribute and value (context.attributes[experiment.hashAttribute || "id"]) and if empty, return immediately (not in experiment, variationId 0)
         val attributeValue =
-            attributes[experiment.hashAttribute ?: Constants.idAttributeKey] as? String ?: ""
+            context.attributes[experiment.hashAttribute ?: Constants.idAttributeKey] as? String
+                ?: ""
         if (attributeValue.isEmpty()) {
-            return getExperimentResult(experiment = experiment, attributes = attributes)
+            return getExperimentResult(
+                experiment = experiment,
+                attributes = context.attributes
+            )
         }
 
         // If experiment.namespace is set, check if hash value is included in the range and if not, return immediately (not in experiment, variationId 0)
@@ -74,15 +79,21 @@ internal class GBExperimentEvaluator {
         if (experiment.namespace != null) {
             val namespace = GBUtils.getGBNameSpace(experiment.namespace)
             if (namespace != null && !GBUtils.inNamespace(attributeValue, namespace)) {
-                return getExperimentResult(experiment = experiment, attributes = attributes)
+                return getExperimentResult(
+                    experiment = experiment,
+                    attributes = context.attributes
+                )
             }
         }
 
         // If experiment.condition is set and the condition evaluates to false, return immediately (not in experiment, variationId 0)
         if (experiment.condition != null) {
-            val attr = attributes.toJsonElement()
+            val attr = context.attributes.toJsonElement()
             if (!GBConditionEvaluator().evalCondition(attr, experiment.condition!!)) {
-                return getExperimentResult(experiment = experiment, attributes = attributes)
+                return getExperimentResult(
+                    experiment = experiment,
+                    attributes = context.attributes
+                )
             }
         }
 
@@ -109,7 +120,10 @@ internal class GBExperimentEvaluator {
 
         // If not assigned a variation (assigned === -1), return immediately (not in experiment, variationId 0)
         if (assigned == -1) {
-            return getExperimentResult(experiment = experiment, attributes = attributes)
+            return getExperimentResult(
+                experiment = experiment,
+                attributes = context.attributes
+            )
         }
 
         // If experiment.force is set, return immediately (not in experiment, variationId experiment.force)
@@ -119,19 +133,22 @@ internal class GBExperimentEvaluator {
                 experiment = experiment,
                 variationIndex = forceExp,
                 inExperiment = false,
-                attributes = attributes,
+                attributes = context.attributes,
             )
         }
 
         // If context.qaMode is true, return immediately (not in experiment, variationId 0)
-        if (qaMode) {
-            return getExperimentResult(attributes = attributes, experiment = experiment)
+        if (context.qaMode) {
+            return getExperimentResult(
+                attributes = context.attributes,
+                experiment = experiment
+            )
         }
 
         // Fire context.trackingCallback if set and the combination of hashAttribute, hashValue, experiment.key, and variationId has not been tracked before
 
         val result = getExperimentResult(
-            attributes = attributes,
+            attributes = context.attributes,
             experiment = experiment,
             variationIndex = assigned,
             inExperiment = true

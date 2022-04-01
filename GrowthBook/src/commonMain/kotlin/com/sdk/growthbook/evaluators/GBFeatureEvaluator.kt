@@ -9,6 +9,7 @@ import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBFeatureSource
+import com.sdk.growthbook.model.GBLocalContext
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
@@ -33,11 +34,8 @@ internal class GBFeatureEvaluator {
             val targetFeature: GBFeature = context.features.getValue(featureKey)
             evaluateFeature(
                 targetFeature,
-                context.attributes,
                 featureKey,
-                context.enabled,
-                context.forcedVariations,
-                context.qaMode
+                context.localContext,
             )
         } catch (exception: Exception) {
             // If the key doesn't exist in context.features, return immediately (value = null, source = unknownFeature).
@@ -51,11 +49,8 @@ internal class GBFeatureEvaluator {
      */
     fun evaluateFeature(
         feature: GBFeature,
-        attributes: Map<String, Any>,
         featureKey: String,
-        enabled: Boolean,
-        forcedVariations: Map<String, Int>,
-        qaMode: Boolean,
+        context: GBLocalContext,
     ): GBFeatureResult {
         // Loop through the feature rules (if any)
         val rules = feature.rules
@@ -66,7 +61,7 @@ internal class GBFeatureEvaluator {
                 // If the rule has a condition and it evaluates to false, skip this rule and continue to the next one
 
                 if (rule.condition != null) {
-                    val attr = attributes.toJsonElement()
+                    val attr = context.attributes.toJsonElement()
                     if (!GBConditionEvaluator().evalCondition(attr, rule.condition)) {
                         continue
                     }
@@ -79,7 +74,7 @@ internal class GBFeatureEvaluator {
 
                         val key = rule.hashAttribute ?: Constants.idAttributeKey
                         // Get the user hash value (context.attributes[rule.hashAttribute || "id"]) and if empty, skip the rule
-                        val attributeValue = attributes.get(key) as? String ?: ""
+                        val attributeValue = context.attributes.get(key) as? String ?: ""
                         if (attributeValue.isEmpty())
                             continue
                         else {
@@ -107,13 +102,7 @@ internal class GBFeatureEvaluator {
 
                     // Run the experiment.
                     val result =
-                        GBExperimentEvaluator().evaluateExperiment(
-                            attributes,
-                            enabled,
-                            forcedVariations,
-                            qaMode,
-                            exp
-                        )
+                        GBExperimentEvaluator().evaluateExperiment(context, exp)
                     if (result.inExperiment) {
                         return prepareResult(
                             value = result.value,
