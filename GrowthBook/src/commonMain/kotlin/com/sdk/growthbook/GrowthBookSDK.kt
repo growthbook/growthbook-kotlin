@@ -1,15 +1,15 @@
 package com.sdk.growthbook
 
-import com.sdk.growthbook.evaluators.GBExperimentEvaluator
-import com.sdk.growthbook.evaluators.GBFeatureEvaluator
-import com.sdk.growthbook.features.FeaturesDataSource
-import com.sdk.growthbook.features.FeaturesFlowDelegate
-import com.sdk.growthbook.features.FeaturesViewModel
 import com.sdk.growthbook.Network.CoreNetworkClient
 import com.sdk.growthbook.Network.NetworkDispatcher
 import com.sdk.growthbook.Utils.GBCacheRefreshHandler
 import com.sdk.growthbook.Utils.GBError
 import com.sdk.growthbook.Utils.GBFeatures
+import com.sdk.growthbook.evaluators.GBExperimentEvaluator
+import com.sdk.growthbook.evaluators.GBFeatureEvaluator
+import com.sdk.growthbook.features.FeaturesDataSource
+import com.sdk.growthbook.features.FeaturesFlowDelegate
+import com.sdk.growthbook.features.FeaturesViewModel
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
@@ -17,7 +17,6 @@ import com.sdk.growthbook.model.GBFeatureResult
 import kotlinx.coroutines.DelicateCoroutinesApi
 
 typealias GBTrackingCallback = (GBExperiment, GBExperimentResult) -> Unit
-
 
 /**
  * SDKBuilder - Root Class for SDK Initializers for GrowthBook SDK
@@ -120,7 +119,6 @@ class GBSDKBuilderApp(
         )
 
         return GrowthBookSDK(gbContext, refreshHandler, networkDispatcher, features = null)
-
     }
 }
 
@@ -183,7 +181,6 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         return gbContext.features
     }
 
-
     override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
         gbContext.features = features
         if (isRemote) {
@@ -196,7 +193,6 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         if (isRemote) {
             this.refreshHandler?.let { it(false) }
         }
-
     }
 
     /**
@@ -205,7 +201,6 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     fun feature(id: String): GBFeatureResult {
 
         return GBFeatureEvaluator().evaluateFeature(gbContext, id)
-
     }
 
     /**
