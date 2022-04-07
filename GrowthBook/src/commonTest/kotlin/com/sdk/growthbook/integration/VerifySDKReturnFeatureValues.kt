@@ -3,9 +3,9 @@ package com.sdk.growthbook.integration
 import com.sdk.growthbook.GBSDKBuilderApp
 import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.tests.MockNetworkClient
-import kotlin.test.assertEquals
 import org.intellij.lang.annotations.Language
 import org.junit.Test
+import kotlin.test.assertEquals
 
 internal class VerifySDKReturnFeatureValues {
 
@@ -45,11 +45,48 @@ internal class VerifySDKReturnFeatureValues {
         assertEquals(-1, sdkInstance.feature("number_feature_negative").value)
     }
 
-    private fun buildSDK(json: String): GrowthBookSDK {
+    @Test
+    fun verifySDKReturnFeatureValueByConditionIfAttributeDoesNotExist() {
+        @Language("json")
+        val json = """
+            {
+              "status": 200,
+              "features": {
+                "string_feature": {
+                  "defaultValue": "Default value",
+                  "rules": [
+                    {
+                      "condition": {
+                        "country": "IN"
+                      },
+                      "force": "Default value for country:IN"
+                    },
+                    {
+                      "condition": {
+                        "brand": "KZ"
+                      },
+                      "force": "Default value for brand:KZ"
+                    }
+                  ]
+                }
+              }
+            }
+        """.trimMargin()
+
+        val attributes = mapOf(
+            "brand" to "KZ"
+        )
+
+        val sdkInstance = buildSDK(json, attributes)
+
+        assertEquals("Default value for brand:KZ", sdkInstance.feature("string_feature").value)
+    }
+
+    private fun buildSDK(json: String, attributes: Map<String, Any> = mapOf()): GrowthBookSDK {
         return GBSDKBuilderApp(
             "some_key",
             "http://host.com",
-            attributes = mapOf(),
+            attributes = attributes,
             trackingCallback = { _, _ -> }).setNetworkDispatcher(
             MockNetworkClient(
                 json,
