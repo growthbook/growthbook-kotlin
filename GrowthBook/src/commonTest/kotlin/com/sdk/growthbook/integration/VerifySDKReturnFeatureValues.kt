@@ -75,12 +75,11 @@ internal class VerifySDKReturnFeatureValues {
             "some_key",
             "http://host.com",
             attributes = mapOf(),
-            trackingCallback = { _, _ -> })
-            .setNetworkDispatcher(
-                MockNetworkClient(
-                    json,
-                    null
-                )
-            ).initialize()
+            trackingCallback = { _, _ -> }).setNetworkDispatcher(
+            MockNetworkClient(
+                json,
+                null
+            )
+        ).initialize()
     }
 }

@@ -101,8 +101,7 @@ internal class GBFeatureEvaluator {
                     )
 
                     // Run the experiment.
-                    val result =
-                        GBExperimentEvaluator().evaluateExperiment(context, exp)
+                    val result = GBExperimentEvaluator().evaluateExperiment(context, exp)
                     if (result.inExperiment) {
                         return prepareResult(
                             value = result.value,
@@ -138,7 +137,6 @@ internal class GBFeatureEvaluator {
 
         val isFalsy = value == null || value.toString() == "false" || value.toString()
             .isEmpty() || value.toString() == "0"
-
 
         return GBFeatureResult(
             value = convertToPrimitiveIfPossible(value),
