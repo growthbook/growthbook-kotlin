@@ -101,4 +101,76 @@ class GBConditionTests {
             )
         )
     }
+
+    @Test
+    fun testConditionDoesNotExistAttributeExist() {
+        @Language("json")
+        val attributes = """
+            {"userId":"1199"}
+        """.trimIndent()
+
+        @Language("json")
+        val condition = """
+            {
+              "userId": {
+                "${'$'}exists": false
+              }
+            }
+        """.trimIndent()
+
+        assertEquals(
+            false, GBConditionEvaluator().evalCondition(
+                Json.decodeFromString(attributes),
+                Json.decodeFromString(condition),
+            )
+        )
+    }
+
+    @Test
+    fun testConditionExistAttributeExist() {
+        @Language("json")
+        val attributes = """
+            {"userId":"1199"}
+        """.trimIndent()
+
+        @Language("json")
+        val condition = """
+            {
+              "userId": {
+                "${'$'}exists": true
+              }
+            }
+        """.trimIndent()
+
+        assertEquals(
+            true, GBConditionEvaluator().evalCondition(
+                Json.decodeFromString(attributes),
+                Json.decodeFromString(condition),
+            )
+        )
+    }
+
+    @Test
+    fun testConditionExistAttributeDoesNotExist() {
+        @Language("json")
+        val attributes = """
+            {"user_id_not_exist":"1199"}
+        """.trimIndent()
+
+        @Language("json")
+        val condition = """
+            {
+              "userId": {
+                "${'$'}exists": true
+              }
+            }
+        """.trimIndent()
+
+        assertEquals(
+            false, GBConditionEvaluator().evalCondition(
+                Json.decodeFromString(attributes),
+                Json.decodeFromString(condition),
+            )
+        )
+    }
 }

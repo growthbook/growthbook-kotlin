@@ -1,7 +1,16 @@
 package com.sdk.growthbook.Evaluators
 
 import com.sdk.growthbook.Utils.GBCondition
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Both experiments and features can define targeting conditions using a syntax modeled after MongoDB queries.
@@ -99,16 +108,26 @@ internal class GBConditionEvaluator{
                 return !evalCondition(attributes, targetItem)
             }
 
+            var notExistPathCount = 0
+
             // Loop through the conditionObj key/value pairs
             for (key in conditionObj.jsonObject.keys) {
                 val element = getPath(attributes, key)
-                val value = conditionObj.jsonObject[key]
-                if (value != null){
-                    // If evalConditionValue(value, getPath(attributes, key)) is false, break out of loop and return false
-                    if(!evalConditionValue(value, element)) {
-                        return false
+                if (element == null) {
+                    notExistPathCount++
+                } else {
+                    val value = conditionObj.jsonObject[key]
+                    if (value != null) {
+                        // If evalConditionValue(value, getPath(attributes, key)) is false, break out of loop and return false
+                        if (!evalConditionValue(value, element)) {
+                            return false
+                        }
                     }
                 }
+            }
+
+            if (notExistPathCount == conditionObj.jsonObject.keys.size) {
+                return false
             }
 
         }
@@ -210,7 +229,8 @@ internal class GBConditionEvaluator{
     }
 
     /**
-     * Given attributes and a dot-separated path string, return the value at that path (or null/undefined if the path doesn't exist)
+     * Given attributes and a dot-separated path string,
+     * @return the value at that path (or null if the path doesn't exist)
      */
     fun getPath(obj: JsonElement, key: String) : JsonElement? {
 
