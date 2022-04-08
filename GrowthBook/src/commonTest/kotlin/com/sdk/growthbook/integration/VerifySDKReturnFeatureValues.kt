@@ -86,7 +86,7 @@ internal class VerifySDKReturnFeatureValues {
         return GBSDKBuilderApp(
             "some_key",
             "http://host.com",
-            attributes = mapOf(),
+            attributes = attributes,
             trackingCallback = { _, _ -> }).setNetworkDispatcher(
             MockNetworkClient(
                 json,
