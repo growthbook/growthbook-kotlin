@@ -1,7 +1,7 @@
 package com.sdk.growthbook.tests
 
-import com.sdk.growthbook.Evaluators.GBAttributeType
-import com.sdk.growthbook.Evaluators.GBConditionEvaluator
+import com.sdk.growthbook.evaluators.GBAttributeType
+import com.sdk.growthbook.evaluators.GBConditionEvaluator
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -59,11 +59,11 @@ class GBConditionTests {
 
         assertFalse(evaluator.isOperatorObject(JsonObject(HashMap())))
 
-        assertTrue(evaluator.getType(null).toString() == GBAttributeType.gbUnknown.toString())
+        assertEquals(evaluator.getType(null).toString(), GBAttributeType.gbUnknown.toString())
 
         assertTrue(evaluator.getPath(JsonPrimitive("test"), "key") == null)
 
-        assertTrue(evaluator.evalConditionValue(JsonObject(HashMap()), null) == false)
+        assertTrue(!evaluator.evalConditionValue(JsonObject(HashMap()), null))
 
         assertTrue(
             evaluator.evalOperatorCondition(
