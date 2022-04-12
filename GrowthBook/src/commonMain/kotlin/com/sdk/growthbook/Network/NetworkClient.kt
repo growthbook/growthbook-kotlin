@@ -17,8 +17,6 @@ import kotlinx.serialization.json.Json
  * Implement this intterface to define specific implementation for Network Calls - to be made by SDK
  */
 interface NetworkDispatcher {
-    val JSONParser : Json
-        get() = Json { prettyPrint = true; isLenient = true; ignoreUnknownKeys = true }
     @DelicateCoroutinesApi
     fun consumeGETRequest(request: String, onSuccess: (String) -> Unit, onError: (Throwable) -> Unit)
 }
