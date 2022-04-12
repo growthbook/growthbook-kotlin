@@ -33,7 +33,7 @@ internal class GBExperimentEvaluator {
     fun evaluateExperiment(
         context: GBLocalContext,
         experiment: GBExperiment,
-        gBTrackingCallback: GBTrackingCallback = { _, _ -> },
+        gBTrackingCallback: GBTrackingCallback,
     ): GBExperimentResult {
         // If experiment.variations has fewer than 2 variations, return immediately (not in experiment, variationId 0)
         //

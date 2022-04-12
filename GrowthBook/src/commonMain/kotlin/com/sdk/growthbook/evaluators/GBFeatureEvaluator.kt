@@ -2,6 +2,7 @@ package com.sdk.growthbook.evaluators
 
 import com.sdk.growthbook.Utils.Constants
 import com.sdk.growthbook.Utils.GBUtils
+import com.sdk.growthbook.Utils.TrackingCallback
 import com.sdk.growthbook.Utils.toJsonElement
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBExperiment
@@ -36,6 +37,7 @@ internal class GBFeatureEvaluator {
                 targetFeature,
                 featureKey,
                 context.localContext,
+                context.trackingCallback,
             )
         } catch (exception: Exception) {
             // If the key doesn't exist in context.features, return immediately (value = null, source = unknownFeature).
@@ -51,6 +53,7 @@ internal class GBFeatureEvaluator {
         feature: GBFeature,
         featureKey: String,
         context: GBLocalContext,
+        trackingCallback: TrackingCallback,
     ): GBFeatureResult {
         // Loop through the feature rules (if any)
         val rules = feature.rules
@@ -101,7 +104,8 @@ internal class GBFeatureEvaluator {
                     )
 
                     // Run the experiment.
-                    val result = GBExperimentEvaluator().evaluateExperiment(context, exp)
+                    val result =
+                        GBExperimentEvaluator().evaluateExperiment(context, exp, trackingCallback)
                     if (result.inExperiment) {
                         return prepareResult(
                             value = result.value,

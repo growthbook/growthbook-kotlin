@@ -137,6 +137,7 @@ internal class GBFeatureEvaluatorIntegration {
             Json.decodeFromString(json),
             "key",
             context,
+            { _, _ -> }
         )
     }
 }

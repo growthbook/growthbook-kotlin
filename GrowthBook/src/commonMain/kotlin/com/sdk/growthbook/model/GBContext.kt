@@ -1,6 +1,7 @@
 package com.sdk.growthbook.model
 
 import com.sdk.growthbook.Utils.GBFeatures
+import com.sdk.growthbook.Utils.TrackingCallback
 
 /**
  * Defines the GrowthBook context.
@@ -33,7 +34,7 @@ class GBContext(
     /**
      * A function that takes experiment and result as arguments.
      */
-    val trackingCallback: (GBExperiment, GBExperimentResult) -> Unit
+    val trackingCallback: TrackingCallback
 ) {
 
     val localContext: GBLocalContext =

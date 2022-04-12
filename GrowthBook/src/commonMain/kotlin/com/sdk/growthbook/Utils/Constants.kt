@@ -1,5 +1,7 @@
 package com.sdk.growthbook.Utils
 
+import com.sdk.growthbook.model.GBExperiment
+import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeature
 import kotlinx.serialization.json.JsonElement
 
@@ -51,6 +53,8 @@ typealias GBNameSpace = Triple<String, Float, Float>
  * Double Tuple for GrowthBook Ranges
  */
 typealias GBBucketRange = Pair<Float, Float>
+
+typealias TrackingCallback = (GBExperiment, GBExperimentResult) -> Unit
 
 /**
  * GrowthBook Error Class to handle any error / exception scenario

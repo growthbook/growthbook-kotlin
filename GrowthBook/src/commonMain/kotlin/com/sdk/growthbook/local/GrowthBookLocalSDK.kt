@@ -1,5 +1,6 @@
 package com.sdk.growthbook.local
 
+import com.sdk.growthbook.Utils.TrackingCallback
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
 import com.sdk.growthbook.features.FeaturesDataModel
 import com.sdk.growthbook.model.GBFeatureResult
@@ -9,7 +10,8 @@ import kotlinx.serialization.json.Json
 
 class GrowthBookLocalSDK(
     private val localContext: GBLocalContext,
-    private val growthBookFeatures: String
+    private val growthBookFeatures: String,
+    private val trackingCallback: TrackingCallback = { _, _ -> }
 ) {
 
     private val gBFeatureEvaluator: GBFeatureEvaluator by lazy { GBFeatureEvaluator() }
@@ -24,6 +26,11 @@ class GrowthBookLocalSDK(
         val features = json.decodeFromString<FeaturesDataModel>(growthBookFeatures)
         val feature = features.features[featureKey] ?: return null
 
-        return gBFeatureEvaluator.evaluateFeature(feature, featureKey, localContext)
+        return gBFeatureEvaluator.evaluateFeature(
+            feature,
+            featureKey,
+            localContext,
+            trackingCallback
+        )
     }
 }
