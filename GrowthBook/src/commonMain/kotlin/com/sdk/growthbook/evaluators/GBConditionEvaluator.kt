@@ -108,28 +108,17 @@ internal class GBConditionEvaluator{
                 return !evalCondition(attributes, targetItem)
             }
 
-            var notExistPathCount = 0
-
             // Loop through the conditionObj key/value pairs
             for (key in conditionObj.jsonObject.keys) {
                 val element = getPath(attributes, key)
-                if (element == null) {
-                    notExistPathCount++
-                } else {
-                    val value = conditionObj.jsonObject[key]
-                    if (value != null) {
-                        // If evalConditionValue(value, getPath(attributes, key)) is false, break out of loop and return false
-                        if (!evalConditionValue(value, element)) {
-                            return false
-                        }
+                val value = conditionObj.jsonObject[key]
+                if (value != null) {
+                    // If evalConditionValue(value, getPath(attributes, key)) is false, break out of loop and return false
+                    if (!evalConditionValue(value, element)) {
+                        return false
                     }
                 }
             }
-
-            if (notExistPathCount == conditionObj.jsonObject.keys.size) {
-                return false
-            }
-
         }
 
         // Return true
@@ -269,9 +258,12 @@ internal class GBConditionEvaluator{
             return conditionValue.content == attributeValue.content
         }
 
+        if (conditionValue is JsonPrimitive && attributeValue == null) {
+            return false
+        }
+
         // If conditionValue is array, return true if it's "equal" - "equal" should do a deep comparison for arrays.
         if (conditionValue is JsonArray) {
-
             if (attributeValue is JsonArray) {
                 if (conditionValue.size == attributeValue.size) {
                     val conditionArray = Json.decodeFromJsonElement<Array<JsonElement>>(conditionValue)

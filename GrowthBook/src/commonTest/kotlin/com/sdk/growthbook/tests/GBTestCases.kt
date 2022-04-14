@@ -220,6 +220,18 @@ val gbTestCases = """
           false
         ],
         [
+          "${"$"}exists     - false pass",
+          {
+            "pets.dog.name": {
+              "${"$"}exists": false
+            }
+          },
+          {
+            "hello": "world"
+          },
+          true
+        ],
+        [
           "${"$"}exists     - false fail",
           {
             "pets.dog.name": {
@@ -411,6 +423,16 @@ val gbTestCases = """
             "${"$"}and": [
               
             ]
+          },
+          {
+            "hello": "world"
+          },
+          true
+        ],
+        [
+          "empty - pass",
+          {
+            
           },
           {
             "hello": "world"
