@@ -7,7 +7,7 @@ package com.sdk.growthbook.model
  * The local content is a Context without network settings (host and api entities)
  */
 
-data class GBLocalContext(
+class GBLocalContext(
     /**
      * Switch to globally disable all experiments. Default true.
      */
