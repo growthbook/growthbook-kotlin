@@ -1,11 +1,8 @@
 package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.GBSDKBuilderApp
-import com.sdk.growthbook.SDKBuilder
-import com.sdk.growthbook.Utils.GBFeatures
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
-import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.model.GBFeatureSource
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -25,7 +22,6 @@ class GrowthBookSDKBuilderTests {
 
     @Test
     fun testSDKInitilizationDefault() {
-
         val sdkInstance = GBSDKBuilderApp(testApiKey, testHostURL, attributes = testAttributes, trackingCallback = {
             gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
 

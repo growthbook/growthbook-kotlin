@@ -1,5 +1,7 @@
 package com.sdk.growthbook.Utils
 
+import com.sdk.growthbook.model.GBExperiment
+import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeature
 import kotlinx.serialization.json.JsonElement
 
@@ -28,6 +30,8 @@ internal class Constants {
  */
 internal typealias GBFeatures = HashMap<String, GBFeature>
 
+typealias GBAttributes = Map<String, Any>
+
 /**
  * Type Alias for Condition Element in GrowthBook Rules
  */
@@ -49,6 +53,8 @@ typealias GBNameSpace = Triple<String, Float, Float>
  * Double Tuple for GrowthBook Ranges
  */
 typealias GBBucketRange = Pair<Float, Float>
+
+typealias TrackingCallback = (GBExperiment, GBExperimentResult) -> Unit
 
 /**
  * GrowthBook Error Class to handle any error / exception scenario

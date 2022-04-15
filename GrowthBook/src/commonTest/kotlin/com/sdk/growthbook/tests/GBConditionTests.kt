@@ -1,7 +1,7 @@
 package com.sdk.growthbook.tests
 
-import com.sdk.growthbook.Evaluators.GBAttributeType
-import com.sdk.growthbook.Evaluators.GBConditionEvaluator
+import com.sdk.growthbook.evaluators.GBAttributeType
+import com.sdk.growthbook.evaluators.GBConditionEvaluator
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -35,7 +35,6 @@ class GBConditionTests {
                 } else {
                     failedScenarios.add(status)
                 }
-
             }
         }
 
@@ -46,7 +45,6 @@ class GBConditionTests {
         print(failedScenarios)
 
         assertTrue(failedScenarios.size == 0)
-
     }
 
     @Test
