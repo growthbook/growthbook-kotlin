@@ -1,4 +1,4 @@
-package com.sdk.growthbook.Evaluators
+package com.sdk.growthbook.evaluators
 
 import com.sdk.growthbook.Utils.Constants
 import com.sdk.growthbook.Utils.GBBucketRange
