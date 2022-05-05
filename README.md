@@ -1,4 +1,4 @@
-![](https://docs.growthbook.io/images/hero.png)
+![](https://docs.growthbook.io/images/hero-kotlin-sdk.png)
 
 # Growth Book - SDK
 
