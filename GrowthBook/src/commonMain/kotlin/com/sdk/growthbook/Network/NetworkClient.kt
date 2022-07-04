@@ -14,7 +14,7 @@ import kotlinx.serialization.json.Json
 
 /**
  * Network Dispatcher Interface for API Consumption
- * Implement this intterface to define specific implementation for Network Calls - to be made by SDK
+ * Implement this interface to define specific implementation for Network Calls - to be made by SDK
  */
 interface NetworkDispatcher {
     @DelicateCoroutinesApi
