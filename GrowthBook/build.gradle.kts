@@ -226,8 +226,8 @@ publishing {
  */
 signing {
     useInMemoryPgpKeys(
-        System.getenv("GB_GPG_PRIVATE_KEY"),
-        System.getenv("GB_GPG_PRIVATE_PASSWORD")
+        System.getenv("GPG_PRIVATE_KEY"),
+        System.getenv("GPG_PRIVATE_PASSWORD")
     )
     sign(publishing.publications)
 }
