@@ -10,6 +10,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
+version = "1.1.10"
 val iOSBinaryName = "GrowthBook"
 
 kotlin {
@@ -21,8 +22,11 @@ kotlin {
         publishLibraryVariants("release")
     }
 
-//    jvm()
-
+    jvm {
+        compilations.all {
+            kotlinOptions.jvmTarget = "1.8"
+        }
+    }
 
     val xcf = XCFramework()
     listOf(
@@ -111,7 +115,6 @@ kotlin {
         val iosX64Test by getting
         val iosArm64Test by getting
         val iosSimulatorArm64Test by getting
-
         val iosTest by creating {
             dependsOn(commonTest)
             iosX64Test.dependsOn(this)
@@ -120,8 +123,17 @@ kotlin {
         }
 
 
-//        val jvmMain by getting
-//        val jvmTest by getting
+        val jvmMain by getting {
+            dependencies {
+                implementation("io.ktor:ktor-client-java:$ktorVersion")
+            }
+        }
+        val jvmTest by getting {
+            dependencies {
+                implementation ("org.jetbrains.kotlin:kotlin-test-junit")
+            }
+        }
+
     }
 
 }
@@ -140,7 +152,6 @@ val dokkaOutputDir = "$buildDir/dokka"
 tasks.dokkaHtml {
     outputDirectory.set(file(dokkaOutputDir))
 }
-
 
 /**
  * This task deletes older documents
@@ -201,8 +212,8 @@ publishing {
                 }
                 developers {
                     developer {
-                        name.set("Nicholas Pearson")
-                        email.set("nicholaspearson918@gmail.com")
+                        name.set("GrowthBook DEV")
+                        email.set("sdk-dev@growthbook.io")
                     }
                 }
             }
@@ -210,17 +221,17 @@ publishing {
     }
 }
 
-
 /**
  * Signing JAR using GPG Keys
  */
 signing {
     useInMemoryPgpKeys(
-        System.getenv("GPG_PRIVATE_KEY"),
-        System.getenv("GPG_PRIVATE_PASSWORD")
+        System.getenv("GB_GPG_PRIVATE_KEY"),
+        System.getenv("GB_GPG_PRIVATE_PASSWORD")
     )
     sign(publishing.publications)
 }
+
 
 /**
  * This task execution requires - pod trunk to be setup

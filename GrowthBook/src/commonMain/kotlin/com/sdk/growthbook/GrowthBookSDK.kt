@@ -68,6 +68,34 @@ abstract class SDKBuilder(
 }
 
 /**
+ * SDKBuilder - Initializer for GrowthBook SDK for JAVA
+ * APIKey - API Key
+ * HostURL - Server URL
+ * UserAttributes - User Attributes
+ * Features - GrowthBook Features Map - Synced via Web API / Web Hooks
+ * Tracking Callback - Track Events for Experiments
+ */
+class GBSDKBuilderJAVA(apiKey: String, hostURL: String, attributes: Map<String, Any>, val features: GBFeatures,
+                       trackingCallback: GBTrackingCallback
+) : SDKBuilder(apiKey, hostURL,
+    attributes, trackingCallback
+) {
+    /**
+     * Initialize the JAVA SDK
+     */
+    @DelicateCoroutinesApi
+    override fun initialize() : GrowthBookSDK{
+
+        val gbContext = GBContext(apiKey = apiKey, enabled = enabled, attributes = attributes, hostURL = hostURL, qaMode = qaMode, forcedVariations = forcedVariations, trackingCallback = trackingCallback)
+
+        val sdkInstance = GrowthBookSDK(gbContext, null, features = features)
+
+        return sdkInstance
+
+    }
+}
+
+/**
  * SDKBuilder - Initializer for GrowthBook SDK for Apps
  * APIKey - API Key
  * HostURL - Server URL
@@ -124,6 +152,7 @@ class GBSDKBuilderApp(
     }
 }
 
+
 /**
  * The main export of the libraries is a simple GrowthBook wrapper class that takes a Context object in the constructor.
  * It exposes two main methods: feature and run.
@@ -158,6 +187,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         } else {
             refreshCache()
         }
+
     }
 
     /**
