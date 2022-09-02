@@ -10,7 +10,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "1.1.10"
+version = "1.1.12"
 val iOSBinaryName = "GrowthBook"
 
 kotlin {
