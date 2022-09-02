@@ -21,7 +21,7 @@ class GBContext(
     /**
      * Map of user attributes that are used to assign variations
      */
-    val attributes: Map<String, Any>,
+    internal var attributes: Map<String, Any>,
     /**
      * Force specific experiments to always assign a specific variation (used for QA)
      */

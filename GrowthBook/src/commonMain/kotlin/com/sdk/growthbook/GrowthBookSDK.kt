@@ -1,10 +1,10 @@
 package com.sdk.growthbook
 
-import com.sdk.growthbook.Evaluators.GBExperimentEvaluator
-import com.sdk.growthbook.Evaluators.GBFeatureEvaluator
-import com.sdk.growthbook.Features.FeaturesDataSource
-import com.sdk.growthbook.Features.FeaturesFlowDelegate
-import com.sdk.growthbook.Features.FeaturesViewModel
+import com.sdk.growthbook.evaluators.GBExperimentEvaluator
+import com.sdk.growthbook.evaluators.GBFeatureEvaluator
+import com.sdk.growthbook.features.FeaturesDataSource
+import com.sdk.growthbook.features.FeaturesFlowDelegate
+import com.sdk.growthbook.features.FeaturesViewModel
 import com.sdk.growthbook.Network.CoreNetworkClient
 import com.sdk.growthbook.Network.NetworkDispatcher
 import com.sdk.growthbook.Utils.GBCacheRefreshHandler
@@ -15,7 +15,6 @@ import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeatureResult
 import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlin.native.concurrent.ThreadLocal
 
 typealias GBTrackingCallback = (GBExperiment, GBExperimentResult) -> Unit
 
@@ -31,16 +30,16 @@ abstract class SDKBuilder(
     val apiKey: String,
     val hostURL: String,
     val attributes: Map<String, Any>,
-    val trackingCallback : GBTrackingCallback
+    val trackingCallback: GBTrackingCallback
 ) {
-    internal var qaMode: Boolean = false;
+    internal var qaMode: Boolean = false
     internal var forcedVariations: Map<String, Int> = HashMap()
-    internal var enabled: Boolean = true;
+    internal var enabled: Boolean = true
 
     /**
      * Set Forced Variations - Default Empty
      */
-    fun setForcedVariations(forcedVariations: Map<String, Int>) : SDKBuilder {
+    fun setForcedVariations(forcedVariations: Map<String, Int>): SDKBuilder {
         this.forcedVariations = forcedVariations
         return this
     }
@@ -48,7 +47,7 @@ abstract class SDKBuilder(
     /**
      * Set QA Mode - Default Disabled
      */
-    fun setQAMode(isEnabled: Boolean) : SDKBuilder {
+    fun setQAMode(isEnabled: Boolean): SDKBuilder {
         this.qaMode = isEnabled
         return this
     }
@@ -56,7 +55,7 @@ abstract class SDKBuilder(
     /**
      * Set Enabled - Default Disabled - If Enabled - then experiments will be disabled
      */
-    fun setEnabled(isEnabled : Boolean) : SDKBuilder {
+    fun setEnabled(isEnabled: Boolean): SDKBuilder {
         this.enabled = isEnabled
         return this
     }
@@ -65,7 +64,7 @@ abstract class SDKBuilder(
      * This method is open to be overridden by subclasses
      */
     @DelicateCoroutinesApi
-    abstract fun initialize() : GrowthBookSDK
+    abstract fun initialize(): GrowthBookSDK
 }
 
 /**
@@ -103,20 +102,22 @@ class GBSDKBuilderJAVA(apiKey: String, hostURL: String, attributes: Map<String, 
  * UserAttributes - User Attributes
  * Tracking Callback - Track Events for Experiments
  */
-class GBSDKBuilderApp(apiKey: String, hostURL: String, attributes: Map<String, Any>,
-                       trackingCallback: GBTrackingCallback
-) : SDKBuilder(apiKey, hostURL,
+class GBSDKBuilderApp(
+    apiKey: String, hostURL: String, attributes: Map<String, Any>,
+    trackingCallback: GBTrackingCallback
+) : SDKBuilder(
+    apiKey, hostURL,
     attributes, trackingCallback
 ) {
 
-    private var refreshHandler : GBCacheRefreshHandler? = null
+    private var refreshHandler: GBCacheRefreshHandler? = null
 
     private var networkDispatcher: NetworkDispatcher = CoreNetworkClient()
 
     /**
      * Set Refresh Handler - Will be called when cache is refreshed
      */
-    fun setRefreshHandler(refreshHandler : GBCacheRefreshHandler) : GBSDKBuilderApp{
+    fun setRefreshHandler(refreshHandler: GBCacheRefreshHandler): GBSDKBuilderApp {
         this.refreshHandler = refreshHandler
         return this
     }
@@ -125,7 +126,7 @@ class GBSDKBuilderApp(apiKey: String, hostURL: String, attributes: Map<String, A
      * Set Network Client - Network Client for Making API Calls
      * Default is KTOR - integrated in SDK
      */
-    fun setNetworkDispatcher(networkDispatcher: NetworkDispatcher) : SDKBuilder {
+    fun setNetworkDispatcher(networkDispatcher: NetworkDispatcher): SDKBuilder {
         this.networkDispatcher = networkDispatcher
         return this
     }
@@ -134,13 +135,19 @@ class GBSDKBuilderApp(apiKey: String, hostURL: String, attributes: Map<String, A
      * Initialize the JAVA SDK
      */
     @DelicateCoroutinesApi
-    override fun initialize() : GrowthBookSDK {
+    override fun initialize(): GrowthBookSDK {
 
-        val gbContext = GBContext(apiKey = apiKey, enabled = enabled, attributes = attributes, hostURL = hostURL, qaMode = qaMode, forcedVariations = forcedVariations, trackingCallback = trackingCallback)
+        val gbContext = GBContext(
+            apiKey = apiKey,
+            enabled = enabled,
+            attributes = attributes,
+            hostURL = hostURL,
+            qaMode = qaMode,
+            forcedVariations = forcedVariations,
+            trackingCallback = trackingCallback
+        )
 
-        val sdkInstance = GrowthBookSDK(gbContext, refreshHandler, networkDispatcher, features = null)
-
-        return sdkInstance
+        return GrowthBookSDK(gbContext, refreshHandler, networkDispatcher, features = null)
 
     }
 }
@@ -152,16 +159,21 @@ class GBSDKBuilderApp(apiKey: String, hostURL: String, attributes: Map<String, A
  */
 class GrowthBookSDK() : FeaturesFlowDelegate {
 
-    private var refreshHandler : GBCacheRefreshHandler? = null
+    private var refreshHandler: GBCacheRefreshHandler? = null
     private lateinit var networkDispatcher: NetworkDispatcher
 
-    @ThreadLocal
+    //@ThreadLocal
     internal companion object {
         internal lateinit var gbContext: GBContext
     }
 
     @DelicateCoroutinesApi
-    internal constructor(context : GBContext, refreshHandler : GBCacheRefreshHandler?, networkDispatcher: NetworkDispatcher = CoreNetworkClient(), features: GBFeatures?) : this(){
+    internal constructor(
+        context: GBContext,
+        refreshHandler: GBCacheRefreshHandler?,
+        networkDispatcher: NetworkDispatcher = CoreNetworkClient(),
+        features: GBFeatures?
+    ) : this() {
         gbContext = context
         this.refreshHandler = refreshHandler
         this.networkDispatcher = networkDispatcher
@@ -182,7 +194,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
      * Manually Refresh Cache
      */
     @DelicateCoroutinesApi
-    fun refreshCache(){
+    fun refreshCache() {
         val featureVM = FeaturesViewModel(this, FeaturesDataSource(networkDispatcher))
         featureVM.fetchFeatures()
     }
@@ -190,19 +202,19 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     /**
      * Get Context - Holding the complete data regarding cached features & attributes etc.
      */
-    fun getGBContext() : GBContext {
+    fun getGBContext(): GBContext {
         return gbContext
     }
 
     /**
      * Get Cached Features
      */
-    fun getFeatures() : GBFeatures {
+    fun getFeatures(): GBFeatures {
         return gbContext.features
     }
 
 
-    override fun featuresFetchedSuccessfully(features : GBFeatures, isRemote: Boolean) {
+    override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
         gbContext.features = features
         if (isRemote) {
             this.refreshHandler?.let { it(true) }
@@ -220,16 +232,23 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     /**
      * The feature method takes a single string argument, which is the unique identifier for the feature and returns a FeatureResult object.
      */
-    fun feature(id: String) : GBFeatureResult {
+    fun feature(id: String): GBFeatureResult {
 
-       return GBFeatureEvaluator().evaluateFeature(gbContext, id)
+        return GBFeatureEvaluator().evaluateFeature(gbContext, id)
 
     }
 
     /**
      * The run method takes an Experiment object and returns an ExperimentResult
      */
-    fun run(experiment: GBExperiment) : GBExperimentResult {
+    fun run(experiment: GBExperiment): GBExperimentResult {
         return GBExperimentEvaluator().evaluateExperiment(gbContext, experiment)
+    }
+
+    /**
+     * The setAttributes method replaces the Map of user attributes that are used to assign variations
+     */
+    fun setAttributes(attributes: Map<String, Any>) {
+        gbContext.attributes = attributes
     }
 }
