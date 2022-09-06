@@ -1,9 +1,9 @@
 Pod::Spec.new do |spec|
     spec.name                     = 'GrowthBook'
-    spec.version       = "1.0.7"
+    spec.version       = "1.1.0"
     spec.homepage                 = 'https://github.com/growthbook/growthbook-kotlin'
-    spec.source       = { :http => "https://github.com/growthbook/growthbook-kotlin/releases/download/1.0.7/GrowthBook.xcframework.zip"}
-    spec.authors                  = 'sdk-dev@growthbook.io'
+    spec.source       = { :http => "https://github.com/growthbook/growthbook-kotlin/releases/download/1.1.0/GrowthBook.xcframework.zip"}
+    spec.authors                  = 'nicholaspearson918@gmail.com'
     spec.license                  = 'https://opensource.org/licenses/MIT'
     spec.summary                  = 'Powerful A/B testing SDK for Swift - iOS'
 

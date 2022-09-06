@@ -10,7 +10,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "1.1.12"
+version = "1.1.13"
 val iOSBinaryName = "GrowthBook"
 
 kotlin {
@@ -212,8 +212,8 @@ publishing {
                 }
                 developers {
                     developer {
-                        name.set("GrowthBook DEV")
-                        email.set("sdk-dev@growthbook.io")
+                        name.set("Nicholas Pearson")
+                        email.set("nicholaspearson918@gmail.com")
                     }
                 }
             }
