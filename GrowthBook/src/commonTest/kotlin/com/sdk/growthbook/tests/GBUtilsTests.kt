@@ -1,6 +1,6 @@
 package com.sdk.growthbook.tests
 
-import com.sdk.growthbook.Utils.*
+import com.sdk.growthbook.utils.*
 import kotlinx.serialization.json.*
 import kotlin.test.Test
 import kotlin.test.assertFalse

@@ -1,6 +1,6 @@
 package com.sdk.growthbook.evaluators
 
-import com.sdk.growthbook.Utils.GBCondition
+import com.sdk.growthbook.utils.GBCondition
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement

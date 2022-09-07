@@ -1,6 +1,6 @@
 package com.sdk.growthbook.model
 
-import com.sdk.growthbook.Utils.GBFeatures
+import com.sdk.growthbook.utils.GBFeatures
 
 /**
  * Defines the GrowthBook context.

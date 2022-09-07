@@ -1,4 +1,4 @@
-package com.sdk.growthbook.Utils
+package com.sdk.growthbook.utils
 
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlinx.serialization.json.JsonArray

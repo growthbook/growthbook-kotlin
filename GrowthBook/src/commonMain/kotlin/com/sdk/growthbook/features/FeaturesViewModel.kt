@@ -1,8 +1,8 @@
 package com.sdk.growthbook.features
 
-import com.sdk.growthbook.Utils.Constants
-import com.sdk.growthbook.Utils.GBError
-import com.sdk.growthbook.Utils.GBFeatures
+import com.sdk.growthbook.utils.Constants
+import com.sdk.growthbook.utils.GBError
+import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.sandbox.CachingImpl
 import com.sdk.growthbook.sandbox.getData
 import com.sdk.growthbook.sandbox.putData

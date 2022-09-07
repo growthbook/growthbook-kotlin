@@ -1,6 +1,6 @@
 package com.sdk.growthbook.tests
 
-import com.sdk.growthbook.Utils.GBFeatures
+import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.model.GBExperiment
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString

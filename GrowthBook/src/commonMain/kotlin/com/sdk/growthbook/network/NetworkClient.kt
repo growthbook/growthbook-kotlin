@@ -1,4 +1,4 @@
-package com.sdk.growthbook.Network
+package com.sdk.growthbook.network
 
 import com.sdk.growthbook.ApplicationDispatcher
 import io.ktor.client.*
@@ -10,11 +10,10 @@ import io.ktor.client.statement.*
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
 
 /**
  * Network Dispatcher Interface for API Consumption
- * Implement this intterface to define specific implementation for Network Calls - to be made by SDK
+ * Implement this interface to define specific implementation for Network Calls - to be made by SDK
  */
 interface NetworkDispatcher {
     @DelicateCoroutinesApi

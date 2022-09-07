@@ -1,8 +1,8 @@
 package com.sdk.growthbook.features
 
 import com.sdk.growthbook.GrowthBookSDK
-import com.sdk.growthbook.Network.CoreNetworkClient
-import com.sdk.growthbook.Network.NetworkDispatcher
+import com.sdk.growthbook.network.CoreNetworkClient
+import com.sdk.growthbook.network.NetworkDispatcher
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json

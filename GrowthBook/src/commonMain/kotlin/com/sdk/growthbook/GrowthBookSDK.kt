@@ -5,11 +5,11 @@ import com.sdk.growthbook.evaluators.GBFeatureEvaluator
 import com.sdk.growthbook.features.FeaturesDataSource
 import com.sdk.growthbook.features.FeaturesFlowDelegate
 import com.sdk.growthbook.features.FeaturesViewModel
-import com.sdk.growthbook.Network.CoreNetworkClient
-import com.sdk.growthbook.Network.NetworkDispatcher
-import com.sdk.growthbook.Utils.GBCacheRefreshHandler
-import com.sdk.growthbook.Utils.GBError
-import com.sdk.growthbook.Utils.GBFeatures
+import com.sdk.growthbook.network.CoreNetworkClient
+import com.sdk.growthbook.network.NetworkDispatcher
+import com.sdk.growthbook.utils.GBCacheRefreshHandler
+import com.sdk.growthbook.utils.GBError
+import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
@@ -84,14 +84,19 @@ class GBSDKBuilderJAVA(apiKey: String, hostURL: String, attributes: Map<String, 
      * Initialize the JAVA SDK
      */
     @DelicateCoroutinesApi
-    override fun initialize() : GrowthBookSDK{
+    override fun initialize(): GrowthBookSDK {
 
-        val gbContext = GBContext(apiKey = apiKey, enabled = enabled, attributes = attributes, hostURL = hostURL, qaMode = qaMode, forcedVariations = forcedVariations, trackingCallback = trackingCallback)
+        val gbContext = GBContext(
+            apiKey = apiKey,
+            enabled = enabled,
+            attributes = attributes,
+            hostURL = hostURL,
+            qaMode = qaMode,
+            forcedVariations = forcedVariations,
+            trackingCallback = trackingCallback
+        )
 
-        val sdkInstance = GrowthBookSDK(gbContext, null, features = features)
-
-        return sdkInstance
-
+        return GrowthBookSDK(gbContext, null, features = features)
     }
 }
 

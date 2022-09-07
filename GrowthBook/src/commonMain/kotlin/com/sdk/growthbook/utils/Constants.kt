@@ -1,4 +1,4 @@
-package com.sdk.growthbook.Utils
+package com.sdk.growthbook.utils
 
 import com.sdk.growthbook.model.GBFeature
 import kotlinx.serialization.json.JsonElement

@@ -1,22 +1,24 @@
 package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.GBSDKBuilderApp
-import com.sdk.growthbook.SDKBuilder
-import com.sdk.growthbook.Utils.GBFeatures
+import com.sdk.growthbook.GBSDKBuilderJAVA
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.model.GBFeatureSource
+import com.sdk.growthbook.utils.GBFeatures
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class GrowthBookSDKBuilderTests {
 
-    val testApiKey = "4r23r324f23"
-    val testHostURL = "https://host.com"
-    val testAttributes : HashMap<String, Any> = HashMap()
+    private val testApiKey = "4r23r324f23"
+    private val testHostURL = "https://host.com"
+    private val testAttributes : HashMap<String, Any> = HashMap()
 
     @BeforeTest
     fun setUp() {
@@ -24,7 +26,7 @@ class GrowthBookSDKBuilderTests {
     }
 
     @Test
-    fun testSDKInitilizationDefault() {
+    fun testSDKInitializationDefault() {
 
         val sdkInstance = GBSDKBuilderApp(testApiKey, testHostURL, attributes = testAttributes, trackingCallback = {
             gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
@@ -32,16 +34,16 @@ class GrowthBookSDKBuilderTests {
 
         }).initialize()
 
-        assertTrue(sdkInstance.getGBContext().apiKey == testApiKey)
+        assertEquals(sdkInstance.getGBContext().apiKey, testApiKey)
         assertTrue(sdkInstance.getGBContext().enabled)
-        assertTrue(sdkInstance.getGBContext().hostURL == testHostURL)
+        assertEquals(sdkInstance.getGBContext().hostURL, testHostURL)
         assertFalse(sdkInstance.getGBContext().qaMode)
-        assertTrue(sdkInstance.getGBContext().attributes == testAttributes)
+        assertEquals(sdkInstance.getGBContext().attributes, testAttributes)
 
     }
 
     @Test
-    fun testSDKInitilizationOverride() {
+    fun testSDKInitializationOverride() {
 
         val variations : HashMap<String, Int> = HashMap()
 
@@ -51,12 +53,12 @@ class GrowthBookSDKBuilderTests {
 
         }).setRefreshHandler {  }.setEnabled(false).setForcedVariations(variations).setQAMode(true).initialize()
 
-        assertTrue(sdkInstance.getGBContext().apiKey == testApiKey)
+        assertEquals(sdkInstance.getGBContext().apiKey, testApiKey)
         assertFalse(sdkInstance.getGBContext().enabled)
-        assertTrue(sdkInstance.getGBContext().hostURL == testHostURL)
+        assertEquals(sdkInstance.getGBContext().hostURL, testHostURL)
         assertTrue(sdkInstance.getGBContext().qaMode)
-        assertTrue(sdkInstance.getGBContext().attributes == testAttributes)
-        assertTrue(sdkInstance.getGBContext().forcedVariations == variations)
+        assertEquals(sdkInstance.getGBContext().attributes, testAttributes)
+        assertEquals(sdkInstance.getGBContext().forcedVariations, variations)
 
     }
 
@@ -135,44 +137,46 @@ class GrowthBookSDKBuilderTests {
 
 
         val featureValue = sdkInstance.feature("fwrfewrfe")
-        assertTrue(featureValue.source == GBFeatureSource.unknownFeature)
+        assertEquals(featureValue.source, GBFeatureSource.unknownFeature)
 
         val expValue = sdkInstance.run(GBExperiment("fwewrwefw"))
         assertTrue(expValue.variationId == 0)
     }
 
-//    @Test
-//    fun testSDKInitializationJAVA() {
-//
-//        val sdkInstance = GBSDKBuilderJAVA(testApiKey, testHostURL, attributes = testAttributes, features = HashMap(), trackingCallback = {
-//                gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
-//
-//
-//        }).initialize()
-//
-//        assertTrue(sdkInstance.getGBContext().apiKey == testApiKey)
-//        assertTrue(sdkInstance.getGBContext().hostURL == testHostURL)
-//        assertTrue(sdkInstance.getGBContext().attributes == testAttributes)
-//
-//
-//    }
-//
-//    @Test
-//    fun testSDKFeaturesDataJAVA() {
-//
-//        val features : GBFeatures = HashMap()
-//        features.put("onboarding", GBFeature())
-//
-//        val sdkInstance = GBSDKBuilderJAVA(testApiKey, testHostURL, attributes = testAttributes, features = features, trackingCallback = {
-//                gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
-//
-//
-//        }).initialize()
-//
-//        assertTrue(sdkInstance.getFeatures().containsKey("onboarding"))
-//        assertFalse(sdkInstance.getFeatures().containsKey("fwrfewrfe"))
-//
-//    }
+   @OptIn(DelicateCoroutinesApi::class)
+   @Test
+   fun testSDKInitializationJAVA() {
+
+       val sdkInstance = GBSDKBuilderJAVA(testApiKey, testHostURL, attributes = testAttributes, features = HashMap(), trackingCallback = {
+               gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
+
+
+       }).initialize()
+
+       assertEquals(sdkInstance.getGBContext().apiKey, testApiKey)
+       assertEquals(sdkInstance.getGBContext().hostURL, testHostURL)
+       assertEquals(sdkInstance.getGBContext().attributes, testAttributes)
+
+
+   }
+
+   @OptIn(DelicateCoroutinesApi::class)
+   @Test
+   fun testSDKFeaturesDataJAVA() {
+
+       val features : GBFeatures = HashMap()
+       features["onboarding"] = GBFeature()
+
+       val sdkInstance = GBSDKBuilderJAVA(testApiKey, testHostURL, attributes = testAttributes, features = features, trackingCallback = {
+               gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
+
+
+       }).initialize()
+
+       assertTrue(sdkInstance.getFeatures().containsKey("onboarding"))
+       assertFalse(sdkInstance.getFeatures().containsKey("fwrfewrfe"))
+
+   }
 
 
 }
