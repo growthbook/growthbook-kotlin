@@ -19,12 +19,12 @@ internal interface FeaturesFlowDelegate{
 /**
  * View Model for Features
  */
-internal class FeaturesViewModel(val delegate: FeaturesFlowDelegate, val dataSource : FeaturesDataSource = FeaturesDataSource()) {
+internal class FeaturesViewModel(private val delegate: FeaturesFlowDelegate, private val dataSource : FeaturesDataSource = FeaturesDataSource()) {
 
     /**
      * Caching Manager
      */
-    val manager = CachingImpl
+    private val manager = CachingImpl
 
     /**
      * Fetch Features
@@ -57,7 +57,7 @@ internal class FeaturesViewModel(val delegate: FeaturesFlowDelegate, val dataSou
     /**
      * Cache API Response and push success event
      */
-    fun prepareFeaturesData(dataModel : FeaturesDataModel) {
+    private fun prepareFeaturesData(dataModel : FeaturesDataModel) {
         manager.getLayer().putData(Constants.featureCache, dataModel)
         // Call Success Delegate with mention of data available with remote
         this.delegate.featuresFetchedSuccessfully(features = dataModel.features, isRemote = true)

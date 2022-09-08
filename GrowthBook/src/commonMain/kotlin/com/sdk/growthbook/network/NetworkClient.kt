@@ -25,7 +25,7 @@ interface NetworkDispatcher {
  */
 internal class CoreNetworkClient : NetworkDispatcher {
 
-    val client = HttpClient {
+    private val client = HttpClient {
         install(JsonFeature){
             serializer = KotlinxSerializer(kotlinx.serialization.json.Json {
                 prettyPrint = true

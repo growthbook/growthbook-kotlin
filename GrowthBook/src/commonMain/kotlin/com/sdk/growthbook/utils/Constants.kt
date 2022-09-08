@@ -13,12 +13,12 @@ internal class Constants {
         /**
          * ID Attribute Key
          */
-        val idAttributeKey = "id"
+        const val idAttributeKey = "id"
 
         /**
          * Identifier for Caching Feature Data in Internal Storage File
          */
-        val featureCache = "FeatureCache"
+        const val featureCache = "FeatureCache"
 
     }
 }

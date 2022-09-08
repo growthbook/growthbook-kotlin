@@ -20,7 +20,7 @@ internal class FNV {
      * Fowler-Noll-Vo hash - 32 bit
      * Returns BigInteger
      */
-    fun fnv1a_32(data: String): BigInteger? {
+    fun fnv1a_32(data: String): BigInteger {
         var hash: BigInteger = INIT32
         for (b in data) {
             hash = hash.xor(BigInteger(b.code and 0xff))
@@ -48,11 +48,10 @@ internal class GBUtils {
          * Hashes a string to a float between 0 and 1
          * fnv32a returns an integer, so we convert that to a float using a modulus:
          */
-        fun hash(data: String) : Float? {
+        fun hash(data: String): Float? {
             val hash = FNV().fnv1a_32(data)
-            val remainder = hash?.remainder(BigInteger(1000))
-            val value = remainder?.toString()?.toFloatOrNull()?.div(1000f)
-            return value
+            val remainder = hash.remainder(BigInteger(1000))
+            return remainder.toString().toFloatOrNull()?.div(1000f)
         }
 
         /**
@@ -130,12 +129,10 @@ internal class GBUtils {
          */
         fun chooseVariation(n: Float, ranges: List<GBBucketRange>) : Int {
 
-            var counter = 0
-            for (range in ranges) {
+            for ((counter, range) in ranges.withIndex()) {
                 if (n >= range.first && n < range.second) {
                     return counter
                 }
-                counter++
             }
 
             return -1

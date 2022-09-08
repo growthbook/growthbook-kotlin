@@ -264,17 +264,17 @@ internal class GBConditionEvaluator{
 
         // If conditionValue is array, return true if it's "equal" - "equal" should do a deep comparison for arrays.
         if (conditionValue is JsonArray) {
-            if (attributeValue is JsonArray) {
+            return if (attributeValue is JsonArray) {
                 if (conditionValue.size == attributeValue.size) {
                     val conditionArray = Json.decodeFromJsonElement<Array<JsonElement>>(conditionValue)
                     val attributeArray = Json.decodeFromJsonElement<Array<JsonElement>>(attributeValue)
 
-                    return conditionArray.contentDeepEquals(attributeArray)
+                    conditionArray.contentDeepEquals(attributeArray)
                 } else {
-                    return false
+                    false
                 }
             } else {
-                return false
+                false
             }
         }
 
@@ -289,7 +289,7 @@ internal class GBConditionEvaluator{
                     }
                 }
             } else if (attributeValue != null) {
-                return conditionValue.equals(attributeValue)
+                return conditionValue == attributeValue
             } else {
                 return false
             }
@@ -444,20 +444,18 @@ internal class GBConditionEvaluator{
                 // Evaluate REGEX operator - whether attribute contains condition regex
                 "\$regex" -> {
 
-                    try {
+                    return try {
 
                         val regex = Regex(targetPrimitiveValue)
-                        return  regex.containsMatchIn(sourcePrimitiveValue)
+                        regex.containsMatchIn(sourcePrimitiveValue)
                     }catch (error : Throwable){
-                        return false
+                        false
                     }
 
 
                 }
             }
-
         }
-
         return false
     }
 

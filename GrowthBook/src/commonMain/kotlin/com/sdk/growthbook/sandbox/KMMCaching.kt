@@ -24,14 +24,14 @@ internal interface CachingLayer {
  */
 internal inline fun <reified T> CachingLayer.getData(fileName: String) : @Serializable T? {
     val content = getContent(fileName)
-    return content?.let { Json {  }.decodeFromJsonElement<T>(it) }
+    return content?.let { Json.decodeFromJsonElement<T>(it) }
 }
 
 /**
  * Default Implementation for Caching Layer Interface methods
  */
 internal inline fun <reified T> CachingLayer.putData(fileName: String, content: @Serializable T) {
-    val jsonContent = Json {  }.encodeToJsonElement(content)
+    val jsonContent = Json.encodeToJsonElement(content)
     saveContent(fileName, jsonContent)
 }
 

@@ -10,9 +10,9 @@ import kotlinx.serialization.json.Json
 /**
  * DataSource for Feature API
  */
-internal class FeaturesDataSource(val dispatcher: NetworkDispatcher = CoreNetworkClient()) {
+internal class FeaturesDataSource(private val dispatcher: NetworkDispatcher = CoreNetworkClient()) {
 
-    private val JSONParser: Json
+    private val jsonParser: Json
         get() = Json { prettyPrint = true; isLenient = true; ignoreUnknownKeys = true }
 
   private val apiUrl =
@@ -27,7 +27,7 @@ internal class FeaturesDataSource(val dispatcher: NetworkDispatcher = CoreNetwor
   ) {
 	dispatcher.consumeGETRequest(apiUrl,
 	  onSuccess = { rawContent ->
-		val result: FeaturesDataModel = JSONParser.decodeFromString(rawContent)
+		val result: FeaturesDataModel = jsonParser.decodeFromString(rawContent)
 		result.also(success)
 	  },
 	  onError = { apiTimeError ->
