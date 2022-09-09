@@ -21,64 +21,68 @@ import kotlinx.serialization.json.jsonPrimitive
 /**
  * Enum For different Attribute Types supported by GrowthBook
  */
-internal enum class  GBAttributeType {
+internal enum class GBAttributeType {
     /**
      * String Type Attribute
      */
-    gbString{
+    GbString {
         override fun toString(): String = "string"
     },
+
     /**
      * Number Type Attribute
      */
-    gbNumber{
+    GbNumber {
         override fun toString(): String = "number"
     },
+
     /**
      * Boolean Type Attribute
      */
-    gbBoolean{
+    GbBoolean {
         override fun toString(): String = "boolean"
     },
+
     /**
      * Array Type Attribute
      */
-    gbArray{
+    GbArray {
         override fun toString(): String = "array"
     },
+
     /**
      * Object Type Attribute
      */
-    gbObject{
+    GbObject {
         override fun toString(): String = "object"
     },
+
     /**
      * Null Type Attribute
      */
-    gbNull{
+    GbNull {
         override fun toString(): String = "null"
     },
+
     /**
      * Not Supported Type Attribute
      */
-    gbUnknown{
+    GbUnknown {
         override fun toString(): String = "unknown"
     }
-
 }
 
 /**
  * Evaluator Class for Conditions
  */
-internal class GBConditionEvaluator{
-
+internal class GBConditionEvaluator {
 
     /**
      * This is the main function used to evaluate a condition.
      * - attributes : User Attributes
      * - condition : to be evaluated
      */
-    fun evalCondition(attributes : JsonElement, conditionObj : GBCondition) : Boolean {
+    fun evalCondition(attributes: JsonElement, conditionObj: GBCondition): Boolean {
 
         if (conditionObj is JsonArray) {
             return false
@@ -128,7 +132,7 @@ internal class GBConditionEvaluator{
     /**
      * Evaluate OR conditions against given attributes
      */
-    fun evalOr(attributes : JsonElement, conditionObjs : JsonArray): Boolean {
+    private fun evalOr(attributes: JsonElement, conditionObjs: JsonArray): Boolean {
         // If conditionObjs is empty, return true
         if (conditionObjs.isEmpty()) {
             return true
@@ -148,7 +152,7 @@ internal class GBConditionEvaluator{
     /**
      * Evaluate AND conditions against given attributes
      */
-    fun evalAnd(attributes : JsonElement, conditionObjs : JsonArray): Boolean {
+    private fun evalAnd(attributes: JsonElement, conditionObjs: JsonArray): Boolean {
 
         // Loop through the conditionObjects
         for (item in conditionObjs) {
@@ -162,15 +166,14 @@ internal class GBConditionEvaluator{
         return true
     }
 
-
     /**
      * This accepts a parsed JSON object as input and returns true if every key in the object starts with $
      */
-    fun isOperatorObject(obj : JsonElement) : Boolean {
+    fun isOperatorObject(obj: JsonElement): Boolean {
         var isOperator = true
         if (obj is JsonObject && obj.keys.isNotEmpty()) {
-            for (key in obj.keys){
-                if (!key.startsWith("$")){
+            for (key in obj.keys) {
+                if (!key.startsWith("$")) {
                     isOperator = false
                     break
                 }
@@ -184,46 +187,43 @@ internal class GBConditionEvaluator{
     /**
      * This returns the data type of the passed in argument.
      */
-    fun getType(obj: JsonElement?) : GBAttributeType {
+    fun getType(obj: JsonElement?): GBAttributeType {
 
         if (obj == JsonNull) {
-            return GBAttributeType.gbNull
+            return GBAttributeType.GbNull
         }
 
-        val value = obj
+        if (obj is JsonPrimitive) {
 
-        if (value is JsonPrimitive) {
+            val primitiveValue = obj.jsonPrimitive
 
-            val primitiveValue = value.jsonPrimitive
-
-            if (primitiveValue.isString) {
-                return GBAttributeType.gbString
-            } else if (primitiveValue.content == "true" || primitiveValue.content == "false"){
-                return GBAttributeType.gbBoolean
+            return if (primitiveValue.isString) {
+                GBAttributeType.GbString
+            } else if (primitiveValue.content == "true" || primitiveValue.content == "false") {
+                GBAttributeType.GbBoolean
             } else {
-                return GBAttributeType.gbNumber
+                GBAttributeType.GbNumber
             }
-
         }
 
-        if (value is JsonArray) {
-            return GBAttributeType.gbArray
+        if (obj is JsonArray) {
+            return GBAttributeType.GbArray
         }
 
-        if (value is JsonObject) {
-            return GBAttributeType.gbObject
+        if (obj is JsonObject) {
+            return GBAttributeType.GbObject
         }
 
-        return GBAttributeType.gbUnknown
+        return GBAttributeType.GbUnknown
     }
 
     /**
      * Given attributes and a dot-separated path string,
      * @return the value at that path (or null if the path doesn't exist)
      */
-    fun getPath(obj: JsonElement, key: String) : JsonElement? {
+    fun getPath(obj: JsonElement, key: String): JsonElement? {
 
-        val paths : ArrayList<String>
+        val paths: ArrayList<String>
 
         if (key.contains(".")) {
             paths = key.split(".") as ArrayList<String>
@@ -232,14 +232,14 @@ internal class GBConditionEvaluator{
             paths.add(key)
         }
 
-        var element : JsonElement? = obj
+        var element: JsonElement? = obj
 
         for (path in paths) {
             if (element == null || element is JsonArray) {
                 return null
             }
             if (element is JsonObject) {
-                element = element.get(path)
+                element = element[path]
             } else {
                 return null
             }
@@ -251,7 +251,7 @@ internal class GBConditionEvaluator{
     /**
      * Evaluates Condition Value against given condition & attributes
      */
-    fun evalConditionValue(conditionValue : JsonElement, attributeValue : JsonElement?) : Boolean {
+    fun evalConditionValue(conditionValue: JsonElement, attributeValue: JsonElement?): Boolean {
 
         // If conditionValue is a string, number, boolean, return true if it's "equal" to attributeValue and false if not.
         if (conditionValue is JsonPrimitive && attributeValue is JsonPrimitive) {
@@ -264,17 +264,19 @@ internal class GBConditionEvaluator{
 
         // If conditionValue is array, return true if it's "equal" - "equal" should do a deep comparison for arrays.
         if (conditionValue is JsonArray) {
-            if (attributeValue is JsonArray) {
+            return if (attributeValue is JsonArray) {
                 if (conditionValue.size == attributeValue.size) {
-                    val conditionArray = Json.decodeFromJsonElement<Array<JsonElement>>(conditionValue)
-                    val attributeArray = Json.decodeFromJsonElement<Array<JsonElement>>(attributeValue)
+                    val conditionArray =
+                        Json.decodeFromJsonElement<Array<JsonElement>>(conditionValue)
+                    val attributeArray =
+                        Json.decodeFromJsonElement<Array<JsonElement>>(attributeValue)
 
-                    return conditionArray.contentDeepEquals(attributeArray)
+                    conditionArray.contentDeepEquals(attributeArray)
                 } else {
-                    return false
+                    false
                 }
             } else {
-                return false
+                false
             }
         }
 
@@ -282,14 +284,14 @@ internal class GBConditionEvaluator{
         if (conditionValue is JsonObject) {
 
             if (isOperatorObject(conditionValue)) {
-                for (key in  conditionValue.keys) {
+                for (key in conditionValue.keys) {
                     // If evalOperatorCondition(key, attributeValue, value) is false, return false
                     if (!evalOperatorCondition(key, attributeValue, conditionValue[key]!!)) {
                         return false
                     }
                 }
             } else if (attributeValue != null) {
-                return conditionValue.equals(attributeValue)
+                return conditionValue == attributeValue
             } else {
                 return false
             }
@@ -302,7 +304,7 @@ internal class GBConditionEvaluator{
     /**
      * This checks if attributeValue is an array, and if so at least one of the array items must match the condition
      */
-    fun elemMatch(attributeValue: JsonElement, condition: JsonElement) : Boolean {
+    private fun elemMatch(attributeValue: JsonElement, condition: JsonElement): Boolean {
 
         if (attributeValue is JsonArray) {
             // Loop through items in attributeValue
@@ -329,22 +331,26 @@ internal class GBConditionEvaluator{
      * This function is just a case statement that handles all the possible operators
      * There are basic comparison operators in the form attributeValue {op} conditionValue
      */
-    fun evalOperatorCondition(operator : String, attributeValue : JsonElement?, conditionValue : JsonElement) : Boolean {
+    fun evalOperatorCondition(
+        operator: String,
+        attributeValue: JsonElement?,
+        conditionValue: JsonElement
+    ): Boolean {
 
         // Evaluate TYPE operator - whether both are of same type
         if (operator == "\$type") {
-            return  getType(attributeValue).toString() == conditionValue.jsonPrimitive.content
+            return getType(attributeValue).toString() == conditionValue.jsonPrimitive.content
         }
 
         // Evaluate NOT operator - whether condition doesn't contain attribute
         if (operator == "\$not") {
-            return  !evalConditionValue(conditionValue, attributeValue)
+            return !evalConditionValue(conditionValue, attributeValue)
         }
 
         // Evaluate EXISTS operator - whether condition contains attribute
         if (operator == "\$exists") {
             val targetPrimitiveValue = conditionValue.jsonPrimitive.content
-            if (targetPrimitiveValue == "false" && attributeValue == null){
+            if (targetPrimitiveValue == "false" && attributeValue == null) {
                 return true
             } else if (targetPrimitiveValue == "true" && attributeValue != null) {
                 return true
@@ -367,39 +373,37 @@ internal class GBConditionEvaluator{
 
                     if (attributeValue is JsonArray) {
                         // Loop through conditionValue array
-                            // If none of the elements in the attributeValue array pass evalConditionValue(conditionValue[i], attributeValue[j]), return false
-                       for (con in conditionValue) {
-                           var result = false
-                           for (attr in attributeValue) {
+                        // If none of the elements in the attributeValue array pass evalConditionValue(conditionValue[i], attributeValue[j]), return false
+                        for (con in conditionValue) {
+                            var result = false
+                            for (attr in attributeValue) {
                                 if (evalConditionValue(con, attr)) {
                                     result = true
                                 }
-                           }
-                           if (!result) {
-                               return result
-                           }
-                       }
+                            }
+                            if (!result) {
+                                return result
+                            }
+                        }
                         return true
                     } else {
                         // If attributeValue is not an array, return false
                         return false
                     }
-
                 }
             }
         } else if (attributeValue is JsonArray) {
 
             when (operator) {
-                // Evaluate ELEMMATCH operator - whether condition matches attribute
+                // Evaluate ElemMATCH operator - whether condition matches attribute
                 "\$elemMatch" -> {
-                    return  elemMatch(attributeValue, conditionValue)
+                    return elemMatch(attributeValue, conditionValue)
                 }
                 // Evaluate SIE operator - whether condition size is same as that of attribute
                 "\$size" -> {
                     return evalConditionValue(conditionValue, JsonPrimitive(attributeValue.size))
                 }
             }
-
         } else if (attributeValue is JsonPrimitive && conditionValue is JsonPrimitive) {
             val targetPrimitiveValue = conditionValue.content
             val sourcePrimitiveValue = attributeValue.content
@@ -407,58 +411,54 @@ internal class GBConditionEvaluator{
             when (operator) {
                 // Evaluate EQ operator - whether condition equals to attribute
                 "\$eq" -> {
-                    return  sourcePrimitiveValue == targetPrimitiveValue
+                    return sourcePrimitiveValue == targetPrimitiveValue
                 }
                 // Evaluate NE operator - whether condition doesn't equal to attribute
                 "\$ne" -> {
-                    return  sourcePrimitiveValue != targetPrimitiveValue
+                    return sourcePrimitiveValue != targetPrimitiveValue
                 }
                 // Evaluate LT operator - whether attribute less than to condition
                 "\$lt" -> {
-                    if (attributeValue.doubleOrNull != null && conditionValue.doubleOrNull != null){
+                    if (attributeValue.doubleOrNull != null && conditionValue.doubleOrNull != null) {
                         return (attributeValue.doubleOrNull!! < conditionValue.doubleOrNull!!)
                     }
-                    return  sourcePrimitiveValue < targetPrimitiveValue
+                    return sourcePrimitiveValue < targetPrimitiveValue
                 }
                 // Evaluate LTE operator - whether attribute less than or equal to condition
                 "\$lte" -> {
-                    if (attributeValue.doubleOrNull != null && conditionValue.doubleOrNull != null){
+                    if (attributeValue.doubleOrNull != null && conditionValue.doubleOrNull != null) {
                         return (attributeValue.doubleOrNull!! <= conditionValue.doubleOrNull!!)
                     }
-                    return  sourcePrimitiveValue <= targetPrimitiveValue
+                    return sourcePrimitiveValue <= targetPrimitiveValue
                 }
                 // Evaluate GT operator - whether attribute greater than to condition
                 "\$gt" -> {
-                    if (attributeValue.doubleOrNull != null && conditionValue.doubleOrNull != null){
+                    if (attributeValue.doubleOrNull != null && conditionValue.doubleOrNull != null) {
                         return (attributeValue.doubleOrNull!! > conditionValue.doubleOrNull!!)
                     }
-                    return  sourcePrimitiveValue > targetPrimitiveValue
+                    return sourcePrimitiveValue > targetPrimitiveValue
                 }
                 // Evaluate GTE operator - whether attribute greater than or equal to condition
                 "\$gte" -> {
-                    if (attributeValue.doubleOrNull != null && conditionValue.doubleOrNull != null){
+                    if (attributeValue.doubleOrNull != null && conditionValue.doubleOrNull != null) {
                         return (attributeValue.doubleOrNull!! >= conditionValue.doubleOrNull!!)
                     }
-                    return  sourcePrimitiveValue >= targetPrimitiveValue
+                    return sourcePrimitiveValue >= targetPrimitiveValue
                 }
                 // Evaluate REGEX operator - whether attribute contains condition regex
                 "\$regex" -> {
 
-                    try {
+                    return try {
 
                         val regex = Regex(targetPrimitiveValue)
-                        return  regex.containsMatchIn(sourcePrimitiveValue)
-                    }catch (error : Throwable){
-                        return false
+                        regex.containsMatchIn(sourcePrimitiveValue)
+                    } catch (error: Throwable) {
+                        false
                     }
-
-
                 }
             }
-
         }
 
         return false
     }
-
 }

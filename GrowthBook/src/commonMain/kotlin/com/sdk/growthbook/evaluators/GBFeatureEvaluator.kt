@@ -34,7 +34,7 @@ internal class GBFeatureEvaluator {
 
             // Loop through the feature rules (if any)
             val rules = targetFeature.rules
-            if (rules != null && rules.size > 0) {
+            if (rules != null && rules.isNotEmpty()) {
 
                 for (rule in rules) {
 
@@ -54,7 +54,7 @@ internal class GBFeatureEvaluator {
 
                             val key = rule.hashAttribute ?: Constants.idAttributeKey
                             // Get the user hash value (context.attributes[rule.hashAttribute || "id"]) and if empty, skip the rule
-                            val attributeValue = context.attributes.get(key) as? String ?: ""
+                            val attributeValue = context.attributes[key] as? String ?: ""
                             if (attributeValue.isEmpty())
                                 continue
                             else {
@@ -87,7 +87,7 @@ internal class GBFeatureEvaluator {
                                 value = result.value,
                                 source = GBFeatureSource.experiment,
                                 experiment = exp,
-                                experimetResult = result
+                                experimentResult = result
                             )
                         } else {
                             // If result.inExperiment is false, skip this rule and continue to the next one.
@@ -116,20 +116,20 @@ internal class GBFeatureEvaluator {
         value: Any?,
         source: GBFeatureSource,
         experiment: GBExperiment? = null,
-        experimetResult: GBExperimentResult? = null
+        experimentResult: GBExperimentResult? = null
     ): GBFeatureResult {
 
-        val isFalsy = value == null || value.toString() == "false" || value.toString()
+        val isFalse = value == null || value.toString() == "false" || value.toString()
             .isEmpty() || value.toString() == "0"
 
 
         return GBFeatureResult(
             value = convertToPrimitiveIfPossible(value),
-            on = !isFalsy,
-            off = isFalsy,
+            on = !isFalse,
+            off = isFalse,
             source = source,
             experiment = experiment,
-            experimentResult = experimetResult
+            experimentResult = experimentResult
         )
     }
 

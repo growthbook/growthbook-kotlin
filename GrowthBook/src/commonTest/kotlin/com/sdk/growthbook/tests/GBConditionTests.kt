@@ -59,7 +59,7 @@ class GBConditionTests {
 
         assertFalse(evaluator.isOperatorObject(JsonObject(HashMap())))
 
-        assertEquals(evaluator.getType(null).toString(), GBAttributeType.gbUnknown.toString())
+        assertEquals(evaluator.getType(null).toString(), GBAttributeType.GbUnknown.toString())
 
         assertTrue(evaluator.getPath(JsonPrimitive("test"), "key") == null)
 

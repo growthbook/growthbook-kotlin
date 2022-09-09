@@ -8,5 +8,5 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 internal data class FeaturesDataModel(
-    val features : GBFeatures
+    val features: GBFeatures
 )
