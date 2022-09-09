@@ -13,13 +13,12 @@ internal class Constants {
         /**
          * ID Attribute Key
          */
-        val idAttributeKey = "id"
+        const val idAttributeKey = "id"
 
         /**
          * Identifier for Caching Feature Data in Internal Storage File
          */
-        val featureCache = "FeatureCache"
-
+        const val featureCache = "FeatureCache"
     }
 }
 
@@ -59,6 +58,7 @@ class GBError(error: Throwable?) {
      * Error Message for the caught error / exception
      */
     lateinit var errorMessage: String
+
     /**
      * Error Stacktrace for the caught error / exception
      */

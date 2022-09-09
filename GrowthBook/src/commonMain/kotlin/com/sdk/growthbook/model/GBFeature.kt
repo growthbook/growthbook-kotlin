@@ -13,7 +13,7 @@ class GBFeature(
     /**
      * The default value (should use null if not specified)
      */
-    val defaultValue : JsonElement? = null,
+    val defaultValue: JsonElement? = null,
     /**
      * Array of Rule objects that determine when and how the defaultValue gets overridden
      */
@@ -28,15 +28,15 @@ class GBFeatureRule(
     /**
      * Optional targeting condition
      */
-    val condition : GBCondition? = null,
+    val condition: GBCondition? = null,
     /**
      * What percent of users should be included in the experiment (between 0 and 1, inclusive)
      */
-    val coverage : Float? = null,
+    val coverage: Float? = null,
     /**
      * Immediately force a specific value (ignore every other option besides condition and coverage)
      */
-    val force : JsonElement? = null,
+    val force: JsonElement? = null,
     /**
      * Run an experiment (A/B test) and randomly choose between these variations
      */
@@ -52,7 +52,7 @@ class GBFeatureRule(
     /**
      * A tuple that contains the namespace identifier, plus a range of coverage for the experiment.
      */
-    val namespace : JsonArray? = null,
+    val namespace: JsonArray? = null,
     /**
      * What user attribute should be used to assign variations (defaults to id)
      */
@@ -91,11 +91,11 @@ class GBFeatureResult(
     /**
      * The assigned value of the feature
      */
-    val value : Any?,
+    val value: Any?,
     /**
      * The assigned value cast to a boolean
      */
-    val on : Boolean = false,
+    val on: Boolean = false,
     /**
      * The assigned value cast to a boolean and then negated
      */

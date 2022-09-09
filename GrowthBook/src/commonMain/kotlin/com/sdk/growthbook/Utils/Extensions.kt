@@ -1,16 +1,19 @@
 package com.sdk.growthbook.Utils
 
-import kotlinx.serialization.json.*
-
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Extension over JsonObject class to convert that into HashMap
  */
-internal fun JsonObject.toHashMap() : HashMap<String, Any> {
+internal fun JsonObject.toHashMap(): HashMap<String, Any> {
     val map: HashMap<String, Any> = HashMap()
     this.forEach {
         val key = it.key
-        when(val value = it.value) {
+        when (val value = it.value) {
             is JsonObject -> map[key] = value.toHashMap()
             is JsonArray -> map[key] = value.toList()
             else -> map[key] = value.jsonPrimitive.content
@@ -19,14 +22,13 @@ internal fun JsonObject.toHashMap() : HashMap<String, Any> {
     return map
 }
 
-
 /**
  * Extension over JsonArray class to convert that into List
  */
-internal fun JsonArray.toList() : List<*> {
+internal fun JsonArray.toList(): List<*> {
     val list: MutableList<Any> = mutableListOf()
     this.forEach {
-        when(val value = it) {
+        when (val value = it) {
             is JsonObject -> list.add((value).toHashMap())
             is List<*> -> list.add(value.toList())
             else -> list.add(value.jsonPrimitive.content)
@@ -35,7 +37,6 @@ internal fun JsonArray.toList() : List<*> {
     return list
 }
 
-
 /**
  * Extension over List class to convert that into JsonArray
  */
@@ -43,7 +44,7 @@ internal fun List<*>.toJsonElement(): JsonElement {
     val list: MutableList<JsonElement> = mutableListOf()
     this.forEach {
         val value = it ?: return@forEach
-        when(value) {
+        when (value) {
             is Map<*, *> -> list.add((value).toJsonElement())
             is List<*> -> list.add(value.toJsonElement())
             else -> list.add(JsonPrimitive(value.toString()))
@@ -51,7 +52,6 @@ internal fun List<*>.toJsonElement(): JsonElement {
     }
     return JsonArray(list)
 }
-
 
 /**
  * Extension over Map class to convert that into JsonObject
@@ -61,7 +61,7 @@ internal fun Map<*, *>.toJsonElement(): JsonElement {
     this.forEach {
         val key = it.key as? String ?: return@forEach
         val value = it.value ?: return@forEach
-        when(value) {
+        when (value) {
             is Map<*, *> -> map[key] = (value).toJsonElement()
             is List<*> -> map[key] = value.toJsonElement()
             else -> map[key] = JsonPrimitive(value.toString())

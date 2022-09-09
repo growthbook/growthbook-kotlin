@@ -1,15 +1,15 @@
 package com.sdk.growthbook
 
-import com.sdk.growthbook.evaluators.GBExperimentEvaluator
-import com.sdk.growthbook.evaluators.GBFeatureEvaluator
-import com.sdk.growthbook.features.FeaturesDataSource
-import com.sdk.growthbook.features.FeaturesFlowDelegate
-import com.sdk.growthbook.features.FeaturesViewModel
 import com.sdk.growthbook.Network.CoreNetworkClient
 import com.sdk.growthbook.Network.NetworkDispatcher
 import com.sdk.growthbook.Utils.GBCacheRefreshHandler
 import com.sdk.growthbook.Utils.GBError
 import com.sdk.growthbook.Utils.GBFeatures
+import com.sdk.growthbook.evaluators.GBExperimentEvaluator
+import com.sdk.growthbook.evaluators.GBFeatureEvaluator
+import com.sdk.growthbook.features.FeaturesDataSource
+import com.sdk.growthbook.features.FeaturesFlowDelegate
+import com.sdk.growthbook.features.FeaturesViewModel
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
@@ -17,7 +17,6 @@ import com.sdk.growthbook.model.GBFeatureResult
 import kotlinx.coroutines.DelicateCoroutinesApi
 
 typealias GBTrackingCallback = (GBExperiment, GBExperimentResult) -> Unit
-
 
 /**
  * SDKBuilder - Root Class for SDK Initializers for GrowthBook SDK
@@ -75,23 +74,30 @@ abstract class SDKBuilder(
  * Features - GrowthBook Features Map - Synced via Web API / Web Hooks
  * Tracking Callback - Track Events for Experiments
  */
-class GBSDKBuilderJAVA(apiKey: String, hostURL: String, attributes: Map<String, Any>, val features: GBFeatures,
-                       trackingCallback: GBTrackingCallback
-) : SDKBuilder(apiKey, hostURL,
+class GBSDKBuilderJAVA(
+    apiKey: String, hostURL: String, attributes: Map<String, Any>, val features: GBFeatures,
+    trackingCallback: GBTrackingCallback
+) : SDKBuilder(
+    apiKey, hostURL,
     attributes, trackingCallback
 ) {
     /**
      * Initialize the JAVA SDK
      */
     @DelicateCoroutinesApi
-    override fun initialize() : GrowthBookSDK{
+    override fun initialize(): GrowthBookSDK {
 
-        val gbContext = GBContext(apiKey = apiKey, enabled = enabled, attributes = attributes, hostURL = hostURL, qaMode = qaMode, forcedVariations = forcedVariations, trackingCallback = trackingCallback)
+        val gbContext = GBContext(
+            apiKey = apiKey,
+            enabled = enabled,
+            attributes = attributes,
+            hostURL = hostURL,
+            qaMode = qaMode,
+            forcedVariations = forcedVariations,
+            trackingCallback = trackingCallback
+        )
 
-        val sdkInstance = GrowthBookSDK(gbContext, null, features = features)
-
-        return sdkInstance
-
+        return GrowthBookSDK(gbContext, null, features = features)
     }
 }
 
@@ -148,10 +154,8 @@ class GBSDKBuilderApp(
         )
 
         return GrowthBookSDK(gbContext, refreshHandler, networkDispatcher, features = null)
-
     }
 }
-
 
 /**
  * The main export of the libraries is a simple GrowthBook wrapper class that takes a Context object in the constructor.
@@ -187,7 +191,6 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         } else {
             refreshCache()
         }
-
     }
 
     /**
@@ -213,7 +216,6 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         return gbContext.features
     }
 
-
     override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
         gbContext.features = features
         if (isRemote) {
@@ -226,7 +228,6 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         if (isRemote) {
             this.refreshHandler?.let { it(false) }
         }
-
     }
 
     /**
@@ -235,7 +236,6 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     fun feature(id: String): GBFeatureResult {
 
         return GBFeatureEvaluator().evaluateFeature(gbContext, id)
-
     }
 
     /**

@@ -11,26 +11,29 @@ import kotlinx.coroutines.DelicateCoroutinesApi
 /**
  * Interface for Feature API Completion Events
  */
-internal interface FeaturesFlowDelegate{
-    fun featuresFetchedSuccessfully(features : GBFeatures, isRemote: Boolean)
+internal interface FeaturesFlowDelegate {
+    fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean)
     fun featuresFetchFailed(error: GBError, isRemote: Boolean)
 }
 
 /**
  * View Model for Features
  */
-internal class FeaturesViewModel(val delegate: FeaturesFlowDelegate, val dataSource : FeaturesDataSource = FeaturesDataSource()) {
+internal class FeaturesViewModel(
+    private val delegate: FeaturesFlowDelegate,
+    private val dataSource: FeaturesDataSource = FeaturesDataSource()
+) {
 
     /**
      * Caching Manager
      */
-    val manager = CachingImpl
+    private val manager = CachingImpl
 
     /**
      * Fetch Features
      */
     @DelicateCoroutinesApi
-    fun fetchFeatures(){
+    fun fetchFeatures() {
 
         try {
             // Check for cache data
@@ -38,29 +41,29 @@ internal class FeaturesViewModel(val delegate: FeaturesFlowDelegate, val dataSou
 
             if (dataModel != null) {
                 // Call Success Delegate with mention of data available but its not remote
-                this.delegate.featuresFetchedSuccessfully(features = dataModel.features, isRemote = false)
+                this.delegate.featuresFetchedSuccessfully(
+                    features = dataModel.features,
+                    isRemote = false
+                )
             }
-        } catch (error : Throwable){
+        } catch (error: Throwable) {
             // Call Error Delegate with mention of data not available but its not remote
             this.delegate.featuresFetchFailed(GBError(error), false)
         }
 
-        dataSource.fetchFeatures(success = {dataModel -> prepareFeaturesData(dataModel = dataModel)},
+        dataSource.fetchFeatures(success = { dataModel -> prepareFeaturesData(dataModel = dataModel) },
             failure = { error ->
                 // Call Error Delegate with mention of data not available but its not remote
                 this.delegate.featuresFetchFailed(GBError(error), true)
             })
-
-
     }
 
     /**
      * Cache API Response and push success event
      */
-    fun prepareFeaturesData(dataModel : FeaturesDataModel) {
+    private fun prepareFeaturesData(dataModel: FeaturesDataModel) {
         manager.getLayer().putData(Constants.featureCache, dataModel)
         // Call Success Delegate with mention of data available with remote
         this.delegate.featuresFetchedSuccessfully(features = dataModel.features, isRemote = true)
     }
-
 }

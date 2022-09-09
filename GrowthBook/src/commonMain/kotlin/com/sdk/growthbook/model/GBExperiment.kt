@@ -17,11 +17,11 @@ class GBExperiment(
     /**
      * The different variations to choose between
      */
-    val variations : List<JsonElement> = ArrayList(),
+    val variations: List<JsonElement> = ArrayList(),
     /**
      * A tuple that contains the namespace identifier, plus a range of coverage for the experiment
      */
-    val namespace : JsonArray? = null,
+    val namespace: JsonArray? = null,
     /**
      * All users included in the experiment will be forced into the specific variation index
      */
@@ -29,15 +29,15 @@ class GBExperiment(
     /**
      * How to weight traffic between variations. Must add to 1.
      */
-    var weights : List<Float>? = null,
+    var weights: List<Float>? = null,
     /**
      * If set to false, always return the control (first variation)
      */
-    var active : Boolean = true,
+    var active: Boolean = true,
     /**
      * What percent of users should be included in the experiment (between 0 and 1, inclusive)
      */
-    var coverage : Float? = null,
+    var coverage: Float? = null,
     /**
      * Optional targeting condition
      */
@@ -45,7 +45,7 @@ class GBExperiment(
     /**
      * All users included in the experiment will be forced into the specific variation index
      */
-    var force : Int? = null
+    var force: Int? = null
 )
 
 /**

@@ -6,16 +6,16 @@ import io.ktor.http.pathComponents
 
 internal class FeatureURLBuilder {
 
-  companion object {
-	/**
-	 * Context Path for Fetching Feature Details - Web Service
-	 */
-	private const val featurePath = "api/features/"
-  }
+    companion object {
+        /**
+         * Context Path for Fetching Feature Details - Web Service
+         */
+        private const val featurePath = "api/features/"
+    }
 
-  fun buildUrl(baseUrl: String, apiKey: String): String {
-	return URLBuilder(url = Url(baseUrl))
-	  .pathComponents(featurePath, apiKey)
-	  .buildString()
-  }
+    fun buildUrl(baseUrl: String, apiKey: String): String {
+        return URLBuilder(url = Url(baseUrl))
+            .pathComponents(featurePath, apiKey)
+            .buildString()
+    }
 }
