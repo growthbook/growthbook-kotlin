@@ -1,11 +1,10 @@
 package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.GBSDKBuilderApp
-import com.sdk.growthbook.SDKBuilder
-import com.sdk.growthbook.Utils.GBFeatures
+import com.sdk.growthbook.Utils.GBCacheRefreshHandler
+import com.sdk.growthbook.Utils.GBError
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
-import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.model.GBFeatureSource
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -16,40 +15,43 @@ class GrowthBookSDKBuilderTests {
 
     val testApiKey = "4r23r324f23"
     val testHostURL = "https://host.com"
-    val testAttributes : HashMap<String, Any> = HashMap()
+    val testAttributes: HashMap<String, Any> = HashMap()
 
     @BeforeTest
     fun setUp() {
-
     }
 
     @Test
     fun testSDKInitilizationDefault() {
 
-        val sdkInstance = GBSDKBuilderApp(testApiKey, testHostURL, attributes = testAttributes, trackingCallback = {
-            gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
+        val sdkInstance = GBSDKBuilderApp(
+            testApiKey,
+            testHostURL,
+            attributes = testAttributes,
+            trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
 
-
-        }).initialize()
+            }).initialize()
 
         assertTrue(sdkInstance.getGBContext().apiKey == testApiKey)
         assertTrue(sdkInstance.getGBContext().enabled)
         assertTrue(sdkInstance.getGBContext().hostURL == testHostURL)
         assertFalse(sdkInstance.getGBContext().qaMode)
         assertTrue(sdkInstance.getGBContext().attributes == testAttributes)
-
     }
 
     @Test
     fun testSDKInitilizationOverride() {
 
-        val variations : HashMap<String, Int> = HashMap()
+        val variations: HashMap<String, Int> = HashMap()
 
-        val sdkInstance = GBSDKBuilderApp(testApiKey, testHostURL, attributes = testAttributes, trackingCallback = {
-                gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
+        val sdkInstance = GBSDKBuilderApp(
+            testApiKey,
+            testHostURL,
+            attributes = testAttributes,
+            trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
 
-
-        }).setRefreshHandler {  }.setEnabled(false).setForcedVariations(variations).setQAMode(true).initialize()
+            }).setRefreshHandler { isRefreshed, gbError ->
+        }.setEnabled(false).setForcedVariations(variations).setQAMode(true).initialize()
 
         assertTrue(sdkInstance.getGBContext().apiKey == testApiKey)
         assertFalse(sdkInstance.getGBContext().enabled)
@@ -57,26 +59,30 @@ class GrowthBookSDKBuilderTests {
         assertTrue(sdkInstance.getGBContext().qaMode)
         assertTrue(sdkInstance.getGBContext().attributes == testAttributes)
         assertTrue(sdkInstance.getGBContext().forcedVariations == variations)
-
     }
 
     @Test
     fun testSDKInitilizationData() {
 
-        val variations : HashMap<String, Int> = HashMap()
+        val variations: HashMap<String, Int> = HashMap()
 
-        val sdkInstance = GBSDKBuilderApp(testApiKey, testHostURL, attributes = testAttributes, trackingCallback = {
-                gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
+        val sdkInstance = GBSDKBuilderApp(
+            testApiKey,
+            testHostURL,
+            attributes = testAttributes,
+            trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
 
+            }).setRefreshHandler { isRefreshed, gbError ->
 
-        }).setRefreshHandler {  }.setNetworkDispatcher(MockNetworkClient(MockResponse.successResponse, null)).setEnabled(false).setForcedVariations(variations).setQAMode(true).initialize()
+        }
+            .setNetworkDispatcher(MockNetworkClient(MockResponse.successResponse, null))
+            .setEnabled(false).setForcedVariations(variations).setQAMode(true).initialize()
 
         assertTrue(sdkInstance.getGBContext().apiKey == testApiKey)
         assertFalse(sdkInstance.getGBContext().enabled)
         assertTrue(sdkInstance.getGBContext().hostURL == testHostURL)
         assertTrue(sdkInstance.getGBContext().qaMode)
         assertTrue(sdkInstance.getGBContext().attributes == testAttributes)
-
     }
 
     @Test
@@ -84,11 +90,13 @@ class GrowthBookSDKBuilderTests {
 
         var isRefreshed = false
 
-        val sdkInstance = GBSDKBuilderApp(testApiKey, testHostURL, attributes = testAttributes, trackingCallback = {
-                gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
+        val sdkInstance = GBSDKBuilderApp(
+            testApiKey,
+            testHostURL,
+            attributes = testAttributes,
+            trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
 
-
-        }).setRefreshHandler {
+            }).setRefreshHandler { _, gbError ->
             isRefreshed = true
         }.setNetworkDispatcher(MockNetworkClient(MockResponse.successResponse, null)).initialize()
 
@@ -99,19 +107,22 @@ class GrowthBookSDKBuilderTests {
         sdkInstance.refreshCache()
 
         assertTrue(isRefreshed)
-
     }
 
     @Test
     fun testSDKFeaturesData() {
 
         var isRefreshed = false
+        val gbError = GBError(error = null)
+        val gbCacheRefreshHandler: GBCacheRefreshHandler = { isRefreshed, gbError -> }
 
-        val sdkInstance = GBSDKBuilderApp(testApiKey, testHostURL, attributes = testAttributes, trackingCallback = {
-                gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
+        val sdkInstance = GBSDKBuilderApp(
+            testApiKey,
+            testHostURL,
+            attributes = testAttributes,
+            trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
 
-
-        }).setRefreshHandler {
+            }).setRefreshHandler { _, gbError ->
             isRefreshed = true
         }.setNetworkDispatcher(MockNetworkClient(MockResponse.successResponse, null)).initialize()
 
@@ -119,20 +130,19 @@ class GrowthBookSDKBuilderTests {
 
         assertTrue(sdkInstance.getFeatures().containsKey("onboarding"))
         assertFalse(sdkInstance.getFeatures().containsKey("fwrfewrfe"))
-
     }
 
     @Test
     fun testSDKRunMethods() {
 
-        val sdkInstance = GBSDKBuilderApp(testApiKey, testHostURL, attributes = testAttributes, trackingCallback = {
-                gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
+        val sdkInstance = GBSDKBuilderApp(
+            testApiKey,
+            testHostURL,
+            attributes = testAttributes,
+            trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
 
-
-        }).setRefreshHandler {
-
+            }).setRefreshHandler { isRefreshed, gbError ->
         }.setNetworkDispatcher(MockNetworkClient(MockResponse.successResponse, null)).initialize()
-
 
         val featureValue = sdkInstance.feature("fwrfewrfe")
         assertTrue(featureValue.source == GBFeatureSource.unknownFeature)
@@ -173,6 +183,5 @@ class GrowthBookSDKBuilderTests {
 //        assertFalse(sdkInstance.getFeatures().containsKey("fwrfewrfe"))
 //
 //    }
-
 
 }

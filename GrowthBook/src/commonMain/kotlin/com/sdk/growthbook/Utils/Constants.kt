@@ -36,7 +36,7 @@ typealias GBCondition = JsonElement
  * Handler for Refresh Cache Request
  * It updates back whether cache was refreshed or not
  */
-typealias GBCacheRefreshHandler = (Boolean) -> Unit
+typealias GBCacheRefreshHandler = (Boolean, GBError?) -> Unit
 
 /**
  * Triple Tuple for GrowthBook Namespaces

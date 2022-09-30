@@ -219,14 +219,14 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
         gbContext.features = features
         if (isRemote) {
-            this.refreshHandler?.let { it(true) }
+            this.refreshHandler?.invoke(true, null)
         }
     }
 
     override fun featuresFetchFailed(error: GBError, isRemote: Boolean) {
 
         if (isRemote) {
-            this.refreshHandler?.let { it(false) }
+            this.refreshHandler?.invoke(false, error)
         }
     }
 
