@@ -54,7 +54,7 @@ internal class GBFeatureEvaluator {
 
                             val key = rule.hashAttribute ?: Constants.idAttributeKey
                             // Get the user hash value (context.attributes[rule.hashAttribute || "id"]) and if empty, skip the rule
-                            val attributeValue = context.attributes[key] as? String ?: ""
+                            val attributeValue = context.attributes.getOrDefault(key, "") as String
                             if (attributeValue.isEmpty())
                                 continue
                             else {
