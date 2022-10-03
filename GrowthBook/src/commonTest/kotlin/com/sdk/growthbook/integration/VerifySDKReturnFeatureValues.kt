@@ -94,4 +94,40 @@ internal class VerifySDKReturnFeatureValues {
             )
         ).initialize()
     }
+
+    @Test
+    fun verifySDKAttributesCastingTypes() {
+        @Language("json")
+        val json = """
+        {
+          "status": 200,
+          "features": {
+            "test_feature": {
+              "defaultValue": "code",
+              "rules": [
+                {
+                  "variations": [
+                    "override", "control"
+                  ],
+                  "coverage": 1,
+                  "weights": [
+                    0.5, 0.5
+                  ],
+                  "key": "test_feature",
+                  "hashAttribute": "id"
+                }
+              ]
+            }
+          }
+        }
+    """.trimMargin()
+
+        val sdkInstance = buildSDK(json = json, attributes = mapOf("id" to "123"))
+
+        val attributeValue = sdkInstance.getGBContext().attributes.getOrDefault("id", "").toString()
+        assertEquals("123", attributeValue)
+
+        val feature = sdkInstance.feature("test_feature")
+        assertEquals("experiment", feature.source.name)
+    }
 }
