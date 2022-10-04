@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "1.1.17"
+version = "1.1.18"
 
 kotlin {
 
@@ -80,7 +80,7 @@ android {
     compileSdk = 31
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
     defaultConfig {
-        minSdk = 26
+        minSdk = 21
         targetSdk = 31
     }
 }

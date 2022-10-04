@@ -42,9 +42,9 @@ internal class GBExperimentEvaluator {
         }
 
         // Get the user hash attribute and value (context.attributes[experiment.hashAttribute || "id"]) and if empty, return immediately (not in experiment, variationId 0)
-        val attr: Any? =
-            context.attributes[experiment.hashAttribute ?: Constants.idAttributeKey]
-        val attributeValue: String = attr?.toString() ?: ""
+        val attributeValue =
+            context.attributes[experiment.hashAttribute ?: Constants.idAttributeKey]?.toString()
+                ?: ""
         if (attributeValue.isEmpty()) {
             return getExperimentResult(experiment = experiment, gbContext = context)
         }
@@ -150,7 +150,7 @@ internal class GBExperimentEvaluator {
         // Hash Attribute - used for Experiment Calculations
         val hashAttribute = experiment.hashAttribute ?: Constants.idAttributeKey
         // Hash Value against hash attribute
-        val hashValue = gbContext.attributes[hashAttribute] ?: ""
+        val hashValue = gbContext.attributes[hashAttribute]?.toString() ?: ""
 
         return GBExperimentResult(
             inExperiment = inExperiment,

@@ -99,35 +99,56 @@ internal class VerifySDKReturnFeatureValues {
     fun verifySDKAttributesCastingTypes() {
         @Language("json")
         val json = """
-        {
-          "status": 200,
-          "features": {
-            "test_feature": {
-              "defaultValue": "code",
-              "rules": [
-                {
-                  "variations": [
-                    "override", "control"
-                  ],
-                  "coverage": 1,
-                  "weights": [
-                    0.5, 0.5
-                  ],
-                  "key": "test_feature",
-                  "hashAttribute": "id"
-                }
-              ]
+{
+      "status": 200,
+      "features": {
+        "test_feature": {
+          "defaultValue": "code",
+          "rules": [
+            {
+              "variations": [
+                "override", "control"
+              ],
+              "coverage": 1,
+              "weights": [
+                0.5, 0.5
+              ],
+              "key": "test_feature",
+              "hashAttribute": "user_id"
             }
-          }
+          ]
         }
-    """.trimMargin()
+      }
+    }
+""".trimMargin()
 
-        val sdkInstance = buildSDK(json = json, attributes = mapOf("id" to "123"))
+        //Check casting with Integer value
+        val sdkInstance = buildSDK(json = json, attributes = mapOf("user_id" to 123))
+        val intAttributeValue = sdkInstance.getGBContext().attributes["user_id"]?.toString() ?: ""
+        assertEquals("123", intAttributeValue)
+        val intFeature = sdkInstance.feature("test_feature")
+        assertEquals("experiment", intFeature.source.name)
 
-        val attributeValue = sdkInstance.getGBContext().attributes.getOrDefault("id", "").toString()
-        assertEquals("123", attributeValue)
+        //Check casting with Boolean value
+        sdkInstance.setAttributes(attributes = mapOf("user_id" to true))
+        val boolAttributeValue = sdkInstance.getGBContext().attributes["user_id"]?.toString() ?: ""
+        assertEquals("true", boolAttributeValue)
+        val boolFeature = sdkInstance.feature("test_feature")
+        assertEquals("experiment", boolFeature.source.name)
 
-        val feature = sdkInstance.feature("test_feature")
-        assertEquals("experiment", feature.source.name)
+        //Check casting with Float value
+        sdkInstance.setAttributes(attributes = mapOf("user_id" to 1.8f))
+        val floatAttributeValue = sdkInstance.getGBContext().attributes["user_id"]?.toString() ?: ""
+        assertEquals("1.8", floatAttributeValue)
+        val floatFeature = sdkInstance.feature("test_feature")
+        assertEquals("experiment", floatFeature.source.name)
+
+        //Checking with wrong attribute key
+        sdkInstance.setAttributes(attributes = mapOf("user_id" to 5))
+        val wrongKeyAttributeValue =
+            sdkInstance.getGBContext().attributes["user_iiii"]?.toString() ?: "wrongIdDefaultValue"
+        assertEquals("wrongIdDefaultValue", wrongKeyAttributeValue)
+        val wrongKeyFeature = sdkInstance.feature("test_feature")
+        assertEquals("experiment", wrongKeyFeature.source.name)
     }
 }
