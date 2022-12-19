@@ -2,9 +2,14 @@ package com.sdk.growthbook
 
 import com.sdk.growthbook.Network.CoreNetworkClient
 import com.sdk.growthbook.Network.NetworkDispatcher
+import com.sdk.growthbook.Utils.Crypto
+import com.sdk.growthbook.Utils.DefaultCrypto
 import com.sdk.growthbook.Utils.GBCacheRefreshHandler
 import com.sdk.growthbook.Utils.GBError
 import com.sdk.growthbook.Utils.GBFeatures
+import com.sdk.growthbook.Utils.encryptToFeaturesDataModel
+import com.sdk.growthbook.Utils.stringToIv
+import com.sdk.growthbook.Utils.stringToSecretKey
 import com.sdk.growthbook.evaluators.GBExperimentEvaluator
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
 import com.sdk.growthbook.features.FeaturesDataSource
@@ -222,6 +227,33 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
             this.refreshHandler?.invoke(true, null)
         }
     }
+
+    fun setEncryptedFeatures(encryptedString: String, encryptionKey: String, subtleCrypto: Crypto?){
+        val encryptedArrayData = encryptedString.split(".")
+
+        val iv = stringToIv(encryptedArrayData[0])
+        val stringToDecrypt = encryptedArrayData[1]
+
+        val cryptoLocal = subtleCrypto ?: DefaultCrypto()
+        val localEncryptionKey = stringToSecretKey(encryptionKey)
+
+        val encrypt = cryptoLocal.decrypt(stringToDecrypt, localEncryptionKey, iv)
+
+        val featuresDataModel = encryptToFeaturesDataModel(encrypt)
+        featuresDataModel?.let {
+            gbContext.features = it.features
+        } ?: return
+    }
+
+    // fun setEncryptedFeatures(encryptedString: String, encryptionKey: String, subtleCrypto: SubtleCrypto?){
+    //     val cryptoLocal = subtleCrypto ?: DefaultCrypto()
+    //     val localEncryptionKey = stringToSecretKey(encryptionKey)
+    //     val encrypt = cryptoLocal.decrypt(encryptedString, localEncryptionKey)
+    //     val featuresDataModel = encryptToFeaturesDataModel(encrypt)
+    //     featuresDataModel?.let {
+    //         gbContext.features = it.features
+    //     } ?: return
+    // }
 
     override fun featuresFetchFailed(error: GBError, isRemote: Boolean) {
 
