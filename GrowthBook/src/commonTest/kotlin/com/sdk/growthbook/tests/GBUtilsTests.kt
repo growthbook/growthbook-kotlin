@@ -1,7 +1,17 @@
 package com.sdk.growthbook.tests
 
-import com.sdk.growthbook.Utils.*
-import kotlinx.serialization.json.*
+import com.sdk.growthbook.Utils.Constants
+import com.sdk.growthbook.Utils.GBBucketRange
+import com.sdk.growthbook.Utils.GBNameSpace
+import com.sdk.growthbook.Utils.GBUtils
+import com.sdk.growthbook.Utils.toJsonElement
+import com.sdk.growthbook.Utils.toList
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.float
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -9,10 +19,10 @@ import kotlin.test.assertTrue
 class GBUtilsTests {
 
     @Test
-    fun testHash(){
+    fun testHash() {
         val evalConditions = GBTestHelper.getFNVHashData()
-        var failedScenarios : ArrayList<String> = ArrayList()
-        var passedScenarios : ArrayList<String> = ArrayList()
+        var failedScenarios: ArrayList<String> = ArrayList()
+        var passedScenarios: ArrayList<String> = ArrayList()
         for (item in evalConditions) {
             if (item is JsonArray) {
 
@@ -21,69 +31,72 @@ class GBUtilsTests {
 
                 val result = GBUtils.hash(testContext)
 
-                val status = item[0].toString() + "\nExpected Result - " +item[1].toString() + "\nActual result - " + result + "\n"
+                val status =
+                    item[0].toString() + "\nExpected Result - " + item[1].toString() + "\nActual result - " + result + "\n"
 
                 if (experiment == result.toString()) {
                     passedScenarios.add(status)
                 } else {
                     failedScenarios.add(status)
                 }
-
             }
         }
 
-        print("\nTOTAL TESTS - "+ evalConditions.size)
-        print("\nPassed TESTS - "+ passedScenarios.size)
-        print("\nFailed TESTS - "+ failedScenarios.size)
+        print("\nTOTAL TESTS - " + evalConditions.size)
+        print("\nPassed TESTS - " + passedScenarios.size)
+        print("\nFailed TESTS - " + failedScenarios.size)
         print("\n")
         print(failedScenarios)
 
         assertTrue(failedScenarios.size == 0)
-
     }
 
     @Test
-    fun testBucketRange(){
+    fun testBucketRange() {
         val evalConditions = GBTestHelper.getBucketRangeData()
-        var failedScenarios : ArrayList<String> = ArrayList()
-        var passedScenarios : ArrayList<String> = ArrayList()
+        var failedScenarios: ArrayList<String> = ArrayList()
+        var passedScenarios: ArrayList<String> = ArrayList()
         for (item in evalConditions) {
             if (item is JsonArray) {
 
                 val numVariations = item[1].jsonArray[0].jsonPrimitive.content.toIntOrNull()
                 val coverage = item[1].jsonArray[1].jsonPrimitive.content.toFloatOrNull()
-                var weights : List<Float>? = null
+                var weights: List<Float>? = null
                 if (item[1].jsonArray[2] != JsonNull) {
                     weights =
                         (item[1].jsonArray[2].jsonArray.toList() as? List<String>)?.map { value -> value.toFloat() }
                 }
 
+                val bucketRange = GBUtils.getBucketRanges(
+                    numVariations ?: 1,
+                    coverage ?: 1F,
+                    weights ?: ArrayList()
+                )
 
-                val bucketRange = GBUtils.getBucketRanges(numVariations ?: 1, coverage ?: 1F, weights ?: ArrayList())
-
-
-                val status = item[0].toString() + "\nExpected Result - " +item[2].jsonArray.toString() + "\nActual result - " + bucketRange.toJsonElement().jsonArray.toString() + "\n"
+                val status =
+                    item[0].toString() + "\nExpected Result - " + item[2].jsonArray.toString() + "\nActual result - " + bucketRange.toJsonElement().jsonArray.toString() + "\n"
 
                 if (compareBucket(item[2].jsonArray.toList() as List<List<Float>>, bucketRange)) {
                     passedScenarios.add(status)
                 } else {
                     failedScenarios.add(status)
                 }
-
             }
         }
 
-        print("\nTOTAL TESTS - "+ evalConditions.size)
-        print("\nPassed TESTS - "+ passedScenarios.size)
-        print("\nFailed TESTS - "+ failedScenarios.size)
+        print("\nTOTAL TESTS - " + evalConditions.size)
+        print("\nPassed TESTS - " + passedScenarios.size)
+        print("\nFailed TESTS - " + failedScenarios.size)
         print("\n")
         print(failedScenarios)
 
         assertTrue(failedScenarios.size == 0)
-
     }
 
-    fun compareBucket(expectedResults : List<List<Float>>, calaculatedResults: List<GBBucketRange>) : Boolean {
+    fun compareBucket(
+        expectedResults: List<List<Float>>,
+        calaculatedResults: List<GBBucketRange>
+    ): Boolean {
 
         var pairExpectedResults = getPairedData(expectedResults)
 
@@ -92,7 +105,7 @@ class GBUtilsTests {
         }
 
         var result = true
-        for (i in 0..pairExpectedResults.size-1) {
+        for (i in 0..pairExpectedResults.size - 1) {
             var source = pairExpectedResults[i]
             var target = calaculatedResults[i]
 
@@ -103,24 +116,28 @@ class GBUtilsTests {
         }
 
         return result
-
     }
 
-    fun getPairedData(items :  List<List<Float>>) : List<GBBucketRange> {
-        var pairExpectedResults : ArrayList<Pair<Float, Float>> = ArrayList()
+    fun getPairedData(items: List<List<Float>>): List<GBBucketRange> {
+        var pairExpectedResults: ArrayList<Pair<Float, Float>> = ArrayList()
 
         for (item in items) {
             val pair = item.zipWithNext().single()
-            pairExpectedResults.add(Pair((pair.first as JsonPrimitive).content.toFloat(), (pair.second as JsonPrimitive).content.toFloat()))
+            pairExpectedResults.add(
+                Pair(
+                    (pair.first as JsonPrimitive).content.toFloat(),
+                    (pair.second as JsonPrimitive).content.toFloat()
+                )
+            )
         }
         return pairExpectedResults
     }
 
     @Test
-    fun testChooseVariation(){
+    fun testChooseVariation() {
         val evalConditions = GBTestHelper.getChooseVariationData()
-        var failedScenarios : ArrayList<String> = ArrayList()
-        var passedScenarios : ArrayList<String> = ArrayList()
+        var failedScenarios: ArrayList<String> = ArrayList()
+        var passedScenarios: ArrayList<String> = ArrayList()
         for (item in evalConditions) {
             if (item is JsonArray) {
 
@@ -129,32 +146,31 @@ class GBUtilsTests {
 
                 val result = GBUtils.chooseVariation(hash ?: 0F, rangeData)
 
-                val status = item[0].toString() + "\nExpected Result - " +item[3].toString() + "\nActual result - " + result.toString() + "\n"
+                val status =
+                    item[0].toString() + "\nExpected Result - " + item[3].toString() + "\nActual result - " + result.toString() + "\n"
 
                 if (item[3].toString() == result.toString()) {
                     passedScenarios.add(status)
                 } else {
                     failedScenarios.add(status)
                 }
-
             }
         }
 
-        print("\nTOTAL TESTS - "+ evalConditions.size)
-        print("\nPassed TESTS - "+ passedScenarios.size)
-        print("\nFailed TESTS - "+ failedScenarios.size)
+        print("\nTOTAL TESTS - " + evalConditions.size)
+        print("\nPassed TESTS - " + passedScenarios.size)
+        print("\nFailed TESTS - " + failedScenarios.size)
         print("\n")
         print(failedScenarios)
 
         assertTrue(failedScenarios.size == 0)
-
     }
 
     @Test
-    fun testInNameSpace(){
+    fun testInNameSpace() {
         val evalConditions = GBTestHelper.getInNameSpaceData()
-        var failedScenarios : ArrayList<String> = ArrayList()
-        var passedScenarios : ArrayList<String> = ArrayList()
+        var failedScenarios: ArrayList<String> = ArrayList()
+        var passedScenarios: ArrayList<String> = ArrayList()
         for (item in evalConditions) {
             if (item is JsonArray) {
 
@@ -164,7 +180,8 @@ class GBUtilsTests {
 
                 val result = namespace?.let { GBUtils.inNamespace(userId, it) }
 
-                val status = item[0].toString() + "\nExpected Result - " +item[3].toString() + "\nActual result - " + result + "\n"
+                val status =
+                    item[0].toString() + "\nExpected Result - " + item[3].toString() + "\nActual result - " + result + "\n"
 
 
                 if (item[3].toString() == result.toString()) {
@@ -172,25 +189,23 @@ class GBUtilsTests {
                 } else {
                     failedScenarios.add(status)
                 }
-
             }
         }
 
-        print("\nTOTAL TESTS - "+ evalConditions.size)
-        print("\nPassed TESTS - "+ passedScenarios.size)
-        print("\nFailed TESTS - "+ failedScenarios.size)
+        print("\nTOTAL TESTS - " + evalConditions.size)
+        print("\nPassed TESTS - " + passedScenarios.size)
+        print("\nFailed TESTS - " + failedScenarios.size)
         print("\n")
         print(failedScenarios)
 
         assertTrue(failedScenarios.size == 0)
-
     }
 
     @Test
-    fun testEqualWeights(){
+    fun testEqualWeights() {
         val evalConditions = GBTestHelper.getEqualWeightsData()
-        var failedScenarios : ArrayList<String> = ArrayList()
-        var passedScenarios : ArrayList<String> = ArrayList()
+        var failedScenarios: ArrayList<String> = ArrayList()
+        var passedScenarios: ArrayList<String> = ArrayList()
         for (item in evalConditions) {
             if (item is JsonArray) {
 
@@ -198,14 +213,15 @@ class GBUtilsTests {
 
                 val result = GBUtils.getEqualWeights(numVariations)
 
-                val status =  "Expected Result - " +item[1].toString() + "\nActual result - " + result + "\n"
+                val status =
+                    "Expected Result - " + item[1].toString() + "\nActual result - " + result + "\n"
 
                 var resultTest = true
 
                 if (item[1].jsonArray.size != result.size) {
                     resultTest = false
-                } else{
-                    for (i in 0..result.size-1) {
+                } else {
+                    for (i in 0..result.size - 1) {
                         var source = item[1].jsonArray[i].jsonPrimitive.float
                         var target = result[i]
 
@@ -221,18 +237,16 @@ class GBUtilsTests {
                 } else {
                     failedScenarios.add(status)
                 }
-
             }
         }
 
-        print("\nTOTAL TESTS - "+ evalConditions.size)
-        print("\nPassed TESTS - "+ passedScenarios.size)
-        print("\nFailed TESTS - "+ failedScenarios.size)
+        print("\nTOTAL TESTS - " + evalConditions.size)
+        print("\nPassed TESTS - " + passedScenarios.size)
+        print("\nFailed TESTS - " + failedScenarios.size)
         print("\n")
         print(failedScenarios)
 
         assertTrue(failedScenarios.size == 0)
-
     }
 
     @Test
@@ -241,12 +255,11 @@ class GBUtilsTests {
         GBUtils()
         Constants()
 
-        assertFalse(GBUtils.inNamespace("4242", GBNameSpace("",0F,0F)))
+        assertFalse(GBUtils.inNamespace("4242", GBNameSpace("", 0F, 0F)))
 
         val items = ArrayList<JsonPrimitive>()
         items.add(JsonPrimitive(1))
 
         assertTrue(GBUtils.getGBNameSpace(JsonArray(items)) == null)
     }
-
 }

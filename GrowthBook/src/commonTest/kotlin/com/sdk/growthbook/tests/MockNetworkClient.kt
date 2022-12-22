@@ -2,7 +2,7 @@ package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.Network.NetworkDispatcher
 
-class MockNetworkClient (val succesResponse : String?, val error: Throwable?) : NetworkDispatcher {
+class MockNetworkClient(val succesResponse: String?, val error: Throwable?) : NetworkDispatcher {
     override fun consumeGETRequest(
         request: String,
         onSuccess: (String) -> Unit,
@@ -18,10 +18,7 @@ class MockNetworkClient (val succesResponse : String?, val error: Throwable?) : 
         } catch (ex: Exception) {
             onError(ex)
         }
-
-
     }
-
 }
 
 class MockResponse {
