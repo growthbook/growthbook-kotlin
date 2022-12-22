@@ -1,6 +1,5 @@
 package com.sdk.growthbook.tests
 
-import com.google.gson.Gson
 import com.sdk.growthbook.GBSDKBuilderApp
 import com.sdk.growthbook.Utils.DefaultCrypto
 import com.sdk.growthbook.Utils.encryptToFeaturesDataModel

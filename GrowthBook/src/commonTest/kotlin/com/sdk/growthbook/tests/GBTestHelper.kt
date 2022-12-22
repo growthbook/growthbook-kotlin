@@ -62,7 +62,7 @@ class GBTestHelper {
 }
 
 @Serializable
-class GBContextTest (
+class GBContextTest(
     val attributes: JsonElement = JsonObject(HashMap()),
     val qaMode: Boolean = false,
     val enabled: Boolean = true,
@@ -71,14 +71,14 @@ class GBContextTest (
 
 @Serializable
 class GBFeaturesTest(
-    val features : GBFeatures? = null,
+    val features: GBFeatures? = null,
     val attributes: JsonElement = JsonObject(HashMap())
 )
 
 @Serializable
 class GBFeatureResultTest(
     val value: JsonPrimitive,
-    val on : Boolean,
+    val on: Boolean,
     val off: Boolean,
     val source: String,
     val experiment: GBExperiment? = null,
