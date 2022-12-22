@@ -231,7 +231,11 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     /**
      * The setEncryptedFeatures method takes an encrypted string with an encryption key and then decrypts it with the default method of decrypting or with a method of decrypting from the user
      */
-    fun setEncryptedFeatures(encryptedString: String, encryptionKey: String, subtleCrypto: Crypto?){
+    fun setEncryptedFeatures(
+        encryptedString: String,
+        encryptionKey: String,
+        subtleCrypto: Crypto?
+    ) {
         val encryptedArrayData = encryptedString.split(".")
 
         val iv = stringToIv(encryptedArrayData[0])
