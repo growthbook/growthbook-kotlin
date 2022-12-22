@@ -8,6 +8,7 @@ import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeatureSource
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -32,7 +33,7 @@ class GrowthBookSDKBuilderTests {
 
             }).initialize()
 
-        assertTrue(sdkInstance.getGBContext().apiKey == testApiKey)
+        assertEquals(sdkInstance.getGBContext().apiKey, testApiKey)
         assertTrue(sdkInstance.getGBContext().enabled)
         assertTrue(sdkInstance.getGBContext().hostURL == testHostURL)
         assertFalse(sdkInstance.getGBContext().qaMode)

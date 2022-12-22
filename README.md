@@ -283,6 +283,12 @@ fun getGBContext() : GBContext
 fun getFeatures() : GBFeatures
 ```
 
+- The setEncryptedFeatures method takes an encrypted string with an encryption key and then decrypts it with the default method of decrypting or with a method of decrypting from the user
+
+```kotlin
+    fun setEncryptedFeatures(encryptedString: String, encryptionKey: String, subtleCrypto: Crypto?){
+```
+
 
 
 ## Models

@@ -7,6 +7,6 @@ import kotlinx.serialization.Serializable
  * Data Object for Feature API Response
  */
 @Serializable
-internal data class FeaturesDataModel(
+data class FeaturesDataModel(
     val features: GBFeatures
 )

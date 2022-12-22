@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "1.1.18"
+version = "1.1.19"
 
 kotlin {
 
@@ -35,6 +35,7 @@ kotlin {
                 implementation("io.ktor:ktor-client-core:$ktorVersion")
                 implementation("io.ktor:ktor-client-serialization:$ktorVersion")
                 implementation("com.ionspin.kotlin:bignum:0.3.3")
+                implementation ("com.google.code.gson:gson:2.10")
             }
         }
         val commonTest by getting {

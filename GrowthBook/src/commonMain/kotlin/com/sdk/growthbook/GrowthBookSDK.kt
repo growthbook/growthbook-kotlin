@@ -2,9 +2,14 @@ package com.sdk.growthbook
 
 import com.sdk.growthbook.Network.CoreNetworkClient
 import com.sdk.growthbook.Network.NetworkDispatcher
+import com.sdk.growthbook.Utils.Crypto
+import com.sdk.growthbook.Utils.DefaultCrypto
 import com.sdk.growthbook.Utils.GBCacheRefreshHandler
 import com.sdk.growthbook.Utils.GBError
 import com.sdk.growthbook.Utils.GBFeatures
+import com.sdk.growthbook.Utils.encryptToFeaturesDataModel
+import com.sdk.growthbook.Utils.stringToIv
+import com.sdk.growthbook.Utils.stringToSecretKey
 import com.sdk.growthbook.evaluators.GBExperimentEvaluator
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
 import com.sdk.growthbook.features.FeaturesDataSource
@@ -221,6 +226,26 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         if (isRemote) {
             this.refreshHandler?.invoke(true, null)
         }
+    }
+
+    /**
+     * The setEncryptedFeatures method takes an encrypted string with an encryption key and then decrypts it with the default method of decrypting or with a method of decrypting from the user
+     */
+    fun setEncryptedFeatures(encryptedString: String, encryptionKey: String, subtleCrypto: Crypto?){
+        val encryptedArrayData = encryptedString.split(".")
+
+        val iv = stringToIv(encryptedArrayData[0])
+        val key = stringToSecretKey(encryptionKey)
+        val stringToDecrypt = encryptedArrayData[1]
+
+        val cryptoLocal = subtleCrypto ?: DefaultCrypto()
+
+        val encrypt = cryptoLocal.decrypt(stringToDecrypt, key, iv)
+
+        val featuresDataModel = encryptToFeaturesDataModel(encrypt)
+        featuresDataModel?.let {
+            gbContext.features = it
+        } ?: return
     }
 
     override fun featuresFetchFailed(error: GBError, isRemote: Boolean) {
