@@ -1,10 +1,9 @@
 package com.sdk.growthbook.Utils
 
-import com.google.gson.Gson
-import com.sdk.growthbook.features.FeaturesDataModel
-import java.util.*
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
+import java.util.Base64
 import javax.crypto.Cipher
-import javax.crypto.SecretKey
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
@@ -23,7 +22,7 @@ interface Crypto {
     ): String
 }
 
-class DefaultCrypto(private val algorithm: String = "AES") : Crypto {
+class DefaultCrypto(private val algorithm: String = "AES/CBC/PKCS5Padding") : Crypto {
 
     override fun decrypt(
         cipherText: String,
@@ -48,29 +47,23 @@ class DefaultCrypto(private val algorithm: String = "AES") : Crypto {
     }
 }
 
-fun secretKeyToString(secretKey: SecretKey): String? {
-    return Base64.getEncoder().encodeToString(secretKey.encoded)
-}
-
 fun stringToSecretKey(encodedKey: String, algorithm: String = "AES"): SecretKeySpec {
-    val decodedKey: ByteArray = encodedKey.toByteArray()
-    return SecretKeySpec(decodedKey, 0, decodedKey.size, algorithm)
+    val decodedKey: ByteArray = Base64.getDecoder().decode(encodedKey)
+    return SecretKeySpec(decodedKey, algorithm)
 }
 
-fun ivToString(iv: IvParameterSpec): String {
-    return String(iv.iv)
-}
-
-fun stringToIv(iv: String): IvParameterSpec{
+fun stringToIv(iv: String): IvParameterSpec {
     val decodedIv: ByteArray = Base64.getDecoder().decode(iv)
     return IvParameterSpec(decodedIv)
 }
 
-fun encryptToFeaturesDataModel(string: String): FeaturesDataModel? {
-    val gson = Gson()
-    val json = gson.toJson(string)
+fun encryptToFeaturesDataModel(string: String): GBFeatures? {
+    val JSONParser = Json { prettyPrint = true; isLenient = true; ignoreUnknownKeys = true }
+
     return try {
-        gson.fromJson(json, FeaturesDataModel::class.java)
+
+        val result: GBFeatures = JSONParser.decodeFromString(string)
+        result
     } catch (e: Exception) {
         null
     }

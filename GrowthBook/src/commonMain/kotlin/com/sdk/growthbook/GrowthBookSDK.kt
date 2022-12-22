@@ -228,32 +228,25 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         }
     }
 
+    /**
+     * The setEncryptedFeatures method takes an encrypted string with an encryption key and then decrypts it with the default method of decrypting or with a method of decrypting from the user
+     */
     fun setEncryptedFeatures(encryptedString: String, encryptionKey: String, subtleCrypto: Crypto?){
         val encryptedArrayData = encryptedString.split(".")
 
         val iv = stringToIv(encryptedArrayData[0])
+        val key = stringToSecretKey(encryptionKey)
         val stringToDecrypt = encryptedArrayData[1]
 
         val cryptoLocal = subtleCrypto ?: DefaultCrypto()
-        val localEncryptionKey = stringToSecretKey(encryptionKey)
 
-        val encrypt = cryptoLocal.decrypt(stringToDecrypt, localEncryptionKey, iv)
+        val encrypt = cryptoLocal.decrypt(stringToDecrypt, key, iv)
 
         val featuresDataModel = encryptToFeaturesDataModel(encrypt)
         featuresDataModel?.let {
-            gbContext.features = it.features
+            gbContext.features = it
         } ?: return
     }
-
-    // fun setEncryptedFeatures(encryptedString: String, encryptionKey: String, subtleCrypto: SubtleCrypto?){
-    //     val cryptoLocal = subtleCrypto ?: DefaultCrypto()
-    //     val localEncryptionKey = stringToSecretKey(encryptionKey)
-    //     val encrypt = cryptoLocal.decrypt(encryptedString, localEncryptionKey)
-    //     val featuresDataModel = encryptToFeaturesDataModel(encrypt)
-    //     featuresDataModel?.let {
-    //         gbContext.features = it.features
-    //     } ?: return
-    // }
 
     override fun featuresFetchFailed(error: GBError, isRemote: Boolean) {
 
