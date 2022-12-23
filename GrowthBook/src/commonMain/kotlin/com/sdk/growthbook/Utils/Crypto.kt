@@ -12,67 +12,31 @@ interface Crypto {
         key: ByteArray,
         iv: ByteArray,
 
-        ): String
+        ): ByteArray
 
     fun encrypt(
         inputText: ByteArray,
         key: ByteArray,
         iv: ByteArray,
-    ): String
+    ): ByteArray
 }
 
-class DefaultCrypto(private val algorithm: String = "AES/CBC/PKCS5Padding") : Crypto {
+class DefaultCrypto : Crypto {
 
-    // override fun decrypt(
-    //     cipherText: String,
-    //     key: SecretKeySpec,
-    //     iv: IvParameterSpec,
-    // ): String {
-    //     val text = Base64.decode(cipherText)
-    //     val cipher = Cipher.getInstance(algorithm)
-    //     cipher.init(Cipher.DECRYPT_MODE, key, iv)
-    //     val plainText = cipher.doFinal(Base64.getDecoder().decode(cipherText))
-    //     return String(
-    //         AES.decryptAesCbc(
-    //             text,
-    //
-    //             )
-    //     )
-    // }
-    //
-    // override fun encrypt(
-    //     inputText: String,
-    //     key: SecretKeySpec,
-    //     iv: IvParameterSpec,
-    // ): String {
-    //     val cipher = Cipher.getInstance(algorithm)
-    //     cipher.init(Cipher.ENCRYPT_MODE, key, iv)
-    //     val cipherText = cipher.doFinal(inputText.toByteArray())
-    //     return Base64.getEncoder().encodeToString(cipherText)
-    // }
+    private val padding = CipherPadding.PKCS7Padding
 
-    override fun decrypt(cipherText: ByteArray, key: ByteArray, iv: ByteArray): String {
-        return String( AES.decryptAesCbc(cipherText, key, iv, CipherPadding.PKCS7Padding))
+    override fun decrypt(cipherText: ByteArray, key: ByteArray, iv: ByteArray): ByteArray {
+        return AES.decryptAesCbc(cipherText, key, iv, padding)
     }
 
-    override fun encrypt(inputText: ByteArray, key: ByteArray, iv: ByteArray): String {
-        return String( AES.encryptAesCbc(inputText, key, iv, CipherPadding.PKCS7Padding))
+    override fun encrypt(inputText: ByteArray, key: ByteArray, iv: ByteArray): ByteArray {
+        return AES.encryptAesCbc(inputText, key, iv, padding)
     }
 }
 
-// fun stringToSecretKey(encodedKey: String, algorithm: String = "AES"): SecretKeySpec {
-//     val decodedKey: ByteArray = Base64.decode(encodedKey)
-//     return SecretKeySpec(decodedKey, algorithm)
-// }
-
-fun decodeBase64(base64: String): ByteArray{
+fun decodeBase64(base64: String): ByteArray {
     return Base64.decode(base64)
 }
-
-// fun stringToIv(iv: String): String {
-//     val decodedIv: ByteArray = Base64.decode(iv)
-//     return de
-// }
 
 fun encryptToFeaturesDataModel(string: String): GBFeatures? {
     val JSONParser = Json { prettyPrint = true; isLenient = true; ignoreUnknownKeys = true }

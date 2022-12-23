@@ -53,6 +53,7 @@ kotlin {
             dependencies {
                 implementation("io.ktor:ktor-client-android:$ktorVersion")
                 implementation("androidx.startup:startup-runtime:1.1.1")
+                implementation("com.soywiz.korlibs.krypto:krypto:3.4.0")
             }
         }
         val androidTest by getting {
@@ -60,12 +61,14 @@ kotlin {
                 implementation(kotlin("test-junit"))
                 implementation("junit:junit:4.13.2")
                 implementation("org.mockito:mockito-core:4.2.0")
+                implementation("com.soywiz.korlibs.krypto:krypto:3.4.0")
             }
         }
 
         val jvmMain by getting {
             dependencies {
                 implementation("io.ktor:ktor-client-java:$ktorVersion")
+                implementation("com.soywiz.korlibs.krypto:krypto:3.4.0")
             }
         }
         val jvmTest by getting {

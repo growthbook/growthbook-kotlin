@@ -239,13 +239,13 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
 
         val iv = decodeBase64(encryptedArrayData[0])
         val key = decodeBase64(encryptionKey)
-        val stringToDecrypt = encryptedArrayData[1]
+        val stringToDecrypt = decodeBase64(encryptedArrayData[1])
 
         val cryptoLocal = subtleCrypto ?: DefaultCrypto()
 
-        val encrypt = cryptoLocal.decrypt(stringToDecrypt.toByteArray(), key, iv)
+        val encrypt = cryptoLocal.decrypt(stringToDecrypt, key, iv)
 
-        val featuresDataModel = encryptToFeaturesDataModel(encrypt)
+        val featuresDataModel = encryptToFeaturesDataModel(String(encrypt))
         featuresDataModel?.let {
             gbContext.features = it
         } ?: return
