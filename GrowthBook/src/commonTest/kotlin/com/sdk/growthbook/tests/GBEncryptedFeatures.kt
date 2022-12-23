@@ -25,6 +25,9 @@ class GBEncryptedFeatures {
         val stringForEncrypt =
             "{\"testfeature1\":{\"defaultValue\":true,\"rules\":[{\"condition\":{\"id\":\"1234\"},\"force\":false}]}}"
         val ivString = "vMSg2Bj/IurObDsWVmvkUg=="
+
+        encryptToFeaturesDataModel(stringForEncrypt)!!
+
         val decodedIv = Base64.getDecoder().decode(ivString)
         val decodedKey = Base64.getDecoder().decode(keyString)
 
@@ -38,14 +41,14 @@ class GBEncryptedFeatures {
 
         val defaultCrypto = DefaultCrypto()
         val encryptedValue = defaultCrypto.encrypt(
-            stringForEncrypt,
-            key,
-            iv
+            stringForEncrypt.toByteArray(),
+            decodedKey,
+            decodedIv
         )
         val decryptedValue = defaultCrypto.decrypt(
-            encryptedValue,
-            key,
-            iv
+            encryptedValue.toByteArray(),
+            decodedKey,
+            decodedIv
         )
         assertEquals(stringForEncrypt, decryptedValue)
     }

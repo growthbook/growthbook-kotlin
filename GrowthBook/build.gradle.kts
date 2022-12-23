@@ -34,7 +34,9 @@ kotlin {
                 )
                 implementation("io.ktor:ktor-client-core:$ktorVersion")
                 implementation("io.ktor:ktor-client-serialization:$ktorVersion")
+                implementation("io.ktor:ktor-utils:$ktorVersion")
                 implementation("com.ionspin.kotlin:bignum:0.3.3")
+                implementation("com.soywiz.korlibs.krypto:krypto:3.4.0")
             }
         }
         val commonTest by getting {
