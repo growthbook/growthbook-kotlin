@@ -7,9 +7,8 @@ import com.sdk.growthbook.Utils.DefaultCrypto
 import com.sdk.growthbook.Utils.GBCacheRefreshHandler
 import com.sdk.growthbook.Utils.GBError
 import com.sdk.growthbook.Utils.GBFeatures
+import com.sdk.growthbook.Utils.decodeBase64
 import com.sdk.growthbook.Utils.encryptToFeaturesDataModel
-import com.sdk.growthbook.Utils.stringToIv
-import com.sdk.growthbook.Utils.stringToSecretKey
 import com.sdk.growthbook.evaluators.GBExperimentEvaluator
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
 import com.sdk.growthbook.features.FeaturesDataSource
@@ -238,15 +237,17 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     ) {
         val encryptedArrayData = encryptedString.split(".")
 
-        val iv = stringToIv(encryptedArrayData[0])
-        val key = stringToSecretKey(encryptionKey)
-        val stringToDecrypt = encryptedArrayData[1]
+        val iv = decodeBase64(encryptedArrayData[0])
+        val key = decodeBase64(encryptionKey)
+        val stringToDecrypt = decodeBase64(encryptedArrayData[1])
 
         val cryptoLocal = subtleCrypto ?: DefaultCrypto()
 
-        val encrypt = cryptoLocal.decrypt(stringToDecrypt, key, iv)
+        val encrypt: ByteArray = cryptoLocal.decrypt(stringToDecrypt, key, iv)
+        val encryptString: String =
+            encrypt.decodeToString()
 
-        val featuresDataModel = encryptToFeaturesDataModel(encrypt)
+        val featuresDataModel = encryptToFeaturesDataModel(encryptString)
         featuresDataModel?.let {
             gbContext.features = it
         } ?: return

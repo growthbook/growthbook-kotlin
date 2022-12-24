@@ -5,10 +5,8 @@ import com.sdk.growthbook.Utils.DefaultCrypto
 import com.sdk.growthbook.Utils.encryptToFeaturesDataModel
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
+import com.soywiz.krypto.encoding.Base64
 import kotlinx.coroutines.DelicateCoroutinesApi
-import java.util.*
-import javax.crypto.spec.IvParameterSpec
-import javax.crypto.spec.SecretKeySpec
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -25,29 +23,25 @@ class GBEncryptedFeatures {
         val stringForEncrypt =
             "{\"testfeature1\":{\"defaultValue\":true,\"rules\":[{\"condition\":{\"id\":\"1234\"},\"force\":false}]}}"
         val ivString = "vMSg2Bj/IurObDsWVmvkUg=="
-        val decodedIv = Base64.getDecoder().decode(ivString)
-        val decodedKey = Base64.getDecoder().decode(keyString)
 
-        val key = SecretKeySpec(decodedKey, "AES")
-
-        val iv = IvParameterSpec(
-            decodedIv
-        )
-
-        // assertEquals(24, key.encoded.size)
+        val decodedIv = Base64.encode(ivString.toByteArray()).toByteArray()
+        val decodedKey = Base64.encode(keyString.toByteArray()).toByteArray()
 
         val defaultCrypto = DefaultCrypto()
+
         val encryptedValue = defaultCrypto.encrypt(
-            stringForEncrypt,
-            key,
-            iv
+            stringForEncrypt.toByteArray(),
+            decodedKey,
+            decodedIv
         )
         val decryptedValue = defaultCrypto.decrypt(
             encryptedValue,
-            key,
-            iv
+            decodedKey,
+            decodedIv
         )
-        assertEquals(stringForEncrypt, decryptedValue)
+        println(stringForEncrypt)
+        println(String(decryptedValue))
+        assertEquals(stringForEncrypt, String(decryptedValue))
     }
 
     val testApiKey = "4r23r324f23"
@@ -75,7 +69,6 @@ class GBEncryptedFeatures {
         sdkInstance.setEncryptedFeatures(encryptedFeatures, keyString, null)
 
         val features = encryptToFeaturesDataModel(expectedResult)!!
-
 
         assertEquals(
             features["testfeature1"]?.rules?.get(0)?.condition,
