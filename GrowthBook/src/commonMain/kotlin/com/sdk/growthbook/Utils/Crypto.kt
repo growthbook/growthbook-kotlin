@@ -1,7 +1,7 @@
 package com.sdk.growthbook.Utils
 
 import com.soywiz.krypto.AES
-import com.soywiz.krypto.CipherPadding
+import com.soywiz.krypto.Padding
 import com.soywiz.krypto.encoding.Base64
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
@@ -23,7 +23,7 @@ interface Crypto {
 
 class DefaultCrypto : Crypto {
 
-    private val padding = CipherPadding.PKCS7Padding
+    private val padding = Padding.PKCS7Padding
 
     override fun decrypt(cipherText: ByteArray, key: ByteArray, iv: ByteArray): ByteArray {
         return AES.decryptAesCbc(cipherText, key, iv, padding)

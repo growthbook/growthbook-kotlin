@@ -5,9 +5,9 @@ import com.sdk.growthbook.Utils.DefaultCrypto
 import com.sdk.growthbook.Utils.encryptToFeaturesDataModel
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
+import com.soywiz.krypto.encoding.Base64
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlin.test.Test
-import com.soywiz.krypto.encoding.Base64
 import kotlin.test.assertEquals
 
 class GBEncryptedFeatures {

@@ -14,6 +14,7 @@ kotlin {
 
     val ktorVersion = "1.6.7"
     val serializationVersion = "1.3.2"
+    val kryptoVersion = "2.7.0"
 
     android {
         publishLibraryVariants("release")
@@ -36,7 +37,7 @@ kotlin {
                 implementation("io.ktor:ktor-client-serialization:$ktorVersion")
                 implementation("io.ktor:ktor-utils:$ktorVersion")
                 implementation("com.ionspin.kotlin:bignum:0.3.3")
-                implementation("com.soywiz.korlibs.krypto:krypto:3.4.0")
+                implementation("com.soywiz.korlibs.krypto:krypto:$kryptoVersion")
             }
         }
         val commonTest by getting {
@@ -53,7 +54,7 @@ kotlin {
             dependencies {
                 implementation("io.ktor:ktor-client-android:$ktorVersion")
                 implementation("androidx.startup:startup-runtime:1.1.1")
-                implementation("com.soywiz.korlibs.krypto:krypto:3.4.0")
+                implementation("com.soywiz.korlibs.krypto:krypto-android:$kryptoVersion")
             }
         }
         val androidTest by getting {
@@ -61,19 +62,20 @@ kotlin {
                 implementation(kotlin("test-junit"))
                 implementation("junit:junit:4.13.2")
                 implementation("org.mockito:mockito-core:4.2.0")
-                implementation("com.soywiz.korlibs.krypto:krypto:3.4.0")
+                implementation("com.soywiz.korlibs.krypto:krypto-android:$kryptoVersion")
             }
         }
 
         val jvmMain by getting {
             dependencies {
                 implementation("io.ktor:ktor-client-java:$ktorVersion")
-                implementation("com.soywiz.korlibs.krypto:krypto:3.4.0")
+                implementation("com.soywiz.korlibs.krypto:krypto-jvm:$kryptoVersion")
             }
         }
         val jvmTest by getting {
             dependencies {
                 implementation ("org.jetbrains.kotlin:kotlin-test-junit")
+                implementation("com.soywiz.korlibs.krypto:krypto-jvm:$kryptoVersion")
             }
         }
 
