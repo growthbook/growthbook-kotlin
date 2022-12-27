@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "1.1.23"
+version = "1.1.24"
 
 kotlin {
 
@@ -89,6 +89,24 @@ android {
     defaultConfig {
         minSdk = 21
         targetSdk = 31
+
+        consumerProguardFiles("consumer-rules.pro")
+    }
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+        debug {
+            isMinifyEnabled = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
     }
 }
 
