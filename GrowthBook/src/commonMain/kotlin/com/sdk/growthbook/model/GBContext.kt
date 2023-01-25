@@ -19,6 +19,10 @@ class GBContext(
      */
     val enabled: Boolean,
     /**
+     * Encryption key for encrypted feature
+     */
+    val encryptionKey: String,
+    /**
      * Map of user attributes that are used to assign variations
      */
     internal var attributes: Map<String, Any>,

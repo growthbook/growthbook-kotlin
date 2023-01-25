@@ -8,5 +8,6 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class FeaturesDataModel(
-    val features: GBFeatures
+    val features: GBFeatures? = null,
+    val encryptedFeatures: String? = null
 )

@@ -9,6 +9,7 @@ import com.sdk.growthbook.Utils.GBError
 import com.sdk.growthbook.Utils.GBFeatures
 import com.sdk.growthbook.Utils.decodeBase64
 import com.sdk.growthbook.Utils.encryptToFeaturesDataModel
+import com.sdk.growthbook.Utils.getFeaturesFromEncryptedFeatures
 import com.sdk.growthbook.evaluators.GBExperimentEvaluator
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
 import com.sdk.growthbook.features.FeaturesDataSource
@@ -33,7 +34,8 @@ abstract class SDKBuilder(
     val apiKey: String,
     val hostURL: String,
     val attributes: Map<String, Any>,
-    val trackingCallback: GBTrackingCallback
+    val trackingCallback: GBTrackingCallback,
+    val encryptionKey: String
 ) {
     internal var qaMode: Boolean = false
     internal var forcedVariations: Map<String, Int> = HashMap()
@@ -80,10 +82,10 @@ abstract class SDKBuilder(
  */
 class GBSDKBuilderJAVA(
     apiKey: String, hostURL: String, attributes: Map<String, Any>, val features: GBFeatures,
-    trackingCallback: GBTrackingCallback
+    trackingCallback: GBTrackingCallback, encryptionKey: String
 ) : SDKBuilder(
     apiKey, hostURL,
-    attributes, trackingCallback
+    attributes, trackingCallback, encryptionKey
 ) {
     /**
      * Initialize the JAVA SDK
@@ -98,7 +100,8 @@ class GBSDKBuilderJAVA(
             hostURL = hostURL,
             qaMode = qaMode,
             forcedVariations = forcedVariations,
-            trackingCallback = trackingCallback
+            trackingCallback = trackingCallback,
+            encryptionKey = encryptionKey
         )
 
         return GrowthBookSDK(gbContext, null, features = features)
@@ -114,10 +117,10 @@ class GBSDKBuilderJAVA(
  */
 class GBSDKBuilderApp(
     apiKey: String, hostURL: String, attributes: Map<String, Any>,
-    trackingCallback: GBTrackingCallback
+    trackingCallback: GBTrackingCallback, encryptionKey: String
 ) : SDKBuilder(
     apiKey, hostURL,
-    attributes, trackingCallback
+    attributes, trackingCallback, encryptionKey
 ) {
 
     private var refreshHandler: GBCacheRefreshHandler? = null
@@ -154,7 +157,8 @@ class GBSDKBuilderApp(
             hostURL = hostURL,
             qaMode = qaMode,
             forcedVariations = forcedVariations,
-            trackingCallback = trackingCallback
+            trackingCallback = trackingCallback,
+            encryptionKey = encryptionKey
         )
 
         return GrowthBookSDK(gbContext, refreshHandler, networkDispatcher, features = null)
@@ -169,6 +173,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
 
     private var refreshHandler: GBCacheRefreshHandler? = null
     private lateinit var networkDispatcher: NetworkDispatcher
+    private lateinit var featuresViewModel: FeaturesViewModel
 
     //@ThreadLocal
     internal companion object {
@@ -180,30 +185,42 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         context: GBContext,
         refreshHandler: GBCacheRefreshHandler?,
         networkDispatcher: NetworkDispatcher = CoreNetworkClient(),
-        features: GBFeatures?
+        features: GBFeatures?,
     ) : this() {
         gbContext = context
         this.refreshHandler = refreshHandler
         this.networkDispatcher = networkDispatcher
-
         /**
          * JAVA Consumers preset Features
          * SDK will not call API to fetch Features List
          */
+        this.featuresViewModel =
+            FeaturesViewModel(
+                delegate = this,
+                dataSource = FeaturesDataSource(networkDispatcher),
+                ""
+            )
         if (features != null) {
             gbContext.features = features
         } else {
+            featuresViewModel.encryptionKey = gbContext.encryptionKey
             refreshCache()
         }
     }
+    //     if (features != null) {
+    //         gbContext.features = features
+    //     } else {
+    //         featuresViewModel.encryptionKey = gbContext.encryptionKey
+    //         refreshCache()
+    //     }
+    // }
 
     /**
      * Manually Refresh Cache
      */
     @DelicateCoroutinesApi
     fun refreshCache() {
-        val featureVM = FeaturesViewModel(this, FeaturesDataSource(networkDispatcher))
-        featureVM.fetchFeatures()
+        featuresViewModel.fetchFeatures()
     }
 
     /**
@@ -235,22 +252,24 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         encryptionKey: String,
         subtleCrypto: Crypto?
     ) {
-        val encryptedArrayData = encryptedString.split(".")
-
-        val iv = decodeBase64(encryptedArrayData[0])
-        val key = decodeBase64(encryptionKey)
-        val stringToDecrypt = decodeBase64(encryptedArrayData[1])
-
-        val cryptoLocal = subtleCrypto ?: DefaultCrypto()
-
-        val encrypt: ByteArray = cryptoLocal.decrypt(stringToDecrypt, key, iv)
-        val encryptString: String =
-            encrypt.decodeToString()
-
-        val featuresDataModel = encryptToFeaturesDataModel(encryptString)
-        featuresDataModel?.let {
-            gbContext.features = it
-        } ?: return
+        // val encryptedArrayData = encryptedString.split(".")
+        //
+        // val iv = decodeBase64(encryptedArrayData[0])
+        // val key = decodeBase64(encryptionKey)
+        // val stringToDecrypt = decodeBase64(encryptedArrayData[1])
+        //
+        // val cryptoLocal = subtleCrypto ?: DefaultCrypto()
+        //
+        // val encrypt: ByteArray = cryptoLocal.decrypt(stringToDecrypt, key, iv)
+        // val encryptString: String =
+        //     encrypt.decodeToString()
+        //
+        // val featuresDataModel = encryptToFeaturesDataModel(encryptString)
+        // featuresDataModel?.let {
+        //     gbContext.features = it
+        // } ?: return
+        gbContext.features =
+            getFeaturesFromEncryptedFeatures(encryptedString, encryptionKey, subtleCrypto)!!
     }
 
     override fun featuresFetchFailed(error: GBError, isRemote: Boolean) {
