@@ -3,12 +3,9 @@ package com.sdk.growthbook
 import com.sdk.growthbook.Network.CoreNetworkClient
 import com.sdk.growthbook.Network.NetworkDispatcher
 import com.sdk.growthbook.Utils.Crypto
-import com.sdk.growthbook.Utils.DefaultCrypto
 import com.sdk.growthbook.Utils.GBCacheRefreshHandler
 import com.sdk.growthbook.Utils.GBError
 import com.sdk.growthbook.Utils.GBFeatures
-import com.sdk.growthbook.Utils.decodeBase64
-import com.sdk.growthbook.Utils.encryptToFeaturesDataModel
 import com.sdk.growthbook.Utils.getFeaturesFromEncryptedFeatures
 import com.sdk.growthbook.evaluators.GBExperimentEvaluator
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
@@ -207,13 +204,6 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
             refreshCache()
         }
     }
-    //     if (features != null) {
-    //         gbContext.features = features
-    //     } else {
-    //         featuresViewModel.encryptionKey = gbContext.encryptionKey
-    //         refreshCache()
-    //     }
-    // }
 
     /**
      * Manually Refresh Cache
@@ -252,22 +242,6 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         encryptionKey: String,
         subtleCrypto: Crypto?
     ) {
-        // val encryptedArrayData = encryptedString.split(".")
-        //
-        // val iv = decodeBase64(encryptedArrayData[0])
-        // val key = decodeBase64(encryptionKey)
-        // val stringToDecrypt = decodeBase64(encryptedArrayData[1])
-        //
-        // val cryptoLocal = subtleCrypto ?: DefaultCrypto()
-        //
-        // val encrypt: ByteArray = cryptoLocal.decrypt(stringToDecrypt, key, iv)
-        // val encryptString: String =
-        //     encrypt.decodeToString()
-        //
-        // val featuresDataModel = encryptToFeaturesDataModel(encryptString)
-        // featuresDataModel?.let {
-        //     gbContext.features = it
-        // } ?: return
         gbContext.features =
             getFeaturesFromEncryptedFeatures(encryptedString, encryptionKey, subtleCrypto)!!
     }

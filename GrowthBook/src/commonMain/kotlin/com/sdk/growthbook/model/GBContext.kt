@@ -21,7 +21,7 @@ class GBContext(
     /**
      * Encryption key for encrypted feature
      */
-    val encryptionKey: String,
+    val encryptionKey: String?,
     /**
      * Map of user attributes that are used to assign variations
      */

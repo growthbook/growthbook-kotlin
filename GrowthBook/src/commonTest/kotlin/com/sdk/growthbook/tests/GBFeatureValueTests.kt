@@ -36,7 +36,7 @@ class GBFeatureValueTests {
                     enabled = true, attributes = attributes, forcedVariations = HashMap(),
                     qaMode = false, trackingCallback = { _, _ ->
 
-                    })
+                    }, encryptionKey = "")
                 if (testData.features != null) {
                     gbContext.features = testData.features
                 }

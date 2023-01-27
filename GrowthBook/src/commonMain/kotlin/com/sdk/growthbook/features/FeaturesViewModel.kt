@@ -6,6 +6,7 @@ import com.sdk.growthbook.Utils.DefaultCrypto
 import com.sdk.growthbook.Utils.GBError
 import com.sdk.growthbook.Utils.GBFeatures
 import com.sdk.growthbook.Utils.getFeaturesFromEncryptedFeatures
+import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.sandbox.CachingImpl
 import com.sdk.growthbook.sandbox.getData
 import com.sdk.growthbook.sandbox.putData
@@ -72,33 +73,20 @@ internal class FeaturesViewModel(
         manager.getLayer().putData(Constants.featureCache, dataModel)
         // Call Success Delegate with mention of data available with remote
         var features = dataModel.features
-        if (features != null) {
-            this.delegate.featuresFetchedSuccessfully(
-                features = features,
-                isRemote = true
-            )
-        } else {
-            val encryptedFeatures = dataModel.encryptedFeatures
-            val crypto = DefaultCrypto()
-            try {
-                if (encryptedFeatures != null && encryptionKey != null) {
-                    features = getFeaturesFromEncryptedFeatures(
-                        dataModel.encryptedFeatures,
-                        encryptionKey!!, crypto
-                    )
-                    this.delegate.featuresFetchedSuccessfully(
-                        features = features!!, true
-                    )
+        val encryptedFeatures = dataModel.encryptedFeatures
+        val crypto = DefaultCrypto()
+        try {
+            if (features != null && features.isNotEmpty()) {
+                this.delegate.featuresFetchedSuccessfully(features = features, isRemote = true)
+            } else if (encryptionKey != null && encryptedFeatures != null) {
+                features =
+                    getFeaturesFromEncryptedFeatures(encryptedFeatures, encryptionKey!!, crypto)
+                features?.let {
+                    this.delegate.featuresFetchedSuccessfully(features = features, isRemote = true)
                 }
-            } catch (error: Throwable) {
-                this.delegate.featuresFetchFailed(GBError(error), isRemote = true)
             }
-        }
-        dataModel.features?.let {
-            this.delegate.featuresFetchedSuccessfully(
-                features = it,
-                isRemote = true
-            )
+        } catch (error: Throwable) {
+            this.delegate.featuresFetchFailed(error = GBError(error), isRemote = true)
         }
     }
 }

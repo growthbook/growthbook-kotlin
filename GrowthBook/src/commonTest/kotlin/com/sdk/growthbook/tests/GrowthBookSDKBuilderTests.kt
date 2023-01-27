@@ -1,8 +1,10 @@
 package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.GBSDKBuilderApp
+import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.Utils.GBCacheRefreshHandler
 import com.sdk.growthbook.Utils.GBError
+import com.sdk.growthbook.Utils.GBFeatures
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeatureSource
@@ -16,6 +18,7 @@ class GrowthBookSDKBuilderTests {
 
     val testApiKey = "4r23r324f23"
     val testHostURL = "https://host.com"
+    val testKeyString = "3tfeoyW0wlo47bDnbWDkxg=="
     val testAttributes: HashMap<String, Any> = HashMap()
 
     @BeforeTest
@@ -29,6 +32,7 @@ class GrowthBookSDKBuilderTests {
             testApiKey,
             testHostURL,
             attributes = testAttributes,
+            encryptionKey = "",
             trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
 
             }).initialize()
@@ -49,6 +53,7 @@ class GrowthBookSDKBuilderTests {
             testApiKey,
             testHostURL,
             attributes = testAttributes,
+            encryptionKey = "",
             trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
 
             }).setRefreshHandler { isRefreshed, gbError ->
@@ -71,6 +76,7 @@ class GrowthBookSDKBuilderTests {
             testApiKey,
             testHostURL,
             attributes = testAttributes,
+            encryptionKey = "",
             trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
 
             }).setRefreshHandler { isRefreshed, gbError ->
@@ -95,6 +101,7 @@ class GrowthBookSDKBuilderTests {
             testApiKey,
             testHostURL,
             attributes = testAttributes,
+            encryptionKey = "",
             trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
 
             }).setRefreshHandler { _, gbError ->
@@ -120,6 +127,7 @@ class GrowthBookSDKBuilderTests {
         val sdkInstance = GBSDKBuilderApp(
             testApiKey,
             testHostURL,
+            encryptionKey = testKeyString,
             attributes = testAttributes,
             trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
 
@@ -140,16 +148,50 @@ class GrowthBookSDKBuilderTests {
             testApiKey,
             testHostURL,
             attributes = testAttributes,
+            encryptionKey = testApiKey,
             trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
 
             }).setRefreshHandler { isRefreshed, gbError ->
         }.setNetworkDispatcher(MockNetworkClient(MockResponse.successResponse, null)).initialize()
 
         val featureValue = sdkInstance.feature("fwrfewrfe")
-        assertTrue(featureValue.source == GBFeatureSource.unknownFeature)
+        assertEquals(featureValue.source, GBFeatureSource.unknownFeature)
 
         val expValue = sdkInstance.run(GBExperiment("fwewrwefw"))
         assertTrue(expValue.variationId == 0)
+    }
+
+    private fun buildSDK(
+        json: String,
+        attributes: Map<String, Any> = mapOf(),
+        encryptionKey: String
+    ): GrowthBookSDK {
+        return GBSDKBuilderApp(
+            "some_key",
+            "http://host.com",
+            attributes = attributes,
+            encryptionKey = encryptionKey,
+            trackingCallback = { _, _ -> }).setNetworkDispatcher(
+            MockNetworkClient(
+                json,
+                null
+            )
+        ).initialize()
+    }
+
+    @Test
+    fun testSDKInitializationDataWithEncrypted() {
+        // val viewModel: FeaturesViewModel()
+        val variations: HashMap<String, Int> = HashMap()
+
+        val sdkInstance = buildSDK(
+            MockResponse.successResponseEncryptedFeatures,
+            testAttributes,
+            testKeyString
+        )
+        assertEquals(sdkInstance.getGBContext().attributes, testAttributes)
+        assertEquals(true, sdkInstance.getFeatures() is GBFeatures)
+        println("from end of decrypted test")
     }
 
 //    @Test

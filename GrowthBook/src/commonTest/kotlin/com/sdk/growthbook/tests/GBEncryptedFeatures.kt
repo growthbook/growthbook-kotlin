@@ -71,7 +71,7 @@ class GBEncryptedFeatures {
         sdkInstance.setEncryptedFeatures(encryptedFeatures, keyString, null)
 
         val features = encryptToFeaturesDataModel(expectedResult)!!
-
+        println(features)
         assertEquals(
             features["testfeature1"]?.rules?.get(0)?.condition,
             sdkInstance.getGBContext().features["testfeature1"]?.rules?.get(0)?.condition
@@ -84,6 +84,5 @@ class GBEncryptedFeatures {
 
     @Test
     fun testDecrypt() {
-
     }
 }

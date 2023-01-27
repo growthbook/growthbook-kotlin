@@ -18,11 +18,13 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
 
     @BeforeTest
     fun setUp() {
-        GrowthBookSDK.gbContext = GBContext("Key", hostURL = "https://example.com",
+        GrowthBookSDK.gbContext = GBContext(
+            "Key", hostURL = "https://example.com",
             enabled = true, attributes = HashMap(), forcedVariations = HashMap(),
             qaMode = false, trackingCallback = { _, _ ->
 
-            })
+            }, encryptionKey = null
+        )
     }
 
     @Test
@@ -32,7 +34,26 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         isError = true
         val viewModel = FeaturesViewModel(
             this,
-            FeaturesDataSource(MockNetworkClient(MockResponse.successResponse, null))
+            FeaturesDataSource(MockNetworkClient(MockResponse.successResponse, null)), null
+        )
+
+        viewModel.fetchFeatures()
+
+        assertTrue(isSuccess)
+        assertTrue(!isError)
+    }
+
+    @Test
+    fun testSuccessForEncryptedFeatures() {
+        isSuccess = false
+        isError = true
+        val viewModel = FeaturesViewModel(
+            this,
+            FeaturesDataSource(
+                MockNetworkClient(
+                    MockResponse.successResponseEncryptedFeatures, null
+                )
+            ), "3tfeoyW0wlo47bDnbWDkxg=="
         )
 
         viewModel.fetchFeatures()
@@ -48,7 +69,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         isError = true
         val viewModel = FeaturesViewModel(
             this,
-            FeaturesDataSource(MockNetworkClient(null, Throwable("UNKNOWN", null)))
+            FeaturesDataSource(MockNetworkClient(null, Throwable("UNKNOWN", null))), null
         )
 
         viewModel.fetchFeatures()
@@ -64,9 +85,8 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         isError = true
         val viewModel = FeaturesViewModel(
             this,
-            FeaturesDataSource(MockNetworkClient(MockResponse.errorResponse, null))
+            FeaturesDataSource(MockNetworkClient(MockResponse.errorResponse, null)), ""
         )
-
         viewModel.fetchFeatures()
 
         assertTrue(!isSuccess)

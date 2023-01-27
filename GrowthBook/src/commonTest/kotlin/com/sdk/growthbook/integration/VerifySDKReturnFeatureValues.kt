@@ -87,6 +87,7 @@ internal class VerifySDKReturnFeatureValues {
             "some_key",
             "http://host.com",
             attributes = attributes,
+            encryptionKey = "",
             trackingCallback = { _, _ -> }).setNetworkDispatcher(
             MockNetworkClient(
                 json,
