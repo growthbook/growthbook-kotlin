@@ -56,6 +56,8 @@ class GBEncryptedFeatures {
             testApiKey,
             testHostURL,
             attributes = testAttributes,
+            //TODO
+            encryptionKey = "",
             trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
 
             }).initialize()
@@ -69,7 +71,7 @@ class GBEncryptedFeatures {
         sdkInstance.setEncryptedFeatures(encryptedFeatures, keyString, null)
 
         val features = encryptToFeaturesDataModel(expectedResult)!!
-
+        println(features)
         assertEquals(
             features["testfeature1"]?.rules?.get(0)?.condition,
             sdkInstance.getGBContext().features["testfeature1"]?.rules?.get(0)?.condition
@@ -78,5 +80,9 @@ class GBEncryptedFeatures {
             features["testfeature1"]?.rules?.get(0)?.force,
             sdkInstance.getGBContext().features["testfeature1"]?.rules?.get(0)?.force
         )
+    }
+
+    @Test
+    fun testDecrypt() {
     }
 }

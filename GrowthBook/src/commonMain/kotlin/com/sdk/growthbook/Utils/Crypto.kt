@@ -49,3 +49,26 @@ fun encryptToFeaturesDataModel(string: String): GBFeatures? {
         null
     }
 }
+
+fun getFeaturesFromEncryptedFeatures(
+    encryptedString: String,
+    encryptionKey: String,
+    subtleCrypto: Crypto?
+): GBFeatures? {
+    println(
+        "crypto data that comes in $encryptedString\n $encryptionKey"
+    )
+    val encryptedArrayData = encryptedString.split(".")
+
+    val iv = decodeBase64(encryptedArrayData[0])
+    val key = decodeBase64(encryptionKey)
+    val stringToDecrypt = decodeBase64(encryptedArrayData[1])
+
+    val cryptoLocal = subtleCrypto ?: DefaultCrypto()
+
+    val encrypt: ByteArray = cryptoLocal.decrypt(stringToDecrypt, key, iv)
+    val encryptString: String =
+        encrypt.decodeToString()
+    println("decrypted string $encryptString")
+    return encryptToFeaturesDataModel(encryptString)
+}

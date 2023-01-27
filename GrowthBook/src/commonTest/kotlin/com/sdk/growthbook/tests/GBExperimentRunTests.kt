@@ -42,7 +42,7 @@ class GBExperimentRunTests {
                     qaMode = testContext.qaMode,
                     trackingCallback = { _, _ ->
 
-                    })
+                    }, encryptionKey = "")
 
                 val evaluator = GBExperimentEvaluator()
                 val result = evaluator.evaluateExperiment(gbContext, experiment)

@@ -1,12 +1,17 @@
 package com.sdk.growthbook.features
 
 import com.sdk.growthbook.Utils.Constants
+import com.sdk.growthbook.Utils.Crypto
+import com.sdk.growthbook.Utils.DefaultCrypto
 import com.sdk.growthbook.Utils.GBError
 import com.sdk.growthbook.Utils.GBFeatures
+import com.sdk.growthbook.Utils.getFeaturesFromEncryptedFeatures
+import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.sandbox.CachingImpl
 import com.sdk.growthbook.sandbox.getData
 import com.sdk.growthbook.sandbox.putData
 import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.serialization.json.Json
 
 /**
  * Interface for Feature API Completion Events
@@ -21,7 +26,8 @@ internal interface FeaturesFlowDelegate {
  */
 internal class FeaturesViewModel(
     private val delegate: FeaturesFlowDelegate,
-    private val dataSource: FeaturesDataSource = FeaturesDataSource()
+    private val dataSource: FeaturesDataSource = FeaturesDataSource(),
+    var encryptionKey: String?
 ) {
 
     /**
@@ -41,10 +47,12 @@ internal class FeaturesViewModel(
 
             if (dataModel != null) {
                 // Call Success Delegate with mention of data available but its not remote
-                this.delegate.featuresFetchedSuccessfully(
-                    features = dataModel.features,
-                    isRemote = false
-                )
+                dataModel.features?.let {
+                    this.delegate.featuresFetchedSuccessfully(
+                        features = it,
+                        isRemote = false
+                    )
+                }
             }
         } catch (error: Throwable) {
             // Call Error Delegate with mention of data not available but its not remote
@@ -64,6 +72,21 @@ internal class FeaturesViewModel(
     private fun prepareFeaturesData(dataModel: FeaturesDataModel) {
         manager.getLayer().putData(Constants.featureCache, dataModel)
         // Call Success Delegate with mention of data available with remote
-        this.delegate.featuresFetchedSuccessfully(features = dataModel.features, isRemote = true)
+        var features = dataModel.features
+        val encryptedFeatures = dataModel.encryptedFeatures
+        val crypto = DefaultCrypto()
+        try {
+            if (features != null && features.isNotEmpty()) {
+                this.delegate.featuresFetchedSuccessfully(features = features, isRemote = true)
+            } else if (encryptionKey != null && encryptedFeatures != null) {
+                features =
+                    getFeaturesFromEncryptedFeatures(encryptedFeatures, encryptionKey!!, crypto)
+                features?.let {
+                    this.delegate.featuresFetchedSuccessfully(features = features, isRemote = true)
+                }
+            }
+        } catch (error: Throwable) {
+            this.delegate.featuresFetchFailed(error = GBError(error), isRemote = true)
+        }
     }
 }
