@@ -190,6 +190,18 @@ var sdkInstance: GrowthBookSDK = GBSDKBuilderApp(apiKey = <API_KEY>,
 
 }).initialize()
 ```
+
+You must also provide the encryption key if you intend to use data encryption.
+
+```kotlin
+var sdkInstance: GrowthBookSDK = GBSDKBuilderApp(apiKey = <API_KEY>,
+    hostURL = <GrowthBook_URL>,
+    encryptionKey: <String>,
+    attributes = <Hashmap>,
+    trackingCallback = { gbExperiment, gbExperimentResult ->
+
+}).initialize()
+```
 ###### JAVA
 ```java
 GrowthBookSDK growthBookSDK = new GBSDKBuilderApp(
