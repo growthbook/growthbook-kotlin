@@ -12,7 +12,7 @@ version = "1.1.28"
 
 kotlin {
 
-    val ktorVersion = "1.6.7"
+    val ktorVersion = "2.1.2"
     val serializationVersion = "1.3.2"
     val kryptoVersion = "2.7.0"
 
@@ -34,8 +34,9 @@ kotlin {
                     "org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion"
                 )
                 implementation("io.ktor:ktor-client-core:$ktorVersion")
-                implementation("io.ktor:ktor-client-serialization:$ktorVersion")
                 implementation("io.ktor:ktor-utils:$ktorVersion")
+                implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
+                implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
                 implementation("com.ionspin.kotlin:bignum:0.3.3")
                 implementation("com.soywiz.korlibs.krypto:krypto:$kryptoVersion")
             }
@@ -47,7 +48,7 @@ kotlin {
                 implementation(
                     "org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion"
                 )
-                implementation("io.ktor:ktor-client-serialization:$ktorVersion")
+                implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
             }
         }
         val androidMain by getting {
