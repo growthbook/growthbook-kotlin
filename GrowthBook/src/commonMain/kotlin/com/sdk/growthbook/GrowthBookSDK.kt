@@ -26,13 +26,14 @@ typealias GBTrackingCallback = (GBExperiment, GBExperimentResult) -> Unit
  * HostURL - Server URL
  * UserAttributes - User Attributes
  * Tracking Callback - Track Events for Experiments
+ * EncryptionKey - Encryption key if you intend to use data encryption.
  */
 abstract class SDKBuilder(
     val apiKey: String,
     val hostURL: String,
     val attributes: Map<String, Any>,
     val trackingCallback: GBTrackingCallback,
-    val encryptionKey: String
+    val encryptionKey: String?
 ) {
     internal var qaMode: Boolean = false
     internal var forcedVariations: Map<String, Int> = HashMap()
@@ -76,10 +77,11 @@ abstract class SDKBuilder(
  * UserAttributes - User Attributes
  * Features - GrowthBook Features Map - Synced via Web API / Web Hooks
  * Tracking Callback - Track Events for Experiments
+ * EncryptionKey - Encryption key if you intend to use data encryption.
  */
 class GBSDKBuilderJAVA(
     apiKey: String, hostURL: String, attributes: Map<String, Any>, val features: GBFeatures,
-    trackingCallback: GBTrackingCallback, encryptionKey: String
+    trackingCallback: GBTrackingCallback, encryptionKey: String?
 ) : SDKBuilder(
     apiKey, hostURL,
     attributes, trackingCallback, encryptionKey
@@ -111,10 +113,11 @@ class GBSDKBuilderJAVA(
  * HostURL - Server URL
  * UserAttributes - User Attributes
  * Tracking Callback - Track Events for Experiments
+ * EncryptionKey - Encryption key if you intend to use data encryption.
  */
 class GBSDKBuilderApp(
     apiKey: String, hostURL: String, attributes: Map<String, Any>,
-    trackingCallback: GBTrackingCallback, encryptionKey: String
+    trackingCallback: GBTrackingCallback, encryptionKey: String?
 ) : SDKBuilder(
     apiKey, hostURL,
     attributes, trackingCallback, encryptionKey
@@ -195,7 +198,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
             FeaturesViewModel(
                 delegate = this,
                 dataSource = FeaturesDataSource(networkDispatcher),
-                ""
+                encryptionKey = null
             )
         if (features != null) {
             gbContext.features = features

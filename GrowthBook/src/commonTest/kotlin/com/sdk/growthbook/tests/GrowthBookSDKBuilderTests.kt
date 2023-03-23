@@ -1,6 +1,7 @@
 package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.GBSDKBuilderApp
+import com.sdk.growthbook.GBSDKBuilderJAVA
 import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.Utils.GBCacheRefreshHandler
 import com.sdk.growthbook.Utils.GBError
@@ -32,7 +33,7 @@ class GrowthBookSDKBuilderTests {
             testApiKey,
             testHostURL,
             attributes = testAttributes,
-            encryptionKey = "",
+            encryptionKey = null,
             trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
 
             }).initialize()
@@ -53,7 +54,7 @@ class GrowthBookSDKBuilderTests {
             testApiKey,
             testHostURL,
             attributes = testAttributes,
-            encryptionKey = "",
+            encryptionKey = null,
             trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
 
             }).setRefreshHandler { isRefreshed, gbError ->
@@ -76,7 +77,7 @@ class GrowthBookSDKBuilderTests {
             testApiKey,
             testHostURL,
             attributes = testAttributes,
-            encryptionKey = "",
+            encryptionKey = null,
             trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
 
             }).setRefreshHandler { isRefreshed, gbError ->
@@ -101,7 +102,7 @@ class GrowthBookSDKBuilderTests {
             testApiKey,
             testHostURL,
             attributes = testAttributes,
-            encryptionKey = "",
+            encryptionKey = null,
             trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
 
             }).setRefreshHandler { _, gbError ->
@@ -127,7 +128,7 @@ class GrowthBookSDKBuilderTests {
         val sdkInstance = GBSDKBuilderApp(
             testApiKey,
             testHostURL,
-            encryptionKey = testKeyString,
+            encryptionKey = null,
             attributes = testAttributes,
             trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
 
@@ -148,7 +149,7 @@ class GrowthBookSDKBuilderTests {
             testApiKey,
             testHostURL,
             attributes = testAttributes,
-            encryptionKey = testApiKey,
+            encryptionKey = null,
             trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
 
             }).setRefreshHandler { isRefreshed, gbError ->
@@ -164,7 +165,7 @@ class GrowthBookSDKBuilderTests {
     private fun buildSDK(
         json: String,
         attributes: Map<String, Any> = mapOf(),
-        encryptionKey: String
+        encryptionKey: String?
     ): GrowthBookSDK {
         return GBSDKBuilderApp(
             "some_key",

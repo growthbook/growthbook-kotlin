@@ -182,21 +182,13 @@ Now you can start/stop tests, adjust coverage and variation weights, and apply a
 
 ### Android
 ###### Kotlin
-```kotlin
-var sdkInstance: GrowthBookSDK = GBSDKBuilderApp(apiKey = <API_KEY>,
-    hostURL = <GrowthBook_URL>,
-    attributes = <Hashmap>,
-    trackingCallback = { gbExperiment, gbExperimentResult ->
-
-}).initialize()
-```
 
 You must also provide the encryption key if you intend to use data encryption.
 
 ```kotlin
 var sdkInstance: GrowthBookSDK = GBSDKBuilderApp(apiKey = <API_KEY>,
     hostURL = <GrowthBook_URL>,
-    encryptionKey: <String>,
+    encryptionKey: <String?>,
     attributes = <Hashmap>,
     trackingCallback = { gbExperiment, gbExperimentResult ->
 
