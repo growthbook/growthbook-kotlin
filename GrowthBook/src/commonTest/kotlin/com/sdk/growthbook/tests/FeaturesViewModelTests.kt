@@ -34,7 +34,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         isError = true
         val viewModel = FeaturesViewModel(
             this,
-            FeaturesDataSource(MockNetworkClient(MockResponse.successResponse, null)), null
+            FeaturesDataSource(MockNetworkClient(MockResponse.successResponse, null)), "3tfeoyW0wlo47bDnbWDkxg=="
         )
 
         viewModel.fetchFeatures()
