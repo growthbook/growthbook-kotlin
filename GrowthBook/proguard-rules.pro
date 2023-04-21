@@ -1,6 +1,6 @@
 
 # Core SDK
--keep class com.sdk.growthbook.**, ** { *; }
+-keep class com.sdk.growthbook.**
 
 -keepattributes *Annotation*, InnerClasses
 -dontnote kotlinx.serialization.SerializationKt

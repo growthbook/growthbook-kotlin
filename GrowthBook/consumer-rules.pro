@@ -20,4 +20,4 @@
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
 
--keep class com.sdk.growthbook.**, ** { *; }
+-keep class com.sdk.growthbook.**
