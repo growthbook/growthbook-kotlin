@@ -1,6 +1,7 @@
 package com.sdk.growthbook.evaluators
 
 import com.sdk.growthbook.Utils.GBCondition
+import com.sdk.growthbook.Utils.GBUtils
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -407,6 +408,8 @@ internal class GBConditionEvaluator {
         } else if (attributeValue is JsonPrimitive && conditionValue is JsonPrimitive) {
             val targetPrimitiveValue = conditionValue.content
             val sourcePrimitiveValue = attributeValue.content
+            val paddedVersionTarget = GBUtils.paddedVersionString(targetPrimitiveValue)
+            val paddedVersionSource = GBUtils.paddedVersionString(sourcePrimitiveValue)
 
             when (operator) {
                 // Evaluate EQ operator - whether condition equals to attribute
@@ -456,6 +459,18 @@ internal class GBConditionEvaluator {
                         false
                     }
                 }
+                // Evaluate VEQ operator - whether versions are equals
+                "\$veq" -> return paddedVersionSource == paddedVersionTarget
+                // Evaluate VNE operator - whether versions are not equals to attribute
+                "\$vne" -> return paddedVersionSource != paddedVersionTarget
+                // Evaluate VGT operator - whether the first version is greater than the second version
+                "\$vgt" -> return paddedVersionSource > paddedVersionTarget
+                // Evaluate VGTE operator - whether the first version is greater than or equal the second version
+                "\$vgte" -> return paddedVersionSource >= paddedVersionTarget
+                // Evaluate VLT operator - whether the first version is lesser than the second version
+                "\$vlt" -> return paddedVersionSource < paddedVersionTarget
+                // Evaluate VLTE operator - whether the first version is lesser than or equal the second version
+                "\$vlte" -> return paddedVersionSource <= paddedVersionTarget
             }
         }
 
