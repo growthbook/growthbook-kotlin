@@ -157,5 +157,25 @@ internal class GBUtils {
 
             return null
         }
+
+        fun paddedVersionString(input: String): String {
+            // "v1.2.3-rc.1+build123" -> ["1","2","3","rc","1"]
+            var parts: List<String> = input.replace(Regex("^v|\\+.*\$"), "")
+                .split(Regex("[-.]"))
+
+            // ["1","0","0"] -> ["1","0","0","~"]
+            // "~" is the largest ASCII character, so this will make "1.0.0" greater than "1.0.0-beta" for example
+            if (parts.size == 3) {
+                val arrayList = ArrayList(parts)
+                arrayList.add("~")
+                parts = arrayList
+            }
+
+            // Left pad each numeric part with spaces so string comparisons will work ("9">"10", but " 9"<"10")
+            // Then, join back together into a single string
+            return parts.joinToString("-") {
+                if (it.matches(Regex("^\\d+$"))) it.padStart(5, ' ') else it
+            }
+        }
     }
 }

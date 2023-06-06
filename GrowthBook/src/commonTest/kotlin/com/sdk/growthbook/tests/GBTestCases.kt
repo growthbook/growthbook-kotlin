@@ -452,6 +452,138 @@ val gbTestCases = """
           true
         ],
         [
+          "${"$"}veq     - fail",
+            {
+            "version": {
+               "${"$"}veq": "v1.2.3-rc.1+build123"
+            }
+            },
+            {
+               "version": "1-    2-    3-rc-    2"
+            },
+            false
+        ],
+        [
+          "${"$"}vne     - pass",
+            {
+            "version": {
+               "${"$"}vne": "v1.2.3-rc.1+build123"
+            }
+            },
+            {
+               "version": "1.3.4-rc.3"
+            },
+            true
+        ],
+        [
+          "${"$"}vne     - fail",
+            {
+            "version": {
+               "${"$"}vne": "v1.2.3-rc.1+build123"
+            }
+            },
+            {
+               "version": "1.2.3-rc.1"
+            },
+            false
+        ],
+        [
+          "${"$"}vgt     - pass",
+            {
+            "version": {
+               "${"$"}vgt": "v1.2.3-rc.1+build123"
+            }
+            },
+            {
+               "version": "1.2.4-rc.0"
+            },
+            true
+        ],
+        [
+          "${"$"}vgt     - fail",
+            {
+            "version": {
+               "${"$"}vgt": "v1.2.3-rc.1+build123"
+            }
+            },
+            {
+               "version": "1.2.2-rc.0"
+            },
+            false
+        ],
+        [
+          "${"$"}vgte     - pass",
+            {
+            "version": {
+               "${"$"}vgte": "v1.2.3-rc.1+build123"
+            }
+            },
+            {
+               "version": "1.2.3-rc.1"
+            },
+            true
+        ],
+        [
+          "${"$"}vgte     - fail",
+            {
+            "version": {
+               "${"$"}vgte": "v1.2.3-rc.1+build123"
+            }
+            },
+            {
+               "version": "1.2.2-rc.1"
+            },
+            false
+        ],
+        [
+          "${"$"}vlt     - pass",
+            {
+            "version": {
+               "${"$"}vlt": "v1.2.3-rc.1+build123"
+            }
+            },
+            {
+               "version": "1.2.2-rc.1"
+            },
+            true
+        ],
+        [
+          "${"$"}vlt     - fail",
+            {
+            "version": {
+               "${"$"}vlt": "v1.2.3-rc.1+build123"
+            }
+            },
+            {
+               "version": "1.2.4-rc.1"
+            },
+            false
+        ],
+        [
+          "${"$"}vlte     - pass",
+            {
+            "version": {
+               "${"$"}vlte": "v1.2.3-rc.1+build123"
+            }
+            },
+            {
+               "version": "1.2.3-rc.1"
+            },
+            true
+        ],
+        [
+          "${"$"}vlte     - fail",
+            {
+            "version": {
+               "${"$"}vlte": "v1.2.3-rc.1+build123"
+            }
+            },
+            {
+               "version": "1.2.4-rc.1"
+            },
+            false
+        ],
+        [
           "${"$"}eq     - fail",
           {
             "occupation": {
