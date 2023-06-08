@@ -2,14 +2,14 @@ package com.sdk.growthbook.Network
 
 import com.sdk.growthbook.ApplicationDispatcher
 import io.ktor.client.HttpClient
-import io.ktor.client.call.receive
-import io.ktor.client.features.json.JsonFeature
-import io.ktor.client.features.json.serializer.KotlinxSerializer
+import io.ktor.client.call.body
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
-import io.ktor.client.statement.HttpResponse
+import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 
 /**
  * Network Dispatcher Interface for API Consumption
@@ -30,8 +30,8 @@ interface NetworkDispatcher {
 internal class CoreNetworkClient : NetworkDispatcher {
 
     private val client = HttpClient {
-        install(JsonFeature) {
-            serializer = KotlinxSerializer(kotlinx.serialization.json.Json {
+        install(ContentNegotiation) {
+            json(Json {
                 prettyPrint = true
                 isLenient = true
                 ignoreUnknownKeys = true
@@ -49,8 +49,8 @@ internal class CoreNetworkClient : NetworkDispatcher {
         GlobalScope.launch(ApplicationDispatcher) {
 
             try {
-                val result = client.get<HttpResponse>(request)
-                onSuccess(result.receive())
+                val result = client.get(request)
+                onSuccess(result.body())
             } catch (ex: Exception) {
                 onError(ex)
             }
