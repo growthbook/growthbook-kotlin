@@ -115,9 +115,12 @@ class GBSDKBuilderJAVA(
  * Tracking Callback - Track Events for Experiments
  * EncryptionKey - Encryption key if you intend to use data encryption.
  */
-class GBSDKBuilderApp(
-    apiKey: String, hostURL: String, attributes: Map<String, Any>,
-    trackingCallback: GBTrackingCallback, encryptionKey: String?
+class GBSDKBuilder(
+    apiKey: String,
+    hostURL: String,
+    attributes: Map<String, Any>,
+    trackingCallback: GBTrackingCallback,
+    encryptionKey: String? = null
 ) : SDKBuilder(
     apiKey, hostURL,
     attributes, trackingCallback, encryptionKey
@@ -130,7 +133,7 @@ class GBSDKBuilderApp(
     /**
      * Set Refresh Handler - Will be called when cache is refreshed
      */
-    fun setRefreshHandler(refreshHandler: GBCacheRefreshHandler): GBSDKBuilderApp {
+    fun setRefreshHandler(refreshHandler: GBCacheRefreshHandler): GBSDKBuilder {
         this.refreshHandler = refreshHandler
         return this
     }
