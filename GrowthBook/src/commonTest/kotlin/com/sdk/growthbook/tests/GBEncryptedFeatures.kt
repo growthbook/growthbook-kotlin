@@ -1,6 +1,6 @@
 package com.sdk.growthbook.tests
 
-import com.sdk.growthbook.GBSDKBuilderApp
+import com.sdk.growthbook.GBSDKBuilder
 import com.sdk.growthbook.Utils.DefaultCrypto
 import com.sdk.growthbook.Utils.encryptToFeaturesDataModel
 import com.sdk.growthbook.model.GBExperiment
@@ -52,7 +52,7 @@ class GBEncryptedFeatures {
     @Test
     fun testEncrypt() {
 
-        val sdkInstance = GBSDKBuilderApp(
+        val sdkInstance = GBSDKBuilder(
             testApiKey,
             testHostURL,
             attributes = testAttributes,

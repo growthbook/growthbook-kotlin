@@ -1,6 +1,6 @@
 package com.sdk.growthbook.tests
 
-import com.sdk.growthbook.GBSDKBuilderApp
+import com.sdk.growthbook.GBSDKBuilder
 import com.sdk.growthbook.GBSDKBuilderJAVA
 import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.Utils.GBCacheRefreshHandler
@@ -29,7 +29,7 @@ class GrowthBookSDKBuilderTests {
     @Test
     fun testSDKInitilizationDefault() {
 
-        val sdkInstance = GBSDKBuilderApp(
+        val sdkInstance = GBSDKBuilder(
             testApiKey,
             testHostURL,
             attributes = testAttributes,
@@ -50,7 +50,7 @@ class GrowthBookSDKBuilderTests {
 
         val variations: HashMap<String, Int> = HashMap()
 
-        val sdkInstance = GBSDKBuilderApp(
+        val sdkInstance = GBSDKBuilder(
             testApiKey,
             testHostURL,
             attributes = testAttributes,
@@ -73,7 +73,7 @@ class GrowthBookSDKBuilderTests {
 
         val variations: HashMap<String, Int> = HashMap()
 
-        val sdkInstance = GBSDKBuilderApp(
+        val sdkInstance = GBSDKBuilder(
             testApiKey,
             testHostURL,
             attributes = testAttributes,
@@ -98,7 +98,7 @@ class GrowthBookSDKBuilderTests {
 
         var isRefreshed = false
 
-        val sdkInstance = GBSDKBuilderApp(
+        val sdkInstance = GBSDKBuilder(
             testApiKey,
             testHostURL,
             attributes = testAttributes,
@@ -125,7 +125,7 @@ class GrowthBookSDKBuilderTests {
         val gbError = GBError(error = null)
         val gbCacheRefreshHandler: GBCacheRefreshHandler = { isRefreshed, gbError -> }
 
-        val sdkInstance = GBSDKBuilderApp(
+        val sdkInstance = GBSDKBuilder(
             testApiKey,
             testHostURL,
             encryptionKey = null,
@@ -145,7 +145,7 @@ class GrowthBookSDKBuilderTests {
     @Test
     fun testSDKRunMethods() {
 
-        val sdkInstance = GBSDKBuilderApp(
+        val sdkInstance = GBSDKBuilder(
             testApiKey,
             testHostURL,
             attributes = testAttributes,
@@ -167,7 +167,7 @@ class GrowthBookSDKBuilderTests {
         attributes: Map<String, Any> = mapOf(),
         encryptionKey: String?
     ): GrowthBookSDK {
-        return GBSDKBuilderApp(
+        return GBSDKBuilder(
             "some_key",
             "http://host.com",
             attributes = attributes,

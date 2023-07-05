@@ -1,6 +1,6 @@
 package com.sdk.growthbook.integration
 
-import com.sdk.growthbook.GBSDKBuilderApp
+import com.sdk.growthbook.GBSDKBuilder
 import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.tests.MockNetworkClient
 import org.intellij.lang.annotations.Language
@@ -83,7 +83,7 @@ internal class VerifySDKReturnFeatureValues {
     }
 
     private fun buildSDK(json: String, attributes: Map<String, Any> = mapOf()): GrowthBookSDK {
-        return GBSDKBuilderApp(
+        return GBSDKBuilder(
             "some_key",
             "http://host.com",
             attributes = attributes,
