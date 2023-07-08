@@ -530,6 +530,8 @@ If you're using ProGuard, you may need to add rules to your configuration file t
 # Core SDK
 -keep class com.sdk.growthbook.** { *; }
 
+-keep class kotlinx.serialization.** { *; }
+
 -keepattributes *Annotation*, InnerClasses
 -dontnote kotlinx.serialization.SerializationKt
 -keep,includedescriptorclasses class com.sdk.growthbook.**$$serializer { *; }
