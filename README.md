@@ -186,17 +186,17 @@ Now you can start/stop tests, adjust coverage and variation weights, and apply a
 You must also provide the encryption key if you intend to use data encryption.
 
 ```kotlin
-var sdkInstance: GrowthBookSDK = GBSDKBuilderApp(apiKey = <API_KEY>,
+var sdkInstance: GrowthBookSDK = GBSDKBuilder(
+    apiKey = <API_KEY>,
     hostURL = <GrowthBook_URL>,
-    encryptionKey: <String?>,
     attributes = <Hashmap>,
-    trackingCallback = { gbExperiment, gbExperimentResult ->
-
-}).initialize()
+    trackingCallback = { gbExperiment, gbExperimentResult -> },
+    encryptionKey = <String?>
+).initialize()
 ```
 ###### JAVA
 ```java
-GrowthBookSDK growthBookSDK = new GBSDKBuilderApp(
+GrowthBookSDK growthBookSDK = new GBSDKBuilder(
                 <API_KEY>, // apiKey
                 <GrowthBook_URL>, // hostURL
                 <Hashmap>, // attributes
@@ -208,7 +208,7 @@ GrowthBookSDK growthBookSDK = new GBSDKBuilderApp(
 
 ### iOS
 ```swift
-let growthBookSDK = GBSDKBuilderApp(
+let growthBookSDK = GBSDKBuilder(
             apiKey: <API_KEY>,
             hostURL: <GrowthBook_URL>,
             attributes: <Hashmap>) { gbExperiment, gbExperimentResult in
