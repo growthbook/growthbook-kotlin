@@ -61,10 +61,12 @@ internal fun Map<*, *>.toJsonElement(): JsonElement {
     this.forEach {
         val key = it.key as? String ?: return@forEach
         val value = it.value ?: return@forEach
-        when (value) {
-            is Map<*, *> -> map[key] = (value).toJsonElement()
-            is List<*> -> map[key] = value.toJsonElement()
-            else -> map[key] = JsonPrimitive(value.toString())
+        map[key] = when (value) {
+            is Map<*, *> -> (value).toJsonElement()
+            is List<*> -> value.toJsonElement()
+            is Boolean -> JsonPrimitive(value)
+            is Number -> JsonPrimitive(value)
+            else -> JsonPrimitive(value.toString())
         }
     }
     return JsonObject(map)

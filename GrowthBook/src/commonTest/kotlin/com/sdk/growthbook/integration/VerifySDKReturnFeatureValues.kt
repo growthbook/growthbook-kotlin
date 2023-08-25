@@ -1,8 +1,5 @@
 package com.sdk.growthbook.integration
 
-import com.sdk.growthbook.GBSDKBuilder
-import com.sdk.growthbook.GrowthBookSDK
-import com.sdk.growthbook.tests.MockNetworkClient
 import org.intellij.lang.annotations.Language
 import org.junit.Test
 import kotlin.test.assertEquals
@@ -80,20 +77,6 @@ internal class VerifySDKReturnFeatureValues {
         val sdkInstance = buildSDK(json, attributes)
 
         assertEquals("Default value for brand:KZ", sdkInstance.feature("string_feature").value)
-    }
-
-    private fun buildSDK(json: String, attributes: Map<String, Any> = mapOf()): GrowthBookSDK {
-        return GBSDKBuilder(
-            "some_key",
-            "http://host.com",
-            attributes = attributes,
-            encryptionKey = "",
-            trackingCallback = { _, _ -> }).setNetworkDispatcher(
-            MockNetworkClient(
-                json,
-                null
-            )
-        ).initialize()
     }
 
     @Test
