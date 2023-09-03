@@ -1,10 +1,11 @@
 package com.sdk.growthbook.tests
 
+import com.sdk.growthbook.Utils.GBCondition
 import com.sdk.growthbook.evaluators.GBAttributeType
 import com.sdk.growthbook.evaluators.GBConditionEvaluator
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.intellij.lang.annotations.Language
@@ -21,8 +22,8 @@ class GBConditionTests {
 
     @Test
     fun testConditions() {
-        var failedScenarios: ArrayList<String> = ArrayList()
-        var passedScenarios: ArrayList<String> = ArrayList()
+        val failedScenarios: ArrayList<String> = ArrayList()
+        val passedScenarios: ArrayList<String> = ArrayList()
         for (item in evalConditions) {
             if (item is JsonArray) {
                 val evaluator = GBConditionEvaluator()
@@ -92,8 +93,8 @@ class GBConditionTests {
 
         assertEquals(
             false, GBConditionEvaluator().evalCondition(
-                Json.decodeFromString(attributes),
-                Json.decodeFromString(condition),
+                Json.decodeFromString(JsonElement.serializer(), attributes),
+                Json.decodeFromString(GBCondition.serializer(), condition),
             )
         )
     }
@@ -116,8 +117,8 @@ class GBConditionTests {
 
         assertEquals(
             false, GBConditionEvaluator().evalCondition(
-                Json.decodeFromString(attributes),
-                Json.decodeFromString(condition),
+                Json.decodeFromString(JsonElement.serializer(), attributes),
+                Json.decodeFromString(GBCondition.serializer(), condition),
             )
         )
     }
@@ -140,8 +141,8 @@ class GBConditionTests {
 
         assertEquals(
             true, GBConditionEvaluator().evalCondition(
-                Json.decodeFromString(attributes),
-                Json.decodeFromString(condition),
+                Json.decodeFromString(JsonElement.serializer(), attributes),
+                Json.decodeFromString(GBCondition.serializer(), condition),
             )
         )
     }
@@ -164,8 +165,8 @@ class GBConditionTests {
 
         assertEquals(
             false, GBConditionEvaluator().evalCondition(
-                Json.decodeFromString(attributes),
-                Json.decodeFromString(condition),
+                Json.decodeFromString(JsonElement.serializer(), attributes),
+                Json.decodeFromString(GBCondition.serializer(), condition),
             )
         )
     }
