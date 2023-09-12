@@ -27,7 +27,7 @@ interface NetworkDispatcher {
 /**
  * Default Ktor Implementation for Network Dispatcher
  */
-class CoreNetworkClient : NetworkDispatcher {
+internal class CoreNetworkClient : NetworkDispatcher {
 
     private val client = HttpClient {
         install(ContentNegotiation) {
