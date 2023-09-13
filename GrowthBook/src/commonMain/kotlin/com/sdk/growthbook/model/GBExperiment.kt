@@ -1,6 +1,9 @@
 package com.sdk.growthbook.model
 
+import com.sdk.growthbook.Utils.GBBucketRange
 import com.sdk.growthbook.Utils.GBCondition
+import com.sdk.growthbook.Utils.GBFilter
+import com.sdk.growthbook.Utils.GBVariationMeta
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -45,7 +48,16 @@ class GBExperiment(
     /**
      * All users included in the experiment will be forced into the specific variation index
      */
-    var force: Int? = null
+    var force: Int? = null,
+
+    //new properties v0.4.0
+    var hashVersion: Int? = null,
+    var ranges: ArrayList<GBBucketRange>? = null,
+    var meta: ArrayList<GBVariationMeta>? = null,
+    var filters: ArrayList<GBFilter>? = null,
+    var seed: String? = null,
+    var name: String? = null,
+    var phase: String? = null
 )
 
 /**
@@ -71,6 +83,11 @@ class GBExperimentResult(
     /**
      * The value of that attribute
      */
-    val hashValue: String? = null
+    val hashValue: String? = null,
 
+    //new properties v0.4.0
+    val key: String? = null,
+    val name: String? = null,
+    val bucket: Float? = null,
+    val passthrough: Boolean? = null
 )

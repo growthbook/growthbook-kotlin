@@ -1,6 +1,9 @@
 package com.sdk.growthbook.model
 
+import com.sdk.growthbook.Utils.GBBucketRange
 import com.sdk.growthbook.Utils.GBCondition
+import com.sdk.growthbook.Utils.GBFilter
+import com.sdk.growthbook.Utils.GBVariationMeta
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -56,7 +59,17 @@ class GBFeatureRule(
     /**
      * What user attribute should be used to assign variations (defaults to id)
      */
-    val hashAttribute: String? = null
+    val hashAttribute: String? = null,
+
+    // new properties v0.4.0
+    val hashVersion: Int? = null,
+    val range: GBBucketRange? = null,
+    val ranges: ArrayList<GBBucketRange>? = null,
+    val meta: ArrayList<GBVariationMeta>? = null,
+    val filters: ArrayList<GBFilter>? = null,
+    val seed: String? = null,
+    val name: String? = null,
+    val phase: String? = null
 )
 
 /**

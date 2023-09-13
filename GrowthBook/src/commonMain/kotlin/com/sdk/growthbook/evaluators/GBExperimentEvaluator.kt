@@ -49,6 +49,12 @@ internal class GBExperimentEvaluator {
             return getExperimentResult(experiment = experiment, gbContext = context)
         }
 
+        if (experiment.filters != null) {
+            if(GBUtils.isFilteredOut(experiment.filters, context.attributes.toJsonElement())) {
+                return getExperimentResult(context, experiment, 0, false)
+            }
+        }
+
         // If experiment.namespace is set, check if hash value is included in the range and if not, return immediately (not in experiment, variationId 0)
 
         if (experiment.namespace != null) {
@@ -84,7 +90,7 @@ internal class GBExperimentEvaluator {
             experiment.weights!!
         )
 
-        val hash = GBUtils.hash(attributeValue + experiment.key)
+        val hash = GBUtils.hash(attributeValue, 1, experiment.key)
         val assigned = hash?.let { GBUtils.chooseVariation(it, bucketRange) } ?: -1
 
         // If not assigned a variation (assigned === -1), return immediately (not in experiment, variationId 0)

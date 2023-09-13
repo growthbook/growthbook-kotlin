@@ -1,6 +1,9 @@
 package com.sdk.growthbook.Utils
 
+import com.sdk.growthbook.model.GBExperiment
+import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeature
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -74,3 +77,23 @@ class GBError(error: Throwable?) {
         }
     }
 }
+
+@Serializable
+class GBFilter(
+    var seed: String,
+    var ranges: List<GBBucketRange>,
+    var attribute: String,
+    var hashVersion: Int
+) {}
+
+@Serializable
+class GBVariationMeta(
+    var key: String?,
+    var name: String?,
+    var passthrough: Boolean?
+) {}
+
+class GBTrackData(
+    var experiment: GBExperiment,
+    var experimentResult: GBExperimentResult
+) {}
