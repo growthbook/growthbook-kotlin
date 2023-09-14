@@ -28,8 +28,15 @@ class GBUtilsTests {
 
                 val testContext = item[0].jsonPrimitive.content
                 val experiment = item[1].jsonPrimitive.content
+                val hashVersion = item[2].jsonPrimitive.content
+                val seed = item[3].jsonPrimitive.content
 
-                val result = GBUtils.hash(testContext, 1, "")
+                val result = if (hashVersion.toInt() == 1){
+                    GBUtils.hash(testContext, 1, seed)
+                } else {
+                    GBUtils.hash(testContext, 2, seed)
+                }
+
 
                 val status =
                     item[0].toString() + "\nExpected Result - " + item[1].toString() + "\nActual result - " + result + "\n"

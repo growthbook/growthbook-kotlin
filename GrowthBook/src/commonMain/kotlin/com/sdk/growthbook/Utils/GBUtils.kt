@@ -66,10 +66,10 @@ internal class GBUtils {
         }
 
         private fun hashV1(stringValue: String, seed: String?): Float {
-            val bigInt: BigInteger =
-                FNV().fnv1a32(stringValue + seed)
+            val bigInt: BigInteger = FNV().fnv1a32(stringValue + seed)
             val thousand = BigInteger(1000)
             val remainder = bigInt.remainder(thousand)
+
             val remainderAsFloat = remainder.toString().toFloat()
             return remainderAsFloat / 1000f
         }
@@ -77,8 +77,10 @@ internal class GBUtils {
         private fun hashV2(stringValue: String, seed: String?): Float {
             val first: BigInteger = FNV().fnv1a32(seed + stringValue)
             val second: BigInteger = FNV().fnv1a32(first.toString())
+
             val tenThousand = BigInteger(10000)
             val remainder = second.remainder(tenThousand)
+
             val remainderAsFloat = remainder.toString().toFloat()
             return remainderAsFloat / 10000f
         }
@@ -224,10 +226,8 @@ internal class GBUtils {
             if (attributes == null) return false
 
             return filters.stream().anyMatch { filter: GBFilter ->
-                var hashAttribute: String? = filter.attribute
-                if (hashAttribute == null) {
-                    hashAttribute = "id"
-                }
+                val hashAttribute: String = filter.attribute ?: "id"
+
                 val hashValueElement: JsonElement = attributes.jsonObject.getValue(hashAttribute)
 
                 if (hashValueElement is JsonNull) return@anyMatch true
@@ -236,12 +236,9 @@ internal class GBUtils {
                 val hashValuePrimitive: JsonPrimitive = hashValueElement.jsonPrimitive
                 val hashValue: String = hashValuePrimitive.toString()
 
-                if (hashValue == null || hashValue == "") return@anyMatch true
-                var hashVersion: Int = filter.hashVersion
+                if (hashValue.isEmpty()) return@anyMatch true
+                val hashVersion: Int = filter.hashVersion ?: 2
 
-                if (hashVersion == null) {
-                    hashVersion = 2
-                }
                 val n: Float = hash(
                     hashValue,
                     hashVersion,

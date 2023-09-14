@@ -90,7 +90,7 @@ internal class GBExperimentEvaluator {
             experiment.weights!!
         )
 
-        val hash = GBUtils.hash(attributeValue, 1, experiment.key)
+        val hash = GBUtils.hash(attributeValue, experiment.hashVersion ?: 1, experiment.key)
         val assigned = hash?.let { GBUtils.chooseVariation(it, bucketRange) } ?: -1
 
         // If not assigned a variation (assigned === -1), return immediately (not in experiment, variationId 0)

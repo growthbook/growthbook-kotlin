@@ -75,7 +75,7 @@ internal class GBFeatureEvaluator {
                                     continue
                                 }
                                 // Compute a hash using the Fowler–Noll–Vo algorithm (specifically fnv32-1a)
-                                val hashFNV = GBUtils.hash(attributeValue, 1, featureKey)
+                                val hashFNV = GBUtils.hash(attributeValue, rule.hashVersion ?: 1, featureKey)
                                 // If the hash is greater than rule.coverage, skip the rule
                                 if (hashFNV != null && hashFNV > rule.coverage) {
                                     continue

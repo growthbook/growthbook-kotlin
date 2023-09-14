@@ -82,8 +82,8 @@ class GBError(error: Throwable?) {
 class GBFilter(
     var seed: String,
     var ranges: List<GBBucketRange>,
-    var attribute: String,
-    var hashVersion: Int
+    var attribute: String?,
+    var hashVersion: Int?
 ) {}
 
 @Serializable
