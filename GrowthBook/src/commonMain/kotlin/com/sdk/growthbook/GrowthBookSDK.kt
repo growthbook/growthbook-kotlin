@@ -120,15 +120,14 @@ class GBSDKBuilder(
     hostURL: String,
     attributes: Map<String, Any>,
     trackingCallback: GBTrackingCallback,
-    encryptionKey: String? = null
+    encryptionKey: String? = null,
+    private var networkDispatcher: NetworkDispatcher = CoreNetworkClient()
 ) : SDKBuilder(
     apiKey, hostURL,
     attributes, trackingCallback, encryptionKey
 ) {
 
     private var refreshHandler: GBCacheRefreshHandler? = null
-
-    private var networkDispatcher: NetworkDispatcher = CoreNetworkClient()
 
     /**
      * Set Refresh Handler - Will be called when cache is refreshed
