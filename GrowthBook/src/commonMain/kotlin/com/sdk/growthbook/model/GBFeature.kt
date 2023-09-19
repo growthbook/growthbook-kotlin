@@ -1,6 +1,9 @@
 package com.sdk.growthbook.model
 
+import com.sdk.growthbook.Utils.GBBucketRange
 import com.sdk.growthbook.Utils.GBCondition
+import com.sdk.growthbook.Utils.GBFilter
+import com.sdk.growthbook.Utils.GBVariationMeta
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -56,7 +59,41 @@ class GBFeatureRule(
     /**
      * What user attribute should be used to assign variations (defaults to id)
      */
-    val hashAttribute: String? = null
+    val hashAttribute: String? = null,
+
+    // new properties v0.4.0
+    /**
+     * The hash version to use (default to 1)
+     */
+    val hashVersion: Int? = null,
+    /**
+     * A more precise version of coverage
+     */
+    val range: GBBucketRange? = null,
+    /**
+     * Ranges for experiment variations
+     */
+    val ranges: ArrayList<GBBucketRange>? = null,
+    /**
+     * Meta info about the experiment variations
+     */
+    val meta: ArrayList<GBVariationMeta>? = null,
+    /**
+     * Array of filters to apply to the rule
+     */
+    val filters: ArrayList<GBFilter>? = null,
+    /**
+     * Seed to use for hashing
+     */
+    val seed: String? = null,
+    /**
+     * Human-readable name for the experiment
+     */
+    val name: String? = null,
+    /**
+     * The phase id of the experiment
+     */
+    val phase: String? = null
 )
 
 /**

@@ -4,7 +4,6 @@ import com.sdk.growthbook.Utils.toHashMap
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
 import com.sdk.growthbook.model.GBContext
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.BeforeTest
@@ -22,21 +21,26 @@ class GBFeatureValueTests {
 
     @Test
     fun testFeatures() {
-        var failedScenarios: ArrayList<String> = ArrayList()
-        var passedScenarios: ArrayList<String> = ArrayList()
+        val failedScenarios: ArrayList<String> = ArrayList()
+        val passedScenarios: ArrayList<String> = ArrayList()
         for (item in evalConditions) {
             if (item is JsonArray) {
 
                 val testData =
-                    GBTestHelper.jsonParser.decodeFromJsonElement<GBFeaturesTest>(item[1])
+                    GBTestHelper.jsonParser.decodeFromJsonElement(
+                        GBFeaturesTest.serializer(),
+                        item[1]
+                    )
 
                 val attributes = testData.attributes.jsonObject.toHashMap()
 
-                val gbContext = GBContext("", hostURL = "",
+                val gbContext = GBContext(
+                    apiKey = "", hostURL = "",
                     enabled = true, attributes = attributes, forcedVariations = HashMap(),
                     qaMode = false, trackingCallback = { _, _ ->
 
-                    }, encryptionKey = "")
+                    }, encryptionKey = ""
+                )
                 if (testData.features != null) {
                     gbContext.features = testData.features
                 }
@@ -45,7 +49,10 @@ class GBFeatureValueTests {
                 val result = evaluator.evaluateFeature(gbContext, item[2].jsonPrimitive.content)
 
                 val expectedResult =
-                    GBTestHelper.jsonParser.decodeFromJsonElement<GBFeatureResultTest>(item[3])
+                    GBTestHelper.jsonParser.decodeFromJsonElement(
+                        GBFeatureResultTest.serializer(),
+                        item[3]
+                    )
 
                 val status = item[0].toString() +
                     "\nExpected Result - " +

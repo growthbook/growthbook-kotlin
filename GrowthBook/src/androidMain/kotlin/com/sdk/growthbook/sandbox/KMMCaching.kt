@@ -1,8 +1,6 @@
 package com.sdk.growthbook.sandbox
 
 import android.content.Context
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import java.io.File
@@ -12,7 +10,7 @@ import java.io.FileInputStream
  * Actual Implementation for Caching in Android - As expected in KMM
  */
 actual internal object CachingImpl {
-    actual fun getLayer() : CachingLayer {
+    actual fun getLayer(): CachingLayer {
         return CachingAndroid()
     }
 }
@@ -22,8 +20,8 @@ actual internal object CachingImpl {
  */
 internal class CachingAndroid : CachingLayer {
 
-    companion object{
-        var context : Context? = null
+    companion object {
+        var context: Context? = null
     }
 
     /**
@@ -34,7 +32,7 @@ internal class CachingAndroid : CachingLayer {
     /**
      * Save Content in Android App Specific Internal Memory
      */
-    override fun saveContent(fileName: String, content: JsonElement){
+    override fun saveContent(fileName: String, content: JsonElement) {
         val file = getTargetFile(fileName)
 
         if (file != null) {
@@ -46,19 +44,17 @@ internal class CachingAndroid : CachingLayer {
             // Create New File
             file.createNewFile()
 
-            val jsonContents = json.encodeToString(content)
+            val jsonContents = json.encodeToString(JsonElement.serializer(), content)
 
             // Save contents in file
             file.appendText(jsonContents)
         }
-
-
     }
 
     /**
      * Retrieve Content from Android App Specific Internal Memory
      */
-    override fun getContent(fileName: String) : JsonElement?{
+    override fun getContent(fileName: String): JsonElement? {
 
         val file = getTargetFile(fileName)
 
@@ -66,18 +62,17 @@ internal class CachingAndroid : CachingLayer {
             // Read File Contents
             val inputAsString = FileInputStream(file).bufferedReader().use { it.readText() }
             // return File Contents
-            return json.decodeFromString(inputAsString)
+            return json.decodeFromString(JsonElement.serializer(), inputAsString)
         }
 
         // Return null if file doesn't exist
         return null
-
     }
 
     /**
      * Get Target File - with complete path in internal memory
      */
-    fun getTargetFile(fileName: String) : File? {
+    fun getTargetFile(fileName: String): File? {
         if (context != null) {
             val path = context!!.getFilesDir()
             // Create Directory in Internal Memory
@@ -88,7 +83,6 @@ internal class CachingAndroid : CachingLayer {
                 targetFileName = fileName.removeSuffix(".txt")
             }
             return File(letDirectory, targetFileName + ".txt")
-        }
-        else return null
+        } else return null
     }
 }

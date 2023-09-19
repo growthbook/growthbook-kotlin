@@ -1,6 +1,9 @@
 package com.sdk.growthbook.Utils
 
+import com.sdk.growthbook.model.GBExperiment
+import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeature
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -25,7 +28,7 @@ internal class Constants {
 /**
  * Type Alias for Feature in GrowthBook
  */
-internal typealias GBFeatures = HashMap<String, GBFeature>
+internal typealias GBFeatures = Map<String, GBFeature>
 
 /**
  * Type Alias for Condition Element in GrowthBook Rules
@@ -74,3 +77,59 @@ class GBError(error: Throwable?) {
         }
     }
 }
+
+/**
+ * Object used for mutual exclusion and filtering users out of experiments based on random hashes. Has the following properties
+ */
+@Serializable
+class GBFilter(
+    /**
+     * The seed used in the hash
+     */
+    var seed: String,
+    /**
+     * Array of ranges that are included
+     */
+    var ranges: List<GBBucketRange>,
+    /**
+     * The attribute to use (default to "id")
+     */
+    var attribute: String?,
+    /**
+     * The hash version to use (default to 2)
+     */
+    var hashVersion: Int?
+) {}
+
+/**
+ * Meta info about an experiment variation. Has the following properties
+ */
+@Serializable
+class GBVariationMeta(
+    /**
+     * A unique key for this variation
+     */
+    var key: String?,
+    /**
+     * A human-readable name for this variation
+     */
+    var name: String?,
+    /**
+     * Used to implement holdout groups
+     */
+    var passthrough: Boolean?
+) {}
+
+/**
+ * Used for remote feature evaluation to trigger the TrackingCallback. An object with 2 properties
+ */
+class GBTrackData(
+    /**
+     * experiment - Experiment
+     */
+    var experiment: GBExperiment,
+    /**
+     * result - ExperimentResult
+     */
+    var experimentResult: GBExperimentResult
+) {}

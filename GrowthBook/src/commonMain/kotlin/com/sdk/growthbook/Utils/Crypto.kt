@@ -1,9 +1,11 @@
 package com.sdk.growthbook.Utils
 
+import com.sdk.growthbook.model.GBFeature
 import com.soywiz.krypto.AES
 import com.soywiz.krypto.Padding
 import com.soywiz.krypto.encoding.Base64
-import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 
 interface Crypto {
@@ -42,8 +44,10 @@ fun encryptToFeaturesDataModel(string: String): GBFeatures? {
     val JSONParser = Json { prettyPrint = true; isLenient = true; ignoreUnknownKeys = true }
 
     return try {
-
-        val result: GBFeatures = JSONParser.decodeFromString(string)
+        val result: GBFeatures = JSONParser.decodeFromString(
+            deserializer = MapSerializer(String.serializer(), GBFeature.serializer()),
+            string = string
+        )
         result
     } catch (e: Exception) {
         null

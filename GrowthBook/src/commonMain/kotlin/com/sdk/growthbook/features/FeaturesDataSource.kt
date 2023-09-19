@@ -4,7 +4,6 @@ import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.Network.CoreNetworkClient
 import com.sdk.growthbook.Network.NetworkDispatcher
 import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
 /**
@@ -30,7 +29,10 @@ internal class FeaturesDataSource(private val dispatcher: NetworkDispatcher = Co
     ) {
         dispatcher.consumeGETRequest(apiUrl,
             onSuccess = { rawContent ->
-                val result: FeaturesDataModel = JSONParser.decodeFromString(rawContent)
+                val result = JSONParser.decodeFromString(
+                    deserializer = FeaturesDataModel.serializer(),
+                    string = rawContent
+                )
                 result.also(success)
             },
             onError = { apiTimeError ->
