@@ -62,13 +62,37 @@ class GBFeatureRule(
     val hashAttribute: String? = null,
 
     // new properties v0.4.0
+    /**
+     * The hash version to use (default to 1)
+     */
     val hashVersion: Int? = null,
+    /**
+     * A more precise version of coverage
+     */
     val range: GBBucketRange? = null,
+    /**
+     * Ranges for experiment variations
+     */
     val ranges: ArrayList<GBBucketRange>? = null,
+    /**
+     * Meta info about the experiment variations
+     */
     val meta: ArrayList<GBVariationMeta>? = null,
+    /**
+     * Array of filters to apply to the rule
+     */
     val filters: ArrayList<GBFilter>? = null,
+    /**
+     * Seed to use for hashing
+     */
     val seed: String? = null,
+    /**
+     * Human-readable name for the experiment
+     */
     val name: String? = null,
+    /**
+     * The phase id of the experiment
+     */
     val phase: String? = null
 )
 

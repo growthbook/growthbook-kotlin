@@ -51,12 +51,33 @@ class GBExperiment(
     var force: Int? = null,
 
     //new properties v0.4.0
+    /**
+     * The hash version to use (default to 1)
+     */
     var hashVersion: Int? = null,
+    /**
+     * Array of ranges, one per variation
+     */
     var ranges: ArrayList<GBBucketRange>? = null,
+    /**
+     * Meta info about the variations
+     */
     var meta: ArrayList<GBVariationMeta>? = null,
+    /**
+     * Array of filters to apply
+     */
     var filters: ArrayList<GBFilter>? = null,
+    /**
+     * The hash seed to use
+     */
     var seed: String? = null,
+    /**
+     * Human-readable name for the experiment
+     */
     var name: String? = null,
+    /**
+     * Id of the current experiment phase
+     */
     var phase: String? = null
 )
 
@@ -86,8 +107,20 @@ class GBExperimentResult(
     val hashValue: String? = null,
 
     //new properties v0.4.0
+    /**
+     * The unique key for the assigned variation
+     */
     val key: String? = null,
+    /**
+     * The human-readable name of the assigned variation
+     */
     val name: String? = null,
+    /**
+     * The hash value used to assign a variation (float from 0 to 1)
+     */
     val bucket: Float? = null,
+    /**
+     * Used for holdout groups
+     */
     val passthrough: Boolean? = null
 )

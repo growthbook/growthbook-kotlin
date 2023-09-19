@@ -44,6 +44,9 @@ internal class FNV {
  * - getBucketRanges
  * - chooseVariation
  * - getGBNameSpace
+ * - inRange
+ * - isFilteredOut
+ * - isIncludedInRollout
  */
 internal class GBUtils {
     companion object {
@@ -210,6 +213,9 @@ internal class GBUtils {
             }
         }
 
+        /**
+         * Determines if a number n is within the provided range.
+         */
         fun inRange(
             n: Float?,
             range: GBBucketRange?
@@ -218,6 +224,9 @@ internal class GBUtils {
             else n >= range.first && n < range.second
         }
 
+        /**
+         * This is a helper method to evaluate filters for both feature flags and experiments.
+         */
         fun isFilteredOut(
             filters: List<GBFilter>?,
             attributes: JsonElement?
@@ -255,6 +264,9 @@ internal class GBUtils {
             }
         }
 
+        /**
+         * Determines if the user is part of a gradual feature rollout.
+         */
         fun isIncludedInRollout(
             attributes: JsonElement?,
             seed: String?,
