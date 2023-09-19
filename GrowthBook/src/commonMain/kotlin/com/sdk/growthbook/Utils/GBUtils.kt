@@ -2,7 +2,12 @@ package com.sdk.growthbook.Utils
 
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.floatOrNull
+import kotlinx.serialization.json.jsonNull
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.math.pow
 import kotlin.math.roundToInt
@@ -39,6 +44,9 @@ internal class FNV {
  * - getBucketRanges
  * - chooseVariation
  * - getGBNameSpace
+ * - inRange
+ * - isFilteredOut
+ * - isIncludedInRollout
  */
 internal class GBUtils {
     companion object {
@@ -47,10 +55,37 @@ internal class GBUtils {
          * Hashes a string to a float between 0 and 1
          * fnv32a returns an integer, so we convert that to a float using a modulus:
          */
-        fun hash(data: String): Float? {
-            val hash = FNV().fnv1a32(data)
-            val remainder = hash.remainder(BigInteger(1000))
-            return remainder.toString().toFloatOrNull()?.div(1000f)
+        fun hash(
+            stringValue: String,
+            hashVersion: Int?,
+            seed: String?
+        ): Float? {
+            if (hashVersion == null) return null
+            return when (hashVersion) {
+                1 -> hashV1(stringValue, seed)
+                2 -> hashV2(stringValue, seed)
+                else -> null
+            }
+        }
+
+        private fun hashV1(stringValue: String, seed: String?): Float {
+            val bigInt: BigInteger = FNV().fnv1a32(stringValue + seed)
+            val thousand = BigInteger(1000)
+            val remainder = bigInt.remainder(thousand)
+
+            val remainderAsFloat = remainder.toString().toFloat()
+            return remainderAsFloat / 1000f
+        }
+
+        private fun hashV2(stringValue: String, seed: String?): Float {
+            val first: BigInteger = FNV().fnv1a32(seed + stringValue)
+            val second: BigInteger = FNV().fnv1a32(first.toString())
+
+            val tenThousand = BigInteger(10000)
+            val remainder = second.remainder(tenThousand)
+
+            val remainderAsFloat = remainder.toString().toFloat()
+            return remainderAsFloat / 10000f
         }
 
         /**
@@ -58,7 +93,7 @@ internal class GBUtils {
          */
         fun inNamespace(userId: String, namespace: GBNameSpace): Boolean {
 
-            val hash = hash(userId + "__" + namespace.first)
+            val hash = hash(userId, 1, "__" + namespace.first)
 
             if (hash != null) {
                 return hash >= namespace.second && hash < namespace.third
@@ -176,6 +211,94 @@ internal class GBUtils {
             return parts.joinToString("-") {
                 if (it.matches(Regex("^\\d+$"))) it.padStart(5, ' ') else it
             }
+        }
+
+        /**
+         * Determines if a number n is within the provided range.
+         */
+        fun inRange(
+            n: Float?,
+            range: GBBucketRange?
+        ): Boolean {
+            return if (n == null || range == null) false
+            else n >= range.first && n < range.second
+        }
+
+        /**
+         * This is a helper method to evaluate filters for both feature flags and experiments.
+         */
+        fun isFilteredOut(
+            filters: List<GBFilter>?,
+            attributes: JsonElement?
+        ): Boolean {
+            if (filters == null) return false
+            if (attributes == null) return false
+
+            return filters.stream().anyMatch { filter: GBFilter ->
+                val hashAttribute: String = filter.attribute ?: "id"
+
+                val hashValueElement: JsonElement = attributes.jsonObject.getValue(hashAttribute)
+
+                if (hashValueElement is JsonNull) return@anyMatch true
+                if (hashValueElement !is JsonPrimitive) return@anyMatch true
+
+                val hashValuePrimitive: JsonPrimitive = hashValueElement.jsonPrimitive
+                val hashValue: String = hashValuePrimitive.toString()
+
+                if (hashValue.isEmpty()) return@anyMatch true
+                val hashVersion: Int = filter.hashVersion ?: 2
+
+                val n: Float = hash(
+                    hashValue,
+                    hashVersion,
+                    filter.seed
+                ) ?: return@anyMatch true
+                val ranges: List<GBBucketRange> = filter.ranges
+                ranges.stream()
+                    .noneMatch { range: GBBucketRange? ->
+                        inRange(
+                            n,
+                            range
+                        )
+                    }
+            }
+        }
+
+        /**
+         * Determines if the user is part of a gradual feature rollout.
+         */
+        fun isIncludedInRollout(
+            attributes: JsonElement?,
+            seed: String?,
+            hashAttribute: String?,
+            range: GBBucketRange?,
+            coverage: Float?,
+            hashVersion: Int?
+        ): Boolean {
+            var latestHashAttribute = hashAttribute
+            var latestHashVersion = hashVersion
+
+            if (range == null && coverage == null) return true
+
+            if (hashAttribute == null || hashAttribute == "") {
+                latestHashAttribute = "id"
+            }
+
+            if (attributes == null) return false
+
+            val hashValueElement: JsonElement = attributes.jsonObject.getValue(latestHashAttribute!!)
+            if (hashValueElement is JsonNull) return false
+
+            if (hashVersion == null) {
+                latestHashVersion = 1
+            }
+            val hashValue: String = hashValueElement.toString()
+            val hash: Float = hash(hashValue, latestHashVersion, seed) ?: return false
+
+            return if (range != null) inRange(
+                hash,
+                range
+            ) else hash <= coverage!!
         }
     }
 }

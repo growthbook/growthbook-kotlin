@@ -47,6 +47,10 @@ internal class GBFeatureEvaluator {
                         }
                     }
 
+                    if (GBUtils.isFilteredOut(rule.filters, context.attributes.toJsonElement())) {
+                        continue
+                    }
+
                     // If rule.force is set
                     if (rule.force != null) {
                         // If rule.coverage is set
@@ -58,8 +62,20 @@ internal class GBFeatureEvaluator {
                             if (attributeValue.isEmpty())
                                 continue
                             else {
+                                if (
+                                    !GBUtils.isIncludedInRollout(
+                                        context.attributes.toJsonElement(),
+                                        rule.seed,
+                                        rule.hashAttribute,
+                                        rule.range,
+                                        rule.coverage,
+                                        rule.hashVersion
+                                    )
+                                ) {
+                                    continue
+                                }
                                 // Compute a hash using the Fowler–Noll–Vo algorithm (specifically fnv32-1a)
-                                val hashFNV = GBUtils.hash(attributeValue + featureKey)
+                                val hashFNV = GBUtils.hash(attributeValue, rule.hashVersion ?: 1, featureKey)
                                 // If the hash is greater than rule.coverage, skip the rule
                                 if (hashFNV != null && hashFNV > rule.coverage) {
                                     continue
