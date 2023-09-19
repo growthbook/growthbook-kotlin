@@ -6,7 +6,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.floatOrNull
-import kotlinx.serialization.json.jsonNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.math.pow
@@ -234,33 +233,32 @@ internal class GBUtils {
             if (filters == null) return false
             if (attributes == null) return false
 
-            return filters.stream().anyMatch { filter: GBFilter ->
+            return filters.any { filter: GBFilter ->
                 val hashAttribute: String = filter.attribute ?: "id"
 
                 val hashValueElement: JsonElement = attributes.jsonObject.getValue(hashAttribute)
 
-                if (hashValueElement is JsonNull) return@anyMatch true
-                if (hashValueElement !is JsonPrimitive) return@anyMatch true
+                if (hashValueElement is JsonNull) return@any true
+                if (hashValueElement !is JsonPrimitive) return@any true
 
                 val hashValuePrimitive: JsonPrimitive = hashValueElement.jsonPrimitive
                 val hashValue: String = hashValuePrimitive.toString()
 
-                if (hashValue.isEmpty()) return@anyMatch true
+                if (hashValue.isEmpty()) return@any true
                 val hashVersion: Int = filter.hashVersion ?: 2
 
                 val n: Float = hash(
                     hashValue,
                     hashVersion,
                     filter.seed
-                ) ?: return@anyMatch true
+                ) ?: return@any true
                 val ranges: List<GBBucketRange> = filter.ranges
-                ranges.stream()
-                    .noneMatch { range: GBBucketRange? ->
-                        inRange(
-                            n,
-                            range
-                        )
-                    }
+                ranges.none { range: GBBucketRange? ->
+                    inRange(
+                        n,
+                        range
+                    )
+                }
             }
         }
 
