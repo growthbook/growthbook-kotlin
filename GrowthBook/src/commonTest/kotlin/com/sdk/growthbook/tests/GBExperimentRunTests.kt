@@ -5,6 +5,7 @@ import com.sdk.growthbook.evaluators.GBExperimentEvaluator
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBExperiment
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -21,26 +22,19 @@ class GBExperimentRunTests {
 
     @Test
     fun testExperiments() {
-        val failedScenarios: ArrayList<String> = ArrayList()
-        val passedScenarios: ArrayList<String> = ArrayList()
+        var failedScenarios: ArrayList<String> = ArrayList()
+        var passedScenarios: ArrayList<String> = ArrayList()
         for (item in evalConditions) {
             if (item is JsonArray) {
 
                 val testContext =
-                    GBTestHelper.jsonParser.decodeFromJsonElement(
-                        GBContextTest.serializer(),
-                        item[1]
-                    )
+                    GBTestHelper.jsonParser.decodeFromJsonElement<GBContextTest>(item[1])
                 val experiment =
-                    GBTestHelper.jsonParser.decodeFromJsonElement(
-                        GBExperiment.serializer(),
-                        item[2]
-                    )
+                    GBTestHelper.jsonParser.decodeFromJsonElement<GBExperiment>(item[2])
 
                 val attributes = testContext.attributes.jsonObject.toHashMap()
 
-                val gbContext = GBContext(
-                    apiKey = "",
+                val gbContext = GBContext("",
                     hostURL = "",
                     enabled = testContext.enabled,
                     attributes = attributes,
@@ -48,8 +42,7 @@ class GBExperimentRunTests {
                     qaMode = testContext.qaMode,
                     trackingCallback = { _, _ ->
 
-                    }, encryptionKey = ""
-                )
+                    }, encryptionKey = "")
 
                 val evaluator = GBExperimentEvaluator()
                 val result = evaluator.evaluateExperiment(gbContext, experiment)

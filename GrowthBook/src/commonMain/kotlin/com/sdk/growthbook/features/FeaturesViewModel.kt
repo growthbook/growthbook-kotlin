@@ -43,10 +43,7 @@ internal class FeaturesViewModel(
 
         try {
             // Check for cache data
-            val dataModel = manager.getLayer().getData(
-                Constants.featureCache,
-                FeaturesDataModel.serializer()
-            )
+            val dataModel = manager.getLayer().getData<FeaturesDataModel>(Constants.featureCache)
 
             if (dataModel != null) {
                 // Call Success Delegate with mention of data available but its not remote

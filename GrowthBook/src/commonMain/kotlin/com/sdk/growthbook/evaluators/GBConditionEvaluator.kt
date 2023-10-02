@@ -2,13 +2,13 @@ package com.sdk.growthbook.evaluators
 
 import com.sdk.growthbook.Utils.GBCondition
 import com.sdk.growthbook.Utils.GBUtils
-import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -267,16 +267,12 @@ internal class GBConditionEvaluator {
         if (conditionValue is JsonArray) {
             return if (attributeValue is JsonArray) {
                 if (conditionValue.size == attributeValue.size) {
-                    val conditionArray = Json.decodeFromJsonElement(
-                        ListSerializer(JsonElement.serializer()),
-                        conditionValue
-                    )
-                    val attributeArray = Json.decodeFromJsonElement(
-                        ListSerializer(JsonElement.serializer()),
-                        attributeValue
-                    )
+                    val conditionArray =
+                        Json.decodeFromJsonElement<Array<JsonElement>>(conditionValue)
+                    val attributeArray =
+                        Json.decodeFromJsonElement<Array<JsonElement>>(attributeValue)
 
-                    conditionArray == attributeArray
+                    conditionArray.contentDeepEquals(attributeArray)
                 } else {
                     false
                 }
