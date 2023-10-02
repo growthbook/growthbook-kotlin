@@ -3,6 +3,7 @@ package com.sdk.growthbook.tests
 import com.sdk.growthbook.Utils.GBFeatures
 import com.sdk.growthbook.model.GBExperiment
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -15,7 +16,7 @@ class GBTestHelper {
     companion object {
 
         val jsonParser = Json { ignoreUnknownKeys = true }
-        val testData = jsonParser.decodeFromString(JsonElement.serializer(), gbTestCases)
+        val testData = jsonParser.decodeFromString<JsonElement>(gbTestCases)
 
         fun getEvalConditionData(): JsonArray {
             val array = testData.jsonObject.get("evalCondition") as JsonArray

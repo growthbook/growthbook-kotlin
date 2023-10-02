@@ -28,7 +28,7 @@ internal class Constants {
 /**
  * Type Alias for Feature in GrowthBook
  */
-internal typealias GBFeatures = Map<String, GBFeature>
+internal typealias GBFeatures = HashMap<String, GBFeature>
 
 /**
  * Type Alias for Condition Element in GrowthBook Rules

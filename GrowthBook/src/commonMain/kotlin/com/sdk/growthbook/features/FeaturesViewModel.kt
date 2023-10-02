@@ -1,14 +1,17 @@
 package com.sdk.growthbook.features
 
 import com.sdk.growthbook.Utils.Constants
+import com.sdk.growthbook.Utils.Crypto
 import com.sdk.growthbook.Utils.DefaultCrypto
 import com.sdk.growthbook.Utils.GBError
 import com.sdk.growthbook.Utils.GBFeatures
 import com.sdk.growthbook.Utils.getFeaturesFromEncryptedFeatures
+import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.sandbox.CachingImpl
 import com.sdk.growthbook.sandbox.getData
 import com.sdk.growthbook.sandbox.putData
 import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.serialization.json.Json
 
 /**
  * Interface for Feature API Completion Events
@@ -70,17 +73,13 @@ internal class FeaturesViewModel(
      * Cache API Response and push success event
      */
     private fun prepareFeaturesData(dataModel: FeaturesDataModel) {
-        manager.getLayer().putData(
-            fileName = Constants.featureCache,
-            content = dataModel,
-            serializer = FeaturesDataModel.serializer()
-        )
+        manager.getLayer().putData(Constants.featureCache, dataModel)
         // Call Success Delegate with mention of data available with remote
         var features = dataModel.features
         val encryptedFeatures = dataModel.encryptedFeatures
         val crypto = DefaultCrypto()
         try {
-            if (!features.isNullOrEmpty()) {
+            if (features != null && features.isNotEmpty()) {
                 this.delegate.featuresFetchedSuccessfully(features = features, isRemote = true)
             } else if (encryptionKey != null && encryptedFeatures != null) {
                 features =
