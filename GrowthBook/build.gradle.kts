@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "1.1.39"
+version = "1.1.41"
 
 kotlin {
 
