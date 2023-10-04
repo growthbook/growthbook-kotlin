@@ -105,7 +105,7 @@ class GBFilter(
  * Meta info about an experiment variation. Has the following properties
  */
 @Serializable
-class GBVariationMeta(
+data class GBVariationMeta(
     /**
      * A unique key for this variation
      */
@@ -113,17 +113,18 @@ class GBVariationMeta(
     /**
      * A human-readable name for this variation
      */
-    var name: String?,
+    var name: String? = null,
     /**
      * Used to implement holdout groups
      */
-    var passthrough: Boolean?
-) {}
+    var passthrough: Boolean? = null
+)
 
 /**
  * Used for remote feature evaluation to trigger the TrackingCallback. An object with 2 properties
  */
-class GBTrackData(
+@Suppress("unused")
+data class GBTrackData(
     /**
      * experiment - Experiment
      */
@@ -132,4 +133,4 @@ class GBTrackData(
      * result - ExperimentResult
      */
     var experimentResult: GBExperimentResult
-) {}
+)
