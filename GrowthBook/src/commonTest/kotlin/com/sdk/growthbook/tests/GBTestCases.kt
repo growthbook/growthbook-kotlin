@@ -1452,6 +1452,36 @@ val gbTestCases = """
             "tags": "hello world"
           },
           false
+        ],
+        [
+          "null condition - null attribute",
+          {"userId": null},
+          {"userId": null},
+          true
+        ],
+        [
+          "null condition - missing attribute",
+          {"userId": null},
+          {},
+          false
+        ],
+        [
+          "null condition - string attribute",
+          {"userId": null},
+          {"userId": "123"},
+          false
+        ],
+        [
+          "null condition - zero attribute",
+          {"userId": null},
+          {"userId": 0},
+          false
+        ],
+        [
+          "null condition - empty string attribute",
+          {"userId": null},
+          {"userId": ""},
+          false
         ]
       ],
       "hash": [
