@@ -321,11 +321,37 @@ val gbTestCases = """
           },
           false
         ],
+        ["${'$'}in - not array", {"num": {"${'$'}in": 1}}, {"num": 1}, false],
+    [
+      "${'$'}in - array pass 1",
+      {"tags": {"${'$'}in": ["a", "b"]}},
+      {"tags": ["d", "e", "a"]},
+      true
+    ],
+    [
+      "${'$'}in - array pass 2",
+      {"tags": {"${'$'}in": ["a", "b"]}},
+      {"tags": ["d", "b", "f"]},
+      true
+    ],
+    [
+      "${'$'}in - array pass 3",
+      {"tags": {"${'$'}in": ["a", "b"]}},
+      {"tags": ["d", "b", "a"]},
+      true
+    ],
+    [
+      "${'$'}in - array fail 1",
+      {"tags": {"${'$'}in": ["a", "b"]}},
+      {"tags": ["d", "e", "f"]},
+      false
+    ],
+    ["${'$'}in - array fail 2", {"tags": {"${'$'}in": ["a", "b"]}}, {"tags": []}, false],
         [
-          "${"$"}nin     - pass",
+          "${'$'}nin     - pass",
           {
             "num": {
-              "${"$"}nin": [
+              "${'$'}nin": [
                 1,
                 2,
                 3
@@ -338,10 +364,10 @@ val gbTestCases = """
           true
         ],
         [
-          "${"$"}nin     - fail",
+          "${'$'}nin     - fail",
           {
             "num": {
-              "${"$"}nin": [
+              "${'$'}nin": [
                 1,
                 2,
                 3
@@ -353,6 +379,32 @@ val gbTestCases = """
           },
           false
         ],
+        ["${'$'}nin - not array", {"num": {"${'$'}nin": 1}}, {"num": 1}, false],
+            [
+              "${'$'}nin - array fail 1",
+              {"tags": {"${'$'}nin": ["a", "b"]}},
+              {"tags": ["d", "e", "a"]},
+              false
+            ],
+            [
+              "${'$'}nin - array fail 2",
+              {"tags": {"${'$'}nin": ["a", "b"]}},
+              {"tags": ["d", "b", "f"]},
+              false
+            ],
+            [
+              "${'$'}nin - array fail 3",
+              {"tags": {"${'$'}nin": ["a", "b"]}},
+              {"tags": ["d", "b", "a"]},
+              false
+            ],
+            [
+              "${'$'}nin - array pass 1",
+              {"tags": {"${'$'}nin": ["a", "b"]}},
+              {"tags": ["d", "e", "f"]},
+              true
+            ],
+            ["${'$'}nin - array pass 2", {"tags": {"${'$'}nin": ["a", "b"]}}, {"tags": []}, true],
         [
           "${"$"}elemMatch     - pass - flat arrays",
           {
