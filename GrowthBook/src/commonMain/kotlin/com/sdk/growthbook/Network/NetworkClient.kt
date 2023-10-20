@@ -1,13 +1,23 @@
 package com.sdk.growthbook.Network
 
 import com.sdk.growthbook.ApplicationDispatcher
+import com.sdk.growthbook.Utils.Resource
+import com.sdk.growthbook.Utils.readSse
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
+import io.ktor.client.request.headers
+import io.ktor.client.request.prepareGet
+import io.ktor.client.statement.HttpStatement
 import io.ktor.serialization.kotlinx.json.json
+import io.ktor.utils.io.ByteReadChannel
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
@@ -22,6 +32,16 @@ interface NetworkDispatcher {
         onSuccess: (String) -> Unit,
         onError: (Throwable) -> Unit
     )
+
+    fun consumeSSEConnection(
+        url: String
+    ): Flow<Resource<String>>
+
+    suspend fun prepareGetRequest(
+        url: String,
+        headers: Map<String, String> = emptyMap(),
+        queryParams: Map<String, String> = emptyMap()
+    ): HttpStatement
 }
 
 /**
@@ -57,4 +77,45 @@ internal class CoreNetworkClient : NetworkDispatcher {
 
         }
     }
+
+    override suspend fun prepareGetRequest(
+        url: String,
+        headers: Map<String, String>,
+        queryParams: Map<String, String>
+    ): HttpStatement =
+        client.prepareGet(url) {
+            headers {
+                headers.forEach { (key, value) -> append(key, value) }
+            }
+            queryParams.forEach { (key, value) -> addOrReplaceParameter(key, value) }
+        }
+
+    @OptIn(DelicateCoroutinesApi::class)
+    override fun consumeSSEConnection(
+        url: String
+    ) = callbackFlow {
+        GlobalScope.launch(ApplicationDispatcher) {
+            try {
+                prepareGetRequest(url).execute { response ->
+                    val channel: ByteReadChannel = response.body()
+                    channel.readSse(
+                        onSseEvent = { sseEvent ->
+                            trySend(sseEvent)
+                        },
+                    )
+                }
+            } catch (ex: Exception) {
+                trySend(Resource.Error(ex))
+            } finally {
+                close()
+            }
+        }
+        awaitClose()
+    }
+
+    private fun HttpRequestBuilder.addOrReplaceParameter(key: String, value: String?): Unit =
+        value?.let {
+            url.parameters.remove(key)
+            url.parameters.append(key, it)
+        } ?: Unit
 }

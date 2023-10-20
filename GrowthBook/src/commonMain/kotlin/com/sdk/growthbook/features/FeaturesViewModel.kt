@@ -4,11 +4,13 @@ import com.sdk.growthbook.Utils.Constants
 import com.sdk.growthbook.Utils.DefaultCrypto
 import com.sdk.growthbook.Utils.GBError
 import com.sdk.growthbook.Utils.GBFeatures
+import com.sdk.growthbook.Utils.Resource
 import com.sdk.growthbook.Utils.getFeaturesFromEncryptedFeatures
 import com.sdk.growthbook.sandbox.CachingImpl
 import com.sdk.growthbook.sandbox.getData
 import com.sdk.growthbook.sandbox.putData
 import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 
 /**
  * Interface for Feature API Completion Events
@@ -64,6 +66,16 @@ internal class FeaturesViewModel(
                 // Call Error Delegate with mention of data not available but its not remote
                 this.delegate.featuresFetchFailed(GBError(error), true)
             })
+    }
+
+    @DelicateCoroutinesApi
+    fun autoRefreshFeatures(): Flow<Resource<GBFeatures?>> {
+        return dataSource.autoRefresh(success = { dataModel ->
+            prepareFeaturesData(dataModel = dataModel)
+        }, failure = { error ->
+            // Call Error Delegate with mention of data not available but its not remote
+            this.delegate.featuresFetchFailed(GBError(error), true)
+        })
     }
 
     /**
