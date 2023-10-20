@@ -57,6 +57,11 @@ class GBTestHelper {
             val array = testData.jsonObject.get("getEqualWeights") as JsonArray
             return array
         }
+
+        fun getDecryptData(): JsonArray {
+            val array = testData.jsonObject.get("decrypt") as JsonArray
+            return array
+        }
     }
 }
 

@@ -321,11 +321,37 @@ val gbTestCases = """
           },
           false
         ],
+        ["${'$'}in - not array", {"num": {"${'$'}in": 1}}, {"num": 1}, false],
+    [
+      "${'$'}in - array pass 1",
+      {"tags": {"${'$'}in": ["a", "b"]}},
+      {"tags": ["d", "e", "a"]},
+      true
+    ],
+    [
+      "${'$'}in - array pass 2",
+      {"tags": {"${'$'}in": ["a", "b"]}},
+      {"tags": ["d", "b", "f"]},
+      true
+    ],
+    [
+      "${'$'}in - array pass 3",
+      {"tags": {"${'$'}in": ["a", "b"]}},
+      {"tags": ["d", "b", "a"]},
+      true
+    ],
+    [
+      "${'$'}in - array fail 1",
+      {"tags": {"${'$'}in": ["a", "b"]}},
+      {"tags": ["d", "e", "f"]},
+      false
+    ],
+    ["${'$'}in - array fail 2", {"tags": {"${'$'}in": ["a", "b"]}}, {"tags": []}, false],
         [
-          "${"$"}nin     - pass",
+          "${'$'}nin     - pass",
           {
             "num": {
-              "${"$"}nin": [
+              "${'$'}nin": [
                 1,
                 2,
                 3
@@ -338,10 +364,10 @@ val gbTestCases = """
           true
         ],
         [
-          "${"$"}nin     - fail",
+          "${'$'}nin     - fail",
           {
             "num": {
-              "${"$"}nin": [
+              "${'$'}nin": [
                 1,
                 2,
                 3
@@ -353,6 +379,32 @@ val gbTestCases = """
           },
           false
         ],
+        ["${'$'}nin - not array", {"num": {"${'$'}nin": 1}}, {"num": 1}, false],
+            [
+              "${'$'}nin - array fail 1",
+              {"tags": {"${'$'}nin": ["a", "b"]}},
+              {"tags": ["d", "e", "a"]},
+              false
+            ],
+            [
+              "${'$'}nin - array fail 2",
+              {"tags": {"${'$'}nin": ["a", "b"]}},
+              {"tags": ["d", "b", "f"]},
+              false
+            ],
+            [
+              "${'$'}nin - array fail 3",
+              {"tags": {"${'$'}nin": ["a", "b"]}},
+              {"tags": ["d", "b", "a"]},
+              false
+            ],
+            [
+              "${'$'}nin - array pass 1",
+              {"tags": {"${'$'}nin": ["a", "b"]}},
+              {"tags": ["d", "e", "f"]},
+              true
+            ],
+            ["${'$'}nin - array pass 2", {"tags": {"${'$'}nin": ["a", "b"]}}, {"tags": []}, true],
         [
           "${"$"}elemMatch     - pass - flat arrays",
           {
@@ -1451,6 +1503,36 @@ val gbTestCases = """
           {
             "tags": "hello world"
           },
+          false
+        ],
+        [
+          "null condition - null attribute",
+          {"userId": null},
+          {"userId": null},
+          true
+        ],
+        [
+          "null condition - missing attribute",
+          {"userId": null},
+          {},
+          false
+        ],
+        [
+          "null condition - string attribute",
+          {"userId": null},
+          {"userId": "123"},
+          false
+        ],
+        [
+          "null condition - zero attribute",
+          {"userId": null},
+          {"userId": 0},
+          false
+        ],
+        [
+          "null condition - empty string attribute",
+          {"userId": null},
+          {"userId": ""},
           false
         ]
       ],
@@ -3964,6 +4046,68 @@ val gbTestCases = """
             0.25,
             0.25
           ]
+        ]
+      ],
+      "decrypt": [
+        [
+          "Valid feature",
+          "m5ylFM6ndyOJA2OPadubkw==.Uu7ViqgKEt/dWvCyhI46q088PkAEJbnXKf3KPZjf9IEQQ+A8fojNoxw4wIbPX3aj",
+          "Zvwv/+uhpFDznZ6SX28Yjg==",
+          "{\"feature\":{\"defaultValue\":true}}"
+        ],
+        [
+          "Broken JSON",
+          "SVZIM2oKD1JoHNIeeoW3Uw==.AGbRiGAHf2f6/ziVr9UTIy+bVFmVli6+bHZ2jnCm9N991ITv1ROvOEjxjLSmgEpv",
+          "UQD0Qqw7fM1bhfKKPH8TGw==",
+          "{\"feature\":{\"defaultValue\":true?5%"
+        ],
+        [
+          "Wrong key",
+          "m5ylFM6ndyOJA2OPadubkw==.Uu7ViqgKEt/dWvCyhI46q088PkAEJbnXKf3KPZjf9IEQQ+A8fojNoxw4wIbPX3aj",
+          "Zvwv/+uhpFDznZ6SX39Yjg==",
+          null
+        ],
+        [
+          "Invalid key length",
+          "m5ylFM6ndyOJA2OPadubkw==.Uu7ViqgKEt/dWvCyhI46q088PkAEJbnXKf3KPZjf9IEQQ+A8fojNoxw4wIbPX3aj",
+          "Zvwv/+uhpFDznSX39Yjg==",
+          null
+        ],
+        [
+          "Invalid key characters",
+          "m5ylFM6ndyOJA2OPadubkw==.Uu7ViqgKEt/dWvCyhI46q088PkAEJbnXKf3KPZjf9IEQQ+A8fojNoxw4wIbPX3aj",
+          "Zvwv/%!(pFDznZ6SX39Yjg==",
+          null
+        ],
+        [
+          "Invalid body",
+          "m5ylFM6ndyOJA2OPadubkw==.Uu7ViqgKEt/dWvCyhI46q0!*&()f3KPZjf9IEQQ+A8fojNoxw4wIbPX3aj",
+          "Zvwv/+uhpFDznZ6SX28Yjg==",
+          null
+        ],
+        [
+          "Invalid iv length",
+          "m5ylFM6ndyOPadubkw==.Uu7ViqgKEt/dWvCyhI46q088PkAEJbnXKf3KPZjf9IEQQ+A8fojNoxw4wIbPX3aj",
+          "Zvwv/+uhpFDznZ6SX28Yjg==",
+          null
+        ],
+        [
+          "Invalid iv",
+          "m5ylFM6*&(OJA2OPadubkw==.Uu7ViqgKEt/dWvCyhI46q088PkAEJbnXKf3KPZjf9IEQQ+A8fojNoxw4wIbPX3aj",
+          "Zvwv/+uhpFDznZ6SX28Yjg==",
+          null
+        ],
+        [
+          "Missing delimiter",
+          "m5ylFM6ndyOJA2OPadubkw==Uu7ViqgKEt/dWvCyhI46q088PkAEJbnXKf3KPZjf9IEQQ+A8fojNoxw4wIbPX3aj",
+          "Zvwv/+uhpFDznZ6SX28Yjg==",
+          null
+        ],
+        [
+          "Corrupted payload",
+          "fsa*(&(SF*&F&SF^SD&*FS&*6fsdkajfd",
+          "Zvwv/+uhpFDznZ6SX28Yjg==",
+          null
         ]
       ]
     }
