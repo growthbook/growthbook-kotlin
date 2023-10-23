@@ -6,6 +6,7 @@ import com.sdk.growthbook.Utils.Crypto
 import com.sdk.growthbook.Utils.GBCacheRefreshHandler
 import com.sdk.growthbook.Utils.GBError
 import com.sdk.growthbook.Utils.GBFeatures
+import com.sdk.growthbook.Utils.Resource
 import com.sdk.growthbook.Utils.getFeaturesFromEncryptedFeatures
 import com.sdk.growthbook.evaluators.GBExperimentEvaluator
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
@@ -17,6 +18,7 @@ import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeatureResult
 import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 
 typealias GBTrackingCallback = (GBExperiment, GBExperimentResult) -> Unit
 
@@ -223,6 +225,15 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
      */
     fun getGBContext(): GBContext {
         return gbContext
+    }
+
+    /**
+     * receive Features automatically when updated
+     * SSE
+     */
+    @OptIn(DelicateCoroutinesApi::class)
+    fun autoRefreshFeatures(): Flow<Resource<GBFeatures?>> {
+        return featuresViewModel.autoRefreshFeatures()
     }
 
     /**

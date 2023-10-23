@@ -1,8 +1,14 @@
 package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.Network.NetworkDispatcher
+import com.sdk.growthbook.Utils.Resource
+import io.ktor.client.statement.HttpStatement
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 
 class MockNetworkClient(val succesResponse: String?, val error: Throwable?) : NetworkDispatcher {
+
+    @DelicateCoroutinesApi
     override fun consumeGETRequest(
         request: String,
         onSuccess: (String) -> Unit,
@@ -18,6 +24,18 @@ class MockNetworkClient(val succesResponse: String?, val error: Throwable?) : Ne
         } catch (ex: Exception) {
             onError(ex)
         }
+    }
+
+    override fun consumeSSEConnection(url: String): Flow<Resource<String>> {
+        TODO("Not yet implemented")
+    }
+
+    override suspend fun prepareGetRequest(
+        url: String,
+        headers: Map<String, String>,
+        queryParams: Map<String, String>
+    ): HttpStatement {
+        TODO("Not yet implemented")
     }
 }
 
