@@ -7,6 +7,7 @@ import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.soywiz.krypto.encoding.Base64
 import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.serialization.json.JsonArray
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -14,34 +15,33 @@ class GBEncryptedFeatures {
 
     @Test
     fun testEncryptDecrypt() {
-        val keyString = "Ns04" +
-            "T5n9" +
-            "+59r" +
-            "l2x3" +
-            "SlNH" +
-            "tQ=="
-        val stringForEncrypt =
-            "{\"testfeature1\":{\"defaultValue\":true,\"rules\":[{\"condition\":{\"id\":\"1234\"},\"force\":false}]}}"
-        val ivString = "vMSg2Bj/IurObDsWVmvkUg=="
+        val testCases = GBTestHelper.getDecryptData()
+        testCases.forEach { jsonElement ->
+            val test: JsonArray = jsonElement as JsonArray
 
-        val decodedIv = Base64.encode(ivString.toByteArray()).toByteArray()
-        val decodedKey = Base64.encode(keyString.toByteArray()).toByteArray()
+            val ivString = test[1].toString()
+            val keyString = test[2].toString()
+            val stringForEncrypt = test[3].toString()
 
-        val defaultCrypto = DefaultCrypto()
+            val decodedIv = Base64.encode(ivString.toByteArray()).toByteArray()
+            val decodedKey = Base64.encode(keyString.toByteArray()).toByteArray()
 
-        val encryptedValue = defaultCrypto.encrypt(
-            stringForEncrypt.toByteArray(),
-            decodedKey,
-            decodedIv
-        )
-        val decryptedValue = defaultCrypto.decrypt(
-            encryptedValue,
-            decodedKey,
-            decodedIv
-        )
-        println(stringForEncrypt)
-        println(String(decryptedValue))
-        assertEquals(stringForEncrypt, String(decryptedValue))
+            val defaultCrypto = DefaultCrypto()
+
+            val encryptedValue = defaultCrypto.encrypt(
+                stringForEncrypt.toByteArray(),
+                decodedKey,
+                decodedIv
+            )
+            val decryptedValue = defaultCrypto.decrypt(
+                encryptedValue,
+                decodedKey,
+                decodedIv
+            )
+            println(stringForEncrypt)
+            println(String(decryptedValue))
+            assertEquals(stringForEncrypt, String(decryptedValue))
+        }
     }
 
     val testApiKey = "4r23r324f23"

@@ -367,11 +367,15 @@ internal class GBConditionEvaluator {
             when (operator) {
                 // Evaluate IN operator - attributeValue in the conditionValue array
                 "\$in" -> {
-                    return conditionValue.contains(attributeValue)
+                    return if (attributeValue is JsonArray) {
+                        isIn(attributeValue, conditionValue)
+                    } else conditionValue.contains(attributeValue)
                 }
                 // Evaluate NIN operator - attributeValue not in the conditionValue array
                 "\$nin" -> {
-                    return !conditionValue.contains(attributeValue)
+                    return if (attributeValue is JsonArray) {
+                        !isIn(attributeValue, conditionValue)
+                    } else !conditionValue.contains(attributeValue)
                 }
                 // Evaluate ALL operator - whether condition contains all attribute
                 "\$all" -> {
@@ -478,6 +482,25 @@ internal class GBConditionEvaluator {
             }
         }
 
+        return false
+    }
+
+    private fun isIn(actualValue: JsonElement, conditionValue: JsonArray): Boolean {
+
+        if (actualValue !is JsonArray) return conditionValue.contains(actualValue)
+
+        if (actualValue.size == 0) return false
+
+        actualValue.forEach {
+            if (getType(it) == GBAttributeType.GbString ||
+                getType(it) == GBAttributeType.GbBoolean ||
+                getType(it) == GBAttributeType.GbNumber
+            ) {
+                if (conditionValue.contains(it)) {
+                    return true
+                }
+            }
+        }
         return false
     }
 }
