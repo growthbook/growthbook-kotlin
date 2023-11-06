@@ -60,6 +60,104 @@ val gbTestCases = """
           true
         ],
         [
+        "${"$"}groups - match",
+        {
+        "${"$"}and": [
+          {
+            "${"$"}groups": {
+              "${"$"}elemMatch": { "${"$"}eq": "a" }
+            }
+          },
+          {
+            "${"$"}groups": {
+              "${"$"}elemMatch": { "${"$"}eq": "b" }
+            }
+          },
+          {
+            "${"$"}or": [
+              {
+                "${"$"}groups": {
+                  "${"$"}elemMatch": { "${"$"}eq": "c" }
+                }
+              },
+              {
+                "${"$"}groups": {
+                  "${"$"}elemMatch": { "${"$"}eq": "e" }
+                }
+              }
+            ]
+          },
+          {
+            "${"$"}not": {
+              "${"$"}groups": {
+                "${"$"}elemMatch": { "${"$"}eq": "f" }
+              }
+            }
+          },
+          {
+            "${"$"}not": {
+              "${"$"}groups": {
+                "${"$"}elemMatch": { "${"$"}eq": "g" }
+              }
+            }
+          }
+        ]
+      },
+      {
+        "${"$"}groups": ["a", "b", "c", "d"]
+      },
+      true
+    ],
+    [
+      "${"$"}groups - no match",
+      {
+        "${"$"}and": [
+          {
+            "${"$"}groups": {
+              "${"$"}elemMatch": { "${"$"}eq": "a" }
+            }
+          },
+          {
+            "${"$"}groups": {
+              "${"$"}elemMatch": { "${"$"}eq": "b" }
+            }
+          },
+          {
+            "${"$"}or": [
+              {
+                "${"$"}groups": {
+                  "${"$"}elemMatch": { "${"$"}eq": "c" }
+                }
+              },
+              {
+                "${"$"}groups": {
+                  "${"$"}elemMatch": { "${"$"}eq": "e" }
+                }
+              }
+            ]
+          },
+          {
+            "${"$"}not": {
+              "${"$"}groups": {
+                "${"$"}elemMatch": { "${"$"}eq": "d" }
+              }
+            }
+          },
+          {
+            "${"$"}not": {
+              "${"$"}groups": {
+                "${"$"}elemMatch": { "${"$"}eq": "g" }
+              }
+            }
+          }
+        ]
+      },
+      {
+        "${"$"}groups": ["a", "b", "c", "d"]
+      },
+      false
+    ],
+        [
           "${"$"}and    /${"$"}or     - first or true",
           {
             "${"$"}and": [
