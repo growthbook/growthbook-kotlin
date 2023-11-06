@@ -556,6 +556,46 @@ val gbTestCases = """
           false
         ],
         [
+      "missing attribute with comparison operators",
+      {
+        "age": {
+          "${"$"}gt": -10,
+          "${"$"}lt": 10,
+          "${"$"}gte": -9,
+          "${"$"}lte": 9,
+          "${"$"}ne": 10
+        }
+      },
+      {},
+      false
+    ],
+    [
+      "comparing numbers and strings",
+      {
+        "n": {
+          "${"$"}gt": 5,
+          "${"$"}lt": 10
+        }
+      },
+      {
+        "n": "8"
+      },
+      true
+    ],
+    [
+      "comparing numbers and strings - v2",
+      {
+        "n": {
+          "${"$"}gt": "5",
+          "${"$"}lt": "10"
+        }
+      },
+      {
+        "n": 8
+      },
+      true
+    ],
+        [
           "empty ${"$"}or     - pass",
           {
             "${"$"}or": [
@@ -2087,6 +2127,32 @@ val gbTestCases = """
             "source": "force"
           }
         ],
+        [
+      "force rule - coverage with integer hash attribute",
+      {
+        "attributes": {
+          "id": 3
+        },
+        "features": {
+          "feature": {
+            "defaultValue": 2,
+            "rules": [
+              {
+                "force": 1,
+                "coverage": 0.5
+              }
+            ]
+          }
+        }
+      },
+      "feature",
+      {
+        "value": 1,
+        "on": true,
+        "off": false,
+        "source": "force"
+      }
+    ],
         [
           "force rules - coverage excluded",
           {
