@@ -567,7 +567,7 @@ val gbTestCases = """
         }
       },
       {},
-      false
+      true
     ],
     [
       "comparing numbers and strings",
