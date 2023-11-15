@@ -1,7 +1,6 @@
 package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.GBSDKBuilder
-import com.sdk.growthbook.GBSDKBuilderJAVA
 import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.Utils.GBCacheRefreshHandler
 import com.sdk.growthbook.Utils.GBError
@@ -32,11 +31,13 @@ class GrowthBookSDKBuilderTests {
         val sdkInstance = GBSDKBuilder(
             testApiKey,
             testHostURL,
-            attributes = testAttributes,
+            testAttributes,
             encryptionKey = null,
             trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
 
-            }).initialize()
+            },
+            networkDispatcher = MockNetworkClient(null, null),
+        ).initialize()
 
         assertEquals(sdkInstance.getGBContext().apiKey, testApiKey)
         assertTrue(sdkInstance.getGBContext().enabled)
@@ -57,7 +58,9 @@ class GrowthBookSDKBuilderTests {
             encryptionKey = null,
             trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
 
-            }).setRefreshHandler { isRefreshed, gbError ->
+            },
+            networkDispatcher = MockNetworkClient(null, null),
+            ).setRefreshHandler { isRefreshed, gbError ->
         }.setEnabled(false).setForcedVariations(variations).setQAMode(true).initialize()
 
         assertTrue(sdkInstance.getGBContext().apiKey == testApiKey)
@@ -80,10 +83,11 @@ class GrowthBookSDKBuilderTests {
             encryptionKey = null,
             trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
 
-            }).setRefreshHandler { isRefreshed, gbError ->
+            },
+            networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
+            ).setRefreshHandler { isRefreshed, gbError ->
 
         }
-            .setNetworkDispatcher(MockNetworkClient(MockResponse.successResponse, null))
             .setEnabled(false).setForcedVariations(variations).setQAMode(true).initialize()
 
         assertTrue(sdkInstance.getGBContext().apiKey == testApiKey)
@@ -105,9 +109,11 @@ class GrowthBookSDKBuilderTests {
             encryptionKey = null,
             trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
 
-            }).setRefreshHandler { _, gbError ->
+            },
+            networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
+            ).setRefreshHandler { _, gbError ->
             isRefreshed = true
-        }.setNetworkDispatcher(MockNetworkClient(MockResponse.successResponse, null)).initialize()
+        }.initialize()
 
         assertTrue(isRefreshed)
 
@@ -132,9 +138,11 @@ class GrowthBookSDKBuilderTests {
             attributes = testAttributes,
             trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
 
-            }).setRefreshHandler { _, gbError ->
+            },
+            networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
+            ).setRefreshHandler { _, gbError ->
             isRefreshed = true
-        }.setNetworkDispatcher(MockNetworkClient(MockResponse.successResponse, null)).initialize()
+        }.initialize()
 
         assertTrue(isRefreshed)
 
@@ -152,8 +160,10 @@ class GrowthBookSDKBuilderTests {
             encryptionKey = null,
             trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
 
-            }).setRefreshHandler { isRefreshed, gbError ->
-        }.setNetworkDispatcher(MockNetworkClient(MockResponse.successResponse, null)).initialize()
+            },
+            networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
+            ).setRefreshHandler { isRefreshed, gbError ->
+        }.initialize()
 
         val featureValue = sdkInstance.feature("fwrfewrfe")
         assertEquals(featureValue.source, GBFeatureSource.unknownFeature)
@@ -172,11 +182,8 @@ class GrowthBookSDKBuilderTests {
             "http://host.com",
             attributes = attributes,
             encryptionKey = encryptionKey,
-            trackingCallback = { _, _ -> }).setNetworkDispatcher(
-            MockNetworkClient(
-                json,
-                null
-            )
+            trackingCallback = { _, _ -> },
+            networkDispatcher = MockNetworkClient(json, null),
         ).initialize()
     }
 

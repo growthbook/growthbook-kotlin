@@ -36,12 +36,6 @@ interface NetworkDispatcher {
     fun consumeSSEConnection(
         url: String
     ): Flow<Resource<String>>
-
-    suspend fun prepareGetRequest(
-        url: String,
-        headers: Map<String, String> = emptyMap(),
-        queryParams: Map<String, String> = emptyMap()
-    ): HttpStatement
 }
 
 /**
@@ -78,10 +72,10 @@ internal class CoreNetworkClient : NetworkDispatcher {
         }
     }
 
-    override suspend fun prepareGetRequest(
+    private suspend fun prepareGetRequest(
         url: String,
-        headers: Map<String, String>,
-        queryParams: Map<String, String>
+        headers: Map<String, String> = emptyMap(),
+        queryParams: Map<String, String> = emptyMap(),
     ): HttpStatement =
         client.prepareGet(url) {
             headers {

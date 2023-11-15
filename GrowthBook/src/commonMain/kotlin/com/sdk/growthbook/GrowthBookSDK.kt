@@ -1,6 +1,5 @@
 package com.sdk.growthbook
 
-import com.sdk.growthbook.Network.CoreNetworkClient
 import com.sdk.growthbook.Network.NetworkDispatcher
 import com.sdk.growthbook.Utils.Crypto
 import com.sdk.growthbook.Utils.GBCacheRefreshHandler
@@ -35,7 +34,8 @@ abstract class SDKBuilder(
     val hostURL: String,
     val attributes: Map<String, Any>,
     val trackingCallback: GBTrackingCallback,
-    val encryptionKey: String?
+    val encryptionKey: String?,
+    val networkDispatcher: NetworkDispatcher,
 ) {
     internal var qaMode: Boolean = false
     internal var forcedVariations: Map<String, Int> = HashMap()
@@ -83,10 +83,10 @@ abstract class SDKBuilder(
  */
 class GBSDKBuilderJAVA(
     apiKey: String, hostURL: String, attributes: Map<String, Any>, val features: GBFeatures,
-    trackingCallback: GBTrackingCallback, encryptionKey: String?
+    trackingCallback: GBTrackingCallback, encryptionKey: String?, networkDispatcher: NetworkDispatcher
 ) : SDKBuilder(
     apiKey, hostURL,
-    attributes, trackingCallback, encryptionKey
+    attributes, trackingCallback, encryptionKey, networkDispatcher
 ) {
     /**
      * Initialize the JAVA SDK
@@ -105,7 +105,7 @@ class GBSDKBuilderJAVA(
             encryptionKey = encryptionKey
         )
 
-        return GrowthBookSDK(gbContext, null, features = features)
+        return GrowthBookSDK(gbContext, null, networkDispatcher, features)
     }
 }
 
@@ -123,10 +123,10 @@ class GBSDKBuilder(
     attributes: Map<String, Any>,
     trackingCallback: GBTrackingCallback,
     encryptionKey: String? = null,
-    private var networkDispatcher: NetworkDispatcher = CoreNetworkClient()
+    networkDispatcher: NetworkDispatcher
 ) : SDKBuilder(
     apiKey, hostURL,
-    attributes, trackingCallback, encryptionKey
+    attributes, trackingCallback, encryptionKey, networkDispatcher
 ) {
 
     private var refreshHandler: GBCacheRefreshHandler? = null
@@ -136,15 +136,6 @@ class GBSDKBuilder(
      */
     fun setRefreshHandler(refreshHandler: GBCacheRefreshHandler): GBSDKBuilder {
         this.refreshHandler = refreshHandler
-        return this
-    }
-
-    /**
-     * Set Network Client - Network Client for Making API Calls
-     * Default is KTOR - integrated in SDK
-     */
-    fun setNetworkDispatcher(networkDispatcher: NetworkDispatcher): SDKBuilder {
-        this.networkDispatcher = networkDispatcher
         return this
     }
 
@@ -188,7 +179,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     internal constructor(
         context: GBContext,
         refreshHandler: GBCacheRefreshHandler?,
-        networkDispatcher: NetworkDispatcher = CoreNetworkClient(),
+        networkDispatcher: NetworkDispatcher,
         features: GBFeatures?,
     ) : this() {
         gbContext = context

@@ -25,7 +25,7 @@ internal interface FeaturesFlowDelegate {
  */
 internal class FeaturesViewModel(
     private val delegate: FeaturesFlowDelegate,
-    private val dataSource: FeaturesDataSource = FeaturesDataSource(),
+    private val dataSource: FeaturesDataSource,
     var encryptionKey: String?
 ) {
 
