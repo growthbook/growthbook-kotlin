@@ -41,7 +41,8 @@ interface NetworkDispatcher {
 /**
  * Default Ktor Implementation for Network Dispatcher
  */
-internal class CoreNetworkClient : NetworkDispatcher {
+@Suppress("unused")
+class DefaultGBNetworkClient : NetworkDispatcher {
 
     private val client = HttpClient {
         install(ContentNegotiation) {
