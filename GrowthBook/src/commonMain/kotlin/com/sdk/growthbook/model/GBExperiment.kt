@@ -96,7 +96,7 @@ class GBExperimentResult(
     /**
      * The array value of the assigned variation
      */
-    val value: Any,
+    val value: JsonElement,
     /**
      * The user attribute used to assign a variation
      */
