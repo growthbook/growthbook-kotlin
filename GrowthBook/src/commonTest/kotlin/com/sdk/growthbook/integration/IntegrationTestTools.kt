@@ -10,8 +10,8 @@ internal fun buildSDK(json: String, attributes: Map<String, Any> = mapOf()): Gro
         "http://host.com",
         attributes = attributes,
         encryptionKey = "",
-        trackingCallback = { _, _ -> }).setNetworkDispatcher(
-        MockNetworkClient(
+        trackingCallback = { _, _ -> },
+        networkDispatcher = MockNetworkClient(
             json,
             null
         )
