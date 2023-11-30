@@ -7,6 +7,8 @@ import com.sdk.growthbook.Utils.toJsonElement
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Experiment Evaluator Class
@@ -146,7 +148,7 @@ internal class GBExperimentEvaluator {
             targetVariationIndex = 0
         }
 
-        var targetValue: Any = 0
+        var targetValue: JsonElement = JsonPrimitive(0)
 
         // check whether variations are non empty - then only query array against index
         if (experiment.variations.isNotEmpty()) {

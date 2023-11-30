@@ -413,11 +413,11 @@ internal class GBConditionEvaluator {
                     return evalConditionValue(conditionValue, JsonPrimitive(attributeValue.size))
                 }
             }
-        } else if (attributeValue is JsonPrimitive && conditionValue is JsonPrimitive) {
+        } else if (attributeValue is JsonPrimitive? && conditionValue is JsonPrimitive) {
             val targetPrimitiveValue = conditionValue.content
-            val sourcePrimitiveValue = attributeValue.content
+            val sourcePrimitiveValue = attributeValue?.content
             val paddedVersionTarget = GBUtils.paddedVersionString(targetPrimitiveValue)
-            val paddedVersionSource = GBUtils.paddedVersionString(sourcePrimitiveValue)
+            val paddedVersionSource = GBUtils.paddedVersionString(sourcePrimitiveValue ?: "0")
 
             when (operator) {
                 // Evaluate EQ operator - whether condition equals to attribute
@@ -430,31 +430,47 @@ internal class GBConditionEvaluator {
                 }
                 // Evaluate LT operator - whether attribute less than to condition
                 "\$lt" -> {
-                    if (attributeValue.doubleOrNull != null && conditionValue.doubleOrNull != null) {
-                        return (attributeValue.doubleOrNull!! < conditionValue.doubleOrNull!!)
+                    if (attributeValue?.doubleOrNull != null && conditionValue.doubleOrNull != null) {
+                        return (attributeValue?.doubleOrNull!! < conditionValue.doubleOrNull!!)
                     }
-                    return sourcePrimitiveValue < targetPrimitiveValue
+                    return if (sourcePrimitiveValue == null) {
+                        0.0 < targetPrimitiveValue.toDouble()
+                    } else {
+                        sourcePrimitiveValue < targetPrimitiveValue
+                    }
                 }
                 // Evaluate LTE operator - whether attribute less than or equal to condition
                 "\$lte" -> {
-                    if (attributeValue.doubleOrNull != null && conditionValue.doubleOrNull != null) {
-                        return (attributeValue.doubleOrNull!! <= conditionValue.doubleOrNull!!)
+                    if (attributeValue?.doubleOrNull != null && conditionValue.doubleOrNull != null) {
+                        return (attributeValue?.doubleOrNull!! <= conditionValue.doubleOrNull!!)
                     }
-                    return sourcePrimitiveValue <= targetPrimitiveValue
+                    return if (sourcePrimitiveValue == null) {
+                        0.0 <= targetPrimitiveValue.toDouble()
+                    } else {
+                        sourcePrimitiveValue <= targetPrimitiveValue
+                    }
                 }
                 // Evaluate GT operator - whether attribute greater than to condition
                 "\$gt" -> {
-                    if (attributeValue.doubleOrNull != null && conditionValue.doubleOrNull != null) {
-                        return (attributeValue.doubleOrNull!! > conditionValue.doubleOrNull!!)
+                    if (attributeValue?.doubleOrNull != null && conditionValue.doubleOrNull != null) {
+                        return (attributeValue?.doubleOrNull!! > conditionValue.doubleOrNull!!)
                     }
-                    return sourcePrimitiveValue > targetPrimitiveValue
+                    return if (sourcePrimitiveValue == null) {
+                        0.0 > targetPrimitiveValue.toDouble()
+                    } else {
+                        sourcePrimitiveValue > targetPrimitiveValue
+                    }
                 }
                 // Evaluate GTE operator - whether attribute greater than or equal to condition
                 "\$gte" -> {
-                    if (attributeValue.doubleOrNull != null && conditionValue.doubleOrNull != null) {
-                        return (attributeValue.doubleOrNull!! >= conditionValue.doubleOrNull!!)
+                    if (attributeValue?.doubleOrNull != null && conditionValue.doubleOrNull != null) {
+                        return (attributeValue?.doubleOrNull!! >= conditionValue.doubleOrNull!!)
                     }
-                    return sourcePrimitiveValue >= targetPrimitiveValue
+                    return if (sourcePrimitiveValue == null) {
+                        0.0 >= targetPrimitiveValue.toDouble()
+                    } else {
+                        sourcePrimitiveValue >= targetPrimitiveValue
+                    }
                 }
                 // Evaluate REGEX operator - whether attribute contains condition regex
                 "\$regex" -> {
@@ -462,7 +478,7 @@ internal class GBConditionEvaluator {
                     return try {
 
                         val regex = Regex(targetPrimitiveValue)
-                        regex.containsMatchIn(sourcePrimitiveValue)
+                        regex.containsMatchIn(sourcePrimitiveValue ?: "0")
                     } catch (error: Throwable) {
                         false
                     }

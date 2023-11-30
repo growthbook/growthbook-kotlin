@@ -1,7 +1,6 @@
 package com.sdk.growthbook.features
 
 import com.sdk.growthbook.GrowthBookSDK
-import com.sdk.growthbook.Network.CoreNetworkClient
 import com.sdk.growthbook.Network.NetworkDispatcher
 import com.sdk.growthbook.Utils.FeatureRefreshStrategy
 import com.sdk.growthbook.Utils.GBFeatures
@@ -15,7 +14,7 @@ import kotlinx.serialization.json.Json
 /**
  * DataSource for Feature API
  */
-internal class FeaturesDataSource(private val dispatcher: NetworkDispatcher = CoreNetworkClient()) {
+internal class FeaturesDataSource(private val dispatcher: NetworkDispatcher) {
 
     private val JSONParser: Json
         get() = Json { prettyPrint = true; isLenient = true; ignoreUnknownKeys = true }
