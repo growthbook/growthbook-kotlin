@@ -124,7 +124,10 @@ internal class GBExperimentEvaluator {
             inExperiment = true,
             gbContext = context
         )
-        context.trackingCallback(experiment, result)
+
+        if (!context.experimentHelper.isTracked(experiment, result)) {
+            context.trackingCallback(experiment, result)
+        }
 
         // Return (in experiment, assigned variation)
 

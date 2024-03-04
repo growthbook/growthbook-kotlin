@@ -1,6 +1,7 @@
 package com.sdk.growthbook.model
 
 import com.sdk.growthbook.Utils.GBFeatures
+import com.sdk.growthbook.evaluators.GBExperimentHelper
 
 /**
  * Defines the GrowthBook context.
@@ -43,4 +44,6 @@ class GBContext(
     // Keys are unique identifiers for the features and the values are Feature objects.
     // Feature definitions - To be pulled from API / Cache
     internal var features: GBFeatures = HashMap()
+
+    internal val experimentHelper: GBExperimentHelper= GBExperimentHelper()
 }

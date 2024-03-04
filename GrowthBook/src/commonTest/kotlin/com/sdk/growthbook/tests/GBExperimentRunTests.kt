@@ -73,4 +73,42 @@ class GBExperimentRunTests {
 
         assertTrue(failedScenarios.size == 0)
     }
+
+    @Test
+    fun testOneTimeInvokeTrackingCallback() {
+        var countTrackingCallback = 0
+        val item = evalConditions.first()
+        if (item is JsonArray) {
+            val testContext =
+                GBTestHelper.jsonParser.decodeFromJsonElement(
+                    GBContextTest.serializer(),
+                    item[1]
+                )
+            val experiment =
+                GBTestHelper.jsonParser.decodeFromJsonElement(
+                    GBExperiment.serializer(),
+                    item[2]
+                )
+            val attributes = testContext.attributes.jsonObject.toHashMap()
+            val gbContext = GBContext(
+                apiKey = "",
+                hostURL = "",
+                enabled = testContext.enabled,
+                attributes = attributes,
+                forcedVariations = testContext.forcedVariations ?: HashMap(),
+                qaMode = testContext.qaMode,
+                trackingCallback = { _, _ ->
+                    countTrackingCallback += 1
+                }, encryptionKey = ""
+            )
+            val evaluator = GBExperimentEvaluator()
+            evaluator.evaluateExperiment(gbContext, experiment)
+            evaluator.evaluateExperiment(
+                gbContext,
+                experiment
+            ) // second time for test count of callbacks
+            println("Count of calls TrackingCallback - $countTrackingCallback")
+            assertTrue(countTrackingCallback == 1)
+        }
+    }
 }
