@@ -260,20 +260,23 @@ GrowthBookSDK growthBookSDK = new GBSDKBuilderJAVA(<API_KEY>, // apiKey
   ```kotlin
   fun feature(id: String) : GBFeatureResult
   ```
+- If you changed, added or removed any features, you can call the refreshCache method to clear the cache and download the latest feature definitions.
+
+  ```kotlin
+  fun refreshCache()
+  ```
+
+- use setRefreshHandler to set a callback that will be called whenever the cache is refreshed.
+
+  ```kotlin
+  fun setRefreshHandler(handler: () -> Unit)
+  ```
 
 - The run method takes an Experiment object and returns an ExperimentResult
 
 ```kotlin
 fun run(experiment: GBExperiment) : GBExperimentResult 
 ```
-
-
-
-- Manually Refresh Cache
-
-  ```kotlin
-  fun refreshCache()
-  ```
 
 - Get Context
 
