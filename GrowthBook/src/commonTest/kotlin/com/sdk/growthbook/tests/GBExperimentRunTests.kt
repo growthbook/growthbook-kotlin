@@ -107,6 +107,7 @@ class GBExperimentRunTests {
                 gbContext,
                 experiment
             ) // second time for test count of callbacks
+
             println("Count of calls TrackingCallback - $countTrackingCallback")
             assertTrue(countTrackingCallback == 1)
         }

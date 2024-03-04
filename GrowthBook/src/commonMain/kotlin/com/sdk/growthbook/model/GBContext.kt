@@ -45,5 +45,5 @@ class GBContext(
     // Feature definitions - To be pulled from API / Cache
     internal var features: GBFeatures = HashMap()
 
-    internal val experimentHelper: GBExperimentHelper= GBExperimentHelper()
+    internal val experimentHelper: GBExperimentHelper = GBExperimentHelper()
 }
