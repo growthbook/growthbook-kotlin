@@ -168,7 +168,9 @@ internal class GBExperimentEvaluator {
             variationId = targetVariationIndex,
             value = targetValue,
             hashAttribute = hashAttribute,
-            hashValue = hashValue as? String
+            hashValue = hashValue as? String,
+            key = experiment.meta?.get(targetVariationIndex)?.key,
+            name = experiment.meta?.get(targetVariationIndex)?.name,
         )
     }
 }
