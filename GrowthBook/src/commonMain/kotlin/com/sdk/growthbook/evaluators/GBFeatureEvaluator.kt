@@ -93,7 +93,9 @@ internal class GBFeatureEvaluator {
                             coverage = rule.coverage,
                             weights = rule.weights,
                             hashAttribute = rule.hashAttribute,
-                            namespace = rule.namespace
+                            namespace = rule.namespace,
+                            meta = rule.meta,
+                            name = rule.name,
                         )
 
                         // Run the experiment.
