@@ -124,7 +124,10 @@ internal class GBExperimentEvaluator {
             inExperiment = true,
             gbContext = context
         )
-        context.trackingCallback(experiment, result)
+
+        if (!context.experimentHelper.isTracked(experiment, result)) {
+            context.trackingCallback(experiment, result)
+        }
 
         // Return (in experiment, assigned variation)
 
@@ -165,7 +168,9 @@ internal class GBExperimentEvaluator {
             variationId = targetVariationIndex,
             value = targetValue,
             hashAttribute = hashAttribute,
-            hashValue = hashValue as? String
+            hashValue = hashValue as? String,
+            key = experiment.meta?.get(targetVariationIndex)?.key,
+            name = experiment.meta?.get(targetVariationIndex)?.name,
         )
     }
 }
