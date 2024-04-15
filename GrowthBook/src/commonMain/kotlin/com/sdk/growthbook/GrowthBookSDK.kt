@@ -5,10 +5,12 @@ import com.sdk.growthbook.Utils.Crypto
 import com.sdk.growthbook.Utils.GBCacheRefreshHandler
 import com.sdk.growthbook.Utils.GBError
 import com.sdk.growthbook.Utils.GBFeatures
+import com.sdk.growthbook.Utils.GBUtils.Companion.refreshStickyBuckets
 import com.sdk.growthbook.Utils.Resource
 import com.sdk.growthbook.Utils.getFeaturesFromEncryptedFeatures
 import com.sdk.growthbook.evaluators.GBExperimentEvaluator
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
+import com.sdk.growthbook.features.FeaturesDataModel
 import com.sdk.growthbook.features.FeaturesDataSource
 import com.sdk.growthbook.features.FeaturesFlowDelegate
 import com.sdk.growthbook.features.FeaturesViewModel
@@ -35,7 +37,7 @@ abstract class SDKBuilder(
     val attributes: Map<String, Any>,
     val trackingCallback: GBTrackingCallback,
     val encryptionKey: String?,
-    val networkDispatcher: NetworkDispatcher,
+    val networkDispatcher: NetworkDispatcher
 ) {
     internal var qaMode: Boolean = false
     internal var forcedVariations: Map<String, Int> = HashMap()
@@ -82,8 +84,13 @@ abstract class SDKBuilder(
  * EncryptionKey - Encryption key if you intend to use data encryption.
  */
 class GBSDKBuilderJAVA(
-    apiKey: String, hostURL: String, attributes: Map<String, Any>, val features: GBFeatures,
-    trackingCallback: GBTrackingCallback, encryptionKey: String?, networkDispatcher: NetworkDispatcher
+    apiKey: String,
+    hostURL: String,
+    attributes: Map<String, Any>,
+    val features: GBFeatures,
+    trackingCallback: GBTrackingCallback,
+    encryptionKey: String?,
+    networkDispatcher: NetworkDispatcher
 ) : SDKBuilder(
     apiKey, hostURL,
     attributes, trackingCallback, encryptionKey, networkDispatcher
@@ -169,6 +176,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     private var refreshHandler: GBCacheRefreshHandler? = null
     private lateinit var networkDispatcher: NetworkDispatcher
     private lateinit var featuresViewModel: FeaturesViewModel
+    private lateinit var attributeOverrides: Map<String, Any>
 
     //@ThreadLocal
     internal companion object {
@@ -180,7 +188,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         context: GBContext,
         refreshHandler: GBCacheRefreshHandler?,
         networkDispatcher: NetworkDispatcher,
-        features: GBFeatures?,
+        features: GBFeatures? = null,
     ) : this() {
         gbContext = context
         this.refreshHandler = refreshHandler
@@ -192,7 +200,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         this.featuresViewModel =
             FeaturesViewModel(
                 delegate = this,
-                dataSource = FeaturesDataSource(networkDispatcher),
+                dataSource = FeaturesDataSource(dispatcher = networkDispatcher),
                 encryptionKey = null
             )
         if (features != null) {
@@ -201,6 +209,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
             featuresViewModel.encryptionKey = gbContext.encryptionKey
             refreshCache()
         }
+        this.attributeOverrides = gbContext.attributes
     }
 
     /**
@@ -250,7 +259,11 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         subtleCrypto: Crypto?
     ) {
         gbContext.features =
-            getFeaturesFromEncryptedFeatures(encryptedString, encryptionKey, subtleCrypto)!!
+            getFeaturesFromEncryptedFeatures(
+                encryptedString = encryptedString,
+                encryptionKey = encryptionKey,
+                subtleCrypto = subtleCrypto
+            ) ?: return
     }
 
     override fun featuresFetchFailed(error: GBError, isRemote: Boolean) {
@@ -264,15 +277,29 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
      * The feature method takes a single string argument, which is the unique identifier for the feature and returns a FeatureResult object.
      */
     fun feature(id: String): GBFeatureResult {
+        return GBFeatureEvaluator().evaluateFeature(
+            context = gbContext,
+            featureKey = id,
+            attributeOverrides = attributeOverrides
+        )
+    }
 
-        return GBFeatureEvaluator().evaluateFeature(gbContext, id)
+    /**
+     * The isOn method takes a single string argument, which is the unique identifier for the feature and returns the feature state on/off
+     */
+    fun isOn(featureDd: String): Boolean {
+        return feature(id = featureDd).on
     }
 
     /**
      * The run method takes an Experiment object and returns an ExperimentResult
      */
     fun run(experiment: GBExperiment): GBExperimentResult {
-        return GBExperimentEvaluator().evaluateExperiment(gbContext, experiment)
+        return GBExperimentEvaluator().evaluateExperiment(
+            context = gbContext,
+            experiment = experiment,
+            attributeOverrides = attributeOverrides
+        )
     }
 
     /**
@@ -280,5 +307,26 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
      */
     fun setAttributes(attributes: Map<String, Any>) {
         gbContext.attributes = attributes
+        refreshStickyBucketService()
+    }
+
+    fun setAttributeOverrides(overrides: Map<String, Any>) {
+        attributeOverrides = overrides
+        refreshStickyBucketService()
+    }
+
+    override fun featuresAPIModelSuccessfully(model: FeaturesDataModel) {
+        refreshStickyBucketService(dataModel = model)
+    }
+
+    private fun refreshStickyBucketService(dataModel: FeaturesDataModel? = null) {
+        if (gbContext.stickyBucketService != null) {
+            val featureEvaluator = GBFeatureEvaluator().evaluateFeature(
+                context = gbContext,
+                featureKey = "",
+                attributeOverrides = attributeOverrides
+            )
+            refreshStickyBuckets(context = gbContext, data = dataModel, attributeOverrides = attributeOverrides)
+        }
     }
 }

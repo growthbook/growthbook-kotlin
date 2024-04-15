@@ -255,8 +255,8 @@ internal class GBConditionEvaluator {
     fun evalConditionValue(conditionValue: JsonElement, attributeValue: JsonElement?): Boolean {
 
         // If conditionValue is a string, number, boolean, return true if it's "equal" to attributeValue and false if not.
-        if (conditionValue is JsonPrimitive && attributeValue is JsonPrimitive) {
-            return conditionValue.content == attributeValue.content
+        if (conditionValue is JsonPrimitive && (attributeValue is JsonPrimitive || attributeValue == null)) {
+            return conditionValue.toString() == attributeValue.toString()
         }
 
         if (conditionValue is JsonPrimitive && attributeValue == null) {
@@ -391,7 +391,7 @@ internal class GBConditionEvaluator {
                                 }
                             }
                             if (!result) {
-                                return result
+                                return false
                             }
                         }
                         return true
