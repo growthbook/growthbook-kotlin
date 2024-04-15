@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 
 class GBExperimentRunTests {
 
-    lateinit var evalConditions: JsonArray
+    private lateinit var evalConditions: JsonArray
 
     @BeforeTest
     fun setUp() {
@@ -48,11 +48,18 @@ class GBExperimentRunTests {
                     qaMode = testContext.qaMode,
                     trackingCallback = { _, _ ->
 
-                    }, encryptionKey = ""
+                    },
+                    encryptionKey = ""
                 )
 
+                gbContext.features = testContext.features
+
                 val evaluator = GBExperimentEvaluator()
-                val result = evaluator.evaluateExperiment(gbContext, experiment)
+                val result = evaluator.evaluateExperiment(
+                    context = gbContext,
+                    experiment = experiment,
+                    attributeOverrides = attributes
+                )
 
                 val status =
                     item[0].toString() + "\nExpected Result - " + item[3] + " & " + item[4] + "\nActual result - " + result.value.toString() + " & " + result.inExperiment + "\n\n"
@@ -102,10 +109,11 @@ class GBExperimentRunTests {
                 }, encryptionKey = ""
             )
             val evaluator = GBExperimentEvaluator()
-            evaluator.evaluateExperiment(gbContext, experiment)
+            evaluator.evaluateExperiment(context = gbContext, experiment = experiment, attributeOverrides = attributes)
             evaluator.evaluateExperiment(
-                gbContext,
-                experiment
+                context = gbContext,
+                experiment = experiment,
+                attributeOverrides = attributes
             ) // second time for test count of callbacks
 
             println("Count of calls TrackingCallback - $countTrackingCallback")

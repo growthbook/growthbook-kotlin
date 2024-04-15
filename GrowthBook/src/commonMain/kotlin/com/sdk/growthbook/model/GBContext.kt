@@ -1,7 +1,10 @@
 package com.sdk.growthbook.model
 
 import com.sdk.growthbook.Utils.GBFeatures
+import com.sdk.growthbook.Utils.GBStickyAssignmentsDocument
+import com.sdk.growthbook.Utils.GBStickyAttributeKey
 import com.sdk.growthbook.evaluators.GBExperimentHelper
+import com.sdk.growthbook.stickybucket.GBStickyBucketService
 
 /**
  * Defines the GrowthBook context.
@@ -30,7 +33,19 @@ class GBContext(
     /**
      * Force specific experiments to always assign a specific variation (used for QA)
      */
-    val forcedVariations: Map<String, Int>,
+    var forcedVariations: Map<String, Any>,
+    /**
+     *
+     */
+    var stickyBucketAssignmentDocs: Map<GBStickyAttributeKey, GBStickyAssignmentsDocument>? = null,
+    /**
+     *
+     */
+    var stickyBucketIdentifierAttributes: List<String>? = null,
+    /**
+     *
+     */
+    val stickyBucketService: GBStickyBucketService? = null,
     /**
      * If true, random assignment is disabled and only explicitly forced variations are used.
      */
@@ -47,3 +62,8 @@ class GBContext(
 
     internal val experimentHelper: GBExperimentHelper = GBExperimentHelper()
 }
+
+data class FeatureEvalContext(
+    val id: String?,
+    val evaluatedFeatures: MutableSet<String>
+)

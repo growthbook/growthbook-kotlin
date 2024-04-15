@@ -4,6 +4,9 @@ import com.sdk.growthbook.Utils.GBBucketRange
 import com.sdk.growthbook.Utils.GBCondition
 import com.sdk.growthbook.Utils.GBFilter
 import com.sdk.growthbook.Utils.GBVariationMeta
+import com.sdk.growthbook.Utils.ParentConditionInterface
+import com.sdk.growthbook.Utils.RangeSerializer
+import com.sdk.growthbook.Utils.TrackData
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -33,6 +36,12 @@ class GBFeatureRule(
      */
     val condition: GBCondition? = null,
     /**
+     * Each item defines a prerequisite where a `condition` must evaluate against
+     * a parent feature's value (identified by `id`). If `gate` is true, then this is a blocking
+     * feature-level prerequisite; otherwise it applies to the current rule only.
+     */
+    val parentConditions: ArrayList<ParentConditionInterface>? = null,
+    /**
      * What percent of users should be included in the experiment (between 0 and 1, inclusive)
      */
     val coverage: Float? = null,
@@ -43,7 +52,7 @@ class GBFeatureRule(
     /**
      * Run an experiment (A/B test) and randomly choose between these variations
      */
-    val variations: ArrayList<JsonElement>? = null,
+    val variations: List<JsonElement>? = null,
     /**
      * The globally unique tracking key for the experiment (default to the feature key)
      */
@@ -69,11 +78,13 @@ class GBFeatureRule(
     /**
      * A more precise version of coverage
      */
+    @Serializable(with = RangeSerializer.GBBucketRangeSerializer::class)
     val range: GBBucketRange? = null,
     /**
      * Ranges for experiment variations
      */
-    val ranges: ArrayList<GBBucketRange>? = null,
+    @Serializable(with = RangeSerializer.GBBucketRangeListSerializer::class)
+    val ranges: List<GBBucketRange>? = null,
     /**
      * Meta info about the experiment variations
      */
@@ -93,12 +104,34 @@ class GBFeatureRule(
     /**
      * The phase id of the experiment
      */
-    val phase: String? = null
+    val phase: String? = null,
+    /**
+     * When using sticky bucketing, can be used as a fallback to assign variations
+     */
+    val fallbackAttribute: String? = null,
+    /**
+     * If true, sticky bucketing will be disabled for this experiment.
+     * (Note: sticky bucketing is only available
+     * if a StickyBucketingService is provided in the Context)
+     */
+    val disableStickyBucketing: Boolean? = null,
+    /**
+     * An sticky bucket version number that can be used to force a re-bucketing of users (default to 0)
+     */
+    val bucketVersion: Int? = null,
+    /**
+     * Any users with a sticky bucket version less than this will be excluded from the experiment
+     */
+    val minBucketVersion: Int? = null,
+
+    /// Array of tracking calls to fire
+    val tracks: ArrayList<TrackData>? = null
 )
 
 /**
  * Enum For defining feature value source
  */
+@Suppress("EnumEntryName")
 enum class GBFeatureSource {
     /**
      * Queried Feature doesn't exist in GrowthBook
@@ -118,7 +151,17 @@ enum class GBFeatureSource {
     /**
      * Experiment Value for the Feature is being processed
      */
-    experiment
+    experiment,
+
+    /**
+     * CyclicPrerequisite Value for the Feature is being processed
+     */
+    cyclicPrerequisite,
+
+    /**
+     * Prerequisite Value for the Feature is being processed
+     */
+    prerequisite
 }
 
 /**
@@ -128,7 +171,7 @@ class GBFeatureResult(
     /**
      * The assigned value of the feature
      */
-    val value: Any?,
+    val value: JsonElement?,
     /**
      * The assigned value cast to a boolean
      */

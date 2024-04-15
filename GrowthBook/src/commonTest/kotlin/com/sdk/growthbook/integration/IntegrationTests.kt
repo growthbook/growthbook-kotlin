@@ -40,7 +40,10 @@ class IntegrationTests {
 
         val sdkInstance = buildSDK(json, attrs)
 
-        assertEquals(true, sdkInstance.feature("user576-feature").value)
+        assertEquals(
+            expected = "true",
+            actual = sdkInstance.feature("user576-feature").value.toString(),
+        )
     }
 
     @Test
