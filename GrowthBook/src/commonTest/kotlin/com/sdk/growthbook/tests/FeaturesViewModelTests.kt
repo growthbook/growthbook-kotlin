@@ -3,6 +3,7 @@ package com.sdk.growthbook.tests
 import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.Utils.GBError
 import com.sdk.growthbook.Utils.GBFeatures
+import com.sdk.growthbook.features.FeaturesDataModel
 import com.sdk.growthbook.features.FeaturesDataSource
 import com.sdk.growthbook.features.FeaturesFlowDelegate
 import com.sdk.growthbook.features.FeaturesViewModel
@@ -13,8 +14,8 @@ import kotlin.test.assertTrue
 
 class FeaturesViewModelTests : FeaturesFlowDelegate {
 
-    var isSuccess: Boolean = false
-    var isError: Boolean = false
+    private var isSuccess: Boolean = false
+    private var isError: Boolean = false
 
     @BeforeTest
     fun setUp() {
@@ -101,5 +102,10 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     override fun featuresFetchFailed(error: GBError, isRemote: Boolean) {
         isSuccess = false
         isError = true
+    }
+
+    override fun featuresAPIModelSuccessfully(model: FeaturesDataModel) {
+        isSuccess = true
+        isError = false
     }
 }

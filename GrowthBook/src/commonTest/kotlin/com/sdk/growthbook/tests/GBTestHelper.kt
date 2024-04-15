@@ -68,6 +68,7 @@ class GBTestHelper {
 @Serializable
 class GBContextTest(
     val attributes: JsonElement = JsonObject(HashMap()),
+    val features: GBFeatures = emptyMap(),
     val qaMode: Boolean = false,
     val enabled: Boolean = true,
     val forcedVariations: HashMap<String, Int>? = null
@@ -76,7 +77,7 @@ class GBContextTest(
 @Serializable
 class GBFeaturesTest(
     val features: GBFeatures? = null,
-    val attributes: JsonElement = JsonObject(HashMap())
+    val attributes: JsonElement = JsonObject(HashMap()),
 )
 
 @Serializable
@@ -101,5 +102,4 @@ class GBExperimentResultTest(
     val hashAttribute: String? = null,
     ///  The value of that attribute
     val hashValue: String? = null
-
 )

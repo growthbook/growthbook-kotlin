@@ -1,5 +1,6 @@
 package com.sdk.growthbook.integration
 
+import kotlinx.serialization.json.jsonPrimitive
 import org.intellij.lang.annotations.Language
 import org.junit.Test
 import kotlin.test.assertEquals
@@ -34,12 +35,12 @@ internal class VerifySDKReturnFeatureValues {
 
         val sdkInstance = buildSDK(json)
 
-        assertEquals(true, sdkInstance.feature("bool_feature_true").value)
-        assertEquals(false, sdkInstance.feature("bool_feature_false").value)
-        assertEquals("Default value", sdkInstance.feature("string_feature").value)
+        assertEquals(true.toString(), sdkInstance.feature("bool_feature_true").value.toString())
+        assertEquals(false.toString(), sdkInstance.feature("bool_feature_false").value.toString())
+        assertEquals("Default value", sdkInstance.feature("string_feature").value?.jsonPrimitive?.content)
 
-        assertEquals(888, sdkInstance.feature("number_feature").value)
-        assertEquals(-1, sdkInstance.feature("number_feature_negative").value)
+        assertEquals(888, sdkInstance.feature("number_feature").value?.jsonPrimitive?.content?.toInt())
+        assertEquals(-1, sdkInstance.feature("number_feature_negative").value?.jsonPrimitive?.content?.toInt())
     }
 
     @Test
@@ -75,8 +76,8 @@ internal class VerifySDKReturnFeatureValues {
         )
 
         val sdkInstance = buildSDK(json, attributes)
-
-        assertEquals("Default value for brand:KZ", sdkInstance.feature("string_feature").value)
+        val value = sdkInstance.feature("string_feature").value
+        assertEquals("Default value for brand:KZ", value?.jsonPrimitive?.content)
     }
 
     @Test

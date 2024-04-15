@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.Flow
  */
 internal interface FeaturesFlowDelegate {
     fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean)
+    fun featuresAPIModelSuccessfully(model: FeaturesDataModel)
     fun featuresFetchFailed(error: GBError, isRemote: Boolean)
 }
 
@@ -37,13 +38,14 @@ internal class FeaturesViewModel(
     /**
      * Fetch Features
      */
+
     @DelicateCoroutinesApi
     fun fetchFeatures() {
 
         try {
             // Check for cache data
             val dataModel = manager.getLayer().getData(
-                Constants.featureCache,
+                Constants.FEATURE_CACHE,
                 FeaturesDataModel.serializer()
             )
 
@@ -81,24 +83,61 @@ internal class FeaturesViewModel(
     /**
      * Cache API Response and push success event
      */
-    private fun prepareFeaturesData(dataModel: FeaturesDataModel) {
-        manager.getLayer().putData(
-            fileName = Constants.featureCache,
-            content = dataModel,
-            serializer = FeaturesDataModel.serializer()
-        )
+    private fun prepareFeaturesData(dataModel: FeaturesDataModel?) {
+        dataModel?.let {
+            manager.getLayer().putData(
+                fileName = Constants.FEATURE_CACHE,
+                content = dataModel,
+                serializer = FeaturesDataModel.serializer()
+            )
+        }
+
         // Call Success Delegate with mention of data available with remote
-        var features = dataModel.features
-        val encryptedFeatures = dataModel.encryptedFeatures
-        val crypto = DefaultCrypto()
+        var features = dataModel?.features
+        val encryptedFeatures = dataModel?.encryptedFeatures
+
         try {
-            if (!features.isNullOrEmpty()) {
-                this.delegate.featuresFetchedSuccessfully(features = features, isRemote = true)
-            } else if (encryptionKey != null && encryptedFeatures != null) {
-                features =
-                    getFeaturesFromEncryptedFeatures(encryptedFeatures, encryptionKey!!, crypto)
-                features?.let {
-                    this.delegate.featuresFetchedSuccessfully(features = features, isRemote = true)
+            if (dataModel != null) {
+                delegate.featuresAPIModelSuccessfully(dataModel)
+                if (!features.isNullOrEmpty()) {
+
+                    manager.getLayer().putData(
+                        fileName = Constants.FEATURE_CACHE,
+                        content = dataModel,
+                        serializer = FeaturesDataModel.serializer()
+                    )
+
+                    this.delegate.featuresFetchedSuccessfully(
+                        features = features,
+                        isRemote = true
+                    )
+                } else {
+                    if (encryptedFeatures != null && encryptionKey != null) {
+                        if (encryptionKey!!.isNotEmpty()) {
+                            val crypto = DefaultCrypto()
+                            features =
+                                getFeaturesFromEncryptedFeatures(
+                                    encryptedString = encryptedFeatures,
+                                    encryptionKey = encryptionKey ?: "",
+                                    subtleCrypto = crypto
+                                ) ?: return
+
+                            manager.getLayer().putData(
+                                fileName = Constants.FEATURE_CACHE,
+                                content = dataModel,
+                                serializer = FeaturesDataModel.serializer()
+                            )
+                        } else {
+                            features?.let {
+                                this.delegate.featuresFetchedSuccessfully(
+                                    features = features,
+                                    isRemote = true
+                                )
+                            }
+                        }
+                    } else {
+                        this.delegate.featuresFetchFailed(error = GBError(Exception()), isRemote = true)
+                    }
                 }
             }
         } catch (error: Throwable) {

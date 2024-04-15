@@ -1,10 +1,13 @@
 package com.sdk.growthbook.Utils
 
 import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.sdk.growthbook.features.FeaturesDataModel
+import com.sdk.growthbook.model.GBContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.floatOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -92,26 +95,28 @@ internal class GBUtils {
          */
         fun inNamespace(userId: String, namespace: GBNameSpace): Boolean {
 
-            val hash = hash(userId, 1, "__" + namespace.first)
+            val hash = hash(
+                stringValue = userId + "__",
+                hashVersion = 1,
+                seed = namespace.first
+            ) ?: return false
 
-            if (hash != null) {
-                return hash >= namespace.second && hash < namespace.third
-            }
-
-            return false
+            return inRange(
+                n = hash,
+                range = GBBucketRange(
+                    first = namespace.second,
+                    second = namespace.third
+                )
+            )
         }
 
         /**
          * Returns an array of floats with numVariations items that are all equal and sum to 1. For example, getEqualWeights(2) would return [0.5, 0.5].
          */
         fun getEqualWeights(numVariations: Int): List<Float> {
-            var weights: List<Float> = ArrayList()
-
-            if (numVariations >= 1) {
-                weights = List(numVariations) { 1.0f / (numVariations) }
-            }
-
-            return weights
+            if (numVariations <= 0) return emptyList()
+            val weight = 1.0f / numVariations.toFloat()
+            return List(numVariations) { weight }
         }
 
         /**
@@ -120,7 +125,7 @@ internal class GBUtils {
         fun getBucketRanges(
             numVariations: Int,
             coverage: Float,
-            weights: List<Float>
+            weights: List<Float>?
         ): List<GBBucketRange> {
             val bucketRange: List<GBBucketRange>
 
@@ -131,13 +136,14 @@ internal class GBUtils {
             if (coverage > 1) targetCoverage = 1F
 
             // Default to equal weights if the weights don't match the number of variations.
-            var targetWeights = weights
-            if (weights.size != numVariations) {
-                targetWeights = getEqualWeights(numVariations)
+            val equal = getEqualWeights(numVariations)
+            var targetWeights = weights ?: equal
+            if (targetWeights.size != numVariations) {
+                targetWeights = equal
             }
 
             // Default to equal weights if the sum is not equal 1 (or close enough when rounding errors are factored in):
-            val weightsSum = targetWeights.sum()
+            val weightsSum = targetWeights.reduce { acc, fl -> acc + fl }
             if (weightsSum < 0.99 || weightsSum > 1.01) {
                 targetWeights = getEqualWeights(numVariations)
             }
@@ -164,10 +170,9 @@ internal class GBUtils {
          * Choose Variation from List of ranges which matches particular number
          */
         fun chooseVariation(n: Float, ranges: List<GBBucketRange>): Int {
-
-            for ((counter, range) in ranges.withIndex()) {
-                if (n >= range.first && n < range.second) {
-                    return counter
+            for ((index, range) in ranges.withIndex()) {
+                if (inRange(n = n, range = range)) {
+                    return index
                 }
             }
 
@@ -180,11 +185,11 @@ internal class GBUtils {
         fun getGBNameSpace(namespace: JsonArray): GBNameSpace? {
 
             if (namespace.size >= 3) {
-                val title = namespace[0].jsonPrimitive.content
+                val title = namespace[0].jsonPrimitive.contentOrNull
                 val start = namespace[1].jsonPrimitive.floatOrNull
                 val end = namespace[2].jsonPrimitive.floatOrNull
 
-                if (start != null && end != null) {
+                if (title != null && start != null && end != null) {
                     return GBNameSpace(title, start, end)
                 }
             }
@@ -215,7 +220,7 @@ internal class GBUtils {
         /**
          * Determines if a number n is within the provided range.
          */
-        fun inRange(
+        private fun inRange(
             n: Float?,
             range: GBBucketRange?
         ): Boolean {
@@ -228,15 +233,17 @@ internal class GBUtils {
          */
         fun isFilteredOut(
             filters: List<GBFilter>?,
-            attributes: JsonElement?
+            attributeOverrides: Map<String, Any>?,
+            context: GBContext,
+
         ): Boolean {
             if (filters == null) return false
-            if (attributes == null) return false
+            if (attributeOverrides == null) return false
 
             return filters.any { filter: GBFilter ->
                 val hashAttribute: String = filter.attribute ?: "id"
 
-                val hashValueElement: JsonElement = attributes.jsonObject.getValue(hashAttribute)
+                val hashValueElement: JsonElement = context.attributes.toJsonElement().jsonObject.getValue(hashAttribute)
 
                 if (hashValueElement is JsonNull) return@any true
                 if (hashValueElement !is JsonPrimitive) return@any true
@@ -266,37 +273,187 @@ internal class GBUtils {
          * Determines if the user is part of a gradual feature rollout.
          */
         fun isIncludedInRollout(
-            attributes: JsonElement?,
+            attributeOverrides: Map<String, Any>,
             seed: String?,
             hashAttribute: String?,
+            fallbackAttribute: String?,
             range: GBBucketRange?,
             coverage: Float?,
-            hashVersion: Int?
+            hashVersion: Int?,
+            context: GBContext
         ): Boolean {
-            var latestHashAttribute = hashAttribute
-            var latestHashVersion = hashVersion
-
             if (range == null && coverage == null) return true
 
-            if (hashAttribute == null || hashAttribute == "") {
-                latestHashAttribute = "id"
+            val (_, hashValue) = getHashAttribute(
+                attr = hashAttribute,
+                fallback = fallbackAttribute,
+                attributeOverrides = attributeOverrides,
+                context = context
+            )
+
+            val hash = hash(
+                seed = seed,
+                stringValue = hashValue,
+                hashVersion = hashVersion ?: 1
+            )
+                ?: return false
+
+            return if (range != null) {
+                inRange(n = hash, range = range)
+            } else if (coverage != null) {
+                hash <= coverage
+            } else {
+                true
+            }
+        }
+
+        fun refreshStickyBuckets(
+            context: GBContext,
+            data: FeaturesDataModel?,
+            attributeOverrides: Map<String, Any>
+        ) {
+            val stickyBucketService = context.stickyBucketService ?: return
+
+            val attributes = getStickyBucketAttributes(context, data, attributeOverrides)
+            context.stickyBucketAssignmentDocs = stickyBucketService.getAllAssignments(attributes)
+        }
+
+        private fun getStickyBucketAttributes(
+            context: GBContext,
+            data: FeaturesDataModel?,
+            attributeOverrides: Map<String, Any>
+        ): Map<String, String> {
+            val attributes = mutableMapOf<String, String>()
+            context.stickyBucketIdentifierAttributes = context.stickyBucketIdentifierAttributes
+                ?.takeIf { true }
+                ?: deriveStickyBucketIdentifierAttributes(context, data)
+
+            context.stickyBucketIdentifierAttributes?.forEach { attr ->
+                val hashValue = getHashAttribute(context, attr,  attributeOverrides = attributeOverrides)
+                attributes[attr] = hashValue.second
+            }
+            return attributes
+        }
+
+        private fun deriveStickyBucketIdentifierAttributes(
+            context: GBContext,
+            data: FeaturesDataModel?
+        ): List<String> {
+            val attributes = mutableSetOf<String>()
+            val features = data?.features ?: context.features
+
+            features.keys.forEach { id ->
+                val feature = features[id]
+                feature?.rules?.forEach { rule ->
+                    rule.variations?.let { _ ->
+                        attributes.add(rule.hashAttribute ?: "id")
+                        rule.fallbackAttribute?.let { fallbackAttribute ->
+                            attributes.add(fallbackAttribute)
+                        }
+                    }
+                }
+            }
+            return attributes.toList()
+        }
+
+        private fun getStickyBucketAssignments(
+            context: GBContext
+        ): Map<String, String> {
+            val mergedAssignments = mutableMapOf<String, String>()
+
+            context.stickyBucketAssignmentDocs?.values?.forEach { doc ->
+                mergedAssignments.putAll(doc.assignments)
+            }
+            return mergedAssignments
+        }
+
+        fun getStickyBucketVariation(
+            context: GBContext,
+            experimentKey: String,
+            experimentBucketVersion: Int = 0,
+            minExperimentBucketVersion: Int = 0,
+            meta: List<GBVariationMeta> = emptyList()
+        ): Pair<Int, Boolean?> {
+            val id = getStickyBucketExperimentKey(experimentKey, experimentBucketVersion)
+            val assignments = getStickyBucketAssignments(context)
+
+            if (minExperimentBucketVersion > 0) {
+                for (version in 0..minExperimentBucketVersion) {
+                    val blockedKey = getStickyBucketExperimentKey(experimentKey, version)
+                    if (blockedKey in assignments) {
+                        return Pair(-1, true)
+                    }
+                }
+            }
+            val variationKey = assignments[id] ?: return Pair(-1, null)
+            val variation = meta.indexOfFirst { it.key == variationKey }
+            return if (variation != -1) {
+                Pair(variation, null)
+            } else {
+                Pair(-1, null)
+            }
+        }
+
+        fun getStickyBucketExperimentKey(
+            experimentKey: String,
+            experimentBucketVersion: Int = 0
+        ): String {
+            return "${experimentKey}__${experimentBucketVersion}"
+        }
+
+        fun generateStickyBucketAssignmentDoc(
+            context: GBContext,
+            attributeName: String,
+            attributeValue: String,
+            assignments: Map<String, String>
+        ): Triple<String, GBStickyAssignmentsDocument, Boolean> {
+            val key = "$attributeName||$attributeValue"
+            val existingAssignments =
+                context.stickyBucketAssignmentDocs?.get(key)?.assignments ?: emptyMap()
+            val newAssignments = existingAssignments.toMutableMap().apply { putAll(assignments) }
+
+            val changed = existingAssignments != newAssignments
+
+            return Triple(
+                key,
+                GBStickyAssignmentsDocument(
+                    attributeName = attributeName,
+                    attributeValue = attributeValue,
+                    assignments = newAssignments
+                ),
+                changed
+            )
+        }
+
+        fun getHashAttribute(
+            context: GBContext,
+            attr: String?,
+            fallback: String? = null,
+            attributeOverrides: Map<String, Any>
+        ): Pair<String, String> {
+            var hashAttribute = attr ?: "id"
+            var hashValue = ""
+
+            if (attributeOverrides[hashAttribute] != JsonNull) {
+                hashValue = attributeOverrides[hashAttribute].toString()
+            } else if (context.attributes[hashAttribute] != JsonNull) {
+                hashValue = context.attributes[hashAttribute].toString()
             }
 
-            if (attributes == null) return false
+            // if no match, try fallback
+            if (hashValue.isEmpty() && fallback != null) {
+                if (attributeOverrides[fallback] != JsonNull) {
+                    hashValue = attributeOverrides[fallback].toString()
+                } else if (context.attributes[fallback] != JsonNull) {
+                    hashValue = context.attributes[fallback].toString()
+                }
 
-            val hashValueElement: JsonElement = attributes.jsonObject.getValue(latestHashAttribute!!)
-            if (hashValueElement is JsonNull) return false
-
-            if (hashVersion == null) {
-                latestHashVersion = 1
+                if (hashValue.isNotEmpty()) {
+                    hashAttribute = fallback
+                }
             }
-            val hashValue: String = hashValueElement.toString()
-            val hash: Float = hash(hashValue, latestHashVersion, seed) ?: return false
 
-            return if (range != null) inRange(
-                hash,
-                range
-            ) else hash <= coverage!!
+            return Pair(hashAttribute, hashValue)
         }
     }
 }

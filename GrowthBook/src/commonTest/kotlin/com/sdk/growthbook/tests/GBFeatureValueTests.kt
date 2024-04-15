@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 
 class GBFeatureValueTests {
 
-    lateinit var evalConditions: JsonArray
+    private lateinit var evalConditions: JsonArray
 
     @BeforeTest
     fun setUp() {
@@ -46,7 +46,11 @@ class GBFeatureValueTests {
                 }
 
                 val evaluator = GBFeatureEvaluator()
-                val result = evaluator.evaluateFeature(gbContext, item[2].jsonPrimitive.content)
+                val result = evaluator.evaluateFeature(
+                    context = gbContext,
+                    featureKey = item[2].jsonPrimitive.content,
+                    attributeOverrides = attributes
+                )
 
                 val expectedResult =
                     GBTestHelper.jsonParser.decodeFromJsonElement(
@@ -70,7 +74,7 @@ class GBFeatureValueTests {
                     "\nExperiment - " + result.experiment?.key +
                     "\nExperiment Result - " + result.experimentResult?.variationId + "\n\n"
 
-                if (result.value.toString() == expectedResult.value.content &&
+                if (result.value.toString() == expectedResult.value.toString() &&
                     result.on.toString() == expectedResult.on.toString() &&
                     result.off.toString() == expectedResult.off.toString() &&
                     result.source.toString() == expectedResult.source &&
