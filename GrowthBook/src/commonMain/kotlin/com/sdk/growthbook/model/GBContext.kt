@@ -1,8 +1,8 @@
 package com.sdk.growthbook.model
 
-import com.sdk.growthbook.Utils.GBFeatures
-import com.sdk.growthbook.Utils.GBStickyAssignmentsDocument
-import com.sdk.growthbook.Utils.GBStickyAttributeKey
+import com.sdk.growthbook.utils.GBFeatures
+import com.sdk.growthbook.utils.GBStickyAssignmentsDocument
+import com.sdk.growthbook.utils.GBStickyAttributeKey
 import com.sdk.growthbook.evaluators.GBExperimentHelper
 import com.sdk.growthbook.stickybucket.GBStickyBucketService
 
@@ -53,7 +53,11 @@ class GBContext(
     /**
      * A function that takes experiment and result as arguments.
      */
-    val trackingCallback: (GBExperiment, GBExperimentResult) -> Unit
+    val trackingCallback: (GBExperiment, GBExperimentResult) -> Unit,
+    /**
+     *
+     */
+    val remoteEval: Boolean = false,
 ) {
 
     // Keys are unique identifiers for the features and the values are Feature objects.

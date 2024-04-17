@@ -1,4 +1,4 @@
-package com.sdk.growthbook.Utils
+package com.sdk.growthbook.utils
 
 internal sealed interface SseResponse {
     data class Data(val value: String) : SseResponse

@@ -1,6 +1,6 @@
 package com.sdk.growthbook.stickybucket
 
-import com.sdk.growthbook.Utils.GBStickyAssignmentsDocument
+import com.sdk.growthbook.utils.GBStickyAssignmentsDocument
 
 interface GBStickyBucketService {
     fun getAssignments(attributeName: String, attributeValue: String): GBStickyAssignmentsDocument?

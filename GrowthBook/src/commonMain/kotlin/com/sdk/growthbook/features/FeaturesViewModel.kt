@@ -1,11 +1,12 @@
 package com.sdk.growthbook.features
 
-import com.sdk.growthbook.Utils.Constants
-import com.sdk.growthbook.Utils.DefaultCrypto
-import com.sdk.growthbook.Utils.GBError
-import com.sdk.growthbook.Utils.GBFeatures
-import com.sdk.growthbook.Utils.Resource
-import com.sdk.growthbook.Utils.getFeaturesFromEncryptedFeatures
+import com.sdk.growthbook.utils.Constants
+import com.sdk.growthbook.utils.DefaultCrypto
+import com.sdk.growthbook.utils.GBError
+import com.sdk.growthbook.utils.GBFeatures
+import com.sdk.growthbook.utils.GBRemoteEvalParams
+import com.sdk.growthbook.utils.Resource
+import com.sdk.growthbook.utils.getFeaturesFromEncryptedFeatures
 import com.sdk.growthbook.sandbox.CachingImpl
 import com.sdk.growthbook.sandbox.getData
 import com.sdk.growthbook.sandbox.putData
@@ -38,10 +39,8 @@ internal class FeaturesViewModel(
     /**
      * Fetch Features
      */
-
     @DelicateCoroutinesApi
-    fun fetchFeatures() {
-
+    fun fetchFeatures(remoteEval: Boolean = false, payload: GBRemoteEvalParams? = null) {
         try {
             // Check for cache data
             val dataModel = manager.getLayer().getData(
@@ -62,12 +61,27 @@ internal class FeaturesViewModel(
             // Call Error Delegate with mention of data not available but its not remote
             this.delegate.featuresFetchFailed(GBError(error), false)
         }
-
-        dataSource.fetchFeatures(success = { dataModel -> prepareFeaturesData(dataModel = dataModel) },
-            failure = { error ->
-                // Call Error Delegate with mention of data not available but its not remote
-                this.delegate.featuresFetchFailed(GBError(error), true)
-            })
+        if (remoteEval) {
+            dataSource.fetchRemoteEval(
+                params = payload,
+                success = { responseFeaturesDataModel ->
+                    prepareFeaturesData(responseFeaturesDataModel.data)
+                },
+                failure = { error ->
+                    this.delegate.featuresFetchFailed(GBError(error.exception), true)
+                }
+            )
+        } else {
+            dataSource.fetchFeatures(
+                success = { dataModel ->
+                    prepareFeaturesData(dataModel)
+                },
+                failure = { error ->
+                    // Call Error Delegate with mention of data not available but its not remote
+                    this.delegate.featuresFetchFailed(GBError(error), true)
+                }
+            )
+        }
     }
 
     @DelicateCoroutinesApi
@@ -136,7 +150,10 @@ internal class FeaturesViewModel(
                             }
                         }
                     } else {
-                        this.delegate.featuresFetchFailed(error = GBError(Exception()), isRemote = true)
+                        this.delegate.featuresFetchFailed(
+                            error = GBError(Exception()),
+                            isRemote = true
+                        )
                     }
                 }
             }
