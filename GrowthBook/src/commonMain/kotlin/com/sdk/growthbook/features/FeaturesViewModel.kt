@@ -141,6 +141,11 @@ internal class FeaturesViewModel(
                                 content = dataModel,
                                 serializer = FeaturesDataModel.serializer()
                             )
+
+                            this.delegate.featuresFetchedSuccessfully(
+                                features = features,
+                                isRemote = true
+                            )
                         } else {
                             features?.let {
                                 this.delegate.featuresFetchedSuccessfully(
