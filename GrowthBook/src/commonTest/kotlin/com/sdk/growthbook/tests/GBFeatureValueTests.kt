@@ -60,7 +60,7 @@ class GBFeatureValueTests {
 
                 val status = item[0].toString() +
                     "\nExpected Result - " +
-                    "\nValue - " + expectedResult.value.toString() +
+                    "\nValue - " + expectedResult.value.content +
                     "\nOn - " + expectedResult.on.toString() +
                     "\nOff - " + expectedResult.off.toString() +
                     "\nSource - " + expectedResult.source +
@@ -74,7 +74,7 @@ class GBFeatureValueTests {
                     "\nExperiment - " + result.experiment?.key +
                     "\nExperiment Result - " + result.experimentResult?.variationId + "\n\n"
 
-                if (result.value.toString() == expectedResult.value.toString() &&
+                if (result.value.toString() == expectedResult.value.content &&
                     result.on.toString() == expectedResult.on.toString() &&
                     result.off.toString() == expectedResult.off.toString() &&
                     result.source.toString() == expectedResult.source &&

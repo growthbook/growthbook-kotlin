@@ -35,15 +35,15 @@ class GBContext(
      */
     var forcedVariations: Map<String, Any>,
     /**
-     *
+     * Map of Sticky Bucket documents
      */
     var stickyBucketAssignmentDocs: Map<GBStickyAttributeKey, GBStickyAssignmentsDocument>? = null,
     /**
-     *
+     * List of user's attributes keys
      */
     var stickyBucketIdentifierAttributes: List<String>? = null,
     /**
-     *
+     * Service that provide functionality of Sticky Bucketing
      */
     val stickyBucketService: GBStickyBucketService? = null,
     /**
@@ -55,7 +55,7 @@ class GBContext(
      */
     val trackingCallback: (GBExperiment, GBExperimentResult) -> Unit,
     /**
-     *
+     * Flag which defines whether to use Remote Evaluation
      */
     val remoteEval: Boolean = false,
 ) {
@@ -67,6 +67,9 @@ class GBContext(
     internal val experimentHelper: GBExperimentHelper = GBExperimentHelper()
 }
 
+/**
+ * Model consist already evaluated features
+ */
 data class FeatureEvalContext(
     val id: String?,
     val evaluatedFeatures: MutableSet<String>
