@@ -1,4 +1,4 @@
-package com.sdk.growthbook.Utils
+package com.sdk.growthbook.utils
 
 import com.sdk.growthbook.model.GBFeature
 import com.soywiz.krypto.AES
@@ -41,10 +41,10 @@ fun decodeBase64(base64: String): ByteArray {
 }
 
 fun encryptToFeaturesDataModel(string: String): GBFeatures? {
-    val JSONParser = Json { prettyPrint = true; isLenient = true; ignoreUnknownKeys = true }
+    val jsonParser = Json { prettyPrint = true; isLenient = true; ignoreUnknownKeys = true }
 
     return try {
-        val result: GBFeatures = JSONParser.decodeFromString(
+        val result: GBFeatures = jsonParser.decodeFromString(
             deserializer = MapSerializer(String.serializer(), GBFeature.serializer()),
             string = string
         )

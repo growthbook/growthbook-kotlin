@@ -1,6 +1,6 @@
 package com.sdk.growthbook.features
 
-import com.sdk.growthbook.Utils.GBFeatures
+import com.sdk.growthbook.utils.GBFeatures
 import kotlinx.serialization.Serializable
 
 /**

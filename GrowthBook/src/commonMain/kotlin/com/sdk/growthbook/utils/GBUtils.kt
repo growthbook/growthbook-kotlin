@@ -1,4 +1,4 @@
-package com.sdk.growthbook.Utils
+package com.sdk.growthbook.utils
 
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import com.sdk.growthbook.features.FeaturesDataModel

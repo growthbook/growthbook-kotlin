@@ -1,12 +1,12 @@
 package com.sdk.growthbook.model
 
-import com.sdk.growthbook.Utils.GBBucketRange
-import com.sdk.growthbook.Utils.GBCondition
-import com.sdk.growthbook.Utils.GBFilter
-import com.sdk.growthbook.Utils.GBVariationMeta
-import com.sdk.growthbook.Utils.ParentConditionInterface
-import com.sdk.growthbook.Utils.RangeSerializer
-import com.sdk.growthbook.Utils.TrackData
+import com.sdk.growthbook.utils.GBBucketRange
+import com.sdk.growthbook.utils.GBCondition
+import com.sdk.growthbook.utils.GBFilter
+import com.sdk.growthbook.utils.GBTrackData
+import com.sdk.growthbook.utils.GBVariationMeta
+import com.sdk.growthbook.utils.GBParentConditionInterface
+import com.sdk.growthbook.utils.RangeSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -40,7 +40,7 @@ class GBFeatureRule(
      * a parent feature's value (identified by `id`). If `gate` is true, then this is a blocking
      * feature-level prerequisite; otherwise it applies to the current rule only.
      */
-    val parentConditions: ArrayList<ParentConditionInterface>? = null,
+    val parentConditions: ArrayList<GBParentConditionInterface>? = null,
     /**
      * What percent of users should be included in the experiment (between 0 and 1, inclusive)
      */
@@ -123,9 +123,10 @@ class GBFeatureRule(
      * Any users with a sticky bucket version less than this will be excluded from the experiment
      */
     val minBucketVersion: Int? = null,
-
-    /// Array of tracking calls to fire
-    val tracks: ArrayList<TrackData>? = null
+    /**
+     * Array of tracking calls to fire
+     */
+    val tracks: ArrayList<GBTrackData>? = null
 )
 
 /**

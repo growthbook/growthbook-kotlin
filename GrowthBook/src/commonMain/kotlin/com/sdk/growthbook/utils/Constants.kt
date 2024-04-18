@@ -1,4 +1,4 @@
-package com.sdk.growthbook.Utils
+package com.sdk.growthbook.utils
 
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
@@ -102,6 +102,7 @@ class GBError(error: Throwable?) {
 /**
  * Object used for mutual exclusion and filtering users out of experiments based on random hashes. Has the following properties
  */
+@Suppress("unused")
 @Serializable
 class GBFilter(
     /**
@@ -120,7 +121,11 @@ class GBFilter(
     /**
      * The hash version to use (default to 2)
      */
-    var hashVersion: Int? = null
+    var hashVersion: Int? = null,
+    /**
+     *
+     */
+    var fallbackAttribute: String? = null
 )
 
 /**
@@ -145,7 +150,7 @@ data class GBVariationMeta(
 /**
  * Used for remote feature evaluation to trigger the TrackingCallback. An object with 2 properties
  */
-@Suppress("unused")
+@Serializable
 data class GBTrackData(
     /**
      * experiment - Experiment
@@ -154,7 +159,7 @@ data class GBTrackData(
     /**
      * result - ExperimentResult
      */
-    var experimentResult: GBExperimentResult
+    var result: GBExperimentResult
 )
 
 /**
@@ -167,17 +172,23 @@ data class GBStickyAssignmentsDocument(
     val assignments: GBStickyAssignments
 )
 
+/**
+ *
+ */
 @Serializable
-data class ParentConditionInterface(
+data class GBParentConditionInterface(
     val id: String,
     val condition: GBCondition,
     val gate: Boolean? = null
 )
 
-@Serializable
-data class TrackData(
-    val experiment: GBExperiment,
-    val result: GBExperimentResult
+/**
+ *
+ */
+data class GBRemoteEvalParams(
+    val attributes: Map<String, Any>,
+    val forcedFeatures: List<List<Any>>,
+    val forcedVariations: Map<String, Any>
 )
 
 object RangeSerializer {
