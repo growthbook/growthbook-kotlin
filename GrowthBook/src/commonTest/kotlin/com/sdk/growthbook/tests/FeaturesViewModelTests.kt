@@ -1,8 +1,8 @@
 package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.GrowthBookSDK
-import com.sdk.growthbook.Utils.GBError
-import com.sdk.growthbook.Utils.GBFeatures
+import com.sdk.growthbook.utils.GBError
+import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.features.FeaturesDataModel
 import com.sdk.growthbook.features.FeaturesDataSource
 import com.sdk.growthbook.features.FeaturesFlowDelegate
@@ -24,7 +24,9 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             enabled = true, attributes = HashMap(), forcedVariations = HashMap(),
             qaMode = false, trackingCallback = { _, _ ->
 
-            }, encryptionKey = null
+            },
+            encryptionKey = null,
+            remoteEval = false,
         )
     }
 
@@ -86,7 +88,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         isError = true
         val viewModel = FeaturesViewModel(
             this,
-            FeaturesDataSource(MockNetworkClient(MockResponse.errorResponse, null)), ""
+            FeaturesDataSource(MockNetworkClient(MockResponse.ERROR_RESPONSE, null)), ""
         )
         viewModel.fetchFeatures()
 

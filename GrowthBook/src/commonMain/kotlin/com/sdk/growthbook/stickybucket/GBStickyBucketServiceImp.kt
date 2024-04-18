@@ -1,6 +1,6 @@
 package com.sdk.growthbook.stickybucket
 
-import com.sdk.growthbook.Utils.GBStickyAssignmentsDocument
+import com.sdk.growthbook.utils.GBStickyAssignmentsDocument
 import com.sdk.growthbook.sandbox.CachingLayer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json

@@ -1,8 +1,8 @@
 package com.sdk.growthbook.evaluators
 
-import com.sdk.growthbook.Utils.GBUtils
-import com.sdk.growthbook.Utils.TrackData
-import com.sdk.growthbook.Utils.toJsonElement
+import com.sdk.growthbook.utils.GBTrackData
+import com.sdk.growthbook.utils.GBUtils
+import com.sdk.growthbook.utils.toJsonElement
 import com.sdk.growthbook.model.FeatureEvalContext
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBExperiment
@@ -134,7 +134,7 @@ internal class GBFeatureEvaluator {
                         }
 
                         if (rule.tracks != null) {
-                            rule.tracks.forEach { track: TrackData ->
+                            rule.tracks.forEach { track: GBTrackData ->
                                 if (!GBExperimentHelper().isTracked(
                                         experiment = track.experiment,
                                         result = track.result

@@ -1,16 +1,21 @@
-package com.sdk.growthbook.Network
+package com.sdk.growthbook.network
 
 import com.sdk.growthbook.ApplicationDispatcher
-import com.sdk.growthbook.Utils.Resource
-import com.sdk.growthbook.Utils.readSse
+import com.sdk.growthbook.utils.Resource
+import com.sdk.growthbook.utils.readSse
+import com.sdk.growthbook.utils.toJsonElement
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
 import io.ktor.client.request.headers
+import io.ktor.client.request.post
 import io.ktor.client.request.prepareGet
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpStatement
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.ByteReadChannel
 import kotlinx.coroutines.DelicateCoroutinesApi
@@ -36,6 +41,13 @@ interface NetworkDispatcher {
     fun consumeSSEConnection(
         url: String
     ): Flow<Resource<String>>
+
+    fun consumePOSTRequest(
+        url: String,
+        bodyParams: Map<String, Any>,
+        onSuccess: (String) -> Unit,
+        onError: (Throwable) -> Unit
+    )
 }
 
 /**
@@ -106,6 +118,32 @@ class DefaultGBNetworkClient : NetworkDispatcher {
             }
         }
         awaitClose()
+    }
+
+    @OptIn(DelicateCoroutinesApi::class)
+    override fun consumePOSTRequest(
+        url: String,
+        bodyParams: Map<String, Any>,
+        onSuccess: (String) -> Unit,
+        onError: (Throwable) -> Unit
+    ) {
+        GlobalScope.launch(ApplicationDispatcher) {
+            try {
+                val response = client.post(url) {
+                    headers {
+                        append("Content-Type", "application/json")
+                        append("Accept", "application/json")
+                    }
+                    contentType(ContentType.Application.Json)
+                    setBody(bodyParams.toJsonElement())
+                    println("body = $body")
+                }
+                onSuccess(response.body())
+            } catch (e: Exception) {
+                println("exception $e")
+                onError(e)
+            }
+        }
     }
 
     private fun HttpRequestBuilder.addOrReplaceParameter(key: String, value: String?): Unit =

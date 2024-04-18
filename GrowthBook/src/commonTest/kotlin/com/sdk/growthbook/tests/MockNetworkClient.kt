@@ -1,11 +1,14 @@
 package com.sdk.growthbook.tests
 
-import com.sdk.growthbook.Network.NetworkDispatcher
-import com.sdk.growthbook.Utils.Resource
+import com.sdk.growthbook.network.NetworkDispatcher
+import com.sdk.growthbook.utils.Resource
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 
-class MockNetworkClient(val succesResponse: String?, val error: Throwable?) : NetworkDispatcher {
+class MockNetworkClient(
+    private val successResponse: String?,
+    private val error: Throwable?
+) : NetworkDispatcher {
 
     @DelicateCoroutinesApi
     override fun consumeGETRequest(
@@ -15,8 +18,8 @@ class MockNetworkClient(val succesResponse: String?, val error: Throwable?) : Ne
     ) {
 
         try {
-            if (succesResponse != null) {
-                onSuccess(succesResponse)
+            if (successResponse != null) {
+                onSuccess(successResponse)
             } else if (error != null) {
                 onError(error)
             }
@@ -28,12 +31,21 @@ class MockNetworkClient(val succesResponse: String?, val error: Throwable?) : Ne
     override fun consumeSSEConnection(url: String): Flow<Resource<String>> {
         TODO("Not yet implemented")
     }
+
+    override fun consumePOSTRequest(
+        url: String,
+        bodyParams: Map<String, Any>,
+        onSuccess: (String) -> Unit,
+        onError: (Throwable) -> Unit
+    ) {
+        TODO("Not yet implemented")
+    }
 }
 
 class MockResponse {
     companion object {
 
-        val errorResponse = "{}"
+        const val ERROR_RESPONSE = "{}"
 
         val successResponse = """
             {

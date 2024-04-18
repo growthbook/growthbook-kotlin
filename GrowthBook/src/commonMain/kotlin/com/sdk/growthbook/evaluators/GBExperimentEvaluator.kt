@@ -1,7 +1,7 @@
 package com.sdk.growthbook.evaluators
 
-import com.sdk.growthbook.Utils.GBUtils
-import com.sdk.growthbook.Utils.toJsonElement
+import com.sdk.growthbook.utils.GBUtils
+import com.sdk.growthbook.utils.toJsonElement
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
