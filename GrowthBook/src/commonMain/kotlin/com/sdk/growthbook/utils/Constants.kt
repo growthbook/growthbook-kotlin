@@ -1,4 +1,4 @@
-package com.sdk.growthbook.Utils
+package com.sdk.growthbook.utils
 
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
@@ -24,6 +24,10 @@ import kotlinx.serialization.json.jsonPrimitive
 internal class Constants {
 
     companion object {
+        /**
+         * ID Attribute Key
+         */
+        const val ID_ATTRIBUTE_KEY = "id"
         /**
          * Identifier for Caching Feature Data in Internal Storage File
          */
@@ -59,17 +63,17 @@ typealias GBNameSpace = Triple<String, Float, Float>
 typealias GBBucketRange = Pair<Float, Float>
 
 /**
- *
+ * Type Alias for map's key in Sticky Bucket documents of Context's property
  */
 typealias GBStickyAttributeKey = String
 
 /**
- *
+ * Type Alias for map's key in Sticky Assignments
  */
 typealias GBStickyExperimentKey = String
 
 /**
- *
+ * Type Alias for Assignments in Sticky Assignment Document
  */
 typealias GBStickyAssignments = Map<GBStickyExperimentKey, String>
 
@@ -102,6 +106,7 @@ class GBError(error: Throwable?) {
 /**
  * Object used for mutual exclusion and filtering users out of experiments based on random hashes. Has the following properties
  */
+@Suppress("unused")
 @Serializable
 class GBFilter(
     /**
@@ -120,7 +125,11 @@ class GBFilter(
     /**
      * The hash version to use (default to 2)
      */
-    var hashVersion: Int? = null
+    var hashVersion: Int? = null,
+    /**
+     * When using sticky bucketing, can be used as a fallback to assign variations
+     */
+    var fallbackAttribute: String? = null
 )
 
 /**
@@ -145,7 +154,7 @@ data class GBVariationMeta(
 /**
  * Used for remote feature evaluation to trigger the TrackingCallback. An object with 2 properties
  */
-@Suppress("unused")
+@Serializable
 data class GBTrackData(
     /**
      * experiment - Experiment
@@ -154,30 +163,58 @@ data class GBTrackData(
     /**
      * result - ExperimentResult
      */
-    var experimentResult: GBExperimentResult
+    var result: GBExperimentResult
 )
 
 /**
- *
+ * Sticky Bucket documents contain three fields
  */
 @Serializable
 data class GBStickyAssignmentsDocument(
+    /**
+     * The name of the attribute used to identify the user (e.g. `id`, `cookie_id`, etc.)
+     */
     val attributeName: String,
+    /**
+     * The value of the attribute (e.g. `123`)
+     */
     val attributeValue: String,
-    val assignments: GBStickyAssignments
+    /**
+     * A dictionary of persisted experiment assignments. For example: `{"exp1__0":"control"}`
+     */
+    val assignments: GBStickyAssignments,
 )
 
+/**
+ * A ParentCondition defines a prerequisite.
+ * It consists of a parent feature's id (string),
+ * a condition (Condition),
+ * and an optional gate (boolean) flag.
+ */
 @Serializable
-data class ParentConditionInterface(
+data class GBParentConditionInterface(
+    /**
+     * Parent feature's Id
+     */
     val id: String,
+    /**
+     * Target condition
+     */
     val condition: GBCondition,
+    /**
+     * If gate is true, then this is a blocking feature-level prerequisite;
+     * otherwise it applies to the current rule only
+     */
     val gate: Boolean? = null
 )
 
-@Serializable
-data class TrackData(
-    val experiment: GBExperiment,
-    val result: GBExperimentResult
+/**
+ * Model for Remote Eval request's body
+ */
+data class GBRemoteEvalParams(
+    val attributes: Map<String, Any>,
+    val forcedFeatures: List<List<Any>>,
+    val forcedVariations: Map<String, Any>
 )
 
 object RangeSerializer {

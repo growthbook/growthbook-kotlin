@@ -1,11 +1,11 @@
 package com.sdk.growthbook.model
 
-import com.sdk.growthbook.Utils.GBBucketRange
-import com.sdk.growthbook.Utils.GBCondition
-import com.sdk.growthbook.Utils.GBFilter
-import com.sdk.growthbook.Utils.GBVariationMeta
-import com.sdk.growthbook.Utils.ParentConditionInterface
-import com.sdk.growthbook.Utils.RangeSerializer
+import com.sdk.growthbook.utils.GBBucketRange
+import com.sdk.growthbook.utils.GBCondition
+import com.sdk.growthbook.utils.GBFilter
+import com.sdk.growthbook.utils.GBVariationMeta
+import com.sdk.growthbook.utils.GBParentConditionInterface
+import com.sdk.growthbook.utils.RangeSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -14,8 +14,8 @@ import kotlinx.serialization.json.JsonObject
 /*
     Defines a single experiment
  */
-@Serializable
 @Suppress("unused")
+@Serializable
 class GBExperiment(
     /**
      * The globally unique tracking key for the experiment
@@ -54,7 +54,7 @@ class GBExperiment(
      * a parent feature's value (identified by `id`). If `gate` is true, then this is a blocking
      * feature-level prerequisite; otherwise it applies to the current rule only.
      */
-    val parentConditions: ArrayList<ParentConditionInterface>? = null,
+    val parentConditions: ArrayList<GBParentConditionInterface>? = null,
     /**
      * All users included in the experiment will be forced into the specific variation index
      */
@@ -113,8 +113,8 @@ class GBExperiment(
 /**
  * The result of running an Experiment given a specific Context
  */
-@Serializable
 @Suppress("unused")
+@Serializable
 class GBExperimentResult(
     /**
      * Whether or not the user is part of the experiment

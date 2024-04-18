@@ -1,12 +1,11 @@
 package com.sdk.growthbook.evaluators
 
-import com.sdk.growthbook.Utils.GBUtils
-import com.sdk.growthbook.Utils.toJsonElement
+import com.sdk.growthbook.utils.GBUtils
+import com.sdk.growthbook.utils.toJsonElement
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeatureSource
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
 /**
@@ -163,11 +162,11 @@ internal class GBExperimentEvaluator {
                         )
                     }
                     val evalObj = parentResult.value?.let {
-                        JsonObject(mapOf("value" to it))
-                    } ?: JsonObject(emptyMap())
+                        mapOf("value" to GBUtils.convertToPrimitiveIfPossible(it))
+                    } ?: emptyMap()
 
                     val evalCondition = GBConditionEvaluator().evalCondition(
-                        attributes = evalObj,
+                        attributes = evalObj.toJsonElement(),
                         conditionObj = parentCondition.condition
                     )
 

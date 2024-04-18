@@ -1,11 +1,11 @@
 package com.sdk.growthbook.tests
 
-import com.sdk.growthbook.Utils.Constants
-import com.sdk.growthbook.Utils.GBBucketRange
-import com.sdk.growthbook.Utils.GBNameSpace
-import com.sdk.growthbook.Utils.GBUtils
-import com.sdk.growthbook.Utils.toJsonElement
-import com.sdk.growthbook.Utils.toList
+import com.sdk.growthbook.utils.Constants
+import com.sdk.growthbook.utils.GBBucketRange
+import com.sdk.growthbook.utils.GBNameSpace
+import com.sdk.growthbook.utils.GBUtils
+import com.sdk.growthbook.utils.toJsonElement
+import com.sdk.growthbook.utils.toList
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive

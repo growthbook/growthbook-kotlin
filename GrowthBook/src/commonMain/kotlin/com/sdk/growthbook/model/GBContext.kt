@@ -1,8 +1,8 @@
 package com.sdk.growthbook.model
 
-import com.sdk.growthbook.Utils.GBFeatures
-import com.sdk.growthbook.Utils.GBStickyAssignmentsDocument
-import com.sdk.growthbook.Utils.GBStickyAttributeKey
+import com.sdk.growthbook.utils.GBFeatures
+import com.sdk.growthbook.utils.GBStickyAssignmentsDocument
+import com.sdk.growthbook.utils.GBStickyAttributeKey
 import com.sdk.growthbook.evaluators.GBExperimentHelper
 import com.sdk.growthbook.stickybucket.GBStickyBucketService
 
@@ -35,15 +35,15 @@ class GBContext(
      */
     var forcedVariations: Map<String, Any>,
     /**
-     *
+     * Map of Sticky Bucket documents
      */
     var stickyBucketAssignmentDocs: Map<GBStickyAttributeKey, GBStickyAssignmentsDocument>? = null,
     /**
-     *
+     * List of user's attributes keys
      */
     var stickyBucketIdentifierAttributes: List<String>? = null,
     /**
-     *
+     * Service that provide functionality of Sticky Bucketing
      */
     val stickyBucketService: GBStickyBucketService? = null,
     /**
@@ -53,7 +53,11 @@ class GBContext(
     /**
      * A function that takes experiment and result as arguments.
      */
-    val trackingCallback: (GBExperiment, GBExperimentResult) -> Unit
+    val trackingCallback: (GBExperiment, GBExperimentResult) -> Unit,
+    /**
+     * Flag which defines whether to use Remote Evaluation
+     */
+    val remoteEval: Boolean = false,
 ) {
 
     // Keys are unique identifiers for the features and the values are Feature objects.
@@ -63,6 +67,9 @@ class GBContext(
     internal val experimentHelper: GBExperimentHelper = GBExperimentHelper()
 }
 
+/**
+ * Model consist already evaluated features
+ */
 data class FeatureEvalContext(
     val id: String?,
     val evaluatedFeatures: MutableSet<String>

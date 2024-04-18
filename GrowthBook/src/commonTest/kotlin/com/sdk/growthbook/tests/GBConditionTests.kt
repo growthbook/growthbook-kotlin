@@ -1,6 +1,6 @@
 package com.sdk.growthbook.tests
 
-import com.sdk.growthbook.Utils.GBCondition
+import com.sdk.growthbook.utils.GBCondition
 import com.sdk.growthbook.evaluators.GBAttributeType
 import com.sdk.growthbook.evaluators.GBConditionEvaluator
 import kotlinx.serialization.json.Json
@@ -13,7 +13,7 @@ import kotlin.test.*
 
 class GBConditionTests {
 
-    lateinit var evalConditions: JsonArray
+    private lateinit var evalConditions: JsonArray
 
     @BeforeTest
     fun setUp() {

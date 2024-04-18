@@ -2,9 +2,9 @@ package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.GBSDKBuilder
 import com.sdk.growthbook.GrowthBookSDK
-import com.sdk.growthbook.Utils.GBCacheRefreshHandler
-import com.sdk.growthbook.Utils.GBError
-import com.sdk.growthbook.Utils.GBFeatures
+import com.sdk.growthbook.utils.GBCacheRefreshHandler
+import com.sdk.growthbook.utils.GBError
+import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeatureSource

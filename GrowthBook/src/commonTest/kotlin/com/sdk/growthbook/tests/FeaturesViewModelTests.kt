@@ -1,8 +1,8 @@
 package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.GrowthBookSDK
-import com.sdk.growthbook.Utils.GBError
-import com.sdk.growthbook.Utils.GBFeatures
+import com.sdk.growthbook.utils.GBError
+import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.features.FeaturesDataModel
 import com.sdk.growthbook.features.FeaturesDataSource
 import com.sdk.growthbook.features.FeaturesFlowDelegate
@@ -16,6 +16,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
 
     private var isSuccess: Boolean = false
     private var isError: Boolean = false
+    private var hasFeatures: Boolean = false
 
     @BeforeTest
     fun setUp() {
@@ -24,13 +25,14 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             enabled = true, attributes = HashMap(), forcedVariations = HashMap(),
             qaMode = false, trackingCallback = { _, _ ->
 
-            }, encryptionKey = null
+            },
+            encryptionKey = null,
+            remoteEval = false,
         )
     }
 
     @Test
     fun testSuccess() {
-
         isSuccess = false
         isError = true
         val viewModel = FeaturesViewModel(
@@ -42,6 +44,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
 
         assertTrue(isSuccess)
         assertTrue(!isError)
+        assertTrue(hasFeatures)
     }
 
     @Test
@@ -61,6 +64,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
 
         assertTrue(isSuccess)
         assertTrue(!isError)
+        assertTrue(hasFeatures)
     }
 
     @Test
@@ -77,6 +81,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
 
         assertTrue(!isSuccess)
         assertTrue(isError)
+        assertTrue(!hasFeatures)
     }
 
     @Test
@@ -86,26 +91,30 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         isError = true
         val viewModel = FeaturesViewModel(
             this,
-            FeaturesDataSource(MockNetworkClient(MockResponse.errorResponse, null)), ""
+            FeaturesDataSource(MockNetworkClient(MockResponse.ERROR_RESPONSE, null)), ""
         )
         viewModel.fetchFeatures()
 
         assertTrue(!isSuccess)
         assertTrue(isError)
+        assertTrue(!hasFeatures)
     }
 
     override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
         isSuccess = true
         isError = false
+        hasFeatures = features.isNotEmpty()
     }
 
     override fun featuresFetchFailed(error: GBError, isRemote: Boolean) {
         isSuccess = false
         isError = true
+        hasFeatures = false
     }
 
     override fun featuresAPIModelSuccessfully(model: FeaturesDataModel) {
         isSuccess = true
         isError = false
+        hasFeatures = !model.features.isNullOrEmpty()
     }
 }

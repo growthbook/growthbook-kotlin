@@ -1,8 +1,8 @@
 package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.GBSDKBuilder
-import com.sdk.growthbook.Utils.DefaultCrypto
-import com.sdk.growthbook.Utils.encryptToFeaturesDataModel
+import com.sdk.growthbook.utils.DefaultCrypto
+import com.sdk.growthbook.utils.encryptToFeaturesDataModel
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.soywiz.krypto.encoding.Base64
@@ -44,9 +44,9 @@ class GBEncryptedFeatures {
         }
     }
 
-    val testApiKey = "4r23r324f23"
-    val testHostURL = "https://host.com"
-    val testAttributes: HashMap<String, Any> = HashMap()
+    private val testApiKey = "4r23r324f23"
+    private val testHostURL = "https://host.com"
+    private val testAttributes: HashMap<String, Any> = HashMap()
 
     @OptIn(DelicateCoroutinesApi::class)
     @Test
@@ -58,7 +58,7 @@ class GBEncryptedFeatures {
             attributes = testAttributes,
             //TODO
             encryptionKey = "",
-            trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult ->
 
             },
             networkDispatcher = MockNetworkClient(null, null),

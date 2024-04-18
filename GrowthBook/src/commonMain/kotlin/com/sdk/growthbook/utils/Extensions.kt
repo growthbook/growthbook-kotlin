@@ -1,4 +1,4 @@
-package com.sdk.growthbook.Utils
+package com.sdk.growthbook.utils
 
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -47,6 +47,8 @@ internal fun List<*>.toJsonElement(): JsonElement {
         when (value) {
             is Map<*, *> -> list.add((value).toJsonElement())
             is List<*> -> list.add(value.toJsonElement())
+            is Boolean -> list.add(JsonPrimitive(value))
+            is Number -> list.add(JsonPrimitive(value))
             else -> list.add(JsonPrimitive(value.toString()))
         }
     }

@@ -1,13 +1,14 @@
 package com.sdk.growthbook
 
-import com.sdk.growthbook.Network.NetworkDispatcher
-import com.sdk.growthbook.Utils.Crypto
-import com.sdk.growthbook.Utils.GBCacheRefreshHandler
-import com.sdk.growthbook.Utils.GBError
-import com.sdk.growthbook.Utils.GBFeatures
-import com.sdk.growthbook.Utils.GBUtils.Companion.refreshStickyBuckets
-import com.sdk.growthbook.Utils.Resource
-import com.sdk.growthbook.Utils.getFeaturesFromEncryptedFeatures
+import com.sdk.growthbook.network.NetworkDispatcher
+import com.sdk.growthbook.utils.Crypto
+import com.sdk.growthbook.utils.GBCacheRefreshHandler
+import com.sdk.growthbook.utils.GBError
+import com.sdk.growthbook.utils.GBFeatures
+import com.sdk.growthbook.utils.GBRemoteEvalParams
+import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBuckets
+import com.sdk.growthbook.utils.Resource
+import com.sdk.growthbook.utils.getFeaturesFromEncryptedFeatures
 import com.sdk.growthbook.evaluators.GBExperimentEvaluator
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
 import com.sdk.growthbook.features.FeaturesDataModel
@@ -29,7 +30,9 @@ typealias GBTrackingCallback = (GBExperiment, GBExperimentResult) -> Unit
  * HostURL - Server URL
  * UserAttributes - User Attributes
  * Tracking Callback - Track Events for Experiments
- * EncryptionKey - Encryption key if you intend to use data encryption.
+ * EncryptionKey - Encryption key if you intend to use data encryption
+ * Network Dispatcher - Network Dispatcher
+ * Remote eval - Whether to use Remote Evaluation
  */
 abstract class SDKBuilder(
     val apiKey: String,
@@ -37,7 +40,8 @@ abstract class SDKBuilder(
     val attributes: Map<String, Any>,
     val trackingCallback: GBTrackingCallback,
     val encryptionKey: String?,
-    val networkDispatcher: NetworkDispatcher
+    val networkDispatcher: NetworkDispatcher,
+    val remoteEval: Boolean
 ) {
     internal var qaMode: Boolean = false
     internal var forcedVariations: Map<String, Int> = HashMap()
@@ -81,7 +85,9 @@ abstract class SDKBuilder(
  * UserAttributes - User Attributes
  * Features - GrowthBook Features Map - Synced via Web API / Web Hooks
  * Tracking Callback - Track Events for Experiments
- * EncryptionKey - Encryption key if you intend to use data encryption.
+ * EncryptionKey - Encryption key if you intend to use data encryption
+ * Network Dispatcher - Network Dispatcher
+ * Remote eval - Whether to use Remote Evaluation
  */
 class GBSDKBuilderJAVA(
     apiKey: String,
@@ -90,10 +96,11 @@ class GBSDKBuilderJAVA(
     val features: GBFeatures,
     trackingCallback: GBTrackingCallback,
     encryptionKey: String?,
-    networkDispatcher: NetworkDispatcher
+    networkDispatcher: NetworkDispatcher,
+    remoteEval: Boolean = false,
 ) : SDKBuilder(
     apiKey, hostURL,
-    attributes, trackingCallback, encryptionKey, networkDispatcher
+    attributes, trackingCallback, encryptionKey, networkDispatcher, remoteEval
 ) {
     /**
      * Initialize the JAVA SDK
@@ -109,7 +116,8 @@ class GBSDKBuilderJAVA(
             qaMode = qaMode,
             forcedVariations = forcedVariations,
             trackingCallback = trackingCallback,
-            encryptionKey = encryptionKey
+            encryptionKey = encryptionKey,
+            remoteEval = remoteEval,
         )
 
         return GrowthBookSDK(gbContext, null, networkDispatcher, features)
@@ -122,7 +130,9 @@ class GBSDKBuilderJAVA(
  * HostURL - Server URL
  * UserAttributes - User Attributes
  * Tracking Callback - Track Events for Experiments
- * EncryptionKey - Encryption key if you intend to use data encryption.
+ * EncryptionKey - Encryption key if you intend to use data encryption
+ * Network Dispatcher - Network Dispatcher
+ * Remote eval - Whether to use Remote Evaluation
  */
 class GBSDKBuilder(
     apiKey: String,
@@ -130,10 +140,11 @@ class GBSDKBuilder(
     attributes: Map<String, Any>,
     trackingCallback: GBTrackingCallback,
     encryptionKey: String? = null,
-    networkDispatcher: NetworkDispatcher
+    networkDispatcher: NetworkDispatcher,
+    remoteEval: Boolean = false,
 ) : SDKBuilder(
     apiKey, hostURL,
-    attributes, trackingCallback, encryptionKey, networkDispatcher
+    attributes, trackingCallback, encryptionKey, networkDispatcher, remoteEval
 ) {
 
     private var refreshHandler: GBCacheRefreshHandler? = null
@@ -147,7 +158,7 @@ class GBSDKBuilder(
     }
 
     /**
-     * Initialize the JAVA SDK
+     * Initialize the Kotlin SDK
      */
     @DelicateCoroutinesApi
     override fun initialize(): GrowthBookSDK {
@@ -160,10 +171,15 @@ class GBSDKBuilder(
             qaMode = qaMode,
             forcedVariations = forcedVariations,
             trackingCallback = trackingCallback,
-            encryptionKey = encryptionKey
+            encryptionKey = encryptionKey,
+            remoteEval = remoteEval
         )
 
-        return GrowthBookSDK(gbContext, refreshHandler, networkDispatcher, features = null)
+        return GrowthBookSDK(
+            gbContext,
+            refreshHandler,
+            networkDispatcher
+        )
     }
 }
 
@@ -176,7 +192,8 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     private var refreshHandler: GBCacheRefreshHandler? = null
     private lateinit var networkDispatcher: NetworkDispatcher
     private lateinit var featuresViewModel: FeaturesViewModel
-    private lateinit var attributeOverrides: Map<String, Any>
+    private var attributeOverrides: Map<String, Any> = emptyMap()
+    private var forcedFeatures: Map<String, Any> = emptyMap()
 
     //@ThreadLocal
     internal companion object {
@@ -188,7 +205,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         context: GBContext,
         refreshHandler: GBCacheRefreshHandler?,
         networkDispatcher: NetworkDispatcher,
-        features: GBFeatures? = null,
+        features: GBFeatures? = null
     ) : this() {
         gbContext = context
         this.refreshHandler = refreshHandler
@@ -210,6 +227,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
             refreshCache()
         }
         this.attributeOverrides = gbContext.attributes
+        refreshStickyBucketService()
     }
 
     /**
@@ -217,7 +235,11 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
      */
     @DelicateCoroutinesApi
     fun refreshCache() {
-        featuresViewModel.fetchFeatures()
+        if (gbContext.remoteEval) {
+            refreshForRemoteEval()
+        } else {
+            featuresViewModel.fetchFeatures()
+        }
     }
 
     /**
@@ -243,6 +265,9 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         return gbContext.features
     }
 
+    /**
+     * Delegate that set to Context successfully fetched features
+     */
     override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
         gbContext.features = features
         if (isRemote) {
@@ -251,21 +276,27 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     }
 
     /**
-     * The setEncryptedFeatures method takes an encrypted string with an encryption key and then decrypts it with the default method of decrypting or with a method of decrypting from the user
+     * The setEncryptedFeatures method takes an encrypted string with an encryption key
+     * and then decrypts it with the default method of decrypting
+     * or with a method of decrypting from the user
      */
     fun setEncryptedFeatures(
         encryptedString: String,
         encryptionKey: String,
         subtleCrypto: Crypto?
     ) {
+        val feature = getFeaturesFromEncryptedFeatures(
+            encryptedString = encryptedString,
+            encryptionKey = encryptionKey,
+            subtleCrypto = subtleCrypto
+        )
         gbContext.features =
-            getFeaturesFromEncryptedFeatures(
-                encryptedString = encryptedString,
-                encryptionKey = encryptionKey,
-                subtleCrypto = subtleCrypto
-            ) ?: return
+            feature ?: return
     }
 
+    /**
+     * Delegate which inform that fetching features failed
+     */
     override fun featuresFetchFailed(error: GBError, isRemote: Boolean) {
 
         if (isRemote) {
@@ -303,6 +334,20 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     }
 
     /**
+     * The setForcedFeatures method setup the Map of user's (forced) features
+     */
+    fun setForcedFeatures(forcedFeatures: Map<String, Any>) {
+        this.forcedFeatures = forcedFeatures
+    }
+
+    /**
+     * The getForcedFeatures method for mapping model object for request's body type
+     */
+    fun getForcedFeatures(): List<List<Any>> {
+        return this.forcedFeatures.map { listOf(it.key, it.value) }
+    }
+
+    /**
      * The setAttributes method replaces the Map of user attributes that are used to assign variations
      */
     fun setAttributes(attributes: Map<String, Any>) {
@@ -310,23 +355,66 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         refreshStickyBucketService()
     }
 
+    /**
+     * The setAttributeOverrides method replaces the Map of user overrides attribute
+     * that are used for Sticky Bucketing
+     */
     fun setAttributeOverrides(overrides: Map<String, Any>) {
         attributeOverrides = overrides
-        refreshStickyBucketService()
+        if (gbContext.stickyBucketService != null) {
+            refreshStickyBucketService()
+        }
+        refreshForRemoteEval()
     }
 
+    /**
+     * The setForcedVariations method setup the Map of user's (forced) variations
+     * to assign a specific variation (used for QA)
+     */
+    fun setForcedVariations(forcedVariations: Map<String, Any>) {
+        gbContext.forcedVariations = forcedVariations
+        refreshForRemoteEval()
+    }
+
+    /**
+     * Delegate that call refresh Sticky Bucket Service
+     * after success fetched features
+     */
     override fun featuresAPIModelSuccessfully(model: FeaturesDataModel) {
         refreshStickyBucketService(dataModel = model)
     }
 
+    /**
+     * Method for update latest attributes
+     */
     private fun refreshStickyBucketService(dataModel: FeaturesDataModel? = null) {
         if (gbContext.stickyBucketService != null) {
-            val featureEvaluator = GBFeatureEvaluator().evaluateFeature(
+            GBFeatureEvaluator().evaluateFeature(
                 context = gbContext,
                 featureKey = "",
                 attributeOverrides = attributeOverrides
             )
-            refreshStickyBuckets(context = gbContext, data = dataModel, attributeOverrides = attributeOverrides)
+            refreshStickyBuckets(
+                context = gbContext,
+                data = dataModel,
+                attributeOverrides = attributeOverrides
+            )
         }
+    }
+
+    /**
+     * Method for sending request evaluate features remotely
+     */
+    @OptIn(DelicateCoroutinesApi::class)
+    private fun refreshForRemoteEval() {
+        if (!gbContext.remoteEval) {
+            return
+        }
+        val payload = GBRemoteEvalParams(
+            gbContext.attributes,
+            this.getForcedFeatures(),
+            gbContext.forcedVariations
+        )
+        featuresViewModel.fetchFeatures(gbContext.remoteEval, payload)
     }
 }

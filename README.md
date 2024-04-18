@@ -621,7 +621,26 @@ If you're using ProGuard, you may need to add rules to your configuration file t
 }
 ```
 
+## Remote Evaluation
+This mode brings the security benefits of a backend SDK to the front end by evaluating feature flags exclusively on a private server. Using Remote Evaluation ensures that any sensitive information within targeting rules or unused feature variations are never seen by the client. Note that Remote Evaluation should not be used in a backend context.
 
+You must enable Remote Evaluation in your SDK Connection settings. Cloud customers are also required to self-host a GrowthBook Proxy Server or custom remote evaluation backend.
+
+To use Remote Evaluation, add the `remoteEval: true` property to your SDK instance. A new evaluation API call will be made any time a user attribute or other dependency changes. You may optionally limit these API calls to specific attribute changes by setting the `cacheKeyAttributes` property (an array of attribute names that, when changed, trigger a new evaluation call).
+
+var sdkInstance: GrowthBookSDK = GrowthBookBuilder(apiHost: <GrowthBook/API_KEY>, clientKey: <GrowthBook/ClientKey>, attributes: <[String: Any]>, trackingCallback: { experiment, experimentResult in
+}, refreshHandler: { isRefreshed in
+}, remoteEval: true)
+.initializer()
+
+:::note
+
+If you would like to implement Sticky Bucketing while using Remote Evaluation, you must configure your remote evaluation backend to support Sticky Bucketing. You will not need to provide a StickyBucketService instance to the client side SDK.
+
+
+## Sticky Bucketing
+
+Sticky bucketing ensures that users see the same experiment variant, even when user session, user login status, or experiment parameters change. See the [Sticky Bucketing docs](https://docs.growthbook.io/app/sticky-bucketing) for more information. If your organization and experiment supports sticky bucketing, you must implement an instance of the `StickyBucketService` to use Sticky Bucketing. For simple bucket persistence using the browser's LocalStorage (can be polyfilled for other environments).
 
 ## License
 

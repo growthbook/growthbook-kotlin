@@ -1,4 +1,4 @@
-package com.sdk.growthbook.Utils
+package com.sdk.growthbook.utils
 
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.readUTF8Line
