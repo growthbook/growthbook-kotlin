@@ -16,6 +16,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
 
     private var isSuccess: Boolean = false
     private var isError: Boolean = false
+    private var hasFeatures: Boolean = false
 
     @BeforeTest
     fun setUp() {
@@ -30,7 +31,6 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
 
     @Test
     fun testSuccess() {
-
         isSuccess = false
         isError = true
         val viewModel = FeaturesViewModel(
@@ -42,6 +42,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
 
         assertTrue(isSuccess)
         assertTrue(!isError)
+        assertTrue(hasFeatures)
     }
 
     @Test
@@ -61,6 +62,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
 
         assertTrue(isSuccess)
         assertTrue(!isError)
+        assertTrue(hasFeatures)
     }
 
     @Test
@@ -77,6 +79,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
 
         assertTrue(!isSuccess)
         assertTrue(isError)
+        assertTrue(!hasFeatures)
     }
 
     @Test
@@ -92,20 +95,24 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
 
         assertTrue(!isSuccess)
         assertTrue(isError)
+        assertTrue(!hasFeatures)
     }
 
     override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
         isSuccess = true
         isError = false
+        hasFeatures = features.isNotEmpty()
     }
 
     override fun featuresFetchFailed(error: GBError, isRemote: Boolean) {
         isSuccess = false
         isError = true
+        hasFeatures = false
     }
 
     override fun featuresAPIModelSuccessfully(model: FeaturesDataModel) {
         isSuccess = true
         isError = false
+        hasFeatures = !model.features.isNullOrEmpty()
     }
 }
