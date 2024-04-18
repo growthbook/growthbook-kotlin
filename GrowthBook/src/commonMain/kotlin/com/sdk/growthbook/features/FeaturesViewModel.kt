@@ -38,10 +38,8 @@ internal class FeaturesViewModel(
     /**
      * Fetch Features
      */
-
     @DelicateCoroutinesApi
     fun fetchFeatures() {
-
         try {
             // Check for cache data
             val dataModel = manager.getLayer().getData(
@@ -126,6 +124,11 @@ internal class FeaturesViewModel(
                                 fileName = Constants.FEATURE_CACHE,
                                 content = dataModel,
                                 serializer = FeaturesDataModel.serializer()
+                            )
+
+                            this.delegate.featuresFetchedSuccessfully(
+                                features = features,
+                                isRemote = true
                             )
                         } else {
                             features?.let {
