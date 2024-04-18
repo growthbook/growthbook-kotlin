@@ -25,6 +25,10 @@ internal class Constants {
 
     companion object {
         /**
+         * ID Attribute Key
+         */
+        const val ID_ATTRIBUTE_KEY = "id"
+        /**
          * Identifier for Caching Feature Data in Internal Storage File
          */
         const val FEATURE_CACHE = "FeatureCache"

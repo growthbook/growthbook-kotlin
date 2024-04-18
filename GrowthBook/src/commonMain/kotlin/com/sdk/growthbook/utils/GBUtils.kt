@@ -7,10 +7,14 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.floatOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
@@ -454,6 +458,20 @@ internal class GBUtils {
             }
 
             return Pair(hashAttribute, hashValue)
+        }
+
+        fun convertToPrimitiveIfPossible(jsonElement: Any?): Any? {
+            return if (jsonElement is JsonPrimitive) {
+                jsonElement.intOrNull
+                    ?: jsonElement.longOrNull
+                    ?: jsonElement.doubleOrNull
+                    ?: jsonElement.floatOrNull
+                    ?: jsonElement.booleanOrNull
+                    ?: jsonElement.contentOrNull
+                    ?: jsonElement
+            } else {
+                jsonElement
+            }
         }
     }
 }

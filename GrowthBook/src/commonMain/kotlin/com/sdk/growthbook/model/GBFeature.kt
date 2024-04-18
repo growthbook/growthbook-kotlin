@@ -172,7 +172,7 @@ class GBFeatureResult(
     /**
      * The assigned value of the feature
      */
-    val value: JsonElement?,
+    val value: Any?,
     /**
      * The assigned value cast to a boolean
      */

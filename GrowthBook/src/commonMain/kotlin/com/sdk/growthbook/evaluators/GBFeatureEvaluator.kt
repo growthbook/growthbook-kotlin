@@ -10,8 +10,7 @@ import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBFeatureSource
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
+import com.sdk.growthbook.utils.Constants
 
 /**
  * Feature Evaluator Class
@@ -64,12 +63,13 @@ internal class GBFeatureEvaluator {
                                     source = GBFeatureSource.cyclicPrerequisite
                                 )
                             }
-                            val evalObj = parentResult.value?.let {
-                                JsonObject(mapOf("value" to it))
-                            } ?: JsonObject(emptyMap())
+
+                            val evalObj = parentResult.value?.let { value ->
+                                mapOf("value" to value)
+                            } ?: emptyMap()
 
                             val evalCondition = GBConditionEvaluator().evalCondition(
-                                attributes = evalObj,
+                                attributes = evalObj.toJsonElement(),
                                 conditionObj = parentCondition.condition
                             )
 
@@ -145,6 +145,20 @@ internal class GBFeatureEvaluator {
                             }
                         }
 
+                        if (rule.range == null) {
+                            if (rule.coverage != null) {
+                                val key = rule.hashAttribute ?: Constants.ID_ATTRIBUTE_KEY
+                                val attributeValue = context.attributes[key]?.toString()
+                                if (attributeValue.isNullOrEmpty()) {
+                                    continue@ruleLoop
+                                }
+                                val hashFNV = GBUtils.hash(seed = featureKey, stringValue = attributeValue, hashVersion = 1) ?: 0f
+                                if (hashFNV > rule.coverage) {
+                                    continue@ruleLoop
+                                }
+                            }
+                        }
+
                         return prepareResult(value = rule.force, source = GBFeatureSource.force)
                     } else {
 
@@ -206,7 +220,7 @@ internal class GBFeatureEvaluator {
      * Besides the passed-in arguments, there are two derived values - on and off, which are just the value cast to booleans.
      */
     private fun prepareResult(
-        value: JsonElement?,
+        value: Any?,
         source: GBFeatureSource,
         experiment: GBExperiment? = null,
         experimentResult: GBExperimentResult? = null
@@ -217,7 +231,7 @@ internal class GBFeatureEvaluator {
 
 
         return GBFeatureResult(
-            value = value,
+            value = GBUtils.convertToPrimitiveIfPossible(value),
             on = !isFalse,
             off = isFalse,
             source = source,
