@@ -201,6 +201,9 @@ internal class GBUtils {
             return null
         }
 
+        /**
+         * This function can be used to help with the evaluation of the version string comparsion
+         */
         fun paddedVersionString(input: String): String {
             // "v1.2.3-rc.1+build123" -> ["1","2","3","rc","1"]
             var parts: List<String> = input.replace(Regex("^v|\\+.*\$"), "")
@@ -311,6 +314,10 @@ internal class GBUtils {
             }
         }
 
+        /**
+         * Method that get cached assignments
+         * and set it to Context's Sticky Bucket Assignments documents
+         */
         fun refreshStickyBuckets(
             context: GBContext,
             data: FeaturesDataModel?,
@@ -322,6 +329,9 @@ internal class GBUtils {
             context.stickyBucketAssignmentDocs = stickyBucketService.getAllAssignments(attributes)
         }
 
+        /**
+         * Supportive method for get attribute value from Context
+         */
         private fun getStickyBucketAttributes(
             context: GBContext,
             data: FeaturesDataModel?,
@@ -339,6 +349,10 @@ internal class GBUtils {
             return attributes
         }
 
+        /**
+         * Supportive method for get attribute value from Context
+         * if identifiers missed
+         */
         private fun deriveStickyBucketIdentifierAttributes(
             context: GBContext,
             data: FeaturesDataModel?
@@ -360,6 +374,10 @@ internal class GBUtils {
             return attributes.toList()
         }
 
+
+        /**
+         * Method to get actual Sticky Bucket assignments
+         */
         private fun getStickyBucketAssignments(
             context: GBContext
         ): Map<String, String> {
@@ -371,6 +389,9 @@ internal class GBUtils {
             return mergedAssignments
         }
 
+        /**
+         * Method to get Sticky Bucket variations
+         */
         fun getStickyBucketVariation(
             context: GBContext,
             experimentKey: String,
@@ -398,6 +419,9 @@ internal class GBUtils {
             }
         }
 
+        /**
+         * Method to get Experiment key from cache
+         */
         fun getStickyBucketExperimentKey(
             experimentKey: String,
             experimentBucketVersion: Int = 0
@@ -405,6 +429,9 @@ internal class GBUtils {
             return "${experimentKey}__${experimentBucketVersion}"
         }
 
+        /**
+         * Method for generate Sticky Bucket Assignment document
+         */
         fun generateStickyBucketAssignmentDoc(
             context: GBContext,
             attributeName: String,
@@ -429,6 +456,9 @@ internal class GBUtils {
             )
         }
 
+        /**
+         * Method for get hash value by identifier
+         */
         fun getHashAttribute(
             context: GBContext,
             attr: String?,

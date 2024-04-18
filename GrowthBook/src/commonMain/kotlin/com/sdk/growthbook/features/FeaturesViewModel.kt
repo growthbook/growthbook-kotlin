@@ -84,6 +84,9 @@ internal class FeaturesViewModel(
         }
     }
 
+    /**
+     * Supportive method for automatically refresh features
+     */
     @DelicateCoroutinesApi
     fun autoRefreshFeatures(): Flow<Resource<GBFeatures?>> {
         return dataSource.autoRefresh(success = { dataModel ->
