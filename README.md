@@ -851,3 +851,4 @@ class GBStickyBucketServiceImp(
 
 This project uses the MIT license. The core GrowthBook app will always remain open and free, although we may add some
 commercial enterprise add-ons in the future.
+ 
