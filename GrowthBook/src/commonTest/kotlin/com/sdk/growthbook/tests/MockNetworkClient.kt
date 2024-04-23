@@ -38,7 +38,15 @@ class MockNetworkClient(
         onSuccess: (String) -> Unit,
         onError: (Throwable) -> Unit
     ) {
-        TODO("Not yet implemented")
+        try {
+            if (successResponse != null) {
+                onSuccess(successResponse)
+            } else if (error != null) {
+                onError(error)
+            }
+        } catch (ex: Exception) {
+            onError(ex)
+        }
     }
 }
 

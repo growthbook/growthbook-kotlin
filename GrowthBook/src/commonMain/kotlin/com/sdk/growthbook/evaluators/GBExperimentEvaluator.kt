@@ -18,7 +18,7 @@ internal class GBExperimentEvaluator {
      * Takes Context & Experiment & returns Experiment Result
      */
     fun evaluateExperiment(
-        context: GBContext, experiment: GBExperiment, attributeOverrides: Map<String, Any>
+        context: GBContext, experiment: GBExperiment, attributeOverrides: Map<String, Any>, featureId: String? = null
     ): GBExperimentResult {
 
         // If experiment.variations has fewer than 2 variations, return immediately (not in experiment, variationId 0)
@@ -26,6 +26,7 @@ internal class GBExperimentEvaluator {
         // If context.enabled is false, return immediately (not in experiment, variationId 0)
         if (experiment.variations.size < 2 || !context.enabled) {
             return getExperimentResult(
+                featureId = featureId,
                 experiment = experiment,
                 gbContext = context,
                 variationIndex = -1,
@@ -38,6 +39,7 @@ internal class GBExperimentEvaluator {
         val forcedVariation = context.forcedVariations[experiment.key]
         if (forcedVariation != null) {
             return getExperimentResult(
+                featureId = featureId,
                 experiment = experiment,
                 variationIndex = forcedVariation.toString().toInt(),
                 gbContext = context,
@@ -49,6 +51,7 @@ internal class GBExperimentEvaluator {
         // If experiment.action is set to false, return immediately (not in experiment, variationId 0)
         if (!(experiment.active)) {
             return getExperimentResult(
+                featureId = featureId,
                 experiment = experiment,
                 gbContext = context,
                 variationIndex = -1,
@@ -61,13 +64,14 @@ internal class GBExperimentEvaluator {
         val (hashAttribute, hashValue) = GBUtils.getHashAttribute(
             context = context,
             attr = experiment.hashAttribute,
-            fallback = if (context.stickyBucketService != null && experiment.disableStickyBucketing == false) experiment.fallBackAttribute else null,
+            fallback = if (context.stickyBucketService != null && experiment.disableStickyBucketing ?: true) experiment.fallBackAttribute else null,
             attributeOverrides = attributeOverrides
         )
 
         if (hashValue.isEmpty() || hashValue == "null") {
             // Skip because missing hashAttribute
             return getExperimentResult(
+                featureId = featureId,
                 experiment = experiment,
                 gbContext = context,
                 variationIndex = -1,
@@ -80,7 +84,7 @@ internal class GBExperimentEvaluator {
         var foundStickyBucket = false
         var stickyBucketVersionIsBlocked = false
 
-        if ((context.stickyBucketService != null) && (experiment.disableStickyBucketing == false)) {
+        if ((context.stickyBucketService != null) && (experiment.disableStickyBucketing ?: true)) {
             val (variation, versionIsBlocked) = GBUtils.getStickyBucketVariation(
                 context = context,
                 experimentKey = experiment.key,
@@ -103,6 +107,7 @@ internal class GBExperimentEvaluator {
                 ) {
                     print("Skip because of filters")
                     return getExperimentResult(
+                        featureId = featureId,
                         gbContext = context,
                         variationIndex = -1,
                         hashUsed = false,
@@ -122,6 +127,7 @@ internal class GBExperimentEvaluator {
                     )
                 ) {
                     return getExperimentResult(
+                        featureId = featureId,
                         experiment = experiment,
                         gbContext = context,
                         variationIndex = -1,
@@ -136,6 +142,7 @@ internal class GBExperimentEvaluator {
                 val attr = context.attributes.toJsonElement()
                 if (!GBConditionEvaluator().evalCondition(attr, experiment.condition!!)) {
                     return getExperimentResult(
+                        featureId = featureId,
                         experiment = experiment,
                         gbContext = context,
                         variationIndex = -1,
@@ -154,6 +161,7 @@ internal class GBExperimentEvaluator {
                     )
                     if (parentResult.source == GBFeatureSource.cyclicPrerequisite) {
                         return getExperimentResult(
+                            featureId = featureId,
                             experiment = experiment,
                             gbContext = context,
                             variationIndex = -1,
@@ -174,6 +182,7 @@ internal class GBExperimentEvaluator {
                     if (!evalCondition) {
                         print("Feature blocked by prerequisite")
                         return getExperimentResult(
+                            featureId = featureId,
                             experiment = experiment,
                             gbContext = context,
                             variationIndex = -1,
@@ -192,6 +201,7 @@ internal class GBExperimentEvaluator {
         if (hash == null) {
             print("Skip because of invalid hash version")
             return getExperimentResult(
+                featureId = featureId,
                 experiment = experiment,
                 gbContext = context,
                 variationIndex = -1,
@@ -212,6 +222,7 @@ internal class GBExperimentEvaluator {
         if (stickyBucketVersionIsBlocked) {
             print("Skip because sticky bucket version is blocked")
             return getExperimentResult(
+                featureId = featureId,
                 experiment = experiment,
                 gbContext = context,
                 variationIndex = -1,
@@ -226,6 +237,7 @@ internal class GBExperimentEvaluator {
         if (assigned < 0) {
             print("Skip because of coverage")
             return getExperimentResult(
+                featureId = featureId,
                 experiment = experiment,
                 gbContext = context,
                 variationIndex = -1,
@@ -238,6 +250,7 @@ internal class GBExperimentEvaluator {
         val forceExp = experiment.force
         if (forceExp != null) {
             return getExperimentResult(
+                featureId = featureId,
                 gbContext = context,
                 variationIndex = forceExp,
                 hashUsed = false,
@@ -249,6 +262,7 @@ internal class GBExperimentEvaluator {
         // If context.qaMode is true, return immediately (not in experiment, variationId 0)
         if (context.qaMode) {
             return getExperimentResult(
+                featureId = featureId,
                 experiment = experiment,
                 gbContext = context,
                 variationIndex = -1,
@@ -260,6 +274,7 @@ internal class GBExperimentEvaluator {
         // Fire context.trackingCallback if set and the combination of hashAttribute, hashValue, experiment.key, and variationId has not been tracked before
 
         val result = getExperimentResult(
+            featureId = featureId,
             experiment = experiment,
             variationIndex = assigned,
             stickyBucketUsed = foundStickyBucket,
@@ -270,7 +285,7 @@ internal class GBExperimentEvaluator {
         )
         print("ExperimentResult: $result")
 
-        if (context.stickyBucketService != null && experiment.disableStickyBucketing == false) {
+        if (context.stickyBucketService != null && experiment.disableStickyBucketing ?: true) {
             val (key, doc, changed) = GBUtils.generateStickyBucketAssignmentDoc(
                 context = context,
                 attributeName = hashAttribute,
@@ -285,10 +300,9 @@ internal class GBExperimentEvaluator {
 
             if (changed) {
                 context.stickyBucketAssignmentDocs =
-                    context.stickyBucketAssignmentDocs ?: emptyMap()
-                context.stickyBucketAssignmentDocs?.let {
-                    it.toMutableMap()[key] = doc
-                }
+                    (context.stickyBucketAssignmentDocs ?: emptyMap()).toMutableMap().apply {
+                        this[key] = doc
+                    }
                 context.stickyBucketService.saveAssignments(doc = doc)
             }
         }
@@ -332,7 +346,7 @@ internal class GBExperimentEvaluator {
         val (hashAttribute, hashValue) = GBUtils.getHashAttribute(
             context = gbContext,
             attr = experiment.hashAttribute,
-            fallback = if (gbContext.stickyBucketService != null && experiment.disableStickyBucketing == false) experiment.fallBackAttribute else null,
+            fallback = if (gbContext.stickyBucketService != null && experiment.disableStickyBucketing ?: true) experiment.fallBackAttribute else null,
             attributeOverrides = attributeOverrides
         )
         val experimentMeta = experiment.meta ?: emptyList()

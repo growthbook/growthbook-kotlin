@@ -468,9 +468,9 @@ internal class GBUtils {
             var hashAttribute = attr ?: "id"
             var hashValue = ""
 
-            if (attributeOverrides[hashAttribute] != JsonNull) {
+            if (attributeOverrides[hashAttribute] != null) {
                 hashValue = attributeOverrides[hashAttribute].toString()
-            } else if (context.attributes[hashAttribute] != JsonNull) {
+            } else if (context.attributes[hashAttribute] != null) {
                 hashValue = context.attributes[hashAttribute].toString()
             }
 
@@ -478,7 +478,7 @@ internal class GBUtils {
             if (hashValue.isEmpty() && fallback != null) {
                 if (attributeOverrides[fallback] != JsonNull) {
                     hashValue = attributeOverrides[fallback].toString()
-                } else if (context.attributes[fallback] != JsonNull) {
+                } else if (context.attributes[fallback] != null) {
                     hashValue = context.attributes[fallback].toString()
                 }
 

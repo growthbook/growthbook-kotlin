@@ -19,6 +19,9 @@ import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeatureResult
+import com.sdk.growthbook.sandbox.CachingImpl
+import com.sdk.growthbook.stickybucket.GBStickyBucketService
+import com.sdk.growthbook.stickybucket.GBStickyBucketServiceImp
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 
@@ -148,12 +151,26 @@ class GBSDKBuilder(
 ) {
 
     private var refreshHandler: GBCacheRefreshHandler? = null
+    private var stickyBucketService: GBStickyBucketService = GBStickyBucketServiceImp(
+        localStorage = CachingImpl.getLayer()
+    )
 
     /**
      * Set Refresh Handler - Will be called when cache is refreshed
      */
     fun setRefreshHandler(refreshHandler: GBCacheRefreshHandler): GBSDKBuilder {
         this.refreshHandler = refreshHandler
+        return this
+    }
+
+    /**
+     * Method for set prefix of filename in cache directory GrowthBook-KMM.
+     * Structure of filename - prefix$attributeName||$attributeValue
+     * Default prefix of filename `gbStickyBuckets__`
+     * Example name of file be like `gbStickyBuckets__test||testAttribute.txt`
+     */
+    fun setCacheDirectory(prefix: String = "gbStickyBuckets__"): GBSDKBuilder {
+        this.stickyBucketService = GBStickyBucketServiceImp(prefix, CachingImpl.getLayer())
         return this
     }
 
@@ -172,7 +189,8 @@ class GBSDKBuilder(
             forcedVariations = forcedVariations,
             trackingCallback = trackingCallback,
             encryptionKey = encryptionKey,
-            remoteEval = remoteEval
+            remoteEval = remoteEval,
+            stickyBucketService = stickyBucketService,
         )
 
         return GrowthBookSDK(
@@ -389,11 +407,6 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
      */
     private fun refreshStickyBucketService(dataModel: FeaturesDataModel? = null) {
         if (gbContext.stickyBucketService != null) {
-            GBFeatureEvaluator().evaluateFeature(
-                context = gbContext,
-                featureKey = "",
-                attributeOverrides = attributeOverrides
-            )
             refreshStickyBuckets(
                 context = gbContext,
                 data = dataModel,
