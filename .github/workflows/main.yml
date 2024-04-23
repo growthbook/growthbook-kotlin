@@ -6,6 +6,8 @@ on:
       - 'main'
     tags-ignore:
       - '**'
+    paths-ignore:
+      - '**.md'
 
 jobs:
   release:
