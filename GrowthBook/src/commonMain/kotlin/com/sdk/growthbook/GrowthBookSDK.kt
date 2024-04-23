@@ -151,9 +151,7 @@ class GBSDKBuilder(
 ) {
 
     private var refreshHandler: GBCacheRefreshHandler? = null
-    private var stickyBucketService: GBStickyBucketService = GBStickyBucketServiceImp(
-        localStorage = CachingImpl.getLayer()
-    )
+    private var stickyBucketService: GBStickyBucketService? = null
 
     /**
      * Set Refresh Handler - Will be called when cache is refreshed
@@ -164,12 +162,23 @@ class GBSDKBuilder(
     }
 
     /**
+     * Method for enable sticky bucket service
+     */
+    fun setStickyBucketService(
+        stickyBucketService: GBStickyBucketService = GBStickyBucketServiceImp(
+            localStorage = CachingImpl.getLayer()
+        )
+    ) {
+        this.stickyBucketService = stickyBucketService
+    }
+
+    /**
      * Method for set prefix of filename in cache directory GrowthBook-KMM.
      * Structure of filename - prefix$attributeName||$attributeValue
      * Default prefix of filename `gbStickyBuckets__`
      * Example name of file be like `gbStickyBuckets__test||testAttribute.txt`
      */
-    fun setCacheDirectory(prefix: String = "gbStickyBuckets__"): GBSDKBuilder {
+    fun setPrefixForStickyBucketCachedDirectory(prefix: String = "gbStickyBuckets__"): GBSDKBuilder {
         this.stickyBucketService = GBStickyBucketServiceImp(prefix, CachingImpl.getLayer())
         return this
     }
