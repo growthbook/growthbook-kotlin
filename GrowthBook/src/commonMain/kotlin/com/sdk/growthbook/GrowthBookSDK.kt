@@ -416,11 +416,6 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
      */
     private fun refreshStickyBucketService(dataModel: FeaturesDataModel? = null) {
         if (gbContext.stickyBucketService != null) {
-            GBFeatureEvaluator().evaluateFeature(
-                context = gbContext,
-                featureKey = "",
-                attributeOverrides = attributeOverrides
-            )
             refreshStickyBuckets(
                 context = gbContext,
                 data = dataModel,

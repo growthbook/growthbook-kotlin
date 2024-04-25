@@ -1,5 +1,6 @@
 package com.sdk.growthbook.evaluators
 
+import com.sdk.growthbook.utils.Constants
 import com.sdk.growthbook.utils.GBTrackData
 import com.sdk.growthbook.utils.GBUtils
 import com.sdk.growthbook.utils.toJsonElement
@@ -10,7 +11,6 @@ import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBFeatureSource
-import com.sdk.growthbook.utils.Constants
 
 /**
  * Feature Evaluator Class
@@ -115,7 +115,7 @@ internal class GBFeatureEvaluator {
                         }
 
                         val gate1 = (context.stickyBucketService != null)
-                        val gate2 = (rule.disableStickyBucketing == false)
+                        val gate2 = (rule.disableStickyBucketing ?: true)
                         val shouldFallbackAttributeBePassed = gate1 && gate2
                         if (!GBUtils.isIncludedInRollout(
                                 seed = rule.seed ?: featureKey,
@@ -152,7 +152,11 @@ internal class GBFeatureEvaluator {
                                 if (attributeValue.isNullOrEmpty()) {
                                     continue@ruleLoop
                                 }
-                                val hashFNV = GBUtils.hash(seed = featureKey, stringValue = attributeValue, hashVersion = 1) ?: 0f
+                                val hashFNV = GBUtils.hash(
+                                    seed = featureKey,
+                                    stringValue = attributeValue,
+                                    hashVersion = 1
+                                ) ?: 0f
                                 if (hashFNV > rule.coverage) {
                                     continue@ruleLoop
                                 }
@@ -185,6 +189,7 @@ internal class GBFeatureEvaluator {
                             )
 
                             val result = GBExperimentEvaluator().evaluateExperiment(
+                                featureId = featureKey,
                                 context = context,
                                 experiment = exp,
                                 attributeOverrides = attributeOverrides
