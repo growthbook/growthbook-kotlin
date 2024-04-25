@@ -57,7 +57,7 @@ fun encryptToFeaturesDataModel(string: String): GBFeatures? {
 fun getFeaturesFromEncryptedFeatures(
     encryptedString: String,
     encryptionKey: String,
-    subtleCrypto: Crypto?
+    subtleCrypto: Crypto? = null,
 ): GBFeatures? {
     val encryptedArrayData = encryptedString.split(".")
 
