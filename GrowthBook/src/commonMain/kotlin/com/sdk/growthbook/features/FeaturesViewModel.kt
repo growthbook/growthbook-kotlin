@@ -28,7 +28,7 @@ internal interface FeaturesFlowDelegate {
 internal class FeaturesViewModel(
     private val delegate: FeaturesFlowDelegate,
     private val dataSource: FeaturesDataSource,
-    var encryptionKey: String?
+    private val encryptionKey: String? = null,
 ) {
 
     /**
@@ -134,12 +134,12 @@ internal class FeaturesViewModel(
                     )
                 } else {
                     if (encryptedFeatures != null && encryptionKey != null) {
-                        if (encryptionKey!!.isNotEmpty()) {
+                        if (encryptionKey.isNotEmpty()) {
                             val crypto = DefaultCrypto()
                             features =
                                 getFeaturesFromEncryptedFeatures(
                                     encryptedString = encryptedFeatures,
-                                    encryptionKey = encryptionKey ?: "",
+                                    encryptionKey = encryptionKey,
                                     subtleCrypto = crypto
                                 ) ?: return
 

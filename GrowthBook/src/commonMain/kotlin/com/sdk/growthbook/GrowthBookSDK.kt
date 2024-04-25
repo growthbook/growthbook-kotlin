@@ -245,12 +245,11 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
             FeaturesViewModel(
                 delegate = this,
                 dataSource = FeaturesDataSource(dispatcher = networkDispatcher),
-                encryptionKey = null
+                encryptionKey = gbContext.encryptionKey,
             )
         if (features != null) {
             gbContext.features = features
         } else {
-            featuresViewModel.encryptionKey = gbContext.encryptionKey
             refreshCache()
         }
         this.attributeOverrides = gbContext.attributes
