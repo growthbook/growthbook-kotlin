@@ -412,7 +412,7 @@ internal class GBUtils {
             }
             val variationKey = assignments[id] ?: return Pair(-1, null)
             val variation = meta.indexOfFirst { it.key == variationKey }
-            return if (variation != -1) {
+            return if (0 <= variation) {
                 Pair(variation, null)
             } else {
                 Pair(-1, null)
@@ -476,7 +476,7 @@ internal class GBUtils {
 
             // if no match, try fallback
             if (hashValue.isEmpty() && fallback != null) {
-                if (attributeOverrides[fallback] != JsonNull) {
+                if (attributeOverrides[fallback] != null) {
                     hashValue = attributeOverrides[fallback].toString()
                 } else if (context.attributes[fallback] != null) {
                     hashValue = context.attributes[fallback].toString()
@@ -485,6 +485,13 @@ internal class GBUtils {
                 if (hashValue.isNotEmpty()) {
                     hashAttribute = fallback
                 }
+            }
+
+            val leftOperand: String = context.stickyBucketAssignmentDocs
+                ?.get("${fallback}||${attributeOverrides[fallback]}")
+                ?.attributeValue.toString()
+            if (leftOperand != attributeOverrides[fallback].toString()) {
+                context.stickyBucketAssignmentDocs = emptyMap()
             }
 
             return Pair(hashAttribute, hashValue)
