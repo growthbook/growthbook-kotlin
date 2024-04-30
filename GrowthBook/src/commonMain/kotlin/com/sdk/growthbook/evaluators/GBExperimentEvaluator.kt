@@ -90,8 +90,11 @@ internal class GBExperimentEvaluator {
                 experimentKey = experiment.key,
                 experimentBucketVersion = experiment.bucketVersion ?: 0,
                 minExperimentBucketVersion = experiment.minBucketVersion ?: 0,
-                meta = experiment.meta ?: emptyList()
-            )
+                meta = experiment.meta ?: emptyList(),
+                expFallBackAttribute = experiment.fallBackAttribute,
+                expHashAttribute = experiment.hashAttribute,
+                attributeOverrides = attributeOverrides)
+
             foundStickyBucket = variation >= 0
             assigned = variation
             stickyBucketVersionIsBlocked = versionIsBlocked ?: false

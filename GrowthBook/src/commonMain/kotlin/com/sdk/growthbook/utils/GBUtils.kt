@@ -379,13 +379,54 @@ internal class GBUtils {
          * Method to get actual Sticky Bucket assignments
          */
         private fun getStickyBucketAssignments(
-            context: GBContext
+            context: GBContext,
+            expHashAttribute: String?,
+            expFallBackAttribute: String?,
+            attributeOverrides: Map<String, Any>
         ): Map<String, String> {
-            val mergedAssignments = mutableMapOf<String, String>()
 
+            val stickyBucketAssignmentDocs = context.stickyBucketAssignmentDocs ?: return emptyMap()
+
+            val (hashAttribute, hashValue) = getHashAttribute(
+                context = context,
+                attr = expHashAttribute,
+                fallback = null,
+                attributeOverrides = attributeOverrides
+            )
+
+            val hashKey = "$hashAttribute||$hashValue"
+
+            val (fallbackAttribute, fallbackValue) = getHashAttribute(
+                context = context,
+                attr = null,
+                fallback = expFallBackAttribute,
+                attributeOverrides = attributeOverrides
+            )
+
+            val fallbackKey = if (fallbackValue.isEmpty()) null else "$fallbackAttribute||$fallbackValue"
+
+            val leftOperand: String = context.stickyBucketAssignmentDocs
+                ?.get("${expFallBackAttribute}||${attributeOverrides[expFallBackAttribute]}")
+                ?.attributeValue.toString()
+            if (leftOperand != attributeOverrides[expFallBackAttribute].toString()) {
+                context.stickyBucketAssignmentDocs = emptyMap()
+            }
+
+            val mergedAssignments = mutableMapOf<String, String>()
             context.stickyBucketAssignmentDocs?.values?.forEach { doc ->
                 mergedAssignments.putAll(doc.assignments)
             }
+
+            fallbackKey?.let { fallbackKey ->
+                stickyBucketAssignmentDocs[fallbackKey]?.let { fallbackAssignments ->
+                    mergedAssignments.putAll(fallbackAssignments.assignments)
+                }
+            }
+
+            stickyBucketAssignmentDocs[hashKey]?.let { hashAssignments ->
+                mergedAssignments.putAll(hashAssignments.assignments)
+            }
+
             return mergedAssignments
         }
 
@@ -397,10 +438,14 @@ internal class GBUtils {
             experimentKey: String,
             experimentBucketVersion: Int = 0,
             minExperimentBucketVersion: Int = 0,
-            meta: List<GBVariationMeta> = emptyList()
+            meta: List<GBVariationMeta> = emptyList(),
+            expFallBackAttribute: String? = null,
+            expHashAttribute: String? = "id",
+            attributeOverrides: Map<String, Any>
         ): Pair<Int, Boolean?> {
             val id = getStickyBucketExperimentKey(experimentKey, experimentBucketVersion)
-            val assignments = getStickyBucketAssignments(context)
+            val assignments = getStickyBucketAssignments(context = context,
+                expHashAttribute = expHashAttribute, expFallBackAttribute = expFallBackAttribute, attributeOverrides = attributeOverrides )
 
             if (minExperimentBucketVersion > 0) {
                 for (version in 0..minExperimentBucketVersion) {
@@ -485,13 +530,6 @@ internal class GBUtils {
                 if (hashValue.isNotEmpty()) {
                     hashAttribute = fallback
                 }
-            }
-
-            val leftOperand: String = context.stickyBucketAssignmentDocs
-                ?.get("${fallback}||${attributeOverrides[fallback]}")
-                ?.attributeValue.toString()
-            if (leftOperand != attributeOverrides[fallback].toString()) {
-                context.stickyBucketAssignmentDocs = emptyMap()
             }
 
             return Pair(hashAttribute, hashValue)
