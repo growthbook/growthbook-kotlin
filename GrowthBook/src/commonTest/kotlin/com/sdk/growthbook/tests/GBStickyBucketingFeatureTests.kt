@@ -4,8 +4,11 @@ import com.sdk.growthbook.utils.toHashMap
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.stickybucket.GBStickyBucketServiceImp
+import com.sdk.growthbook.utils.GBStickyAssignmentsDocument
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Before
@@ -60,21 +63,39 @@ class GBStickyBucketingFeatureTests {
                 if (testData.stickyBucketAssignmentDocs != null) {
                     gbContext.stickyBucketAssignmentDocs = testData.stickyBucketAssignmentDocs
                 }
-                val expectedExperimentResult: GBExperimentResultTest? = if (item[3] is JsonNull) {
+
+
+                val listActualStickyAssigmentsDoc = mutableListOf<GBStickyAssignmentsDocument>()
+
+                item[2].jsonArray.forEach {
+                    listActualStickyAssigmentsDoc.add(
+                        Json.decodeFromJsonElement(GBStickyAssignmentsDocument.serializer(), it)
+                    )
+                }
+
+                val mapOfDocForContext = mutableMapOf<String, GBStickyAssignmentsDocument>()
+                for (doc in listActualStickyAssigmentsDoc) {
+                    val key = "${doc.attributeName}||${doc.attributeValue}"
+                    mapOfDocForContext[key] = doc
+                }
+
+                gbContext.stickyBucketAssignmentDocs = mapOfDocForContext
+
+                val expectedExperimentResult: GBExperimentResultTest? = if (item[4] is JsonNull) {
                     null
                 } else {
                     GBTestHelper.jsonParser.decodeFromJsonElement(
                         GBExperimentResultTest.serializer(),
-                        item[3]
+                        item[4]
                     )
                 }
 
-                val stickyAssigmentDocs = item[4].jsonObject.toHashMap()
+                val stickyAssigmentDocs = item[5].jsonObject.toHashMap()
 
                 val evaluator = GBFeatureEvaluator()
                 val actualExperimentResult = evaluator.evaluateFeature(
                     context = gbContext,
-                    featureKey = item[2].jsonPrimitive.content,
+                    featureKey = item[3].jsonPrimitive.content,
                     attributeOverrides = attributes
                 ).experimentResult
 
@@ -112,11 +133,14 @@ class GBStickyBucketingFeatureTests {
                 println()
                 val status =
                     item[0].toString() +
-                        "\nExpected Result - " + item[3] + " & " + stickyAssigmentDocs + "\n\n" +
+                        "\nExpected Result - " + item[4] + " & " + stickyAssigmentDocs + "\n\n" +
                         "\nActual result - " + actualExperimentResult.toString() + " & " + gbContext.stickyBucketAssignmentDocs + "\n\n"
 
-                if (expectedExperimentResult?.value.toString() == actualExperimentResult?.value.toString()
-                    && stickyAssigmentDocs.size == gbContext.stickyBucketAssignmentDocs?.size) {
+                if (
+                    expectedExperimentResult?.value.toString() == actualExperimentResult?.value.toString()
+                    &&
+                    stickyAssigmentDocs.size == gbContext.stickyBucketAssignmentDocs?.size
+                ) {
                     passedScenarios.add(status)
                 } else {
                     failedScenarios.add(status)
