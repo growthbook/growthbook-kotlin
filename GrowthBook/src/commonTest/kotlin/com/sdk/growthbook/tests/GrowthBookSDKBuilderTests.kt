@@ -33,10 +33,9 @@ class GrowthBookSDKBuilderTests {
             testHostURL,
             testAttributes,
             encryptionKey = null,
-            trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
-
-            },
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult -> },
             networkDispatcher = MockNetworkClient(null, null),
+            remoteEval = false
         ).initialize()
 
         assertEquals(sdkInstance.getGBContext().apiKey, testApiKey)
@@ -56,10 +55,9 @@ class GrowthBookSDKBuilderTests {
             testHostURL,
             attributes = testAttributes,
             encryptionKey = null,
-            trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
-
-            },
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult -> },
             networkDispatcher = MockNetworkClient(null, null),
+            remoteEval = false
             ).setRefreshHandler { isRefreshed, gbError ->
         }.setEnabled(false).setForcedVariations(variations).setQAMode(true).initialize()
 
@@ -81,11 +79,10 @@ class GrowthBookSDKBuilderTests {
             testHostURL,
             attributes = testAttributes,
             encryptionKey = null,
-            trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
-
-            },
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult -> },
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
-            ).setRefreshHandler { isRefreshed, gbError ->
+            remoteEval = false
+        ).setRefreshHandler { isRefreshed, gbError ->
 
         }
             .setEnabled(false).setForcedVariations(variations).setQAMode(true).initialize()
@@ -107,11 +104,10 @@ class GrowthBookSDKBuilderTests {
             testHostURL,
             attributes = testAttributes,
             encryptionKey = null,
-            trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
-
-            },
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult -> },
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
-            ).setRefreshHandler { _, gbError ->
+            remoteEval = false
+        ).setRefreshHandler { _, gbError ->
             isRefreshed = true
         }.initialize()
 
@@ -129,18 +125,17 @@ class GrowthBookSDKBuilderTests {
 
         var isRefreshed = false
         val gbError = GBError(error = null)
-        val gbCacheRefreshHandler: GBCacheRefreshHandler = { isRefreshed, gbError -> }
+        val gbCacheRefreshHandler: GBCacheRefreshHandler = { _, _ -> }
 
         val sdkInstance = GBSDKBuilder(
             testApiKey,
             testHostURL,
             encryptionKey = null,
             attributes = testAttributes,
-            trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
-
-            },
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult -> },
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
-            ).setRefreshHandler { _, gbError ->
+            remoteEval = false
+        ).setRefreshHandler { _, gbError ->
             isRefreshed = true
         }.initialize()
 
@@ -158,11 +153,10 @@ class GrowthBookSDKBuilderTests {
             testHostURL,
             attributes = testAttributes,
             encryptionKey = null,
-            trackingCallback = { gbExperiment: GBExperiment, gbExperimentResult: GBExperimentResult ->
-
-            },
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult -> },
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
-            ).setRefreshHandler { isRefreshed, gbError ->
+            remoteEval = false
+        ).setRefreshHandler { isRefreshed, gbError ->
         }.initialize()
 
         val featureValue = sdkInstance.feature("fwrfewrfe")
@@ -184,6 +178,7 @@ class GrowthBookSDKBuilderTests {
             encryptionKey = encryptionKey,
             trackingCallback = { _, _ -> },
             networkDispatcher = MockNetworkClient(json, null),
+            remoteEval = false
         ).initialize()
     }
 

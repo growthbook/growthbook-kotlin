@@ -62,9 +62,13 @@ class GBExperimentRunTests {
                 )
 
                 val status =
-                    item[0].toString() + "\nExpected Result - " + item[3] + " & " + item[4] + "\nActual result - " + result.value.toString() + " & " + result.inExperiment + "\n\n"
+                    item[0].toString() + "\nExpected Result - " + item[3] + " & " + item[4] +
+                        "\nActual result - " + result.value.toString() + " & " +
+                        result.inExperiment + "\n\n"
 
-                if (item[3].toString() == result.value.toString() && item[4].toString() == result.inExperiment.toString()) {
+                if (item[3].toString() == result.value.toString()
+                    && item[4].toString() == result.inExperiment.toString()
+                ) {
                     passedScenarios.add(status)
                 } else {
                     failedScenarios.add(status)
@@ -109,7 +113,13 @@ class GBExperimentRunTests {
                 }, encryptionKey = ""
             )
             val evaluator = GBExperimentEvaluator()
-            evaluator.evaluateExperiment(context = gbContext, experiment = experiment, attributeOverrides = attributes)
+
+            evaluator.evaluateExperiment(
+                context = gbContext,
+                experiment = experiment,
+                attributeOverrides = attributes
+            )
+
             evaluator.evaluateExperiment(
                 context = gbContext,
                 experiment = experiment,

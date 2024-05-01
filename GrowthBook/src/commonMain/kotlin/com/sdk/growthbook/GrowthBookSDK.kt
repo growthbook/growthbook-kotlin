@@ -105,6 +105,7 @@ class GBSDKBuilderJAVA(
     apiKey, hostURL,
     attributes, trackingCallback, encryptionKey, networkDispatcher, remoteEval
 ) {
+
     /**
      * Initialize the JAVA SDK
      */
@@ -178,7 +179,9 @@ class GBSDKBuilder(
      * Default prefix of filename `gbStickyBuckets__`
      * Example name of file be like `gbStickyBuckets__test||testAttribute.txt`
      */
-    fun setPrefixForStickyBucketCachedDirectory(prefix: String = "gbStickyBuckets__"): GBSDKBuilder {
+    fun setPrefixForStickyBucketCachedDirectory(
+        prefix: String = "gbStickyBuckets__"
+    ): GBSDKBuilder {
         this.stickyBucketService = GBStickyBucketServiceImp(prefix, CachingImpl.getLayer())
         return this
     }
@@ -211,7 +214,8 @@ class GBSDKBuilder(
 }
 
 /**
- * The main export of the libraries is a simple GrowthBook wrapper class that takes a Context object in the constructor.
+ * The main export of the libraries is a simple GrowthBook wrapper class
+ * that takes a Context object in the constructor.
  * It exposes two main methods: feature and run.
  */
 class GrowthBookSDK() : FeaturesFlowDelegate {
@@ -237,6 +241,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         gbContext = context
         this.refreshHandler = refreshHandler
         this.networkDispatcher = networkDispatcher
+
         /**
          * JAVA Consumers preset Features
          * SDK will not call API to fetch Features List
@@ -276,8 +281,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     }
 
     /**
-     * receive Features automatically when updated
-     * SSE
+     * receive Features automatically when updated SSE
      */
     @OptIn(DelicateCoroutinesApi::class)
     fun autoRefreshFeatures(): Flow<Resource<GBFeatures?>> {
@@ -331,7 +335,8 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     }
 
     /**
-     * The feature method takes a single string argument, which is the unique identifier for the feature and returns a FeatureResult object.
+     * The feature method takes a single string argument,
+     * which is the unique identifier for the feature and returns a FeatureResult object.
      */
     fun feature(id: String): GBFeatureResult {
         return GBFeatureEvaluator().evaluateFeature(
@@ -342,7 +347,8 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     }
 
     /**
-     * The isOn method takes a single string argument, which is the unique identifier for the feature and returns the feature state on/off
+     * The isOn method takes a single string argument,
+     * which is the unique identifier for the feature and returns the feature state on/off
      */
     fun isOn(featureDd: String): Boolean {
         return feature(id = featureDd).on
@@ -374,7 +380,8 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     }
 
     /**
-     * The setAttributes method replaces the Map of user attributes that are used to assign variations
+     * The setAttributes method replaces the Map of user attributes
+     * that are used to assign variations
      */
     fun setAttributes(attributes: Map<String, Any>) {
         gbContext.attributes = attributes

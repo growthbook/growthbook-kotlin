@@ -34,7 +34,8 @@ class GBUtilsTests {
                 val result = GBUtils.hash(testContext, hashVersion.toInt(), seed)
 
                 val status =
-                    item[0].toString() + "\nExpected Result - " + item[1].toString() + "\nActual result - " + result + "\n"
+                    item[0].toString() + "\nExpected Result - " + item[1].toString() +
+                        "\nActual result - " + result + "\n"
 
                 if (experiment == result.toString()) {
                     passedScenarios.add(status)
@@ -66,7 +67,8 @@ class GBUtilsTests {
                 var weights: List<Float>? = null
                 if (item[1].jsonArray[2] != JsonNull) {
                     weights =
-                        (item[1].jsonArray[2].jsonArray.toList() as? List<String>)?.map { value -> value.toFloat() }
+                        (item[1].jsonArray[2].jsonArray.toList() as? List<String>
+                            )?.map { value -> value.toFloat() }
                 }
 
                 val bucketRange = GBUtils.getBucketRanges(
@@ -76,7 +78,9 @@ class GBUtilsTests {
                 )
 
                 val status =
-                    item[0].toString() + "\nExpected Result - " + item[2].jsonArray.toString() + "\nActual result - " + bucketRange.toJsonElement().jsonArray.toString() + "\n"
+                    item[0].toString() + "\nExpected Result - " + item[2].jsonArray.toString() +
+                        "\nActual result - " +
+                        bucketRange.toJsonElement().jsonArray.toString() + "\n"
 
                 if (compareBucket(item[2].jsonArray.toList() as List<List<Float>>, bucketRange)) {
                     passedScenarios.add(status)
@@ -144,12 +148,14 @@ class GBUtilsTests {
             if (item is JsonArray) {
 
                 val hash = item[1].jsonPrimitive.content.toFloatOrNull()
-                val rangeData = getPairedData(item[2].jsonArray.toList() as List<List<Float>>)
+                val rangeData =
+                    getPairedData(item[2].jsonArray.toList() as List<List<Float>>)
 
                 val result = GBUtils.chooseVariation(hash ?: 0F, rangeData)
 
                 val status =
-                    item[0].toString() + "\nExpected Result - " + item[3].toString() + "\nActual result - " + result.toString() + "\n"
+                    item[0].toString() + "\nExpected Result - " + item[3].toString() +
+                        "\nActual result - " + result.toString() + "\n"
 
                 if (item[3].toString() == result.toString()) {
                     passedScenarios.add(status)
@@ -183,7 +189,8 @@ class GBUtilsTests {
                 val result = namespace?.let { GBUtils.inNamespace(userId, it) }
 
                 val status =
-                    item[0].toString() + "\nExpected Result - " + item[3].toString() + "\nActual result - " + result + "\n"
+                    item[0].toString() + "\nExpected Result - " + item[3].toString() +
+                        "\nActual result - " + result + "\n"
 
 
                 if (item[3].toString() == result.toString()) {

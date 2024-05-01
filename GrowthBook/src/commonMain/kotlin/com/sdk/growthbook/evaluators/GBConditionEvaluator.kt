@@ -14,9 +14,10 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
- * Both experiments and features can define targeting conditions using a syntax modeled after MongoDB queries.
- * These conditions can have arbitrary nesting levels and evaluating them requires recursion.
- * There are a handful of functions to define, and be aware that some of them may reference function definitions further below.
+ * Both experiments and features can define targeting conditions using a syntax modeled
+ * after MongoDB queries. These conditions can have arbitrary nesting levels
+ * and evaluating them requires recursion. There are a handful of functions to define,
+ * and be aware that some of them may reference function definitions further below.
  */
 
 /**
@@ -118,7 +119,8 @@ internal class GBConditionEvaluator {
                 val element = getPath(attributes, key)
                 val value = conditionObj.jsonObject[key]
                 if (value != null) {
-                    // If evalConditionValue(value, getPath(attributes, key)) is false, break out of loop and return false
+                    // If evalConditionValue(value, getPath(attributes, key)) is false,
+                    // break out of loop and return false
                     if (!evalConditionValue(value, element)) {
                         return false
                     }
@@ -140,7 +142,8 @@ internal class GBConditionEvaluator {
         } else {
             // Loop through the conditionObjects
             for (item in conditionObjs) {
-                // If evalCondition(attributes, conditionObjs[i]) is true, break out of the loop and return true
+                // If evalCondition(attributes, conditionObjs[i]) is true,
+                // break out of the loop and return true
                 if (evalCondition(attributes, item)) {
                     return true
                 }
@@ -157,7 +160,8 @@ internal class GBConditionEvaluator {
 
         // Loop through the conditionObjects
         for (item in conditionObjs) {
-            // If evalCondition(attributes, conditionObjs[i]) is false, break out of the loop and return false
+            // If evalCondition(attributes, conditionObjs[i]) is false,
+            // break out of the loop and return false
             if (!evalCondition(attributes, item)) {
                 return false
             }
@@ -168,7 +172,8 @@ internal class GBConditionEvaluator {
     }
 
     /**
-     * This accepts a parsed JSON object as input and returns true if every key in the object starts with $
+     * This accepts a parsed JSON object as input and returns true
+     * if every key in the object starts with $
      */
     fun isOperatorObject(obj: JsonElement): Boolean {
         var isOperator = true
@@ -254,8 +259,12 @@ internal class GBConditionEvaluator {
      */
     fun evalConditionValue(conditionValue: JsonElement, attributeValue: JsonElement?): Boolean {
 
-        // If conditionValue is a string, number, boolean, return true if it's "equal" to attributeValue and false if not.
-        if (conditionValue is JsonPrimitive && (attributeValue is JsonPrimitive || attributeValue == null)) {
+        // If conditionValue is a string, number, boolean, return true
+        // if it's "equal" to attributeValue and false if not.
+        if (
+            conditionValue is JsonPrimitive &&
+            (attributeValue is JsonPrimitive || attributeValue == null)
+        ) {
             return conditionValue.toString() == attributeValue.toString()
         }
 
@@ -263,7 +272,8 @@ internal class GBConditionEvaluator {
             return false
         }
 
-        // If conditionValue is array, return true if it's "equal" - "equal" should do a deep comparison for arrays.
+        // If conditionValue is array, return true if it's "equal" - "equal"
+        // should do a deep comparison for arrays.
         if (conditionValue is JsonArray) {
             return if (attributeValue is JsonArray) {
                 if (conditionValue.size == attributeValue.size) {
@@ -307,7 +317,8 @@ internal class GBConditionEvaluator {
     }
 
     /**
-     * This checks if attributeValue is an array, and if so at least one of the array items must match the condition
+     * This checks if attributeValue is an array,
+     * and if so at least one of the array items must match the condition
      */
     private fun elemMatch(attributeValue: JsonElement, condition: JsonElement): Boolean {
 
@@ -382,7 +393,8 @@ internal class GBConditionEvaluator {
 
                     if (attributeValue is JsonArray) {
                         // Loop through conditionValue array
-                        // If none of the elements in the attributeValue array pass evalConditionValue(conditionValue[i], attributeValue[j]), return false
+                        // If none of the elements in the attributeValue array pass
+                        // evalConditionValue(conditionValue[i], attributeValue[j]), return false
                         for (con in conditionValue) {
                             var result = false
                             for (attr in attributeValue) {
@@ -430,7 +442,9 @@ internal class GBConditionEvaluator {
                 }
                 // Evaluate LT operator - whether attribute less than to condition
                 "\$lt" -> {
-                    if (attributeValue?.doubleOrNull != null && conditionValue.doubleOrNull != null) {
+                    if (
+                        attributeValue?.doubleOrNull != null && conditionValue.doubleOrNull != null
+                    ) {
                         return (attributeValue?.doubleOrNull!! < conditionValue.doubleOrNull!!)
                     }
                     return if (sourcePrimitiveValue == null) {
@@ -441,7 +455,9 @@ internal class GBConditionEvaluator {
                 }
                 // Evaluate LTE operator - whether attribute less than or equal to condition
                 "\$lte" -> {
-                    if (attributeValue?.doubleOrNull != null && conditionValue.doubleOrNull != null) {
+                    if (
+                        attributeValue?.doubleOrNull != null && conditionValue.doubleOrNull != null
+                    ) {
                         return (attributeValue?.doubleOrNull!! <= conditionValue.doubleOrNull!!)
                     }
                     return if (sourcePrimitiveValue == null) {
@@ -452,7 +468,9 @@ internal class GBConditionEvaluator {
                 }
                 // Evaluate GT operator - whether attribute greater than to condition
                 "\$gt" -> {
-                    if (attributeValue?.doubleOrNull != null && conditionValue.doubleOrNull != null) {
+                    if (
+                        attributeValue?.doubleOrNull != null && conditionValue.doubleOrNull != null
+                    ) {
                         return (attributeValue?.doubleOrNull!! > conditionValue.doubleOrNull!!)
                     }
                     return if (sourcePrimitiveValue == null) {
@@ -463,7 +481,9 @@ internal class GBConditionEvaluator {
                 }
                 // Evaluate GTE operator - whether attribute greater than or equal to condition
                 "\$gte" -> {
-                    if (attributeValue?.doubleOrNull != null && conditionValue.doubleOrNull != null) {
+                    if (
+                        attributeValue?.doubleOrNull != null && conditionValue.doubleOrNull != null
+                    ) {
                         return (attributeValue?.doubleOrNull!! >= conditionValue.doubleOrNull!!)
                     }
                     return if (sourcePrimitiveValue == null) {
@@ -487,13 +507,17 @@ internal class GBConditionEvaluator {
                 "\$veq" -> return paddedVersionSource == paddedVersionTarget
                 // Evaluate VNE operator - whether versions are not equals to attribute
                 "\$vne" -> return paddedVersionSource != paddedVersionTarget
-                // Evaluate VGT operator - whether the first version is greater than the second version
+                // Evaluate VGT operator - whether the first version is greater
+                // than the second version
                 "\$vgt" -> return paddedVersionSource > paddedVersionTarget
-                // Evaluate VGTE operator - whether the first version is greater than or equal the second version
+                // Evaluate VGTE operator - whether the first version is greater
+                // than or equal the second version
                 "\$vgte" -> return paddedVersionSource >= paddedVersionTarget
-                // Evaluate VLT operator - whether the first version is lesser than the second version
+                // Evaluate VLT operator - whether the first version is lesser
+                // than the second version
                 "\$vlt" -> return paddedVersionSource < paddedVersionTarget
-                // Evaluate VLTE operator - whether the first version is lesser than or equal the second version
+                // Evaluate VLTE operator - whether the first version is lesser
+                // than or equal the second version
                 "\$vlte" -> return paddedVersionSource <= paddedVersionTarget
             }
         }

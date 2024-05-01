@@ -3,6 +3,10 @@ package com.sdk.growthbook.utils
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.readUTF8Line
 
+/**
+ * Extension method for ByteReadChannel that read SSE response data,
+ * validate it and send it to onSseEvent callback
+ */
 internal suspend fun ByteReadChannel.readSse(
     onSseEvent: (Resource<String>) -> (Unit)
 ) {
@@ -35,6 +39,11 @@ internal suspend fun ByteReadChannel.readSse(
     }
 }
 
+/**
+ * A helper method to parse SSE string line into a field and value.
+ * Then depending on the value of the field - wrapped it
+ * to SSeResponse and send it to the onSseResponse callback
+ */
 private fun parseSseLine(
     line: String?,
     onSseResponse: (SseResponse) -> (Unit)

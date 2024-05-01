@@ -75,8 +75,12 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         isSuccess = false
         isError = true
         val viewModel = FeaturesViewModel(
-            this,
-            FeaturesDataSource(MockNetworkClient(null, Throwable("UNKNOWN", null))), null
+            delegate = this,
+            dataSource = FeaturesDataSource(
+                MockNetworkClient(
+                    null, Throwable("UNKNOWN", null)
+                )
+            )
         )
 
         viewModel.fetchFeatures()
@@ -92,8 +96,13 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         isSuccess = false
         isError = true
         val viewModel = FeaturesViewModel(
-            this,
-            FeaturesDataSource(MockNetworkClient(MockResponse.ERROR_RESPONSE, null)), ""
+            delegate = this,
+            dataSource = FeaturesDataSource(
+                MockNetworkClient(
+                    MockResponse.ERROR_RESPONSE, null
+                )
+            ),
+            encryptionKey = "",
         )
         viewModel.fetchFeatures()
 

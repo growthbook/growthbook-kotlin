@@ -10,7 +10,11 @@ import kotlinx.serialization.json.decodeFromJsonElement
 internal class GBStickyBucketServiceImp(
     private val prefix: String = "gbStickyBuckets__",
     private val localStorage: CachingLayer? = null
-): GBStickyBucketService {
+) : GBStickyBucketService {
+
+    /**
+     * Method for get assignment document from cache by attribute name and attribute value
+     */
     override fun getAssignments(
         attributeName: String,
         attributeValue: String
@@ -30,6 +34,9 @@ internal class GBStickyBucketServiceImp(
         return null
     }
 
+    /**
+     * Method for saving assignments document to cache
+     */
     override fun saveAssignments(doc: GBStickyAssignmentsDocument) {
         val key = "${doc.attributeName}||${doc.attributeValue}"
 
@@ -44,8 +51,14 @@ internal class GBStickyBucketServiceImp(
         }
     }
 
-    override fun getAllAssignments(attributes: Map<String, String>): Map<String, GBStickyAssignmentsDocument> {
-        val docs = mutableMapOf<String, GBStickyAssignmentsDocument>()
+    /**
+     * Method for getting sticky bucket assignments from attributes of context
+     */
+    override fun getAllAssignments(
+        attributes: Map<String, String>
+    ): Map<String, GBStickyAssignmentsDocument> {
+        val docs =
+            mutableMapOf<String, GBStickyAssignmentsDocument>()
 
         attributes.forEach { (key, value) ->
             getAssignments(key, value)?.let { doc ->

@@ -17,7 +17,9 @@ class GBTestHelper {
     companion object {
 
         val jsonParser = Json { ignoreUnknownKeys = true }
-        val testData = jsonParser.decodeFromString(JsonElement.serializer(), gbTestCases)
+        val testData = jsonParser.decodeFromString(
+            JsonElement.serializer(), gbTestCases
+        )
 
         fun getEvalConditionData(): JsonArray {
             val array = testData.jsonObject.get("evalCondition") as JsonArray

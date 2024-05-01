@@ -56,6 +56,9 @@ interface NetworkDispatcher {
 @Suppress("unused")
 class DefaultGBNetworkClient : NetworkDispatcher {
 
+    /**
+     * Ktor http client instance for sending request
+     */
     private val client = HttpClient {
         install(ContentNegotiation) {
             json(Json {
@@ -66,6 +69,9 @@ class DefaultGBNetworkClient : NetworkDispatcher {
         }
     }
 
+    /**
+     * Function that execute API Call to fetch features
+     */
     @DelicateCoroutinesApi
     override fun consumeGETRequest(
         request: String,
@@ -85,6 +91,9 @@ class DefaultGBNetworkClient : NetworkDispatcher {
         }
     }
 
+    /**
+     * Supportive method for preparing GET request for consuming SSE connection
+     */
     private suspend fun prepareGetRequest(
         url: String,
         headers: Map<String, String> = emptyMap(),
@@ -97,6 +106,9 @@ class DefaultGBNetworkClient : NetworkDispatcher {
             queryParams.forEach { (key, value) -> addOrReplaceParameter(key, value) }
         }
 
+    /**
+     * Method that produce SSE connection
+     */
     @OptIn(DelicateCoroutinesApi::class)
     override fun consumeSSEConnection(
         url: String
@@ -120,6 +132,9 @@ class DefaultGBNetworkClient : NetworkDispatcher {
         awaitClose()
     }
 
+    /**
+     * Method that make POST request to server for remote feature evaluation
+     */
     @OptIn(DelicateCoroutinesApi::class)
     override fun consumePOSTRequest(
         url: String,
@@ -146,6 +161,10 @@ class DefaultGBNetworkClient : NetworkDispatcher {
         }
     }
 
+    /**
+     * Supportive extensions method, for HttpRequestBuilder object,
+     * that replace parameter in prepare get request method
+     */
     private fun HttpRequestBuilder.addOrReplaceParameter(key: String, value: String?): Unit =
         value?.let {
             url.parameters.remove(key)
