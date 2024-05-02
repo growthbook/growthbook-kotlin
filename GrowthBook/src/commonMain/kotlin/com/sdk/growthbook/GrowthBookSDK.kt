@@ -23,7 +23,7 @@ import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 
 typealias GBTrackingCallback = (GBExperiment, GBExperimentResult) -> Unit
-typealias GBFeatureUsageCallback = (String, GBFeatureResult) -> Unit
+typealias GBFeatureUsageCallback = (featureKey: String, gbFeatureResult: GBFeatureResult) -> Unit
 
 /**
  * The main export of the libraries is a simple GrowthBook wrapper class
