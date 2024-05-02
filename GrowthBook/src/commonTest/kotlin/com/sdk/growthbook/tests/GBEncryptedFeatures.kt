@@ -3,8 +3,6 @@ package com.sdk.growthbook.tests
 import com.sdk.growthbook.GBSDKBuilder
 import com.sdk.growthbook.utils.DefaultCrypto
 import com.sdk.growthbook.utils.encryptToFeaturesDataModel
-import com.sdk.growthbook.model.GBExperiment
-import com.sdk.growthbook.model.GBExperimentResult
 import com.soywiz.krypto.encoding.Base64
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.serialization.json.JsonArray
@@ -58,9 +56,7 @@ class GBEncryptedFeatures {
             attributes = testAttributes,
             //TODO
             encryptionKey = "",
-            trackingCallback = { _: GBExperiment, _: GBExperimentResult ->
-
-            },
+            trackingCallback = { _, _ -> },
             networkDispatcher = MockNetworkClient(null, null),
             ).initialize()
 

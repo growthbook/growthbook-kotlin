@@ -32,6 +32,11 @@ internal class GBFeatureEvaluator {
             evaluatedFeatures = mutableSetOf()
         )
     ): GBFeatureResult {
+        /**
+         * This callback serves for listening for feature usage events
+         */
+        val onFeatureUsageCallback = context.onFeatureUsage
+        
         try {
 
             /**
@@ -39,10 +44,17 @@ internal class GBFeatureEvaluator {
              */
             print("evaluateFeature: circular dependency detected:")
             if (evalContext.evaluatedFeatures.contains(featureKey)) {
-                return prepareResult(
+                val featureResultWhenCircularDependencyDetected = prepareResult(
                     value = null,
                     source = GBFeatureSource.cyclicPrerequisite
                 )
+                
+                onFeatureUsageCallback?.invoke(
+                    featureKey, 
+                    featureResultWhenCircularDependencyDetected
+                )
+
+                return featureResultWhenCircularDependencyDetected
             }
             evalContext.evaluatedFeatures.add(featureKey)
 
@@ -71,10 +83,17 @@ internal class GBFeatureEvaluator {
                              * break out for cyclic prerequisites
                              */
                             if (parentResult.source == GBFeatureSource.cyclicPrerequisite) {
-                                return prepareResult(
+                                val featureResultWhenCircularDependencyDetected = prepareResult(
                                     value = null,
                                     source = GBFeatureSource.cyclicPrerequisite
                                 )
+                                
+                                onFeatureUsageCallback?.invoke(
+                                    featureKey,
+                                    featureResultWhenCircularDependencyDetected
+                                )
+
+                                return featureResultWhenCircularDependencyDetected
                             }
 
                             val evalObj = parentResult.value?.let { value ->
@@ -93,10 +112,18 @@ internal class GBFeatureEvaluator {
                                  */
                                 if (parentCondition.gate != false) {
                                     println("Feature blocked by prerequisite")
-                                    return prepareResult(
+                                    
+                                    val featureResultWhenBlockedByPrerequisite = prepareResult(
                                         value = null,
                                         source = GBFeatureSource.prerequisite
                                     )
+                                    
+                                    onFeatureUsageCallback?.invoke(
+                                        featureKey, 
+                                        featureResultWhenBlockedByPrerequisite
+                                    )
+                                    
+                                    return featureResultWhenBlockedByPrerequisite
                                 }
                                 /**
                                  * non-blocking prerequisite eval failed: break out
@@ -203,8 +230,18 @@ internal class GBFeatureEvaluator {
                                 }
                             }
                         }
+                        val forcedFeatureResult =
+                            prepareResult(
+                                value = rule.force,
+                                source = GBFeatureSource.force
+                            )
 
-                        return prepareResult(value = rule.force, source = GBFeatureSource.force)
+                        onFeatureUsageCallback?.invoke(
+                            featureKey,
+                            forcedFeatureResult
+                        )
+
+                        return forcedFeatureResult
                     } else {
 
                         val variation = rule.variations
@@ -244,12 +281,19 @@ internal class GBFeatureEvaluator {
                                     attributeOverrides = attributeOverrides
                                 )
                             if (result.inExperiment && (result.passthrough != true)) {
-                                return prepareResult(
+                                val experimentFeatureResult = prepareResult(
                                     value = result.value,
                                     source = GBFeatureSource.experiment,
                                     experiment = exp,
                                     experimentResult = result
                                 )
+
+                                onFeatureUsageCallback?.invoke(
+                                    featureKey,
+                                    experimentFeatureResult
+                                )
+
+                                return experimentFeatureResult
                             }
                         } else {
                             continue
@@ -261,16 +305,33 @@ internal class GBFeatureEvaluator {
             /**
              * Return (value = defaultValue or null, source = defaultValue)
              */
-            return prepareResult(
+            val defaultFeatureResult = prepareResult(
                 value = targetFeature.defaultValue,
                 source = GBFeatureSource.defaultValue
             )
+
+            onFeatureUsageCallback?.invoke(
+                featureKey,
+                defaultFeatureResult
+            )
+
+            return defaultFeatureResult
         } catch (exception: Exception) {
             /**
              * If the key doesn't exist in context.features, return immediately
              * (value = null, source = unknownFeature).
              */
-            return prepareResult(value = null, source = GBFeatureSource.unknownFeature)
+            val emptyFeatureResult = prepareResult(
+                value = null,
+                source = GBFeatureSource.unknownFeature
+            )
+
+            onFeatureUsageCallback?.invoke(
+                featureKey,
+                emptyFeatureResult
+            )
+
+            return emptyFeatureResult
         }
     }
 

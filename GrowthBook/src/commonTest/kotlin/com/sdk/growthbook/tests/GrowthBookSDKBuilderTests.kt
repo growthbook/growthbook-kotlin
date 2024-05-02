@@ -31,7 +31,7 @@ class GrowthBookSDKBuilderTests {
         val sdkInstance = GBSDKBuilder(
             testApiKey,
             testHostURL,
-            testAttributes,
+            attributes = testAttributes,
             encryptionKey = null,
             trackingCallback = { _: GBExperiment, _: GBExperimentResult -> },
             networkDispatcher = MockNetworkClient(null, null),
