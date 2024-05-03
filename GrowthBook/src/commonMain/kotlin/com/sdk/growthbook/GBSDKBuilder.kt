@@ -104,8 +104,9 @@ class GBSDKBuilder(
         stickyBucketService: GBStickyBucketService = GBStickyBucketServiceImp(
             localStorage = CachingImpl.getLayer()
         )
-    ) {
+    ): GBSDKBuilder {
         this.stickyBucketService = stickyBucketService
+        return this
     }
 
     /**

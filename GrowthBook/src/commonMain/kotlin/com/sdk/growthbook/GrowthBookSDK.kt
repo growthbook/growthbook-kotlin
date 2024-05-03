@@ -162,8 +162,8 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
      * The isOn method takes a single string argument,
      * which is the unique identifier for the feature and returns the feature state on/off
      */
-    fun isOn(featureDd: String): Boolean {
-        return feature(id = featureDd).on
+    fun isOn(featureId: String): Boolean {
+        return feature(id = featureId).on
     }
 
     /**
@@ -210,6 +210,10 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
             refreshStickyBucketService()
         }
         refreshForRemoteEval()
+    }
+
+    fun getAttributeOverrides(): Map<String, Any> {
+        return attributeOverrides
     }
 
     /**
