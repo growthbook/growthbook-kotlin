@@ -1,6 +1,5 @@
 package com.sdk.growthbook.network
 
-import com.sdk.growthbook.ApplicationDispatcher
 import com.sdk.growthbook.utils.Resource
 import com.sdk.growthbook.utils.readSse
 import com.sdk.growthbook.utils.toJsonElement
@@ -18,8 +17,8 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.ByteReadChannel
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -31,7 +30,6 @@ import kotlinx.serialization.json.Json
  * Implement this interface to define specific implementation for Network Calls - to be made by SDK
  */
 interface NetworkDispatcher {
-    @DelicateCoroutinesApi
     fun consumeGETRequest(
         request: String,
         onSuccess: (String) -> Unit,
@@ -53,7 +51,6 @@ interface NetworkDispatcher {
 /**
  * Default Ktor Implementation for Network Dispatcher
  */
-@Suppress("unused")
 class DefaultGBNetworkClient : NetworkDispatcher {
 
     /**
@@ -72,14 +69,12 @@ class DefaultGBNetworkClient : NetworkDispatcher {
     /**
      * Function that execute API Call to fetch features
      */
-    @DelicateCoroutinesApi
     override fun consumeGETRequest(
         request: String,
         onSuccess: (String) -> Unit,
         onError: (Throwable) -> Unit
     ) {
-
-        GlobalScope.launch(ApplicationDispatcher) {
+        CoroutineScope(Dispatchers.IO).launch {
 
             try {
                 val result = client.get(request)
@@ -109,11 +104,10 @@ class DefaultGBNetworkClient : NetworkDispatcher {
     /**
      * Method that produce SSE connection
      */
-    @OptIn(DelicateCoroutinesApi::class)
     override fun consumeSSEConnection(
         url: String
     ) = callbackFlow {
-        GlobalScope.launch(ApplicationDispatcher) {
+        CoroutineScope(Dispatchers.IO).launch {
             try {
                 prepareGetRequest(url).execute { response ->
                     val channel: ByteReadChannel = response.body()
@@ -135,14 +129,13 @@ class DefaultGBNetworkClient : NetworkDispatcher {
     /**
      * Method that make POST request to server for remote feature evaluation
      */
-    @OptIn(DelicateCoroutinesApi::class)
     override fun consumePOSTRequest(
         url: String,
         bodyParams: Map<String, Any>,
         onSuccess: (String) -> Unit,
         onError: (Throwable) -> Unit
     ) {
-        GlobalScope.launch(ApplicationDispatcher) {
+        CoroutineScope(Dispatchers.IO).launch {
             try {
                 val response = client.post(url) {
                     headers {

@@ -6,7 +6,6 @@ import com.sdk.growthbook.utils.FeatureRefreshStrategy
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.utils.GBRemoteEvalParams
 import com.sdk.growthbook.utils.Resource
-import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.transform
 import kotlinx.serialization.decodeFromString
@@ -35,7 +34,6 @@ internal class FeaturesDataSource(private val dispatcher: NetworkDispatcher) {
     /**
      * Executes API Call to fetch features
      */
-    @DelicateCoroutinesApi
     fun fetchFeatures(
         success: (FeaturesDataModel) -> Unit, failure: (Throwable?) -> Unit
     ) {
@@ -55,7 +53,6 @@ internal class FeaturesDataSource(private val dispatcher: NetworkDispatcher) {
     /**
      * Supportive method for automatically refresh features
      */
-    @DelicateCoroutinesApi
     fun autoRefresh(
         success: (FeaturesDataModel) -> Unit, failure: (Throwable?) -> Unit
     ): Flow<Resource<GBFeatures?>> = dispatcher.consumeSSEConnection(

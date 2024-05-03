@@ -2,7 +2,6 @@ package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.network.NetworkDispatcher
 import com.sdk.growthbook.utils.Resource
-import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 
 class MockNetworkClient(
@@ -10,7 +9,6 @@ class MockNetworkClient(
     private val error: Throwable?
 ) : NetworkDispatcher {
 
-    @DelicateCoroutinesApi
     override fun consumeGETRequest(
         request: String,
         onSuccess: (String) -> Unit,
