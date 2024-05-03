@@ -4,4 +4,5 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 
 // 1
-internal actual val ApplicationDispatcher: CoroutineDispatcher = Dispatchers.Default
+internal actual val PlatformDependentIODispatcher: CoroutineDispatcher =
+    Dispatchers.IO

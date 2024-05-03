@@ -1,5 +1,6 @@
 package com.sdk.growthbook.network
 
+import com.sdk.growthbook.PlatformDependentIODispatcher
 import com.sdk.growthbook.utils.Resource
 import com.sdk.growthbook.utils.readSse
 import com.sdk.growthbook.utils.toJsonElement
@@ -18,7 +19,6 @@ import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.ByteReadChannel
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -74,8 +74,7 @@ class DefaultGBNetworkClient : NetworkDispatcher {
         onSuccess: (String) -> Unit,
         onError: (Throwable) -> Unit
     ) {
-        CoroutineScope(Dispatchers.IO).launch {
-
+        CoroutineScope(PlatformDependentIODispatcher).launch {
             try {
                 val result = client.get(request)
                 onSuccess(result.body())
@@ -107,7 +106,7 @@ class DefaultGBNetworkClient : NetworkDispatcher {
     override fun consumeSSEConnection(
         url: String
     ) = callbackFlow {
-        CoroutineScope(Dispatchers.IO).launch {
+        CoroutineScope(PlatformDependentIODispatcher).launch {
             try {
                 prepareGetRequest(url).execute { response ->
                     val channel: ByteReadChannel = response.body()
@@ -135,7 +134,7 @@ class DefaultGBNetworkClient : NetworkDispatcher {
         onSuccess: (String) -> Unit,
         onError: (Throwable) -> Unit
     ) {
-        CoroutineScope(Dispatchers.IO).launch {
+        CoroutineScope(PlatformDependentIODispatcher).launch {
             try {
                 val response = client.post(url) {
                     headers {
