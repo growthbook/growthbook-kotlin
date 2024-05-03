@@ -8,6 +8,7 @@ import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeatureSource
+import com.sdk.growthbook.stickybucket.GBStickyBucketServiceImp
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -31,7 +32,7 @@ class GrowthBookSDKBuilderTests {
         val sdkInstance = GBSDKBuilder(
             testApiKey,
             testHostURL,
-            testAttributes,
+            attributes = testAttributes,
             encryptionKey = null,
             trackingCallback = { _: GBExperiment, _: GBExperimentResult -> },
             networkDispatcher = MockNetworkClient(null, null),
@@ -58,7 +59,7 @@ class GrowthBookSDKBuilderTests {
             trackingCallback = { _: GBExperiment, _: GBExperimentResult -> },
             networkDispatcher = MockNetworkClient(null, null),
             remoteEval = false
-            ).setRefreshHandler { isRefreshed, gbError ->
+        ).setRefreshHandler { isRefreshed, gbError ->
         }.setEnabled(false).setForcedVariations(variations).setQAMode(true).initialize()
 
         assertTrue(sdkInstance.getGBContext().apiKey == testApiKey)
@@ -166,6 +167,145 @@ class GrowthBookSDKBuilderTests {
         assertTrue(expValue.variationId == 0)
     }
 
+    @Test
+    fun testSDKInitializationDataWithEncrypted() {
+        // val viewModel: FeaturesViewModel()
+        val variations: HashMap<String, Int> = HashMap()
+
+        val sdkInstance = buildSDK(
+            MockResponse.successResponseEncryptedFeatures,
+            testAttributes,
+            testKeyString
+        )
+        assertEquals(sdkInstance.getGBContext().attributes, testAttributes)
+        assertEquals(true, sdkInstance.getFeatures() is GBFeatures)
+        println("from end of decrypted test")
+    }
+
+    @Test
+    fun test_setPrefixForStickyBucketCachedDirectory_Ok() {
+        val sdkInstance = GBSDKBuilder(
+            testApiKey,
+            testHostURL,
+            attributes = testAttributes,
+            encryptionKey = null,
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult -> },
+            networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
+            remoteEval = false
+        ).setPrefixForStickyBucketCachedDirectory(
+            prefix = "test_prefix"
+        ).initialize()
+
+        assertTrue { sdkInstance.getGBContext().stickyBucketService != null }
+        assertTrue { sdkInstance.getGBContext().stickyBucketService is GBStickyBucketServiceImp }
+    }
+
+    @Test
+    fun test_setStickyBucketService_Ok() {
+        val sdkInstance = GBSDKBuilder(
+            testApiKey,
+            testHostURL,
+            attributes = testAttributes,
+            encryptionKey = null,
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult -> },
+            networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
+            remoteEval = false
+        ).setStickyBucketService()
+            .initialize()
+
+        assertTrue { sdkInstance.getGBContext().stickyBucketService != null }
+        assertTrue { sdkInstance.getGBContext().stickyBucketService is GBStickyBucketServiceImp }
+    }
+
+    @Test
+    fun test_setForcedVariations_Ok() {
+        val expectedForcedVariation = mapOf("user" to 1234)
+        val sdkInstance = GBSDKBuilder(
+            testApiKey,
+            testHostURL,
+            attributes = testAttributes,
+            encryptionKey = null,
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult -> },
+            networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
+            remoteEval = false
+        ).setForcedVariations(expectedForcedVariation)
+            .initialize()
+
+        val actualForcedVariation = sdkInstance.getGBContext().forcedVariations
+
+        assertTrue { actualForcedVariation.isNotEmpty() }
+        assertEquals(actualForcedVariation, expectedForcedVariation)
+    }
+
+    @Test
+    fun test_setForcedVariationsWithRemoteEval_Ok() {
+        val expectedForcedVariation = mapOf("user" to 1234)
+        val sdkInstance = GBSDKBuilder(
+            testApiKey,
+            testHostURL,
+            attributes = testAttributes,
+            encryptionKey = null,
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult -> },
+            networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
+            remoteEval = true
+        ).setForcedVariations(expectedForcedVariation)
+            .initialize()
+        sdkInstance.setForcedFeatures(mapOf("featureForce" to 112))
+
+        sdkInstance
+
+        val actualForcedVariation = sdkInstance.getGBContext().forcedVariations
+
+        assertTrue { actualForcedVariation.isNotEmpty() }
+        assertEquals(actualForcedVariation, expectedForcedVariation)
+        assertTrue { sdkInstance.getForcedFeatures().isNotEmpty() }
+    }
+
+    @Test
+    fun test_setAttributesOverrides_Ok() {
+        val expectedAttributes = mapOf("user" to false)
+        val sdkInstance = GBSDKBuilder(
+            testApiKey,
+            testHostURL,
+            attributes = expectedAttributes,
+            encryptionKey = null,
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult -> },
+            networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
+            remoteEval = false
+        )
+            .initialize()
+
+        sdkInstance.setAttributeOverrides(expectedAttributes)
+
+        val actualAttributesOverrides = sdkInstance.getAttributeOverrides()
+
+        assertTrue { actualAttributesOverrides.isNotEmpty() }
+        assertEquals(actualAttributesOverrides, expectedAttributes)
+    }
+
+    @Test
+    fun test_setAttributesOverridesWithStickyBucketing_Ok() {
+        val expectedAttributes = mapOf("user" to false)
+        val sdkInstance = GBSDKBuilder(
+            testApiKey,
+            testHostURL,
+            attributes = expectedAttributes,
+            encryptionKey = null,
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult -> },
+            networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
+            remoteEval = true
+        ).setStickyBucketService(GBStickyBucketServiceImp())
+            .initialize()
+
+        sdkInstance.setAttributeOverrides(expectedAttributes)
+
+        val actualAttributesOverrides = sdkInstance.getAttributeOverrides()
+
+        assertTrue { actualAttributesOverrides.isNotEmpty() }
+        assertTrue { sdkInstance.getGBContext().stickyBucketService != null }
+        assertEquals(actualAttributesOverrides, expectedAttributes)
+    }
+
     private fun buildSDK(
         json: String,
         attributes: Map<String, Any> = mapOf(),
@@ -180,21 +320,6 @@ class GrowthBookSDKBuilderTests {
             networkDispatcher = MockNetworkClient(json, null),
             remoteEval = false
         ).initialize()
-    }
-
-    @Test
-    fun testSDKInitializationDataWithEncrypted() {
-        // val viewModel: FeaturesViewModel()
-        val variations: HashMap<String, Int> = HashMap()
-
-        val sdkInstance = buildSDK(
-            MockResponse.successResponseEncryptedFeatures,
-            testAttributes,
-            testKeyString
-        )
-        assertEquals(sdkInstance.getGBContext().attributes, testAttributes)
-        assertEquals(true, sdkInstance.getFeatures() is GBFeatures)
-        println("from end of decrypted test")
     }
 
 //    @Test

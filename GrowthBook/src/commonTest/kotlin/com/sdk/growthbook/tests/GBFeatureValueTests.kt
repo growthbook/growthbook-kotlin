@@ -1,5 +1,7 @@
 package com.sdk.growthbook.tests
 
+import com.sdk.growthbook.GBSDKBuilder
+import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.utils.toHashMap
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
 import com.sdk.growthbook.model.GBContext
@@ -8,6 +10,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class GBFeatureValueTests {
@@ -43,6 +46,9 @@ class GBFeatureValueTests {
                 )
                 if (testData.features != null) {
                     gbContext.features = testData.features
+                }
+                if (testData.forcedVariations != null) {
+                    gbContext.forcedVariations = testData.forcedVariations.toHashMap()
                 }
 
                 val evaluator = GBFeatureEvaluator()
@@ -95,5 +101,86 @@ class GBFeatureValueTests {
         print(failedScenarios)
 
         assertTrue(failedScenarios.size == 0)
+    }
+
+    @Test
+    fun `whether featureUsageCallback is called`() {
+        val expectedNumberOfOnFeatureUsageCalls = 1
+        var actualNumberOfOnFeatureUsageCalls = 0
+
+        val builder = GBSDKBuilder(
+            apiKey = "",
+            hostURL = "",
+            networkDispatcher = MockNetworkClient(
+                successResponse = null,
+                error = null,
+            ),
+            attributes = emptyMap(),
+            trackingCallback = { _, _ -> },
+        )
+
+        builder.setFeatureUsageCallback { _, _ ->
+            actualNumberOfOnFeatureUsageCalls++
+        }
+
+        val sdk: GrowthBookSDK = builder.initialize()
+
+        for (item in evalConditions) {
+            if (item is JsonArray) {
+                sdk.feature(id = item[2].jsonPrimitive.content)
+                break
+            }
+        }
+
+        assertEquals(expectedNumberOfOnFeatureUsageCalls, actualNumberOfOnFeatureUsageCalls)
+    }
+
+    @Test
+    fun `whether featureUsageCallback is called on context level`() {
+        val expectedNumberOfOnFeatureUsageCalls = 1
+        var actualNumberOfOnFeatureUsageCalls = 0
+
+        for (item in evalConditions) {
+            if (item is JsonArray) {
+
+                val testData =
+                    GBTestHelper.jsonParser.decodeFromJsonElement(
+                        GBFeaturesTest.serializer(),
+                        item[1]
+                    )
+
+                val attributes = testData.attributes.jsonObject.toHashMap()
+
+                val gbContext = GBContext(
+                    apiKey = "",
+                    hostURL = "",
+                    enabled = true,
+                    attributes = attributes,
+                    forcedVariations = HashMap(),
+                    qaMode = false,
+                    trackingCallback = { _, _ -> },
+                    onFeatureUsage = { _, _ ->
+                        actualNumberOfOnFeatureUsageCalls++
+                    },
+                    encryptionKey = ""
+                )
+                if (testData.features != null) {
+                    gbContext.features = testData.features
+                }
+                if (testData.forcedVariations != null) {
+                    gbContext.forcedVariations = testData.forcedVariations.toHashMap()
+                }
+
+                val evaluator = GBFeatureEvaluator()
+                evaluator.evaluateFeature(
+                    context = gbContext,
+                    featureKey = item[2].jsonPrimitive.content,
+                    attributeOverrides = attributes
+                )
+
+                assertEquals(expectedNumberOfOnFeatureUsageCalls, actualNumberOfOnFeatureUsageCalls)
+                break
+            }
+        }
     }
 }

@@ -67,6 +67,11 @@ class GBContext(
     val trackingCallback: (GBExperiment, GBExperimentResult) -> Unit,
 
     /**
+     * A callback that will be invoked every time a feature is viewed. Listen for feature usage events
+     */
+    val onFeatureUsage: ((String, GBFeatureResult) -> Unit)? = null,
+
+    /**
      * Flag which defines whether to use Remote Evaluation
      */
     val remoteEval: Boolean = false,
