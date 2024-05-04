@@ -19,6 +19,7 @@ import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.ByteReadChannel
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -34,7 +35,7 @@ interface NetworkDispatcher {
         request: String,
         onSuccess: (String) -> Unit,
         onError: (Throwable) -> Unit
-    )
+    ): Job
 
     fun consumeSSEConnection(
         url: String
@@ -48,15 +49,8 @@ interface NetworkDispatcher {
     )
 }
 
-/**
- * Default Ktor Implementation for Network Dispatcher
- */
-class DefaultGBNetworkClient : NetworkDispatcher {
-
-    /**
-     * Ktor http client instance for sending request
-     */
-    private val client = HttpClient {
+internal fun createDefaultHttpClient(): HttpClient =
+    HttpClient {
         install(ContentNegotiation) {
             json(Json {
                 prettyPrint = true
@@ -66,6 +60,18 @@ class DefaultGBNetworkClient : NetworkDispatcher {
         }
     }
 
+/**
+ * Default Ktor Implementation for Network Dispatcher
+ */
+class DefaultGBNetworkClient(
+
+    /**
+     * Ktor http client instance for sending request
+     */
+    private val client: HttpClient = createDefaultHttpClient()
+
+) : NetworkDispatcher {
+
     /**
      * Function that execute API Call to fetch features
      */
@@ -73,17 +79,15 @@ class DefaultGBNetworkClient : NetworkDispatcher {
         request: String,
         onSuccess: (String) -> Unit,
         onError: (Throwable) -> Unit
-    ) {
+    ): Job =
         CoroutineScope(PlatformDependentIODispatcher).launch {
+            val result = client.get(request)
             try {
-                val result = client.get(request)
                 onSuccess(result.body())
             } catch (ex: Exception) {
                 onError(ex)
             }
-
         }
-    }
 
     /**
      * Supportive method for preparing GET request for consuming SSE connection

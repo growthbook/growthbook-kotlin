@@ -62,7 +62,8 @@ kotlin {
             dependencies {
                 implementation(kotlin("test-junit"))
                 implementation("junit:junit:4.13.2")
-                implementation("org.mockito:mockito-core:4.2.0")
+                implementation("org.mockito:mockito-core:4.8.0")
+                implementation("io.ktor:ktor-client-mock:$ktorVersion")
                 implementation("com.soywiz.korlibs.krypto:krypto-android:$kryptoVersion")
             }
         }
