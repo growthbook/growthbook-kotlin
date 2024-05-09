@@ -6,7 +6,6 @@ import com.sdk.growthbook.sandbox.CachingImpl
 import com.sdk.growthbook.stickybucket.GBStickyBucketService
 import com.sdk.growthbook.stickybucket.GBStickyBucketServiceImp
 import com.sdk.growthbook.utils.GBCacheRefreshHandler
-import kotlinx.coroutines.DelicateCoroutinesApi
 
 /**
  * SDKBuilder - Root Class for SDK Initializers for GrowthBook SDK
@@ -58,7 +57,6 @@ abstract class SDKBuilder(
     /**
      * This method is open to be overridden by subclasses
      */
-    @DelicateCoroutinesApi
     abstract fun initialize(): GrowthBookSDK
 }
 
@@ -134,7 +132,6 @@ class GBSDKBuilder(
     /**
      * Initialize the Kotlin SDK
      */
-    @DelicateCoroutinesApi
     override fun initialize(): GrowthBookSDK {
 
         val gbContext = GBContext(

@@ -19,7 +19,6 @@ import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeatureResult
-import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 
 typealias GBTrackingCallback = (GBExperiment, GBExperimentResult) -> Unit
@@ -43,7 +42,6 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         internal lateinit var gbContext: GBContext
     }
 
-    @DelicateCoroutinesApi
     internal constructor(
         context: GBContext,
         refreshHandler: GBCacheRefreshHandler?,
@@ -76,7 +74,6 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     /**
      * Manually Refresh Cache
      */
-    @DelicateCoroutinesApi
     fun refreshCache() {
         if (gbContext.remoteEval) {
             refreshForRemoteEval()
@@ -95,7 +92,6 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     /**
      * receive Features automatically when updated SSE
      */
-    @OptIn(DelicateCoroutinesApi::class)
     fun autoRefreshFeatures(): Flow<Resource<GBFeatures?>> {
         return featuresViewModel.autoRefreshFeatures()
     }
@@ -249,7 +245,6 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     /**
      * Method for sending request evaluate features remotely
      */
-    @OptIn(DelicateCoroutinesApi::class)
     private fun refreshForRemoteEval() {
         if (!gbContext.remoteEval) {
             return

@@ -2,7 +2,6 @@ package com.sdk.growthbook.integration
 
 import org.intellij.lang.annotations.Language
 import org.junit.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class IntegrationTests {
@@ -40,9 +39,8 @@ class IntegrationTests {
 
         val sdkInstance = buildSDK(json, attrs)
 
-        assertEquals(
-            expected = "true",
-            actual = sdkInstance.feature("user576-feature").value.toString(),
+        assertTrue(
+            sdkInstance.isOn("user576-feature")
         )
     }
 

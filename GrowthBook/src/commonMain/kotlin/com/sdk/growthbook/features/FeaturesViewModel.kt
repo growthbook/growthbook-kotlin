@@ -10,7 +10,6 @@ import com.sdk.growthbook.utils.getFeaturesFromEncryptedFeatures
 import com.sdk.growthbook.sandbox.CachingImpl
 import com.sdk.growthbook.sandbox.getData
 import com.sdk.growthbook.sandbox.putData
-import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -39,7 +38,6 @@ internal class FeaturesViewModel(
     /**
      * Fetch Features
      */
-    @DelicateCoroutinesApi
     fun fetchFeatures(remoteEval: Boolean = false, payload: GBRemoteEvalParams? = null) {
         try {
             // Check for cache data
@@ -101,7 +99,6 @@ internal class FeaturesViewModel(
     /**
      * Supportive method for automatically refresh features
      */
-    @DelicateCoroutinesApi
     fun autoRefreshFeatures(): Flow<Resource<GBFeatures?>> {
         return dataSource.autoRefresh(success = { dataModel ->
             prepareFeaturesData(dataModel = dataModel)
