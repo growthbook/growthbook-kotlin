@@ -78,6 +78,15 @@ class GBConditionTests {
                 JsonPrimitive("abc")
             )
         )
+
+        assertTrue(
+            evaluator.evalOperatorCondition(
+                "${"$"}vlt",
+                JsonPrimitive("0.9.0"),
+                JsonPrimitive("0.10.0")
+            )
+        )
+
     }
 
     @Test
