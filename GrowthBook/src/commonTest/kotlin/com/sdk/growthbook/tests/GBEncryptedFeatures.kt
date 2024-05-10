@@ -3,10 +3,7 @@ package com.sdk.growthbook.tests
 import com.sdk.growthbook.GBSDKBuilder
 import com.sdk.growthbook.utils.DefaultCrypto
 import com.sdk.growthbook.utils.encryptToFeaturesDataModel
-import com.sdk.growthbook.model.GBExperiment
-import com.sdk.growthbook.model.GBExperimentResult
 import com.soywiz.krypto.encoding.Base64
-import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.serialization.json.JsonArray
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -48,7 +45,6 @@ class GBEncryptedFeatures {
     private val testHostURL = "https://host.com"
     private val testAttributes: HashMap<String, Any> = HashMap()
 
-    @OptIn(DelicateCoroutinesApi::class)
     @Test
     fun testEncrypt() {
 
@@ -58,9 +54,7 @@ class GBEncryptedFeatures {
             attributes = testAttributes,
             //TODO
             encryptionKey = "",
-            trackingCallback = { _: GBExperiment, _: GBExperimentResult ->
-
-            },
+            trackingCallback = { _, _ -> },
             networkDispatcher = MockNetworkClient(null, null),
             ).initialize()
 

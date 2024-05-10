@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "1.1.47"
+version = "1.1.49"
 
 kotlin {
 
@@ -62,7 +62,8 @@ kotlin {
             dependencies {
                 implementation(kotlin("test-junit"))
                 implementation("junit:junit:4.13.2")
-                implementation("org.mockito:mockito-core:4.2.0")
+                implementation("org.mockito:mockito-core:4.8.0")
+                implementation("io.ktor:ktor-client-mock:$ktorVersion")
                 implementation("com.soywiz.korlibs.krypto:krypto-android:$kryptoVersion")
             }
         }

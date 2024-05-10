@@ -74,6 +74,9 @@ internal class GBUtils {
             }
         }
 
+        /**
+         * Method for hash stings to float for hash version #1
+         */
         private fun hashV1(stringValue: String, seed: String?): Float {
             val bigInt: BigInteger = FNV().fnv1a32(stringValue + seed)
             val thousand = BigInteger(1000)
@@ -83,6 +86,9 @@ internal class GBUtils {
             return remainderAsFloat / 1000f
         }
 
+        /**
+         * Method for hash stings to float for hash version #2
+         */
         private fun hashV2(stringValue: String, seed: String?): Float {
             val first: BigInteger = FNV().fnv1a32(seed + stringValue)
             val second: BigInteger = FNV().fnv1a32(first.toString())
@@ -115,7 +121,8 @@ internal class GBUtils {
         }
 
         /**
-         * Returns an array of floats with numVariations items that are all equal and sum to 1. For example, getEqualWeights(2) would return [0.5, 0.5].
+         * Returns an array of floats with numVariations items that are all equal and sum to 1.
+         * For example, getEqualWeights(2) would return [0.5, 0.5].
          */
         fun getEqualWeights(numVariations: Int): List<Float> {
             if (numVariations <= 0) return emptyList()
@@ -124,7 +131,8 @@ internal class GBUtils {
         }
 
         /**
-         * This converts and experiment's coverage and variation weights into an array of bucket ranges.
+         * This converts and experiment's coverage and variation weights
+         * into an array of bucket ranges.
          */
         fun getBucketRanges(
             numVariations: Int,
@@ -146,7 +154,8 @@ internal class GBUtils {
                 targetWeights = equal
             }
 
-            // Default to equal weights if the sum is not equal 1 (or close enough when rounding errors are factored in):
+            // Default to equal weights if the sum is not equal 1 (
+            // or close enough when rounding errors are factored in):
             val weightsSum = targetWeights.reduce { acc, fl -> acc + fl }
             if (weightsSum < 0.99 || weightsSum > 1.01) {
                 targetWeights = getEqualWeights(numVariations)
@@ -159,12 +168,18 @@ internal class GBUtils {
                 val start = cumulative
                 cumulative += weight
 
-                GBBucketRange(start.roundTo(4), (start + (targetCoverage * weight)).roundTo(4))
+                GBBucketRange(
+                    start.roundTo(4),
+                    (start + (targetCoverage * weight)).roundTo(4)
+                )
             }
 
             return bucketRange
         }
 
+        /**
+         * Extension function for round float number to specific digit after comma
+         */
         private fun Float.roundTo(numFractionDigits: Int): Float {
             val factor = 10F.pow(numFractionDigits.toFloat())
             return (this * factor).roundToInt() / factor
@@ -202,7 +217,7 @@ internal class GBUtils {
         }
 
         /**
-         * This function can be used to help with the evaluation of the version string comparsion
+         * This function can be used to help with the evaluation of the version string comparison
          */
         fun paddedVersionString(input: String): String {
             // "v1.2.3-rc.1+build123" -> ["1","2","3","rc","1"]
@@ -210,14 +225,16 @@ internal class GBUtils {
                 .split(Regex("[-.]"))
 
             // ["1","0","0"] -> ["1","0","0","~"]
-            // "~" is the largest ASCII character, so this will make "1.0.0" greater than "1.0.0-beta" for example
+            // "~" is the largest ASCII character, so this will make "1.0.0" greater
+            // than "1.0.0-beta" for example
             if (parts.size == 3) {
                 val arrayList = ArrayList(parts)
                 arrayList.add("~")
                 parts = arrayList
             }
 
-            // Left pad each numeric part with spaces so string comparisons will work ("9">"10", but " 9"<"10")
+            // Left pad each numeric part with spaces
+            // so string comparisons will work ("9">"10", but " 9"<"10")
             // Then, join back together into a single string
             return parts.joinToString("-") {
                 if (it.matches(Regex("^\\d+$"))) it.padStart(5, ' ') else it
@@ -243,14 +260,15 @@ internal class GBUtils {
             attributeOverrides: Map<String, Any>?,
             context: GBContext,
 
-        ): Boolean {
+            ): Boolean {
             if (filters == null) return false
             if (attributeOverrides == null) return false
 
             return filters.any { filter: GBFilter ->
                 val hashAttribute: String = filter.attribute ?: "id"
 
-                val hashValueElement: JsonElement = context.attributes.toJsonElement().jsonObject.getValue(hashAttribute)
+                val hashValueElement: JsonElement =
+                    context.attributes.toJsonElement().jsonObject.getValue(hashAttribute)
 
                 if (hashValueElement is JsonNull) return@any true
                 if (hashValueElement !is JsonPrimitive) return@any true
@@ -325,7 +343,12 @@ internal class GBUtils {
         ) {
             val stickyBucketService = context.stickyBucketService ?: return
 
-            val attributes = getStickyBucketAttributes(context, data, attributeOverrides)
+            val attributes = getStickyBucketAttributes(
+                context = context,
+                data = data,
+                attributeOverrides = attributeOverrides
+            )
+
             context.stickyBucketAssignmentDocs = stickyBucketService.getAllAssignments(attributes)
         }
 
@@ -343,15 +366,15 @@ internal class GBUtils {
                 ?: deriveStickyBucketIdentifierAttributes(context, data)
 
             context.stickyBucketIdentifierAttributes?.forEach { attr ->
-                val hashValue = getHashAttribute(context, attr,  attributeOverrides = attributeOverrides)
+                val hashValue =
+                    getHashAttribute(context, attr, attributeOverrides = attributeOverrides)
                 attributes[attr] = hashValue.second
             }
             return attributes
         }
 
         /**
-         * Supportive method for get attribute value from Context
-         * if identifiers missed
+         * Supportive method for get attribute value from Context if identifiers missed
          */
         private fun deriveStickyBucketIdentifierAttributes(
             context: GBContext,
@@ -374,18 +397,63 @@ internal class GBUtils {
             return attributes.toList()
         }
 
-
         /**
-         * Method to get actual Sticky Bucket assignments
+         * Method to get actual Sticky Bucket assignments.
+         * Also this method handle if assignments belong to user
          */
         private fun getStickyBucketAssignments(
-            context: GBContext
+            context: GBContext,
+            expHashAttribute: String?,
+            expFallBackAttribute: String?,
+            attributeOverrides: Map<String, Any>
         ): Map<String, String> {
+
             val mergedAssignments = mutableMapOf<String, String>()
+
+            val stickyBucketAssignmentDocs =
+                context.stickyBucketAssignmentDocs ?: return mergedAssignments
+
+            val (hashAttribute, hashValue) = getHashAttribute(
+                context = context,
+                attr = expHashAttribute,
+                fallback = null,
+                attributeOverrides = attributeOverrides
+            )
+
+            val hashKey = "$hashAttribute||$hashValue"
+
+            val (fallbackAttribute, fallbackValue) = getHashAttribute(
+                context = context,
+                attr = null,
+                fallback = expFallBackAttribute,
+                attributeOverrides = attributeOverrides
+            )
+
+            val fallbackKey = if (fallbackValue.isEmpty()) null
+            else "$fallbackAttribute||$fallbackValue"
+
+            val leftOperand =
+                stickyBucketAssignmentDocs["$expFallBackAttribute" +
+                    "||${attributeOverrides[expFallBackAttribute]}"]?.attributeValue
+
+            if (leftOperand != attributeOverrides[expFallBackAttribute]) {
+                context.stickyBucketAssignmentDocs = emptyMap()
+            }
 
             context.stickyBucketAssignmentDocs?.values?.forEach { doc ->
                 mergedAssignments.putAll(doc.assignments)
             }
+
+            fallbackKey?.let { fallback ->
+                stickyBucketAssignmentDocs[fallback]?.let { fallbackAssignments ->
+                    mergedAssignments.putAll(fallbackAssignments.assignments)
+                }
+            }
+
+            stickyBucketAssignmentDocs[hashKey]?.let { hashAssignments ->
+                mergedAssignments.putAll(hashAssignments.assignments)
+            }
+
             return mergedAssignments
         }
 
@@ -397,10 +465,18 @@ internal class GBUtils {
             experimentKey: String,
             experimentBucketVersion: Int = 0,
             minExperimentBucketVersion: Int = 0,
-            meta: List<GBVariationMeta> = emptyList()
+            meta: List<GBVariationMeta> = emptyList(),
+            expFallBackAttribute: String? = null,
+            expHashAttribute: String? = "id",
+            attributeOverrides: Map<String, Any>
         ): Pair<Int, Boolean?> {
             val id = getStickyBucketExperimentKey(experimentKey, experimentBucketVersion)
-            val assignments = getStickyBucketAssignments(context)
+            val assignments = getStickyBucketAssignments(
+                context = context,
+                expHashAttribute = expHashAttribute,
+                expFallBackAttribute = expFallBackAttribute,
+                attributeOverrides = attributeOverrides
+            )
 
             if (minExperimentBucketVersion > 0) {
                 for (version in 0..minExperimentBucketVersion) {
@@ -412,7 +488,7 @@ internal class GBUtils {
             }
             val variationKey = assignments[id] ?: return Pair(-1, null)
             val variation = meta.indexOfFirst { it.key == variationKey }
-            return if (variation != -1) {
+            return if (0 <= variation) {
                 Pair(variation, null)
             } else {
                 Pair(-1, null)
@@ -438,10 +514,16 @@ internal class GBUtils {
             attributeValue: String,
             assignments: Map<String, String>
         ): Triple<String, GBStickyAssignmentsDocument, Boolean> {
+
             val key = "$attributeName||$attributeValue"
+
             val existingAssignments =
                 context.stickyBucketAssignmentDocs?.get(key)?.assignments ?: emptyMap()
-            val newAssignments = existingAssignments.toMutableMap().apply { putAll(assignments) }
+
+            val newAssignments =
+                existingAssignments.toMutableMap().apply {
+                    putAll(assignments)
+                }
 
             val changed = existingAssignments != newAssignments
 
@@ -468,17 +550,17 @@ internal class GBUtils {
             var hashAttribute = attr ?: "id"
             var hashValue = ""
 
-            if (attributeOverrides[hashAttribute] != JsonNull) {
+            if (attributeOverrides[hashAttribute] != null) {
                 hashValue = attributeOverrides[hashAttribute].toString()
-            } else if (context.attributes[hashAttribute] != JsonNull) {
+            } else if (context.attributes[hashAttribute] != null) {
                 hashValue = context.attributes[hashAttribute].toString()
             }
 
             // if no match, try fallback
             if (hashValue.isEmpty() && fallback != null) {
-                if (attributeOverrides[fallback] != JsonNull) {
+                if (attributeOverrides[fallback] != null) {
                     hashValue = attributeOverrides[fallback].toString()
-                } else if (context.attributes[fallback] != JsonNull) {
+                } else if (context.attributes[fallback] != null) {
                     hashValue = context.attributes[fallback].toString()
                 }
 
@@ -490,6 +572,10 @@ internal class GBUtils {
             return Pair(hashAttribute, hashValue)
         }
 
+        /**
+         * Supportive function for convert json element to primitive:
+         * int, double, float, boolean, string -  if possible
+         */
         fun convertToPrimitiveIfPossible(jsonElement: Any?): Any? {
             return if (jsonElement is JsonPrimitive) {
                 jsonElement.intOrNull

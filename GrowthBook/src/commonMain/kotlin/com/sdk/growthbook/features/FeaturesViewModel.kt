@@ -10,7 +10,6 @@ import com.sdk.growthbook.utils.getFeaturesFromEncryptedFeatures
 import com.sdk.growthbook.sandbox.CachingImpl
 import com.sdk.growthbook.sandbox.getData
 import com.sdk.growthbook.sandbox.putData
-import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -28,7 +27,7 @@ internal interface FeaturesFlowDelegate {
 internal class FeaturesViewModel(
     private val delegate: FeaturesFlowDelegate,
     private val dataSource: FeaturesDataSource,
-    var encryptionKey: String?
+    private val encryptionKey: String? = null,
 ) {
 
     /**
@@ -39,7 +38,6 @@ internal class FeaturesViewModel(
     /**
      * Fetch Features
      */
-    @DelicateCoroutinesApi
     fun fetchFeatures(remoteEval: Boolean = false, payload: GBRemoteEvalParams? = null) {
         try {
             // Check for cache data
@@ -55,6 +53,20 @@ internal class FeaturesViewModel(
                         features = it,
                         isRemote = false
                     )
+                }
+                dataModel.encryptedFeatures?.let { encryptedFeatures: String ->
+                    encryptionKey?.let { encryptionKey ->
+                        val features = getFeaturesFromEncryptedFeatures(
+                            encryptedString = encryptedFeatures,
+                            encryptionKey = encryptionKey,
+                        )
+                        features?.let {
+                            this.delegate.featuresFetchedSuccessfully(
+                                features = it,
+                                isRemote = false
+                            )
+                        }
+                    }
                 }
             }
         } catch (error: Throwable) {
@@ -87,7 +99,6 @@ internal class FeaturesViewModel(
     /**
      * Supportive method for automatically refresh features
      */
-    @DelicateCoroutinesApi
     fun autoRefreshFeatures(): Flow<Resource<GBFeatures?>> {
         return dataSource.autoRefresh(success = { dataModel ->
             prepareFeaturesData(dataModel = dataModel)
@@ -101,49 +112,33 @@ internal class FeaturesViewModel(
      * Cache API Response and push success event
      */
     private fun prepareFeaturesData(dataModel: FeaturesDataModel?) {
-        dataModel?.let {
-            manager.getLayer().putData(
-                fileName = Constants.FEATURE_CACHE,
-                content = dataModel,
-                serializer = FeaturesDataModel.serializer()
-            )
-        }
-
-        // Call Success Delegate with mention of data available with remote
         var features = dataModel?.features
         val encryptedFeatures = dataModel?.encryptedFeatures
 
         try {
             if (dataModel != null) {
+                manager.getLayer().putData(
+                    fileName = Constants.FEATURE_CACHE,
+                    content = dataModel,
+                    serializer = FeaturesDataModel.serializer()
+                )
+
                 delegate.featuresAPIModelSuccessfully(dataModel)
                 if (!features.isNullOrEmpty()) {
-
-                    manager.getLayer().putData(
-                        fileName = Constants.FEATURE_CACHE,
-                        content = dataModel,
-                        serializer = FeaturesDataModel.serializer()
-                    )
-
                     this.delegate.featuresFetchedSuccessfully(
                         features = features,
                         isRemote = true
                     )
                 } else {
                     if (encryptedFeatures != null && encryptionKey != null) {
-                        if (encryptionKey!!.isNotEmpty()) {
+                        if (encryptionKey.isNotEmpty()) {
                             val crypto = DefaultCrypto()
                             features =
                                 getFeaturesFromEncryptedFeatures(
                                     encryptedString = encryptedFeatures,
-                                    encryptionKey = encryptionKey ?: "",
+                                    encryptionKey = encryptionKey,
                                     subtleCrypto = crypto
                                 ) ?: return
-
-                            manager.getLayer().putData(
-                                fileName = Constants.FEATURE_CACHE,
-                                content = dataModel,
-                                serializer = FeaturesDataModel.serializer()
-                            )
 
                             this.delegate.featuresFetchedSuccessfully(
                                 features = features,

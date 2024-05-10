@@ -13,17 +13,23 @@ internal class FeatureURLBuilder {
         private const val REMOTE_FEATURE_PATH = "api/eval"
     }
 
+    /**
+     * Supportive method for build URL dynamically depending on what's strategy user has chosen
+     */
     fun buildUrl(
         baseUrl: String,
         apiKey: String,
         featureRefreshStrategy: FeatureRefreshStrategy = FeatureRefreshStrategy.STALE_WHILE_REVALIDATE
     ): String {
-        val endpointPath = when(featureRefreshStrategy) {
+        val endpointPath = when (featureRefreshStrategy) {
             FeatureRefreshStrategy.STALE_WHILE_REVALIDATE -> FEATURE_PATH
             FeatureRefreshStrategy.SERVER_SENT_EVENTS -> EVENTS_PATH
             FeatureRefreshStrategy.SERVER_SENT_REMOTE_FEATURE_EVAL -> REMOTE_FEATURE_PATH
         }
 
+        /**
+         * Validate url for setting "/" to result
+         */
         val baseUrlWithFeaturePath = if (baseUrl.endsWith('/'))
             "$baseUrl$endpointPath"
         else

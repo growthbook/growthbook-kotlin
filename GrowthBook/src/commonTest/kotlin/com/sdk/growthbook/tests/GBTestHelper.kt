@@ -1,6 +1,8 @@
 package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.utils.GBFeatures
+import com.sdk.growthbook.utils.GBStickyAssignmentsDocument
+import com.sdk.growthbook.utils.GBStickyAttributeKey
 import com.sdk.growthbook.model.GBExperiment
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -15,7 +17,9 @@ class GBTestHelper {
     companion object {
 
         val jsonParser = Json { ignoreUnknownKeys = true }
-        val testData = jsonParser.decodeFromString(JsonElement.serializer(), gbTestCases)
+        val testData = jsonParser.decodeFromString(
+            JsonElement.serializer(), gbTestCases
+        )
 
         fun getEvalConditionData(): JsonArray {
             val array = testData.jsonObject.get("evalCondition") as JsonArray
@@ -62,6 +66,11 @@ class GBTestHelper {
             val array = testData.jsonObject.get("decrypt") as JsonArray
             return array
         }
+
+        fun getStickyBucketingData(): JsonArray {
+            val array = testData.jsonObject.get("stickyBucket") as JsonArray
+            return array
+        }
     }
 }
 
@@ -78,6 +87,8 @@ class GBContextTest(
 class GBFeaturesTest(
     val features: GBFeatures? = null,
     val attributes: JsonElement = JsonObject(HashMap()),
+    val forcedVariations: JsonObject? = null,
+    val stickyBucketAssignmentDocs: Map<GBStickyAttributeKey, GBStickyAssignmentsDocument>? = null
 )
 
 @Serializable
@@ -91,15 +102,30 @@ class GBFeatureResultTest(
 )
 
 @Serializable
-class GBExperimentResultTest(
-    /// Whether or not the user is part of the experiment
-    val inExperiment: Boolean,
-    /// The array index of the assigned variation
-    val variationId: Int,
-    /// The array value of the assigned variation
-    val value: JsonElement,
-    /// The user attribute used to assign a variation
+data class GBExperimentResultTest(
+    // Whether or not the user is part of the experiment
+    val inExperiment: Boolean = false,
+    // The array index of the assigned variation
+    val variationId: Int = 0,
+    // The array value of the assigned variation
+    val value: JsonElement = JsonObject(HashMap()),
+    // The user attribute used to assign a variation
     val hashAttribute: String? = null,
-    ///  The value of that attribute
-    val hashValue: String? = null
+    // The value of that attribute
+    val hashValue: String? = null,
+    //new properties v0.4.0
+    // The unique key for the assigned variation
+    val key: String = "",
+    // The human-readable name of the assigned variation
+    var name: String? = null,
+    // The hash value used to assign a variation (float from 0 to 1)
+    var bucket: Float? = null,
+    // Used for holdout groups
+    var passthrough: Boolean? = null,
+    // If a hash was used to assign a variation
+    val hashUsed: Boolean? = null,
+    // The id of the feature (if any) that the experiment came from
+    val featureId: String? = null,
+    // If sticky bucketing was used to assign a variation
+    val stickyBucketUsed: Boolean? = null
 )

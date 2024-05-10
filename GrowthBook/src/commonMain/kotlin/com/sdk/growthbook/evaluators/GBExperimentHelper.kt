@@ -9,6 +9,8 @@ internal class GBExperimentHelper {
 
     fun isTracked(experiment: GBExperiment, result: GBExperimentResult): Boolean {
         val experimentKey = experiment.key
+
+        //Make sure a tracking callback is only fired once per unique experiment
         val key = (result.hashAttribute ?: "") +
         (result.hashValue ?: "") +
         (experimentKey + result.variationId)

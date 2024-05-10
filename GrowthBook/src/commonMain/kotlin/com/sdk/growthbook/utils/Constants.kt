@@ -24,10 +24,12 @@ import kotlinx.serialization.json.jsonPrimitive
 internal class Constants {
 
     companion object {
+
         /**
          * ID Attribute Key
          */
         const val ID_ATTRIBUTE_KEY = "id"
+
         /**
          * Identifier for Caching Feature Data in Internal Storage File
          */
@@ -104,28 +106,34 @@ class GBError(error: Throwable?) {
 }
 
 /**
- * Object used for mutual exclusion and filtering users out of experiments based on random hashes. Has the following properties
+ * Object used for mutual exclusion and filtering users out of experiments based on random hashes.
+ * Has the following properties
  */
 @Suppress("unused")
 @Serializable
 class GBFilter(
+
     /**
      * The seed used in the hash
      */
     var seed: String,
+
     /**
      * Array of ranges that are included
      */
     @Serializable(with = RangeSerializer.GBBucketRangeListSerializer::class)
     var ranges: List<GBBucketRange>,
+
     /**
      * The attribute to use (default to "id")
      */
     var attribute: String? = null,
+
     /**
      * The hash version to use (default to 2)
      */
     var hashVersion: Int? = null,
+
     /**
      * When using sticky bucketing, can be used as a fallback to assign variations
      */
@@ -137,14 +145,17 @@ class GBFilter(
  */
 @Serializable
 data class GBVariationMeta(
+
     /**
      * A unique key for this variation
      */
     var key: String? = null,
+
     /**
      * A human-readable name for this variation
      */
     var name: String? = null,
+
     /**
      * Used to implement holdout groups
      */
@@ -156,10 +167,12 @@ data class GBVariationMeta(
  */
 @Serializable
 data class GBTrackData(
+
     /**
      * experiment - Experiment
      */
     var experiment: GBExperiment,
+
     /**
      * result - ExperimentResult
      */
@@ -171,14 +184,17 @@ data class GBTrackData(
  */
 @Serializable
 data class GBStickyAssignmentsDocument(
+
     /**
      * The name of the attribute used to identify the user (e.g. `id`, `cookie_id`, etc.)
      */
     val attributeName: String,
+
     /**
      * The value of the attribute (e.g. `123`)
      */
     val attributeValue: String,
+
     /**
      * A dictionary of persisted experiment assignments. For example: `{"exp1__0":"control"}`
      */
@@ -193,14 +209,17 @@ data class GBStickyAssignmentsDocument(
  */
 @Serializable
 data class GBParentConditionInterface(
+
     /**
      * Parent feature's Id
      */
     val id: String,
+
     /**
      * Target condition
      */
     val condition: GBCondition,
+
     /**
      * If gate is true, then this is a blocking feature-level prerequisite;
      * otherwise it applies to the current rule only
@@ -212,11 +231,27 @@ data class GBParentConditionInterface(
  * Model for Remote Eval request's body
  */
 data class GBRemoteEvalParams(
+
+    /**
+     * Map of user attributes that are used to assign variations
+     */
     val attributes: Map<String, Any>,
+
+    /**
+     * Force features that created by user for remote evaluation
+     */
     val forcedFeatures: List<List<Any>>,
+
+    /**
+     * Force specific experiments to always assign a specific variation (used for QA)
+     */
     val forcedVariations: Map<String, Any>
 )
 
+/**
+ * Serializer, that responsible for serialization / deserialization multiple ranges,
+ * from array of array of two elements ([[1,2]]) to List of Pairs format
+ */
 object RangeSerializer {
     object GBBucketRangeListSerializer : KSerializer<List<GBBucketRange>> {
         override val descriptor: SerialDescriptor =
@@ -248,6 +283,10 @@ object RangeSerializer {
         }
     }
 
+    /**
+     * Serializer, that responsible for serialization / deserialization range,
+     * from array of two elements to Pair format
+     */
     object GBBucketRangeSerializer : KSerializer<GBBucketRange> {
         override fun deserialize(decoder: Decoder): GBBucketRange {
             val array = decoder.decodeSerializableValue(JsonArray.serializer())

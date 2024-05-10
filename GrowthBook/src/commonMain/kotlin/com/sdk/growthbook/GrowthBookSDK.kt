@@ -19,172 +19,14 @@ import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeatureResult
-import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 
 typealias GBTrackingCallback = (GBExperiment, GBExperimentResult) -> Unit
+typealias GBFeatureUsageCallback = (featureKey: String, gbFeatureResult: GBFeatureResult) -> Unit
 
 /**
- * SDKBuilder - Root Class for SDK Initializers for GrowthBook SDK
- * APIKey - API Key
- * HostURL - Server URL
- * UserAttributes - User Attributes
- * Tracking Callback - Track Events for Experiments
- * EncryptionKey - Encryption key if you intend to use data encryption
- * Network Dispatcher - Network Dispatcher
- * Remote eval - Whether to use Remote Evaluation
- */
-abstract class SDKBuilder(
-    val apiKey: String,
-    val hostURL: String,
-    val attributes: Map<String, Any>,
-    val trackingCallback: GBTrackingCallback,
-    val encryptionKey: String?,
-    val networkDispatcher: NetworkDispatcher,
-    val remoteEval: Boolean
-) {
-    internal var qaMode: Boolean = false
-    internal var forcedVariations: Map<String, Int> = HashMap()
-    internal var enabled: Boolean = true
-
-    /**
-     * Set Forced Variations - Default Empty
-     */
-    fun setForcedVariations(forcedVariations: Map<String, Int>): SDKBuilder {
-        this.forcedVariations = forcedVariations
-        return this
-    }
-
-    /**
-     * Set QA Mode - Default Disabled
-     */
-    fun setQAMode(isEnabled: Boolean): SDKBuilder {
-        this.qaMode = isEnabled
-        return this
-    }
-
-    /**
-     * Set Enabled - Default Disabled - If Enabled - then experiments will be disabled
-     */
-    fun setEnabled(isEnabled: Boolean): SDKBuilder {
-        this.enabled = isEnabled
-        return this
-    }
-
-    /**
-     * This method is open to be overridden by subclasses
-     */
-    @DelicateCoroutinesApi
-    abstract fun initialize(): GrowthBookSDK
-}
-
-/**
- * SDKBuilder - Initializer for GrowthBook SDK for JAVA
- * APIKey - API Key
- * HostURL - Server URL
- * UserAttributes - User Attributes
- * Features - GrowthBook Features Map - Synced via Web API / Web Hooks
- * Tracking Callback - Track Events for Experiments
- * EncryptionKey - Encryption key if you intend to use data encryption
- * Network Dispatcher - Network Dispatcher
- * Remote eval - Whether to use Remote Evaluation
- */
-class GBSDKBuilderJAVA(
-    apiKey: String,
-    hostURL: String,
-    attributes: Map<String, Any>,
-    val features: GBFeatures,
-    trackingCallback: GBTrackingCallback,
-    encryptionKey: String?,
-    networkDispatcher: NetworkDispatcher,
-    remoteEval: Boolean = false,
-) : SDKBuilder(
-    apiKey, hostURL,
-    attributes, trackingCallback, encryptionKey, networkDispatcher, remoteEval
-) {
-    /**
-     * Initialize the JAVA SDK
-     */
-    @DelicateCoroutinesApi
-    override fun initialize(): GrowthBookSDK {
-
-        val gbContext = GBContext(
-            apiKey = apiKey,
-            enabled = enabled,
-            attributes = attributes,
-            hostURL = hostURL,
-            qaMode = qaMode,
-            forcedVariations = forcedVariations,
-            trackingCallback = trackingCallback,
-            encryptionKey = encryptionKey,
-            remoteEval = remoteEval,
-        )
-
-        return GrowthBookSDK(gbContext, null, networkDispatcher, features)
-    }
-}
-
-/**
- * SDKBuilder - Initializer for GrowthBook SDK for Apps
- * APIKey - API Key
- * HostURL - Server URL
- * UserAttributes - User Attributes
- * Tracking Callback - Track Events for Experiments
- * EncryptionKey - Encryption key if you intend to use data encryption
- * Network Dispatcher - Network Dispatcher
- * Remote eval - Whether to use Remote Evaluation
- */
-class GBSDKBuilder(
-    apiKey: String,
-    hostURL: String,
-    attributes: Map<String, Any>,
-    trackingCallback: GBTrackingCallback,
-    encryptionKey: String? = null,
-    networkDispatcher: NetworkDispatcher,
-    remoteEval: Boolean = false,
-) : SDKBuilder(
-    apiKey, hostURL,
-    attributes, trackingCallback, encryptionKey, networkDispatcher, remoteEval
-) {
-
-    private var refreshHandler: GBCacheRefreshHandler? = null
-
-    /**
-     * Set Refresh Handler - Will be called when cache is refreshed
-     */
-    fun setRefreshHandler(refreshHandler: GBCacheRefreshHandler): GBSDKBuilder {
-        this.refreshHandler = refreshHandler
-        return this
-    }
-
-    /**
-     * Initialize the Kotlin SDK
-     */
-    @DelicateCoroutinesApi
-    override fun initialize(): GrowthBookSDK {
-
-        val gbContext = GBContext(
-            apiKey = apiKey,
-            enabled = enabled,
-            attributes = attributes,
-            hostURL = hostURL,
-            qaMode = qaMode,
-            forcedVariations = forcedVariations,
-            trackingCallback = trackingCallback,
-            encryptionKey = encryptionKey,
-            remoteEval = remoteEval
-        )
-
-        return GrowthBookSDK(
-            gbContext,
-            refreshHandler,
-            networkDispatcher
-        )
-    }
-}
-
-/**
- * The main export of the libraries is a simple GrowthBook wrapper class that takes a Context object in the constructor.
+ * The main export of the libraries is a simple GrowthBook wrapper class
+ * that takes a Context object in the constructor.
  * It exposes two main methods: feature and run.
  */
 class GrowthBookSDK() : FeaturesFlowDelegate {
@@ -200,7 +42,6 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         internal lateinit var gbContext: GBContext
     }
 
-    @DelicateCoroutinesApi
     internal constructor(
         context: GBContext,
         refreshHandler: GBCacheRefreshHandler?,
@@ -210,6 +51,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         gbContext = context
         this.refreshHandler = refreshHandler
         this.networkDispatcher = networkDispatcher
+
         /**
          * JAVA Consumers preset Features
          * SDK will not call API to fetch Features List
@@ -218,12 +60,11 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
             FeaturesViewModel(
                 delegate = this,
                 dataSource = FeaturesDataSource(dispatcher = networkDispatcher),
-                encryptionKey = null
+                encryptionKey = gbContext.encryptionKey,
             )
         if (features != null) {
             gbContext.features = features
         } else {
-            featuresViewModel.encryptionKey = gbContext.encryptionKey
             refreshCache()
         }
         this.attributeOverrides = gbContext.attributes
@@ -233,7 +74,6 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     /**
      * Manually Refresh Cache
      */
-    @DelicateCoroutinesApi
     fun refreshCache() {
         if (gbContext.remoteEval) {
             refreshForRemoteEval()
@@ -250,10 +90,8 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     }
 
     /**
-     * receive Features automatically when updated
-     * SSE
+     * receive Features automatically when updated SSE
      */
-    @OptIn(DelicateCoroutinesApi::class)
     fun autoRefreshFeatures(): Flow<Resource<GBFeatures?>> {
         return featuresViewModel.autoRefreshFeatures()
     }
@@ -305,7 +143,8 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     }
 
     /**
-     * The feature method takes a single string argument, which is the unique identifier for the feature and returns a FeatureResult object.
+     * The feature method takes a single string argument,
+     * which is the unique identifier for the feature and returns a FeatureResult object.
      */
     fun feature(id: String): GBFeatureResult {
         return GBFeatureEvaluator().evaluateFeature(
@@ -316,10 +155,11 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     }
 
     /**
-     * The isOn method takes a single string argument, which is the unique identifier for the feature and returns the feature state on/off
+     * The isOn method takes a single string argument,
+     * which is the unique identifier for the feature and returns the feature state on/off
      */
-    fun isOn(featureDd: String): Boolean {
-        return feature(id = featureDd).on
+    fun isOn(featureId: String): Boolean {
+        return feature(id = featureId).on
     }
 
     /**
@@ -348,7 +188,8 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     }
 
     /**
-     * The setAttributes method replaces the Map of user attributes that are used to assign variations
+     * The setAttributes method replaces the Map of user attributes
+     * that are used to assign variations
      */
     fun setAttributes(attributes: Map<String, Any>) {
         gbContext.attributes = attributes
@@ -365,6 +206,10 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
             refreshStickyBucketService()
         }
         refreshForRemoteEval()
+    }
+
+    fun getAttributeOverrides(): Map<String, Any> {
+        return attributeOverrides
     }
 
     /**
@@ -389,11 +234,6 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
      */
     private fun refreshStickyBucketService(dataModel: FeaturesDataModel? = null) {
         if (gbContext.stickyBucketService != null) {
-            GBFeatureEvaluator().evaluateFeature(
-                context = gbContext,
-                featureKey = "",
-                attributeOverrides = attributeOverrides
-            )
             refreshStickyBuckets(
                 context = gbContext,
                 data = dataModel,
@@ -405,7 +245,6 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     /**
      * Method for sending request evaluate features remotely
      */
-    @OptIn(DelicateCoroutinesApi::class)
     private fun refreshForRemoteEval() {
         if (!gbContext.remoteEval) {
             return

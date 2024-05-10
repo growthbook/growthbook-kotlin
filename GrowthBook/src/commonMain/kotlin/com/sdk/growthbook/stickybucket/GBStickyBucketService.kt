@@ -6,7 +6,15 @@ import com.sdk.growthbook.utils.GBStickyAssignmentsDocument
  * Responsible for reading and writing documents which describe sticky bucket assignments.
  */
 interface GBStickyBucketService {
+
+    /**
+     * Method for get assignment document for cache by attribute name and attribute value
+     */
     fun getAssignments(attributeName: String, attributeValue: String): GBStickyAssignmentsDocument?
+
+    /**
+     * Method for saving assignments document to cache
+     */
     fun saveAssignments(doc: GBStickyAssignmentsDocument)
 
     /**

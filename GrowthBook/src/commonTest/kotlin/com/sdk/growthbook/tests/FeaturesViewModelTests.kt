@@ -3,6 +3,7 @@ package com.sdk.growthbook.tests
 import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.utils.GBError
 import com.sdk.growthbook.utils.GBFeatures
+import com.sdk.growthbook.utils.GBRemoteEvalParams
 import com.sdk.growthbook.features.FeaturesDataModel
 import com.sdk.growthbook.features.FeaturesDataSource
 import com.sdk.growthbook.features.FeaturesFlowDelegate
@@ -37,7 +38,8 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         isError = true
         val viewModel = FeaturesViewModel(
             this,
-            FeaturesDataSource(MockNetworkClient(MockResponse.successResponse, null)), "3tfeoyW0wlo47bDnbWDkxg=="
+            FeaturesDataSource(MockNetworkClient(MockResponse.successResponse, null)),
+            "3tfeoyW0wlo47bDnbWDkxg=="
         )
 
         viewModel.fetchFeatures()
@@ -73,8 +75,12 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         isSuccess = false
         isError = true
         val viewModel = FeaturesViewModel(
-            this,
-            FeaturesDataSource(MockNetworkClient(null, Throwable("UNKNOWN", null))), null
+            delegate = this,
+            dataSource = FeaturesDataSource(
+                MockNetworkClient(
+                    null, Throwable("UNKNOWN", null)
+                )
+            )
         )
 
         viewModel.fetchFeatures()
@@ -90,10 +96,78 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         isSuccess = false
         isError = true
         val viewModel = FeaturesViewModel(
-            this,
-            FeaturesDataSource(MockNetworkClient(MockResponse.ERROR_RESPONSE, null)), ""
+            delegate = this,
+            dataSource = FeaturesDataSource(
+                MockNetworkClient(
+                    MockResponse.ERROR_RESPONSE, null
+                )
+            ),
+            encryptionKey = "",
         )
         viewModel.fetchFeatures()
+
+        assertTrue(!isSuccess)
+        assertTrue(isError)
+        assertTrue(!hasFeatures)
+    }
+
+    @Test
+    fun testForRemoteEvalSuccess() {
+        isSuccess = false
+        isError = true
+
+        val viewModel = FeaturesViewModel(
+            delegate = this,
+            dataSource =
+            FeaturesDataSource(
+                dispatcher = MockNetworkClient(
+                    successResponse = MockResponse.successResponse,
+                    error = null
+                )
+            ),
+            encryptionKey = "3tfeoyW0wlo47bDnbWDkxg=="
+        )
+        val forcedFeature = mapOf("feature" to 123)
+        val forcedVariation = mapOf("feature" to 123)
+        val attributes = emptyMap<String, Any>()
+        val payload = GBRemoteEvalParams(
+            attributes = attributes,
+            forcedFeatures = forcedFeature.map { listOf(it.key, it.value) },
+            forcedVariations = forcedVariation
+        )
+
+        viewModel.fetchFeatures(remoteEval = true, payload = payload)
+        assertTrue(isSuccess)
+        assertTrue(!isError)
+        assertTrue(hasFeatures)
+    }
+
+    @Test
+    fun testForRemoteEvalFailed() {
+        isSuccess = false
+        isError = true
+
+        val viewModel = FeaturesViewModel(
+            delegate = this,
+            dataSource =
+            FeaturesDataSource(
+                dispatcher = MockNetworkClient(
+                    successResponse = null,
+                    error = Error()
+                )
+            ),
+            encryptionKey = "3tfeoyW0wlo47bDnbWDkxg=="
+        )
+        val forcedFeature = mapOf("feature" to 123)
+        val forcedVariation = mapOf("feature" to 123)
+        val attributes = emptyMap<String, Any>()
+        val payload = GBRemoteEvalParams(
+            attributes = attributes,
+            forcedFeatures = forcedFeature.map { listOf(it.key, it.value) },
+            forcedVariations = forcedVariation
+        )
+
+        viewModel.fetchFeatures(remoteEval = true, payload = payload)
 
         assertTrue(!isSuccess)
         assertTrue(isError)

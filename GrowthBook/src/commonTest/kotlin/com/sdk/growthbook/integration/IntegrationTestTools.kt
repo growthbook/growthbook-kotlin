@@ -19,6 +19,7 @@ internal fun buildSDK(
         networkDispatcher = MockNetworkClient(
             json,
             null
-        )
+        ),
+        remoteEval = false,
     ).initialize()
 }

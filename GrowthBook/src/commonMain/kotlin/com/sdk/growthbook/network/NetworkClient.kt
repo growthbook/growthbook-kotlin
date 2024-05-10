@@ -1,6 +1,6 @@
 package com.sdk.growthbook.network
 
-import com.sdk.growthbook.ApplicationDispatcher
+import com.sdk.growthbook.PlatformDependentIODispatcher
 import com.sdk.growthbook.utils.Resource
 import com.sdk.growthbook.utils.readSse
 import com.sdk.growthbook.utils.toJsonElement
@@ -18,8 +18,8 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.ByteReadChannel
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -31,12 +31,11 @@ import kotlinx.serialization.json.Json
  * Implement this interface to define specific implementation for Network Calls - to be made by SDK
  */
 interface NetworkDispatcher {
-    @DelicateCoroutinesApi
     fun consumeGETRequest(
         request: String,
         onSuccess: (String) -> Unit,
         onError: (Throwable) -> Unit
-    )
+    ): Job
 
     fun consumeSSEConnection(
         url: String
@@ -50,13 +49,8 @@ interface NetworkDispatcher {
     )
 }
 
-/**
- * Default Ktor Implementation for Network Dispatcher
- */
-@Suppress("unused")
-class DefaultGBNetworkClient : NetworkDispatcher {
-
-    private val client = HttpClient {
+internal fun createDefaultHttpClient(): HttpClient =
+    HttpClient {
         install(ContentNegotiation) {
             json(Json {
                 prettyPrint = true
@@ -66,25 +60,38 @@ class DefaultGBNetworkClient : NetworkDispatcher {
         }
     }
 
-    @DelicateCoroutinesApi
+/**
+ * Default Ktor Implementation for Network Dispatcher
+ */
+class DefaultGBNetworkClient(
+
+    /**
+     * Ktor http client instance for sending request
+     */
+    private val client: HttpClient = createDefaultHttpClient()
+
+) : NetworkDispatcher {
+
+    /**
+     * Function that execute API Call to fetch features
+     */
     override fun consumeGETRequest(
         request: String,
         onSuccess: (String) -> Unit,
         onError: (Throwable) -> Unit
-    ) {
-
-        GlobalScope.launch(ApplicationDispatcher) {
-
+    ): Job =
+        CoroutineScope(PlatformDependentIODispatcher).launch {
+            val result = client.get(request)
             try {
-                val result = client.get(request)
                 onSuccess(result.body())
             } catch (ex: Exception) {
                 onError(ex)
             }
-
         }
-    }
 
+    /**
+     * Supportive method for preparing GET request for consuming SSE connection
+     */
     private suspend fun prepareGetRequest(
         url: String,
         headers: Map<String, String> = emptyMap(),
@@ -97,11 +104,13 @@ class DefaultGBNetworkClient : NetworkDispatcher {
             queryParams.forEach { (key, value) -> addOrReplaceParameter(key, value) }
         }
 
-    @OptIn(DelicateCoroutinesApi::class)
+    /**
+     * Method that produce SSE connection
+     */
     override fun consumeSSEConnection(
         url: String
     ) = callbackFlow {
-        GlobalScope.launch(ApplicationDispatcher) {
+        CoroutineScope(PlatformDependentIODispatcher).launch {
             try {
                 prepareGetRequest(url).execute { response ->
                     val channel: ByteReadChannel = response.body()
@@ -120,14 +129,16 @@ class DefaultGBNetworkClient : NetworkDispatcher {
         awaitClose()
     }
 
-    @OptIn(DelicateCoroutinesApi::class)
+    /**
+     * Method that make POST request to server for remote feature evaluation
+     */
     override fun consumePOSTRequest(
         url: String,
         bodyParams: Map<String, Any>,
         onSuccess: (String) -> Unit,
         onError: (Throwable) -> Unit
     ) {
-        GlobalScope.launch(ApplicationDispatcher) {
+        CoroutineScope(PlatformDependentIODispatcher).launch {
             try {
                 val response = client.post(url) {
                     headers {
@@ -146,6 +157,10 @@ class DefaultGBNetworkClient : NetworkDispatcher {
         }
     }
 
+    /**
+     * Supportive extensions method, for HttpRequestBuilder object,
+     * that replace parameter in prepare get request method
+     */
     private fun HttpRequestBuilder.addOrReplaceParameter(key: String, value: String?): Unit =
         value?.let {
             url.parameters.remove(key)

@@ -2022,79 +2022,764 @@ val gbTestCases = """
             "v": "1.2.3-alpha"
         },
         true
-    ]
     ],
-    "versionCompare": {
-    "lt": [
-    ["0.9.99", "1.0.0", true],
-    ["0.9.0", "0.10.0", true],
-    ["1.0.0-0.0", "1.0.0-0.0.0", true],
-    ["1.0.0-9999", "1.0.0--", true],
-    ["1.0.0-99", "1.0.0-100", true],
-    ["1.0.0-alpha", "1.0.0-alpha.1", true],
-    ["1.0.0-alpha.1", "1.0.0-alpha.beta", true],
-    ["1.0.0-alpha.beta", "1.0.0-beta", true],
-    ["1.0.0-beta", "1.0.0-beta.2", true],
-    ["1.0.0-beta.2", "1.0.0-beta.11", true],
-    ["1.0.0-beta.11", "1.0.0-rc.1", true],
-    ["1.0.0-rc.1", "1.0.0", true],
-    ["1.0.0-0", "1.0.0--1", true],
-    ["1.0.0-0", "1.0.0-1", true],
-    ["1.0.0-1.0", "1.0.0-1.-1", true]
+    [
+          "version 0.9.99 < 1.0.0",
+          {
+            "version": {
+              "${"$"}vlt": "1.0.0"
+            }
+          },
+          {
+            "version": "0.9.99"
+          },
+          true
+        ],
+        [
+          "version 0.9.0 < 0.10.0",
+          {
+            "version": {
+              "${"$"}vlt": "0.10.0"
+            }
+          },
+          {
+            "version": "0.9.0"
+          },
+          true
+        ],
+        [
+          "version 1.0.0-0.0 < 1.0.0-0.0.0",
+          {
+            "version": {
+              "${"$"}vlt": "1.0.0-0.0.0"
+            }
+          },
+          {
+            "version": "1.0.0-0.0"
+          },
+          true
+        ],
+        [
+          "version 1.0.0-9999 < 1.0.0--",
+          {
+            "version": {
+              "${"$"}vlt": "1.0.0--"
+            }
+          },
+          {
+            "version": "1.0.0-9999"
+          },
+          true
+        ],
+        [
+          "version 1.0.0-99 < 1.0.0-100",
+          {
+            "version": {
+              "${"$"}vlt": "1.0.0-100"
+            }
+          },
+          {
+            "version": "1.0.0-99"
+          },
+          true
+        ],
+        [
+          "version 1.0.0-alpha < 1.0.0-alpha.1",
+          {
+            "version": {
+              "${"$"}vlt": "1.0.0-alpha.1"
+            }
+          },
+          {
+            "version": "1.0.0-alpha"
+          },
+          true
+        ],
+        [
+          "version 1.0.0-alpha.1 < 1.0.0-alpha.beta",
+          {
+            "version": {
+              "${"$"}vlt": "1.0.0-alpha.beta"
+            }
+          },
+          {
+            "version": "1.0.0-alpha.1"
+          },
+          true
+        ],
+        [
+          "version 1.0.0-alpha.beta < 1.0.0-beta",
+          {
+            "version": {
+              "${"$"}vlt": "1.0.0-beta"
+            }
+          },
+          {
+            "version": "1.0.0-alpha.beta"
+          },
+          true
+        ],
+        [
+          "version 1.0.0-beta < 1.0.0-beta.2",
+          {
+            "version": {
+              "${"$"}vlt": "1.0.0-beta.2"
+            }
+          },
+          {
+            "version": "1.0.0-beta"
+          },
+          true
+        ],
+        [
+          "version 1.0.0-beta.2 < 1.0.0-beta.11",
+          {
+            "version": {
+              "${"$"}vlt": "1.0.0-beta.11"
+            }
+          },
+          {
+            "version": "1.0.0-beta.2"
+          },
+          true
+        ],
+        [
+          "version 1.0.0-beta.11 < 1.0.0-rc.1",
+          {
+            "version": {
+              "${"$"}vlt": "1.0.0-rc.1"
+            }
+          },
+          {
+            "version": "1.0.0-beta.11"
+          },
+          true
+        ],
+        [
+          "version 1.0.0-rc.1 < 1.0.0",
+          {
+            "version": {
+              "${"$"}vlt": "1.0.0"
+            }
+          },
+          {
+            "version": "1.0.0-rc.1"
+          },
+          true
+        ],
+        [
+          "version 1.0.0-0 < 1.0.0--1",
+          {
+            "version": {
+              "${"$"}vlt": "1.0.0--1"
+            }
+          },
+          {
+            "version": "1.0.0-0"
+          },
+          true
+        ],
+        [
+          "version 1.0.0-0 < 1.0.0-1",
+          {
+            "version": {
+              "${"$"}vlt": "1.0.0-1"
+            }
+          },
+          {
+            "version": "1.0.0-0"
+          },
+          true
+        ],
+        [
+          "version 1.0.0-1.0 < 1.0.0-1.-1",
+          {
+            "version": {
+              "${"$"}vlt": "1.0.0-1.-1"
+            }
+          },
+          {
+            "version": "1.0.0-1.0"
+          },
+          true
+        ],
+        [
+          "version 1.2.3-a.b.c < 1.2.3-a.b.c.d",
+          {
+            "version": {
+              "${"$"}vlt": "1.2.3-a.b.c.d"
+            }
+          },
+          {
+            "version": "1.2.3-a.b.c"
+          },
+          true
+        ],
+        [
+          "version 0.0.0 > 0.0.0-foo",
+          {
+            "version": {
+              "${"$"}vgt": "0.0.0-foo"
+            }
+          },
+          {
+            "version": "0.0.0"
+          },
+          true
+        ],
+        [
+          "version 0.0.1 > 0.0.0",
+          {
+            "version": {
+              "${"$"}vgt": "0.0.0"
+            }
+          },
+          {
+            "version": "0.0.1"
+          },
+          true
+        ],
+        [
+          "version 1.0.0 > 0.9.9",
+          {
+            "version": {
+              "${"$"}vgt": "0.9.9"
+            }
+          },
+          {
+            "version": "1.0.0"
+          },
+          true
+        ],
+        [
+          "version 0.10.0 > 0.9.0",
+          {
+            "version": {
+              "${"$"}vgt": "0.9.0"
+            }
+          },
+          {
+            "version": "0.10.0"
+          },
+          true
+        ],
+        [
+          "version 0.99.0 > 0.10.0",
+          {
+            "version": {
+              "${"$"}vgt": "0.10.0"
+            }
+          },
+          {
+            "version": "0.99.0"
+          },
+          true
+        ],
+        [
+          "version 2.0.0 > 1.2.3",
+          {
+            "version": {
+              "${"$"}vgt": "1.2.3"
+            }
+          },
+          {
+            "version": "2.0.0"
+          },
+          true
+        ],
+        [
+          "version v0.0.0 > 0.0.0-foo",
+          {
+            "version": {
+              "${"$"}vgt": "0.0.0-foo"
+            }
+          },
+          {
+            "version": "v0.0.0"
+          },
+          true
+        ],
+        [
+          "version v0.0.1 > 0.0.0",
+          {
+            "version": {
+              "${"$"}vgt": "0.0.0"
+            }
+          },
+          {
+            "version": "v0.0.1"
+          },
+          true
+        ],
+        [
+          "version v1.0.0 > 0.9.9",
+          {
+            "version": {
+              "${"$"}vgt": "0.9.9"
+            }
+          },
+          {
+            "version": "v1.0.0"
+          },
+          true
+        ],
+        [
+          "version v0.10.0 > 0.9.0",
+          {
+            "version": {
+              "${"$"}vgt": "0.9.0"
+            }
+          },
+          {
+            "version": "v0.10.0"
+          },
+          true
+        ],
+        [
+          "version v0.99.0 > 0.10.0",
+          {
+            "version": {
+              "${"$"}vgt": "0.10.0"
+            }
+          },
+          {
+            "version": "v0.99.0"
+          },
+          true
+        ],
+        [
+          "version v2.0.0 > 1.2.3",
+          {
+            "version": {
+              "${"$"}vgt": "1.2.3"
+            }
+          },
+          {
+            "version": "v2.0.0"
+          },
+          true
+        ],
+        [
+          "version 0.0.0 > v0.0.0-foo",
+          {
+            "version": {
+              "${"$"}vgt": "v0.0.0-foo"
+            }
+          },
+          {
+            "version": "0.0.0"
+          },
+          true
+        ],
+        [
+          "version 0.0.1 > v0.0.0",
+          {
+            "version": {
+              "${"$"}vgt": "v0.0.0"
+            }
+          },
+          {
+            "version": "0.0.1"
+          },
+          true
+        ],
+        [
+          "version 1.0.0 > v0.9.9",
+          {
+            "version": {
+              "${"$"}vgt": "v0.9.9"
+            }
+          },
+          {
+            "version": "1.0.0"
+          },
+          true
+        ],
+        [
+          "version 0.10.0 > v0.9.0",
+          {
+            "version": {
+              "${"$"}vgt": "v0.9.0"
+            }
+          },
+          {
+            "version": "0.10.0"
+          },
+          true
+        ],
+        [
+          "version 0.99.0 > v0.10.0",
+          {
+            "version": {
+              "${"$"}vgt": "v0.10.0"
+            }
+          },
+          {
+            "version": "0.99.0"
+          },
+          true
+        ],
+        [
+          "version 2.0.0 > v1.2.3",
+          {
+            "version": {
+              "${"$"}vgt": "v1.2.3"
+            }
+          },
+          {
+            "version": "2.0.0"
+          },
+          true
+        ],
+        [
+          "version 1.2.3 > 1.2.3-asdf",
+          {
+            "version": {
+              "${"$"}vgt": "1.2.3-asdf"
+            }
+          },
+          {
+            "version": "1.2.3"
+          },
+          true
+        ],
+        [
+          "version 1.2.3 > 1.2.3-4",
+          {
+            "version": {
+              "${"$"}vgt": "1.2.3-4"
+            }
+          },
+          {
+            "version": "1.2.3"
+          },
+          true
+        ],
+        [
+          "version 1.2.3 > 1.2.3-4-foo",
+          {
+            "version": {
+              "${"$"}vgt": "1.2.3-4-foo"
+            }
+          },
+          {
+            "version": "1.2.3"
+          },
+          true
+        ],
+        [
+          "version 1.2.3-5-foo > 1.2.3-5",
+          {
+            "version": {
+              "${"$"}vgt": "1.2.3-5"
+            }
+          },
+          {
+            "version": "1.2.3-5-foo"
+          },
+          true
+        ],
+        [
+          "version 1.2.3-5 > 1.2.3-4",
+          {
+            "version": {
+              "${"$"}vgt": "1.2.3-4"
+            }
+          },
+          {
+            "version": "1.2.3-5"
+          },
+          true
+        ],
+        [
+          "version 1.2.3-5-foo > 1.2.3-5-Foo",
+          {
+            "version": {
+              "${"$"}vgt": "1.2.3-5-Foo"
+            }
+          },
+          {
+            "version": "1.2.3-5-foo"
+          },
+          true
+        ],
+        [
+          "version 3.0.0 > 2.7.2+asdf",
+          {
+            "version": {
+              "${"$"}vgt": "2.7.2+asdf"
+            }
+          },
+          {
+            "version": "3.0.0"
+          },
+          true
+        ],
+        [
+          "version 1.2.3-a.10 > 1.2.3-a.5",
+          {
+            "version": {
+              "${"$"}vgt": "1.2.3-a.5"
+            }
+          },
+          {
+            "version": "1.2.3-a.10"
+          },
+          true
+        ],
+        [
+          "version 1.2.3-a.b > 1.2.3-a.5",
+          {
+            "version": {
+              "${"$"}vgt": "1.2.3-a.5"
+            }
+          },
+          {
+            "version": "1.2.3-a.b"
+          },
+          true
+        ],
+        [
+          "version 1.2.3-a.b > 1.2.3-a",
+          {
+            "version": {
+              "${"$"}vgt": "1.2.3-a"
+            }
+          },
+          {
+            "version": "1.2.3-a.b"
+          },
+          true
+        ],
+        [
+          "version 1.2.3-a.b.c.10.d.5 > 1.2.3-a.b.c.5.d.100",
+          {
+            "version": {
+              "${"$"}vgt": "1.2.3-a.b.c.5.d.100"
+            }
+          },
+          {
+            "version": "1.2.3-a.b.c.10.d.5"
+          },
+          true
+        ],
+        [
+          "version 1.2.3-r2 > 1.2.3-r100",
+          {
+            "version": {
+              "${"$"}vgt": "1.2.3-r100"
+            }
+          },
+          {
+            "version": "1.2.3-r2"
+          },
+          true
+        ],
+        [
+          "version 1.2.3-r100 > 1.2.3-R2",
+          {
+            "version": {
+              "${"$"}vgt": "1.2.3-R2"
+            }
+          },
+          {
+            "version": "1.2.3-r100"
+          },
+          true
+        ],
+        [
+          "version a.b.c.d.e.f > 1.2.3",
+          {
+            "version": {
+              "${"$"}vgt": "1.2.3"
+            }
+          },
+          {
+            "version": "a.b.c.d.e.f"
+          },
+          true
+        ],
+        [
+          "version 10.0.0 > 9.0.0",
+          {
+            "version": {
+              "${"$"}vgt": "9.0.0"
+            }
+          },
+          {
+            "version": "10.0.0"
+          },
+          true
+        ],
+        [
+          "version 10000.0.0 > 9999.0.0",
+          {
+            "version": {
+              "${"$"}vgt": "9999.0.0"
+            }
+          },
+          {
+            "version": "10000.0.0"
+          },
+          true
+        ],
+        [
+          "version 1.2.3 == 1.2.3",
+          {
+            "version": {
+              "${"$"}veq": "1.2.3"
+            }
+          },
+          {
+            "version": "1.2.3"
+          },
+          true
+        ],
+        [
+          "version 1.2.3 == v1.2.3",
+          {
+            "version": {
+              "${"$"}veq": "v1.2.3"
+            }
+          },
+          {
+            "version": "1.2.3"
+          },
+          true
+        ],
+        [
+          "version 1.2.3-0 == v1.2.3-0",
+          {
+            "version": {
+              "${"$"}veq": "v1.2.3-0"
+            }
+          },
+          {
+            "version": "1.2.3-0"
+          },
+          true
+        ],
+        [
+          "version 1.2.3-1 == 1.2.3-1",
+          {
+            "version": {
+              "${"$"}veq": "1.2.3-1"
+            }
+          },
+          {
+            "version": "1.2.3-1"
+          },
+          true
+        ],
+        [
+          "version 1.2.3-1 == v1.2.3-1",
+          {
+            "version": {
+              "${"$"}veq": "v1.2.3-1"
+            }
+          },
+          {
+            "version": "1.2.3-1"
+          },
+          true
+        ],
+        [
+          "version 1.2.3-beta == 1.2.3-beta",
+          {
+            "version": {
+              "${"$"}veq": "1.2.3-beta"
+            }
+          },
+          {
+            "version": "1.2.3-beta"
+          },
+          true
+        ],
+        [
+          "version 1.2.3-beta == v1.2.3-beta",
+          {
+            "version": {
+              "${"$"}veq": "v1.2.3-beta"
+            }
+          },
+          {
+            "version": "1.2.3-beta"
+          },
+          true
+        ],
+        [
+          "version 1.2.3-beta+build == 1.2.3-beta+otherbuild",
+          {
+            "version": {
+              "${"$"}veq": "1.2.3-beta+otherbuild"
+            }
+          },
+          {
+            "version": "1.2.3-beta+build"
+          },
+          true
+        ],
+        [
+          "version 1.2.3-beta+build == v1.2.3-beta+otherbuild",
+          {
+            "version": {
+              "${"$"}veq": "v1.2.3-beta+otherbuild"
+            }
+          },
+          {
+            "version": "1.2.3-beta+build"
+          },
+          true
+        ],
+        [
+          "version 1-2-3 == 1.2.3",
+          {
+            "version": {
+              "${"$"}veq": "1.2.3"
+            }
+          },
+          {
+            "version": "1-2-3"
+          },
+          true
+        ],
+        [
+          "version 1-2-3 == 1-2.3+build99",
+          {
+            "version": {
+              "${"$"}veq": "1-2.3+build99"
+            }
+          },
+          {
+            "version": "1-2-3"
+          },
+          true
+        ],
+        [
+          "version 1-2-3 == v1.2.3",
+          {
+            "version": {
+              "${"$"}veq": "v1.2.3"
+            }
+          },
+          {
+            "version": "1-2-3"
+          },
+          true
+        ],
+        [
+          "version 1.2.3.4 == 1.2.3-4",
+          {
+            "version": {
+              "${"$"}veq": "1.2.3-4"
+            }
+          },
+          {
+            "version": "1.2.3.4"
+          },
+          true
+        ]
     ],
-    "gt": [
-    ["0.0.0", "0.0.0-foo", true],
-    ["0.0.1", "0.0.0", true],
-    ["1.0.0", "0.9.9", true],
-    ["0.10.0", "0.9.0", true],
-    ["0.99.0", "0.10.0", true],
-    ["2.0.0", "1.2.3", true],
-    ["v0.0.0", "0.0.0-foo", true],
-    ["v0.0.1", "0.0.0", true],
-    ["v1.0.0", "0.9.9", true],
-    ["v0.10.0", "0.9.0", true],
-    ["v0.99.0", "0.10.0", true],
-    ["v2.0.0", "1.2.3", true],
-    ["0.0.0", "v0.0.0-foo", true],
-    ["0.0.1", "v0.0.0", true],
-    ["1.0.0", "v0.9.9", true],
-    ["0.10.0", "v0.9.0", true],
-    ["0.99.0", "v0.10.0", true],
-    ["2.0.0", "v1.2.3", true],
-    ["1.2.3", "1.2.3-asdf", true],
-    ["1.2.3", "1.2.3-4", true],
-    ["1.2.3", "1.2.3-4-foo", true],
-    ["1.2.3-5-foo", "1.2.3-5", true],
-    ["1.2.3-5", "1.2.3-4", true],
-    ["1.2.3-5-foo", "1.2.3-5-Foo", true],
-    ["3.0.0", "2.7.2+asdf", true],
-    ["1.2.3-a.10", "1.2.3-a.5", true],
-    ["1.2.3-a.b", "1.2.3-a.5", true],
-    ["1.2.3-a.b", "1.2.3-a", true],
-    ["1.2.3-a.b.c", "1.2.3-a.b.c.d", false],
-    ["1.2.3-a.b.c.10.d.5", "1.2.3-a.b.c.5.d.100", true],
-    ["1.2.3-r2", "1.2.3-r100", true],
-    ["1.2.3-r100", "1.2.3-R2", true],
-    ["a.b.c.d.e.f", "1.2.3", true],
-    ["10.0.0", "9.0.0", true],
-    ["10000.0.0", "9999.0.0", true]
-    ],
-    "eq": [
-    ["1.2.3", "1.2.3", true],
-    ["1.2.3", "v1.2.3", true],
-    ["1.2.3-0", "v1.2.3-0", true],
-    ["1.2.3-1", "1.2.3-1", true],
-    ["1.2.3-1", "v1.2.3-1", true],
-    ["1.2.3-beta", "1.2.3-beta", true],
-    ["1.2.3-beta", "v1.2.3-beta", true],
-    ["1.2.3-beta+build", "1.2.3-beta+otherbuild", true],
-    ["1.2.3-beta+build", "v1.2.3-beta+otherbuild", true],
-    ["1-2-3", "1.2.3", true],
-    ["1-2-3", "1-2.3+build99", true],
-    ["1-2-3", "v1.2.3", true],
-    ["1.2.3.4", "1.2.3-4", true]
-    ]
-},
     "hash": [
     ["", "a", 1, 0.22],
     ["", "b", 1, 0.077],
@@ -2416,6 +3101,582 @@ val gbTestCases = """
         }
     ],
     [
+        "force rules - coverage 0",
+        {
+            "attributes": {
+                "id": "d0bc0a5a"
+            },
+            "features": {
+                "8d156": {
+                    "defaultValue": 0,
+                    "rules": [
+                        {
+                            "force": 1,
+                            "coverage": 0,
+                            "hashVersion": 2
+                        }
+                    ]
+                }
+            }
+        },
+        "8d156",
+        {
+            "value": 0,
+            "on": false,
+            "off": true,
+            "source": "defaultValue"
+        }
+    ],
+    [
+        "force rules - condition pass",
+        {
+            "attributes": {
+            "country": "US",
+            "browser": "firefox"
+        },
+            "features": {
+            "feature": {
+            "defaultValue": 2,
+            "rules": [
+            {
+                "force": 1,
+                "condition": {
+                "country": { "${'$'}in": ["US", "CA"] },
+                "browser": "firefox"
+            }
+            }
+            ]
+        }
+        }
+        },
+        "feature",
+        {
+            "value": 1,
+            "on": true,
+            "off": false,
+            "source": "force"
+        }
+    ],
+    [
+        "force rules - condition fail",
+        {
+            "attributes": {
+            "country": "US",
+            "browser": "chrome"
+        },
+            "features": {
+            "feature": {
+            "defaultValue": 2,
+            "rules": [
+            {
+                "force": 1,
+                "condition": {
+                "country": { "${'$'}in": ["US", "CA"] },
+                "browser": "firefox"
+            }
+            }
+            ]
+        }
+        }
+        },
+        "feature",
+        {
+            "value": 2,
+            "on": true,
+            "off": false,
+            "source": "defaultValue"
+        }
+    ],
+    [
+        "force rules - coverage with bad hash version",
+        {
+            "attributes": {
+            "id": "1"
+        },
+            "features": {
+            "feature": {
+            "defaultValue": 2,
+            "rules": [
+            {
+                "force": 1,
+                "coverage": 1.0,
+                "hashVersion": 99
+            }
+            ]
+        }
+        }
+        },
+        "feature",
+        {
+            "value": 2,
+            "on": true,
+            "off": false,
+            "source": "defaultValue"
+        }
+    ],
+    [
+        "ignores empty rules",
+        {
+            "features": {
+            "feature": {
+            "rules": [{}]
+        }
+        }
+        },
+        "feature",
+        {
+            "value": null,
+            "on": false,
+            "off": true,
+            "source": "defaultValue"
+        }
+    ],
+    [
+        "empty experiment rule - c",
+        {
+            "attributes": {
+            "id": "123"
+        },
+            "features": {
+            "feature": {
+            "rules": [
+            {
+                "variations": ["a", "b", "c"]
+            }
+            ]
+        }
+        }
+        },
+        "feature",
+        {
+            "value": "c",
+            "on": true,
+            "off": false,
+            "experiment": {
+            "key": "feature",
+            "variations": ["a", "b", "c"]
+        },
+            "experimentResult": {
+            "featureId": "feature",
+            "value": "c",
+            "variationId": 2,
+            "inExperiment": true,
+            "hashUsed": true,
+            "hashAttribute": "id",
+            "hashValue": "123",
+            "bucket": 0.863,
+            "key": "2",
+            "stickyBucketUsed": false
+        },
+            "source": "experiment"
+        }
+    ],
+    [
+        "empty experiment rule - a",
+        {
+            "attributes": {
+            "id": "456"
+        },
+            "features": {
+            "feature": {
+            "rules": [
+            {
+                "variations": ["a", "b", "c"]
+            }
+            ]
+        }
+        }
+        },
+        "feature",
+        {
+            "value": "a",
+            "on": true,
+            "off": false,
+            "experiment": {
+            "key": "feature",
+            "variations": ["a", "b", "c"]
+        },
+            "experimentResult": {
+            "featureId": "feature",
+            "value": "a",
+            "variationId": 0,
+            "inExperiment": true,
+            "hashUsed": true,
+            "hashAttribute": "id",
+            "hashValue": "456",
+            "bucket": 0.178,
+            "key": "0",
+            "stickyBucketUsed": false
+        },
+            "source": "experiment"
+        }
+    ],
+    [
+        "empty experiment rule - b",
+        {
+            "attributes": {
+            "id": "fds"
+        },
+            "features": {
+            "feature": {
+            "rules": [
+            {
+                "variations": ["a", "b", "c"]
+            }
+            ]
+        }
+        }
+        },
+        "feature",
+        {
+            "value": "b",
+            "on": true,
+            "off": false,
+            "experiment": {
+            "key": "feature",
+            "variations": ["a", "b", "c"]
+        },
+            "experimentResult": {
+            "featureId": "feature",
+            "value": "b",
+            "variationId": 1,
+            "inExperiment": true,
+            "hashUsed": true,
+            "hashAttribute": "id",
+            "hashValue": "fds",
+            "bucket": 0.514,
+            "key": "1",
+            "stickyBucketUsed": false
+        },
+            "source": "experiment"
+        }
+    ],
+    [
+        "creates experiments properly",
+        {
+            "attributes": {
+            "anonId": "123",
+            "premium": true
+        },
+            "features": {
+            "feature": {
+            "rules": [
+            {
+                "coverage": 0.99,
+                "hashAttribute": "anonId",
+                "seed": "feature",
+                "hashVersion": 2,
+                "name": "Test",
+                "phase": "1",
+                "ranges": [
+                [0, 0.1],
+                [0.1, 1.0]
+                ],
+                "meta": [
+                {
+                    "key": "v0",
+                    "name": "variation 0"
+                },
+                {
+                    "key": "v1",
+                    "name": "variation 1"
+                }
+                ],
+                "filters": [
+                {
+                    "attribute": "anonId",
+                    "seed": "pricing",
+                    "ranges": [[0, 1]]
+                }
+                ],
+                "namespace": ["pricing", 0, 1],
+                "key": "hello",
+                "variations": [true, false],
+                "weights": [0.1, 0.9],
+                "condition": { "premium": true }
+            }
+            ]
+        }
+        }
+        },
+        "feature",
+        {
+            "value": false,
+            "on": false,
+            "off": true,
+            "source": "experiment",
+            "experiment": {
+            "coverage": 0.99,
+            "ranges": [
+            [0, 0.1],
+            [0.1, 1.0]
+            ],
+            "meta": [
+            {
+                "key": "v0",
+                "name": "variation 0"
+            },
+            {
+                "key": "v1",
+                "name": "variation 1"
+            }
+            ],
+            "filters": [
+            {
+                "attribute": "anonId",
+                "seed": "pricing",
+                "ranges": [[0, 1]]
+            }
+            ],
+            "name": "Test",
+            "phase": "1",
+            "seed": "feature",
+            "hashVersion": 2,
+            "hashAttribute": "anonId",
+            "namespace": ["pricing", 0, 1],
+            "key": "hello",
+            "variations": [true, false],
+            "weights": [0.1, 0.9],
+            "condition": { "premium": true }
+        },
+            "experimentResult": {
+            "featureId": "feature",
+            "value": false,
+            "variationId": 1,
+            "inExperiment": true,
+            "hashUsed": true,
+            "hashAttribute": "anonId",
+            "hashValue": "123",
+            "bucket": 0.5231,
+            "key": "v1",
+            "name": "variation 1",
+            "stickyBucketUsed": false
+        }
+        }
+    ],
+    [
+        "rule orders - skip 1",
+        {
+            "attributes": {
+            "browser": "firefox"
+        },
+            "features": {
+            "feature": {
+            "defaultValue": 0,
+            "rules": [
+            {
+                "force": 1,
+                "condition": { "browser": "chrome" }
+            },
+            {
+                "force": 2,
+                "condition": { "browser": "firefox" }
+            },
+            {
+                "force": 3,
+                "condition": { "browser": "safari" }
+            }
+            ]
+        }
+        }
+        },
+        "feature",
+        {
+            "value": 2,
+            "on": true,
+            "off": false,
+            "source": "force"
+        }
+    ],
+    [
+        "rule orders - skip 1,2",
+        {
+            "attributes": {
+            "browser": "safari"
+        },
+            "features": {
+            "feature": {
+            "defaultValue": 0,
+            "rules": [
+            {
+                "force": 1,
+                "condition": { "browser": "chrome" }
+            },
+            {
+                "force": 2,
+                "condition": { "browser": "firefox" }
+            },
+            {
+                "force": 3,
+                "condition": { "browser": "safari" }
+            }
+            ]
+        }
+        }
+        },
+        "feature",
+        {
+            "value": 3,
+            "on": true,
+            "off": false,
+            "source": "force"
+        }
+    ],
+    [
+        "rule orders - skip all",
+        {
+            "attributes": {
+            "browser": "ie"
+        },
+            "features": {
+            "feature": {
+            "defaultValue": 0,
+            "rules": [
+            {
+                "force": 1,
+                "condition": { "browser": "chrome" }
+            },
+            {
+                "force": 2,
+                "condition": { "browser": "firefox" }
+            },
+            {
+                "force": 3,
+                "condition": { "browser": "safari" }
+            }
+            ]
+        }
+        }
+        },
+        "feature",
+        {
+            "value": 0,
+            "on": false,
+            "off": true,
+            "source": "defaultValue"
+        }
+    ],
+    [
+        "skips experiment on coverage",
+        {
+            "attributes": { "id": "123" },
+            "features": {
+            "feature": {
+            "defaultValue": 0,
+            "rules": [
+            {
+                "variations": [0, 1, 2, 3],
+                "coverage": 0.01
+            },
+            {
+                "force": 3
+            }
+            ]
+        }
+        }
+        },
+        "feature",
+        {
+            "value": 3,
+            "on": true,
+            "off": false,
+            "source": "force"
+        }
+    ],
+    [
+        "skips experiment on namespace",
+        {
+            "attributes": { "id": "123" },
+            "features": {
+            "feature": {
+            "defaultValue": 0,
+            "rules": [
+            {
+                "variations": [0, 1, 2, 3],
+                "namespace": ["pricing", 0, 0.01]
+            },
+            {
+                "force": 3
+            }
+            ]
+        }
+        }
+        },
+        "feature",
+        {
+            "value": 3,
+            "on": true,
+            "off": false,
+            "source": "force"
+        }
+    ],
+    [
+        "handles integer hashAttribute",
+        {
+            "attributes": { "id": 123 },
+            "features": {
+            "feature": {
+            "defaultValue": 0,
+            "rules": [
+            {
+                "variations": [0, 1]
+            }
+            ]
+        }
+        }
+        },
+        "feature",
+        {
+            "value": 1,
+            "on": true,
+            "off": false,
+            "source": "experiment",
+            "experiment": {
+                "key": "feature",
+                "variations": [0, 1]
+            },
+            "experimentResult": {
+                "featureId": "feature",
+                "hashAttribute": "id",
+                "hashValue": "123",
+                "hashUsed": true,
+                "inExperiment": true,
+                "value": 1,
+                "variationId": 1,
+                "key": "1",
+                "bucket": 0.863,
+                "stickyBucketUsed": false
+            }
+        }
+    ],
+    [
+        "skip experiment on missing hashAttribute",
+        {
+            "attributes": { "id": "123" },
+            "features": {
+            "feature": {
+            "defaultValue": 0,
+            "rules": [
+            {
+                "variations": [0, 1, 2, 3],
+                "hashAttribute": "company"
+            },
+            {
+                "force": 3
+            }
+            ]
+        }
+        }
+        },
+        "feature",
+        {
+            "value": 3,
+            "on": true,
+            "off": false,
+            "source": "force"
+        }
+    ],
+    [
         "Force rule with range, ignores coverage",
         {
             "attributes": {
@@ -2554,118 +3815,6 @@ val gbTestCases = """
             "source": "force"
         }
     ],
-        [
-          "Force rule, hash version 2",
-          {
-            "attributes": {
-              "id": "1"
-            },
-            "features": {
-              "feature": {
-                "defaultValue": 0,
-                "rules": [
-                  {
-                    "force": 2,
-                    "hashVersion": 2,
-                    "range": [0.96, 0.97]
-                  }
-                ]
-              }
-            }
-          },
-          "feature",
-          {
-            "value": 2,
-            "on": true,
-            "off": false,
-            "source": "force"
-          }
-        ],
-    [
-          "Force rule, skip due to range",
-          {
-            "attributes": {
-              "id": "1"
-            },
-            "features": {
-              "feature": {
-                "defaultValue": 0,
-                "rules": [
-                  {
-                    "force": 2,
-                    "range": [0, 0.01]
-                  }
-                ]
-              }
-            }
-          },
-          "feature",
-          {
-            "value": 0,
-            "on": false,
-            "off": true,
-            "source": "defaultValue"
-          }
-        ],
-    [
-          "Force rule, skip due to filter",
-          {
-            "attributes": {
-              "id": "1"
-            },
-            "features": {
-              "feature": {
-                "defaultValue": 0,
-                "rules": [
-                  {
-                    "force": 2,
-                    "filters": [
-                      {
-                        "seed": "seed",
-                        "ranges": [[0, 0.01]]
-                      }
-                    ]
-                  }
-                ]
-              }
-            }
-          },
-          "feature",
-          {
-            "value": 0,
-            "on": false,
-            "off": true,
-            "source": "defaultValue"
-          }
-        ],
-    [
-          "Force rule, use seed with range",
-          {
-            "attributes": {
-              "id": "1"
-            },
-            "features": {
-              "feature": {
-                "defaultValue": 0,
-                "rules": [
-                  {
-                    "force": 2,
-                    "range": [0, 0.5],
-                    "seed": "fjdslafdsa",
-                    "hashVersion": 2
-                  }
-                ]
-              }
-            }
-          },
-          "feature",
-          {
-            "value": 2,
-            "on": true,
-            "off": false,
-            "source": "force"
-          }
-        ],
     [
         "Support passthrough variations",
         {
@@ -3822,6 +4971,61 @@ val gbTestCases = """
         true
     ],
     [
+        "Filtered, excluded",
+        {
+            "attributes": {
+            "id": "1",
+            "anonId": "fsdafsda"
+        }
+        },
+        {
+            "key": "filtered",
+            "variations": [0, 1],
+            "filters": [
+            {
+                "seed": "seed",
+                "ranges": [
+                [0, 0.1],
+                [0.2, 0.4]
+                ]
+            },
+            {
+                "seed": "seed",
+                "attribute": "anonId",
+                "ranges": [[0.6, 0.8]]
+            }
+            ]
+        },
+        0,
+        false,
+        false
+    ],
+    [
+        "Filtered, ignore namespace",
+        {
+            "attributes": {
+            "id": "1"
+        }
+        },
+        {
+            "key": "filtered",
+            "variations": [0, 1],
+            "filters": [
+            {
+                "seed": "seed",
+                "ranges": [
+                [0, 0.1],
+                [0.2, 0.4]
+                ]
+            }
+            ],
+            "namespace": ["test", 0, 0.001]
+        },
+        1,
+        true,
+        true
+    ],
+    [
         "Ranges, ignore coverage and weights",
         {
             "attributes": {
@@ -3861,101 +5065,6 @@ val gbTestCases = """
         false,
         false
     ],
-        [
-        "Filtered, excluded",
-        {
-            "attributes": {
-                "id": "1",
-                "anonId": "fsdafsda"
-            }
-        },
-        {
-            "key": "filtered",
-            "variations": [0, 1],
-            "filters": [
-                {
-                    "seed": "seed",
-                    "ranges": [
-                        [0, 0.1],
-                        [0.2, 0.4]
-                    ]
-                },
-                {
-                    "seed": "seed",
-                    "attribute": "anonId",
-                    "ranges": [[0.6, 0.8]]
-                }
-            ]
-        },
-        0,
-        false,
-        false
-    ],
-    [
-          "Filtered, ignore namespace",
-          {
-            "attributes": {
-              "id": "1"
-            }
-          },
-          {
-            "key": "filtered",
-            "variations": [0, 1],
-            "filters": [
-              {
-                "seed": "seed",
-                "ranges": [
-                  [0, 0.1],
-                  [0.2, 0.4]
-                ]
-              }
-            ],
-            "namespace": ["test", 0, 0.001]
-          },
-          1,
-          true,
-          true
-        ],
-    [
-          "Ranges, ignore coverage and weights",
-          {
-            "attributes": {
-              "id": "1"
-            }
-          },
-          {
-            "key": "ranges",
-            "variations": [0, 1],
-            "ranges": [
-              [0.99, 1.0],
-              [0.0, 0.99]
-            ],
-            "coverage": 0.01,
-            "weights": [0.99, 0.01]
-          },
-          1,
-          true,
-          true
-        ],
-    [
-          "Ranges, partial coverage",
-          {
-            "attributes": {
-              "id": "1"
-            }
-          },
-          {
-            "key": "configs",
-            "variations": [0, 1],
-            "ranges": [
-              [0, 0.1],
-              [0.9, 1.0]
-            ]
-          },
-          0,
-          false,
-          false
-        ],
     [
         "Uses seed and hash version",
         {
@@ -4334,6 +5443,7 @@ val gbTestCases = """
         }
         }
         },
+        [],
         "feature",
         {
             "bucket": 0.863,
@@ -4387,6 +5497,7 @@ val gbTestCases = """
         },
             "stickyBucketAssignmentDocs": {}
         },
+        [],
         "exp1",
         {
             "bucket": 0.6468,
@@ -4437,17 +5548,17 @@ val gbTestCases = """
             }
             ]
         }
-        },
-            "stickyBucketAssignmentDocs": {
-            "deviceId||d123": {
-            "attributeName": "deviceId",
-            "attributeValue": "d123",
-            "assignments": {
-            "feature-exp__0": "2"
-        }
-        }
         }
         },
+        [
+            {
+                "attributeName": "deviceId",
+                "attributeValue": "d123",
+                "assignments": {
+                "feature-exp__0": "2"
+            }
+            }
+        ],
         "exp1",
         {
             "bucket": 0.6468,
@@ -4470,10 +5581,10 @@ val gbTestCases = """
         }
     ],
     [
-        "upgrades a sticky bucket doc from a fallbackAttribute to a hashAttribute",
+        "does not consume a sticky bucket not belonging to the user",
         {
             "attributes": {
-            "id": "i123",
+            "deviceId": "d123",
             "anonymousId": "ses123",
             "foo": "bar",
             "country": "USA"
@@ -4498,17 +5609,78 @@ val gbTestCases = """
             }
             ]
         }
-        },
-            "stickyBucketAssignmentDocs": {
-            "anonymousId||123": {
-            "attributeName": "anonymousId",
-            "attributeValue": "123",
-            "assignments": {
-            "feature-exp__0": "2"
-        }
-        }
         }
         },
+        [
+            {
+                "attributeName": "deviceId",
+                "attributeValue": "d456",
+                "assignments": {
+                "feature-exp__0": "2"
+            }
+            }
+        ],
+        "exp1",
+        {
+            "bucket": 0.6468,
+            "featureId": "exp1",
+            "hashAttribute": "deviceId",
+            "hashUsed": true,
+            "hashValue": "d123",
+            "inExperiment": true,
+            "key": "1",
+            "stickyBucketUsed": false,
+            "value": "red",
+            "variationId": 1
+        },
+        {
+            "deviceId||d123": {
+            "assignments": { "feature-exp__0": "1" },
+            "attributeName": "deviceId",
+            "attributeValue": "d123"
+        }
+        }
+    ],
+    [
+        "upgrades a sticky bucket doc from a fallbackAttribute to a hashAttribute",
+        {
+            "attributes": {
+            "id": "i123",
+            "anonymousId": "ses123",
+            "foo": "bar",
+            "country": "USA"
+        },
+            "features": {
+            "exp1": {
+            "defaultValue": "control",
+            "rules": [
+            {
+                "key": "feature-exp",
+                "seed": "feature-exp",
+                "hashAttribute": "id",
+                "fallbackAttribute": "anonymousId",
+                "hashVersion": 2,
+                "bucketVersion": 0,
+                "condition": { "country": "USA" },
+                "variations": ["control", "red", "blue"],
+                "meta": [{ "key": "0" }, { "key": "1" }, { "key": "2" }],
+                "coverage": 1,
+                "weights": [0.3334, 0.3333, 0.3333],
+                "phase": "0"
+            }
+            ]
+        }
+        }
+        },
+        [
+            {
+                "attributeName": "anonymousId",
+                "attributeValue": "ses123",
+                "assignments": {
+                "feature-exp__0": "1"
+            }
+            }
+        ],
         "exp1",
         {
             "bucket": 0.9943,
@@ -4517,19 +5689,19 @@ val gbTestCases = """
             "hashUsed": true,
             "hashValue": "i123",
             "inExperiment": true,
-            "key": "2",
+            "key": "1",
             "stickyBucketUsed": true,
-            "value": "blue",
-            "variationId": 2
+            "value": "red",
+            "variationId": 1
         },
         {
-            "anonymousId||123": {
-            "assignments": { "feature-exp__0": "2" },
+            "anonymousId||ses123": {
+            "assignments": { "feature-exp__0": "1" },
             "attributeName": "anonymousId",
-            "attributeValue": "123"
+            "attributeValue": "ses123"
         },
             "id||i123": {
-            "assignments": { "feature-exp__0": "2" },
+            "assignments": { "feature-exp__0": "1" },
             "attributeName": "id",
             "attributeValue": "i123"
         }
@@ -4552,7 +5724,7 @@ val gbTestCases = """
                 "key": "feature-exp",
                 "seed": "feature-exp",
                 "hashAttribute": "id",
-                "fallbackAttribute": "deviceId",
+                "fallbackAttribute": "anonymousId",
                 "hashVersion": 2,
                 "bucketVersion": 0,
                 "condition": { "country": "USA" },
@@ -4564,24 +5736,24 @@ val gbTestCases = """
             }
             ]
         }
-        },
-            "stickyBucketAssignmentDocs": {
-            "anonymousId||123": {
-            "attributeName": "anonymousId",
-            "attributeValue": "123",
-            "assignments": {
-            "feature-exp__0": "2"
         }
         },
-            "id||i123": {
-            "attributeName": "id",
-            "attributeValue": "i123",
-            "assignments": {
-            "feature-exp__0": "1"
-        }
-        }
-        }
-        },
+        [
+            {
+                "attributeName": "anonymousId",
+                "attributeValue": "ses123",
+                "assignments": {
+                "feature-exp__0": "2"
+            }
+            },
+            {
+                "attributeName": "id",
+                "attributeValue": "i123",
+                "assignments": {
+                "feature-exp__0": "1"
+            }
+            }
+        ],
         "exp1",
         {
             "bucket": 0.9943,
@@ -4596,10 +5768,10 @@ val gbTestCases = """
             "variationId": 1
         },
         {
-            "anonymousId||123": {
+            "anonymousId||ses123": {
             "assignments": { "feature-exp__0": "2" },
             "attributeName": "anonymousId",
-            "attributeValue": "123"
+            "attributeValue": "ses123"
         },
             "id||i123": {
             "assignments": { "feature-exp__0": "1" },
@@ -4636,15 +5808,15 @@ val gbTestCases = """
             }
             ]
         }
-        },
-            "stickyBucketAssignmentDocs": {
-            "id||i123": {
-            "assignments": { "feature-exp__0": "1" },
-            "attributeName": "id",
-            "attributeValue": "i123"
-        }
         }
         },
+        [
+            {
+                "assignments": { "feature-exp__0": "1" },
+                "attributeName": "id",
+                "attributeValue": "i123"
+            }
+        ],
         "exp1",
         {
             "bucket": 0.9943,
@@ -4698,15 +5870,15 @@ val gbTestCases = """
             }
             ]
         }
-        },
-            "stickyBucketAssignmentDocs": {
-            "id||i123": {
-            "assignments": { "feature-exp__0": "1" },
-            "attributeName": "id",
-            "attributeValue": "i123"
-        }
         }
         },
+        [
+            {
+                "assignments": { "feature-exp__0": "1" },
+                "attributeName": "id",
+                "attributeValue": "i123"
+            }
+        ],
         "exp1",
         null,
         {
@@ -4748,15 +5920,15 @@ val gbTestCases = """
             }
             ]
         }
-        },
-            "stickyBucketAssignmentDocs": {
-            "id||i123": {
-            "attributeName": "id",
-            "attributeValue": "i123",
-            "assignments": { "feature-exp__0": "1" }
-        }
         }
         },
+        [
+            {
+                "attributeName": "id",
+                "attributeValue": "i123",
+                "assignments": { "feature-exp__0": "1" }
+            }
+        ],
         "exp1",
         {
             "bucket": 0.9943,
