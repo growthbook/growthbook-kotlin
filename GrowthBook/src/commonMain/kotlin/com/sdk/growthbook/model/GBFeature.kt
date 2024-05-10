@@ -33,7 +33,10 @@ class GBFeature(
  */
 @Serializable
 class GBFeatureRule(
-
+    /**
+     * Unique feature rule id
+     */
+    val id: String? = null,
     /**
      * Optional targeting condition
      */
