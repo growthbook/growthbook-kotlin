@@ -1,3 +1,5 @@
+import org.gradle.kotlin.dsl.support.kotlinCompilerOptions
+
 plugins {
     kotlin("multiplatform")
     id("com.android.library")
@@ -13,7 +15,7 @@ version = "1.1.51"
 kotlin {
 
     val ktorVersion = "2.1.2"
-    val serializationVersion = "1.3.2"
+    val serializationVersion = "1.3.3"
     val kryptoVersion = "2.7.0"
 
     android {
@@ -62,9 +64,8 @@ kotlin {
             dependencies {
                 implementation(kotlin("test-junit"))
                 implementation("junit:junit:4.13.2")
-                implementation("org.mockito:mockito-core:4.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test")
                 implementation("io.ktor:ktor-client-mock:$ktorVersion")
-                implementation("com.soywiz.korlibs.krypto:krypto-android:$kryptoVersion")
             }
         }
 
@@ -80,20 +81,24 @@ kotlin {
                 implementation("com.soywiz.korlibs.krypto:krypto-jvm:$kryptoVersion")
             }
         }
-
     }
-
 }
 
 android {
-    compileSdk = 31
+    compileSdk = 34
+    namespace = "com.sdk.growthbook"
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
+
     defaultConfig {
         minSdk = 21
-        targetSdk = 31
-
         consumerProguardFiles("consumer-rules.pro")
     }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -112,7 +117,7 @@ android {
     }
 }
 
-val dokkaOutputDir = "$buildDir/dokka"
+val dokkaOutputDir = "${layout.buildDirectory}/dokka"
 
 tasks.dokkaHtml {
     outputDirectory.set(file(dokkaOutputDir))
