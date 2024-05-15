@@ -8,14 +8,10 @@ jobs:
   collect_coverage:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/setup-java@v1
-      with:
-        java-version: 17
     - uses: actions/checkout@v2
     - uses: Bohdan-Kim/kotlin-kover-action@java-version-update
       id: kover-tests
       with:
-        java-version: 17
         coverage-threshold: 80
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         proxy-url: https://add-pr-comment-proxy-94idvmwyie-uc.a.run.app
