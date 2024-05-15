@@ -12,6 +12,7 @@ jobs:
     - uses: stevenleadbeater/kotlin-kover-action@main
       id: kover-tests
       with:
+        java-version: 17
         coverage-threshold: 80
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         proxy-url: https://add-pr-comment-proxy-94idvmwyie-uc.a.run.app
