@@ -12,7 +12,7 @@ jobs:
       with:
         java-version: 17
     - uses: actions/checkout@v2
-    - uses: stevenleadbeater/kotlin-kover-action@main
+    - uses: Bohdan-Kim/kotlin-kover-action@java-version-update
       id: kover-tests
       with:
         java-version: 17
