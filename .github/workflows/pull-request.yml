@@ -8,6 +8,9 @@ jobs:
   collect_coverage:
     runs-on: ubuntu-latest
     steps:
+    - uses: actions/setup-java@v1
+      with:
+        java-version: 17
     - uses: actions/checkout@v2
     - uses: stevenleadbeater/kotlin-kover-action@main
       id: kover-tests
