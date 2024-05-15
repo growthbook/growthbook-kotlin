@@ -13,7 +13,7 @@ version = "1.1.51"
 kotlin {
 
     val ktorVersion = "2.1.2"
-    val serializationVersion = "1.3.2"
+    val serializationVersion = "1.3.3"
     val kryptoVersion = "2.7.0"
 
     android {
@@ -85,11 +85,11 @@ kotlin {
 }
 
 android {
-    compileSdk = 31
+    compileSdk = 34
+    namespace = "com.sdk.growthbook"
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
     defaultConfig {
         minSdk = 21
-        targetSdk = 31
 
         consumerProguardFiles("consumer-rules.pro")
     }
