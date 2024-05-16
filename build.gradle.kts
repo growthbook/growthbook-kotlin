@@ -9,7 +9,7 @@ buildscript {
     }
     dependencies {
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
-        classpath("com.android.tools.build:gradle:8.1.4")
+        classpath("com.android.tools.build:gradle:7.4.2")
         classpath ("org.jetbrains.kotlin:kotlin-serialization:$kotlinVersion")
     }
 }
@@ -29,4 +29,3 @@ tasks.register("clean", Delete::class) {
 plugins {
     id("org.jetbrains.kotlinx.kover") version "0.5.0"
 }
-
