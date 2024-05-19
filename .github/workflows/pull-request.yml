@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - uses: Bohdan-Kim/kotlin-kover-action@java-version-update
+    - uses: stevenleadbeater/kotlin-kover-action@main
       id: kover-tests
       with:
         coverage-threshold: 80
