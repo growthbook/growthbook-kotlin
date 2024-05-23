@@ -81,54 +81,71 @@ internal class GBConditionEvaluator {
 
     /**
      * This is the main function used to evaluate a condition.
-     * - attributes : User Attributes
-     * - condition : to be evaluated
+     * It loops through the condition key/value pairs and checks each entry:
+     * - attributes is the user's attributes
+     * - condition to be evaluated
      */
     fun evalCondition(attributes: JsonElement, conditionObj: GBCondition): Boolean {
 
         if (conditionObj is JsonArray) {
             return false
         } else {
-
-            // If conditionObj has a key $or, return evalOr(attributes, condition["$or"])
-            var targetItems = conditionObj.jsonObject["\$or"] as? JsonArray
-            if (targetItems != null) {
-                return evalOr(attributes, targetItems)
-            }
-
-            // If conditionObj has a key $nor, return !evalOr(attributes, condition["$nor"])
-            targetItems = conditionObj.jsonObject["\$nor"] as? JsonArray
-            if (targetItems != null) {
-                return !evalOr(attributes, targetItems)
-            }
-
-            // If conditionObj has a key $and, return !evalAnd(attributes, condition["$and"])
-            targetItems = conditionObj.jsonObject["\$and"] as? JsonArray
-            if (targetItems != null) {
-                return evalAnd(attributes, targetItems)
-            }
-
-            // If conditionObj has a key $not, return !evalCondition(attributes, condition["$not"])
-            val targetItem = conditionObj.jsonObject["\$not"]
-            if (targetItem != null) {
-                return !evalCondition(attributes, targetItem)
-            }
-
             // Loop through the conditionObj key/value pairs
-            for (key in conditionObj.jsonObject.keys) {
-                val element = getPath(attributes, key)
-                val value = conditionObj.jsonObject[key]
-                if (value != null) {
-                    // If evalConditionValue(value, getPath(attributes, key)) is false,
-                    // break out of loop and return false
-                    if (!evalConditionValue(value, element)) {
-                        return false
+            for ((key, value) in conditionObj.jsonObject) {
+                when (key) {
+                    "\$or" -> {
+                        // If conditionObj has a key $or, return evalOr(attributes, condition["$or"])
+                        val targetItems = conditionObj.jsonObject[key] as? JsonArray
+                        if (targetItems != null) {
+                            if (!evalOr(attributes, targetItems)) {
+                                return false
+                            }
+                        }
+                    }
+
+                    "\$nor" -> {
+                        // If conditionObj has a key $nor, return !evalOr(attributes, condition["$nor"])
+                        val targetItems = conditionObj.jsonObject[key] as? JsonArray
+                        if (targetItems != null) {
+                            if (evalOr(attributes, targetItems)) {
+                                return false
+                            }
+                        }
+                    }
+
+                    "\$and" -> {
+                        // If conditionObj has a key $and, return !evalAnd(attributes, condition["$and"])
+                        val targetItems = conditionObj.jsonObject[key] as? JsonArray
+                        if (targetItems != null) {
+                            if (!evalAnd(attributes, targetItems)) {
+                                return false
+                            }
+                        }
+                    }
+
+                    "\$not" -> {
+                        // If conditionObj has a key $not, return !evalCondition(attributes, condition["$not"])
+                        val targetItem = conditionObj.jsonObject[key]
+                        if (targetItem != null) {
+                            if (evalCondition(attributes, targetItem)) {
+                                return false
+                            }
+                        }
+                    }
+
+                    else -> {
+                        val element = getPath(attributes, key)
+                            // If evalConditionValue(value, getPath(attributes, key)) is false,
+                            // break out of loop and return false
+                            if (!evalConditionValue(value, element)) {
+                                return false
+                            }
                     }
                 }
             }
         }
 
-        // Return true
+        // If none of the entries failed their checks, `evalCondition` returns true
         return true
     }
 

@@ -1,8 +1,6 @@
 package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.utils.GBFeatures
-import com.sdk.growthbook.utils.GBStickyAssignmentsDocument
-import com.sdk.growthbook.utils.GBStickyAttributeKey
 import com.sdk.growthbook.model.GBExperiment
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -11,64 +9,73 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
+import java.io.File
 
 class GBTestHelper {
 
     companion object {
 
         val jsonParser = Json { ignoreUnknownKeys = true }
-        val testData = jsonParser.decodeFromString(
-            JsonElement.serializer(), gbTestCases
-        )
+        private val testData: JsonObject
+
+        init {
+            val usrDir = System.getProperty("user.dir")
+            val pathToFile = "$usrDir/src/commonTest/kotlin/com/sdk/growthbook/tests/cases.json"
+            val casesJsonFile = File(pathToFile)
+
+            testData = jsonParser.decodeFromString(
+                JsonObject.serializer(), casesJsonFile.readText()
+            )
+        }
 
         fun getEvalConditionData(): JsonArray {
-            val array = testData.jsonObject.get("evalCondition") as JsonArray
+            val array = testData.jsonObject["evalCondition"] as JsonArray
             return array
         }
 
         fun getRunExperimentData(): JsonArray {
-            val array = testData.jsonObject.get("run") as JsonArray
+            val array = testData.jsonObject["run"] as JsonArray
             return array
         }
 
         fun getFNVHashData(): JsonArray {
-            val array = testData.jsonObject.get("hash") as JsonArray
+            val array = testData.jsonObject["hash"] as JsonArray
             return array
         }
 
         fun getFeatureData(): JsonArray {
 
-            val array = testData.jsonObject.get("feature") as JsonArray
+            val array = testData.jsonObject["feature"] as JsonArray
             return array
         }
 
         fun getBucketRangeData(): JsonArray {
-            val array = testData.jsonObject.get("getBucketRange") as JsonArray
+            val array = testData.jsonObject["getBucketRange"] as JsonArray
             return array
         }
 
         fun getInNameSpaceData(): JsonArray {
-            val array = testData.jsonObject.get("inNamespace") as JsonArray
+            val array = testData.jsonObject["inNamespace"] as JsonArray
             return array
         }
 
         fun getChooseVariationData(): JsonArray {
-            val array = testData.jsonObject.get("chooseVariation") as JsonArray
+            val array = testData.jsonObject["chooseVariation"] as JsonArray
             return array
         }
 
         fun getEqualWeightsData(): JsonArray {
-            val array = testData.jsonObject.get("getEqualWeights") as JsonArray
+            val array = testData.jsonObject["getEqualWeights"] as JsonArray
             return array
         }
 
         fun getDecryptData(): JsonArray {
-            val array = testData.jsonObject.get("decrypt") as JsonArray
+            val array = testData.jsonObject["decrypt"] as JsonArray
             return array
         }
 
         fun getStickyBucketingData(): JsonArray {
-            val array = testData.jsonObject.get("stickyBucket") as JsonArray
+            val array = testData.jsonObject["stickyBucket"] as JsonArray
             return array
         }
     }
@@ -88,7 +95,6 @@ class GBFeaturesTest(
     val features: GBFeatures? = null,
     val attributes: JsonElement = JsonObject(HashMap()),
     val forcedVariations: JsonObject? = null,
-    val stickyBucketAssignmentDocs: Map<GBStickyAttributeKey, GBStickyAssignmentsDocument>? = null
 )
 
 @Serializable
