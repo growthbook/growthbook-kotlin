@@ -8,9 +8,9 @@ import com.sdk.growthbook.sandbox.CachingAndroid
  * Android App Context Provider
  * KotlinX Implementation to simplify SDK Initialization
  */
-class AppContextProvider : Initializer<Context> {
+internal class AppContextProvider : Initializer<Context> {
     override fun create(context: Context) : Context {
-        CachingAndroid.context = context
+        CachingAndroid.consumeContext(context)
         return context
     }
     override fun dependencies(): List<Class<out Initializer<*>>> {

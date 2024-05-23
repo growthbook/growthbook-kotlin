@@ -9,7 +9,7 @@ import java.io.FileInputStream
 /**
  * Actual Implementation for Caching in Android - As expected in KMM
  */
-actual internal object CachingImpl {
+internal actual object CachingImpl {
     actual fun getLayer(): CachingLayer {
         return CachingAndroid()
     }
@@ -18,16 +18,12 @@ actual internal object CachingImpl {
 /**
  * Android Caching Layer
  */
-internal class CachingAndroid : CachingLayer {
-
-    companion object {
-        var context: Context? = null
-    }
+class CachingAndroid: CachingLayer {
 
     /**
      * JSON Parser SetUp
      */
-    val json = Json { prettyPrint = true; isLenient = true; ignoreUnknownKeys = true }
+    private val json = Json { prettyPrint = true; isLenient = true; ignoreUnknownKeys = true }
 
     /**
      * Save Content in Android App Specific Internal Memory
@@ -73,16 +69,28 @@ internal class CachingAndroid : CachingLayer {
      * Get Target File - with complete path in internal memory
      */
     fun getTargetFile(fileName: String): File? {
-        if (context != null) {
-            val path = context!!.getFilesDir()
-            // Create Directory in Internal Memory
-            val letDirectory = File(path, "GrowthBook-KMM")
-            letDirectory.mkdirs()
-            var targetFileName = fileName
-            if (fileName.endsWith(".txt", true)) {
-                targetFileName = fileName.removeSuffix(".txt")
-            }
-            return File(letDirectory, targetFileName + ".txt")
-        } else return null
+        if (filesDir == null) {
+            return null
+        }
+
+        // Create Directory in Internal Memory
+        val letDirectory = File(filesDir, "GrowthBook-KMM")
+        letDirectory.mkdirs()
+        var targetFileName = fileName
+        if (fileName.endsWith(".txt", true)) {
+            targetFileName = fileName.removeSuffix(".txt")
+        }
+        return File(letDirectory, "$targetFileName.txt")
+    }
+
+    companion object {
+        internal var filesDir: File? = null
+
+        /**
+         * Retrieves filesDir from context
+         */
+        fun consumeContext(context: Context) {
+            filesDir = context.filesDir
+        }
     }
 }
