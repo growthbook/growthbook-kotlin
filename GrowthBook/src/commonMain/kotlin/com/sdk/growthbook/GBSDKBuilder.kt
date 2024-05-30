@@ -92,7 +92,6 @@ class GBSDKBuilder(
      */
     fun setRefreshHandler(refreshHandler: GBCacheRefreshHandler): GBSDKBuilder {
         this.refreshHandler = refreshHandler
-
         return this
     }
 
