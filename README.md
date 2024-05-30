@@ -28,7 +28,13 @@ repositories {
 }
 
 dependencies {
-    implementation 'io.growthbook.sdk:GrowthBook:<version>'
+    String ktorVersion = 'some_ktor_version' //  for example 2.1.1
+    compileOnly("io.ktor:ktor-client-core:$ktorVersion")
+
+    // maybe in some cases you will not need this
+    compileOnly("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+
+    implementation 'io.growthbook.sdk:GrowthBook:<version>' // 1.1.58 latest version at the this file editing moment
 }
 ```
 
@@ -49,7 +55,13 @@ android {
 }
 
 dependencies {
-    implementation 'io.growthbook.sdk:GrowthBook:<version>'
+    String ktorVersion = 'some_ktor_version' //  for example 2.1.1
+    compileOnly("io.ktor:ktor-client-core:$ktorVersion")
+
+    // maybe in some cases you will not need this
+    compileOnly("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+
+    implementation 'io.growthbook.sdk:GrowthBook:<version>' // 1.1.58 latest version at the this file editing moment
 }
 ```
 
@@ -92,7 +104,13 @@ repositories {
 }
 
 dependencies {
-    implementation 'io.growthbook.sdk:GrowthBook:<version>'
+    String ktorVersion = 'some_ktor_version' //  for example 2.1.1
+    compileOnly("io.ktor:ktor-client-core:$ktorVersion")
+
+    // maybe in some cases you will not need this
+    compileOnly("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+
+    implementation 'io.growthbook.sdk:GrowthBook:<version>' // 1.1.58 latest version at the this file editing moment
 }
 ```
 
@@ -113,7 +131,13 @@ repositories {
 }
 
 dependencies {
-    implementation 'io.growthbook.sdk:GrowthBook:<version>'
+    String ktorVersion = 'some_ktor_version' //  for example 2.1.1
+    compileOnly("io.ktor:ktor-client-core:$ktorVersion")
+
+    // maybe in some cases you will not need this
+    compileOnly("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+
+    implementation 'io.growthbook.sdk:GrowthBook:<version>' // 1.1.58 latest version at the this file editing moment
 }
 ```
 
@@ -142,7 +166,7 @@ var sdkInstance: GrowthBookSDK = GBSDKBuilder(
     attributes = < Hashmap >,
     trackingCallback = { gbExperiment, gbExperimentResult -> },
     encryptionKey = <String?>,
-    networkDispatcher = <NetworkDispatcher>,
+    networkDispatcher = <NetworkDispatcher>, // you can use DefaultGBNetworkClient
 ).initialize()
 ```
 In next releases we plan to rename `initialize()` method to `build()`. If you are accessing features the first time there will be no features right after `initialize()` method call because features are not got from Backend yet. If you need to access features as soon as possible, you need to use `GBCacheRefreshHandler`. You can pass your implementation of `GBCacheRefreshHandler` through `setRefreshHandler()` method.
