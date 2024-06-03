@@ -21,33 +21,9 @@ import io.ktor.utils.io.ByteReadChannel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
-
-/**
- * Network Dispatcher Interface for API Consumption
- * Implement this interface to define specific implementation for Network Calls - to be made by SDK
- */
-interface NetworkDispatcher {
-    fun consumeGETRequest(
-        request: String,
-        onSuccess: (String) -> Unit,
-        onError: (Throwable) -> Unit
-    ): Job
-
-    fun consumeSSEConnection(
-        url: String
-    ): Flow<Resource<String>>
-
-    fun consumePOSTRequest(
-        url: String,
-        bodyParams: Map<String, Any>,
-        onSuccess: (String) -> Unit,
-        onError: (Throwable) -> Unit
-    )
-}
 
 internal fun createDefaultHttpClient(): HttpClient =
     HttpClient {
