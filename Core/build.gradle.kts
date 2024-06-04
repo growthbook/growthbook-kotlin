@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk.core"
-version = "1.0.0"
+version = "1.0.1"
 
 kotlin {
     android {
@@ -32,7 +32,7 @@ kotlin {
 
 android {
     compileSdk = 34
-    namespace = "com.sdk.growthbook"
+    namespace = "com.sdk.growthbook.core"
     defaultConfig {
         minSdk = 21
     }
