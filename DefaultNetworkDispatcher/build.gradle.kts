@@ -34,6 +34,11 @@ kotlin {
                 implementation("io.growthbook.sdk:Core:1.0.0")
             }
         }
+        val androidMain by getting {
+            dependencies {
+                implementation("io.ktor:ktor-client-android:$ktorVersion")
+            }
+        }
         val androidTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
