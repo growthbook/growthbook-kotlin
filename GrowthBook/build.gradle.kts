@@ -29,7 +29,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api(project(":Core"))
+                api("io.growthbook.sdk:Core:1.0.0")
                 implementation("org.jetbrains.kotlin:kotlin-stdlib-common")
                 implementation(
                     "org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion"
