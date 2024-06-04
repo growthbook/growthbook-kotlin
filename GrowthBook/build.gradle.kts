@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "1.1.62"
+version = "1.1.59"
 
 kotlin {
 
@@ -29,7 +29,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api("io.growthbook.sdk:Core:1.0.0")
+                implementation("io.growthbook.sdk:Core:1.0.0")
                 implementation("org.jetbrains.kotlin:kotlin-stdlib-common")
                 implementation(
                     "org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion"

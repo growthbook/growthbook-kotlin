@@ -54,7 +54,7 @@ jobs:
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: GrowthBook/build/libs/GrowthBook-jvm-${{ steps.gitversion.outputs.SemVer }}.jar
-        asset_name: GrowthBook-${{ steps.gitversion.outputs.SemVer }}.jar
+        asset_name: GrowthBook-$LIB_VERSION.jar
         asset_content_type: application/x-jar
     - name: Upload sources
       uses: actions/upload-release-asset@v1
@@ -62,7 +62,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: GrowthBook/build/libs/GrowthBook-kotlin-${{ steps.gitversion.outputs.SemVer }}-sources.jar
+        asset_path: GrowthBook/build/libs/GrowthBook-kotlin-$LIB_VERSION-sources.jar
         asset_name: GrowthBook-kotlin-${{ steps.gitversion.outputs.SemVer }}-sources.jar
         asset_content_type: application/x-jar
     - name: Upload metadata
@@ -71,6 +71,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: GrowthBook/build/libs/GrowthBook-metadata-${{ steps.gitversion.outputs.SemVer }}.jar
-        asset_name: GrowthBook-metadata-${{ steps.gitversion.outputs.SemVer }}-all.jar
+        asset_path: GrowthBook/build/libs/GrowthBook-metadata-$LIB_VERSION.jar
+        asset_name: GrowthBook-metadata-$LIB_VERSION-all.jar
         asset_content_type: application/x-jar
