@@ -7,8 +7,8 @@ plugins {
     id("org.jetbrains.dokka") version "1.4.20"
 }
 
-group = "io.growthbook.sdk.core"
-version = "1.0.1"
+group = "io.growthbook.sdk"
+version = "1.0.0"
 
 kotlin {
     android {

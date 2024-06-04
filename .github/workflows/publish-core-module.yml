@@ -4,7 +4,7 @@ on:
   workflow_dispatch
 
 env:
-  CORE_MODULE_VERSION: 1.0.1
+  CORE_MODULE_VERSION: 1.0.0
 
 jobs:
   release:
@@ -14,10 +14,6 @@ jobs:
       with:
         clean: 'true'
         fetch-depth: 0
-    - name: Install GitVersion
-      uses: gittools/actions/gitversion/setup@v0.9.7
-      with:
-        versionSpec: '5.x'
     - uses: actions/setup-java@v1
       with:
         java-version: 11
