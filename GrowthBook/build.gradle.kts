@@ -31,13 +31,10 @@ kotlin {
             dependencies {
                 implementation("io.growthbook.sdk:Core:1.0.0")
                 implementation("org.jetbrains.kotlin:kotlin-stdlib-common")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.2.0")
                 implementation(
                     "org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion"
                 )
-                implementation("io.ktor:ktor-client-core:$ktorVersion")
-                implementation("io.ktor:ktor-utils:$ktorVersion")
-                implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
-                implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
                 implementation("com.ionspin.kotlin:bignum:0.3.3")
                 implementation("com.soywiz.korlibs.krypto:krypto:$kryptoVersion")
             }
@@ -54,7 +51,6 @@ kotlin {
         }
         val androidMain by getting {
             dependencies {
-                implementation("io.ktor:ktor-client-android:$ktorVersion")
                 implementation("androidx.startup:startup-runtime:1.1.1")
                 implementation("com.soywiz.korlibs.krypto:krypto-android:$kryptoVersion")
             }

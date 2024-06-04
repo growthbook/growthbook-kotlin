@@ -1,29 +1,29 @@
 package com.sdk.growthbook.network
 
-import com.sdk.growthbook.PlatformDependentIODispatcher
 import com.sdk.growthbook.utils.Resource
-import com.sdk.growthbook.utils.readSse
-import com.sdk.growthbook.utils.toJsonElement
+import kotlinx.coroutines.Job
 import io.ktor.client.HttpClient
-import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.serialization.kotlinx.json.json
+import kotlinx.serialization.json.Json
+import kotlinx.coroutines.CoroutineScope
+import com.sdk.growthbook.PlatformDependentIODispatcher
+import kotlinx.coroutines.launch
 import io.ktor.client.request.get
-import io.ktor.client.request.headers
 import io.ktor.client.request.post
 import io.ktor.client.request.prepareGet
-import io.ktor.client.request.setBody
+import io.ktor.client.call.body
 import io.ktor.client.statement.HttpStatement
+import io.ktor.client.request.headers
+import kotlinx.coroutines.flow.callbackFlow
+import io.ktor.utils.io.ByteReadChannel
+import com.sdk.growthbook.utils.readSse
+import kotlinx.coroutines.channels.awaitClose
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
-import io.ktor.serialization.kotlinx.json.json
-import io.ktor.utils.io.ByteReadChannel
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
+//import io.ktor.client.request.setBody
+//import com.sdk.growthbook.utils.toJsonElement
+import io.ktor.client.request.HttpRequestBuilder
 
 internal fun createDefaultHttpClient(): HttpClient =
     HttpClient {
@@ -39,7 +39,7 @@ internal fun createDefaultHttpClient(): HttpClient =
 /**
  * Default Ktor Implementation for Network Dispatcher
  */
-class DefaultGBNetworkClient(
+class DefaultGBNetworkDispatcher(
 
     /**
      * Ktor http client instance for sending request
@@ -122,7 +122,7 @@ class DefaultGBNetworkClient(
                         append("Accept", "application/json")
                     }
                     contentType(ContentType.Application.Json)
-                    setBody(bodyParams.toJsonElement())
+                    //setBody(bodyParams.toJsonElement())
                     println("body = $body")
                 }
                 onSuccess(response.body())
