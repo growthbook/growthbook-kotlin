@@ -4,6 +4,7 @@ plugins {
     kotlin("plugin.serialization")
     id("maven-publish")
     id("signing")
+    id("org.jetbrains.dokka") version "1.4.20"
 }
 
 group = "io.growthbook.sdk"
@@ -58,6 +59,28 @@ android {
     }
 }
 
+val dokkaOutputDir = "$buildDir/dokka"
+
+tasks.dokkaHtml {
+    outputDirectory.set(file(dokkaOutputDir))
+}
+
+/**
+ * This task deletes older documents
+ */
+val deleteDokkaOutputDir by tasks.register<Delete>("deleteDokkaOutputDirectory") {
+    delete(dokkaOutputDir)
+}
+
+/**
+ * This task creates JAVA Docs for Release
+ */
+val javadocJar = tasks.register<Jar>("javadocJar") {
+    dependsOn(deleteDokkaOutputDir, tasks.dokkaHtml)
+    archiveClassifier.set("javadoc")
+    from(dokkaOutputDir)
+}
+
 val sonatypeUsername: String? = System.getenv("GB_SONATYPE_USERNAME")
 val sonatypePassword: String? = System.getenv("GB_SONATYPE_PASSWORD")
 
@@ -80,7 +103,7 @@ publishing {
 
     publications {
         withType<MavenPublication> {
-            //artifact(javadocJar)
+            artifact(javadocJar)
             pom {
                 name.set("kotlin")
                 description.set("Default network dispatcher for GrowthBook")
