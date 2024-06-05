@@ -1,4 +1,4 @@
-name: Release
+name: Upload sources, binaries etc.
 
 on:
   workflow_dispatch
@@ -23,6 +23,17 @@ jobs:
       run: ./gradlew clean --info
     - name: Build with Gradle
       run: ./gradlew -Pversion=$LIB_VERSION build --info
+    - name: release
+      uses: actions/create-release@v1
+      id: create_release
+      with:
+        draft: false
+        prerelease: false
+        release_name: $LIB_VERSION
+        tag_name: $LIB_VERSION
+        body: ${{ github.event.head_commit.message }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     - name: Upload binary
       uses: actions/upload-release-asset@v1
       env:
