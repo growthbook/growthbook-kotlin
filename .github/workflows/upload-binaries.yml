@@ -3,8 +3,8 @@ name: Upload sources, binaries etc.
 on:
   workflow_dispatch
 
-#env:
-#  LIB_VERSION: 0.0.0.0 # experimental version
+env:
+  LIB_VERSION: 1.1.59
 
 jobs:
   release:
@@ -40,7 +40,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: GrowthBook/build/libs/GrowthBook-jvm-${{ steps.gitversion.outputs.SemVer }}.jar
+        asset_path: GrowthBook/build/libs/GrowthBook-jvm-$LIB_VERSION.jar
         asset_name: GrowthBook-$LIB_VERSION.jar
         asset_content_type: application/x-jar
     - name: Upload sources
@@ -50,7 +50,7 @@ jobs:
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: GrowthBook/build/libs/GrowthBook-kotlin-$LIB_VERSION-sources.jar
-        asset_name: GrowthBook-kotlin-${{ steps.gitversion.outputs.SemVer }}-sources.jar
+        asset_name: GrowthBook-kotlin-$LIB_VERSION-sources.jar
         asset_content_type: application/x-jar
     - name: Upload metadata
       uses: actions/upload-release-asset@v1
