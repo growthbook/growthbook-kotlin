@@ -20,12 +20,6 @@ jobs:
         java-version: 11
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
-    - name: Determine Version
-      id: gitversion
-      uses: gittools/actions/gitversion/execute@v0.9.7
-      with:
-        useConfigFile: true
-        configFilePath: ./.github/gitversion.yml
     - name: Gradle clean
       run: ./gradlew clean --info
     - name: Build with Gradle
