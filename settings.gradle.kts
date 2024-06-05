@@ -9,3 +9,4 @@ pluginManagement {
 rootProject.name = "GrowthBook"
 include(":GrowthBook")
 include(":Core")
+include(":DefaultNetworkDispatcher")
