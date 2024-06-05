@@ -1,4 +1,4 @@
-name: Release
+name: Release library and dispatcher
 
 on:
   workflow_dispatch
@@ -37,7 +37,7 @@ jobs:
 #        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     - name: Publish to maven central
       run: |
-        GPG_PRIVATE_KEY="${{secrets.GPG_PRIVATE_KEY}}" GPG_PRIVATE_PASSWORD="${{secrets.GPG_PRIVATE_PASSWORD}}" GB_SONATYPE_USERNAME='${{secrets.GB_SONATYPE_USERNAME}}' GB_SONATYPE_PASSWORD='${{secrets.GB_SONATYPE_PASSWORD}}' ./gradlew -Pversion=$LIB_VERSION publish
+        GPG_PRIVATE_KEY="${{secrets.GPG_PRIVATE_KEY}}" GPG_PRIVATE_PASSWORD="${{secrets.GPG_PRIVATE_PASSWORD}}" GB_SONATYPE_USERNAME='${{secrets.GB_SONATYPE_USERNAME}}' GB_SONATYPE_PASSWORD='${{secrets.GB_SONATYPE_PASSWORD}}' ./gradlew -Pversion=$LIB_VERSION :GrowthBook:publish -Pversion=$DISPATCHER_VERSION :DefaultNetworkDispatcher:publish
     - name: Upload binary
       uses: actions/upload-release-asset@v1
       env:
