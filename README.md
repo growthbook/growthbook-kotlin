@@ -14,13 +14,9 @@
 - **Use your existing event tracking (GA, Segment, Mixpanel, custom)**
 - **Adjust variation weights and targeting without deploying new code**
 
-## Installation
+## Setup
 
-##### Android
-
-###### Kotlin
-
-App level build.gradle
+App level build.gradle (Groovy DSL):
 
 ```kotlin
 repositories {
@@ -28,124 +24,20 @@ repositories {
 }
 
 dependencies {
-    String ktorVersion = 'some_ktor_version' //  for example 2.1.1
-    compileOnly("io.ktor:ktor-client-core:$ktorVersion")
-
-    // maybe in some cases you will not need this
-    compileOnly("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
-
-    implementation 'io.growthbook.sdk:GrowthBook:<version>' // 1.1.58 latest version at the this file editing moment
+    implementation 'io.growthbook.sdk:GrowthBook:<version>' // 1.1.59 latest version when this file was edited
+    implementation 'io.growthbook.sdk:DefaultNetworkDispatcher:1.0.0'
 }
 ```
-
-###### JAVA
-
-App level build.gradle
-
-```kotlin
-plugins {
-    id 'com.android.application'
-    id 'org.jetbrains.kotlin.android'
-}
-
-android {
-    kotlinOptions {
-        jvmTarget = '1.8'
-    }
-}
-
-dependencies {
-    String ktorVersion = 'some_ktor_version' //  for example 2.1.1
-    compileOnly("io.ktor:ktor-client-core:$ktorVersion")
-
-    // maybe in some cases you will not need this
-    compileOnly("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
-
-    implementation 'io.growthbook.sdk:GrowthBook:<version>' // 1.1.58 latest version at the this file editing moment
-}
-```
-
-Project level build.gradle
-
-```kotlin
-plugins {
-    id 'org.jetbrains.kotlin.android' version '1.5.30' apply false
-}
-```
+`DefaultNetworkDispatcher` artifact provides `NetworkDispatcher` implementation based on `ktor` network client.
+If you are using other network client for example `OkHttp` and don't want to have any other network client in your application,
+you can provide your own implementation of `NetworkDispatcher` for example based on `OkHttp` client.
+You will not need to include `DefaultNetworkDispatcher` artifact in this case.
 
 **Add Internet Permission to your AndroidManifest.xml, if not already added**
 
   ```kotlin
-  <uses - permission android : name ="android.permission.INTERNET" / >
+  <uses-permission android:name="android.permission.INTERNET" />
   ```
-
-##### JVM
-
-###### JAVA
-
-Add below in build.gradle files -
-
-```kotlin
-
-plugins {
-    id 'java'
-    id 'application'
-    id 'org.jetbrains.kotlin.jvm' version '1.5.31'
-}
-
-[compileKotlin, compileTestKotlin].forEach {
-    it.kotlinOptions {
-        jvmTarget = '11'
-    }
-}
-
-repositories {
-    mavenCentral()
-}
-
-dependencies {
-    String ktorVersion = 'some_ktor_version' //  for example 2.1.1
-    compileOnly("io.ktor:ktor-client-core:$ktorVersion")
-
-    // maybe in some cases you will not need this
-    compileOnly("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
-
-    implementation 'io.growthbook.sdk:GrowthBook:<version>' // 1.1.58 latest version at the this file editing moment
-}
-```
-
-Add below in module-info.java -
-
-```java
-requires kotlin.stdlib;
-requires GrowthBook.jvm;
-```
-
-###### Kotlin
-
-Add below in build.gradle files -
-
-```kotlin
-repositories {
-    mavenCentral()
-}
-
-dependencies {
-    String ktorVersion = 'some_ktor_version' //  for example 2.1.1
-    compileOnly("io.ktor:ktor-client-core:$ktorVersion")
-
-    // maybe in some cases you will not need this
-    compileOnly("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
-
-    implementation 'io.growthbook.sdk:GrowthBook:<version>' // 1.1.58 latest version at the this file editing moment
-}
-```
-
-Add below in module-info.java -
-
-```java
-requires GrowthBook.jvm;
-```
 
 ## Integration
 
