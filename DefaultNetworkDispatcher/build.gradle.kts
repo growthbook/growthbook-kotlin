@@ -31,7 +31,7 @@ kotlin {
                 implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
 
-                implementation("io.growthbook.sdk:Core:1.0.0")
+                implementation("io.growthbook.sdk:Core:1.0.1")
             }
         }
         val androidMain by getting {

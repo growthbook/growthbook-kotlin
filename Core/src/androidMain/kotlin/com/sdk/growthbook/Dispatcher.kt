@@ -6,5 +6,5 @@ import kotlinx.coroutines.Dispatchers
 /**
  * IO Dispatcher
  */
-internal actual val PlatformDependentIODispatcher: CoroutineDispatcher =
+actual val PlatformDependentIODispatcher: CoroutineDispatcher =
     Dispatchers.IO

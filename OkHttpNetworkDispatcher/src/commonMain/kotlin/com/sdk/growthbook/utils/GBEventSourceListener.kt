@@ -1,6 +1,5 @@
-package com.sdk.growthbook.utils.fromJava
+package com.sdk.growthbook.utils
 
-import okhttp3.Response
 import okhttp3.sse.EventSource
 import okhttp3.sse.EventSourceListener
 
@@ -17,16 +16,8 @@ class GBEventSourceListener(private val handler: GBEventSourceHandler): EventSou
         }
         try {
             handler.onFeaturesResponse(data)
-        }catch (e: Exception) {
+        } catch (e: Exception) {
             println(e)
         }
-    }
-
-    override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
-        super.onFailure(eventSource, t, response)
-    }
-
-    override fun onOpen(eventSource: EventSource, response: Response) {
-        super.onOpen(eventSource, response)
     }
 }

@@ -1,4 +1,4 @@
-package com.sdk.growthbook.utils.fromJava
+package com.sdk.growthbook.utils
 
 import okhttp3.sse.EventSource
 

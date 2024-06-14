@@ -2,8 +2,8 @@ package com.sdk.growthbook.network
 
 import com.sdk.growthbook.PlatformDependentIODispatcher
 import com.sdk.growthbook.utils.Resource
-import com.sdk.growthbook.utils.fromJava.GBEventSourceHandler
-import com.sdk.growthbook.utils.fromJava.GBEventSourceListener
+import com.sdk.growthbook.utils.GBEventSourceHandler
+import com.sdk.growthbook.utils.GBEventSourceListener
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -116,7 +116,7 @@ class OkHttpGBNetworkDispatcher(
                 .addHeader("Accept", "text/event-stream")
                 .build()
 
-            val sseEventSource = EventSources
+            EventSources
                 .createFactory(sseHttpClient)
                 .newEventSource(
                 request = request,
