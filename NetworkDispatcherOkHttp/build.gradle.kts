@@ -31,7 +31,7 @@ kotlin {
                 // https://mvnrepository.com/artifact/com.google.code.gson/gson
                 //implementation("com.google.code.gson:gson:2.11.0")
 
-                implementation("io.growthbook.sdk:Core:1.0.0")
+                implementation("io.growthbook.sdk:Core:1.0.1")
             }
         }
         val androidMain by getting {
