@@ -56,7 +56,7 @@ kotlin {
                 implementation("com.soywiz.korlibs.krypto:krypto-android:$kryptoVersion")
             }
         }
-        val androidTest by getting {
+        val androidUnitTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
                 implementation("junit:junit:4.13.2")
