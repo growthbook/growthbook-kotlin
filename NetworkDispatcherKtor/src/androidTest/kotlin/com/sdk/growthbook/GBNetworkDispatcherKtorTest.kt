@@ -1,6 +1,6 @@
 package com.sdk.growthbook
 
-import com.sdk.growthbook.network.DefaultGBNetworkDispatcher
+import com.sdk.growthbook.network.GBNetworkDispatcherKtor
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import org.junit.Test
@@ -15,8 +15,8 @@ import org.junit.Assert.assertTrue
 
 private const val FEATURES_ENDPOINT = "/api/features/"
 
-class DefaultGBNetworkDispatcherTest {
-    private val classUnderTest: DefaultGBNetworkDispatcher
+class GBNetworkDispatcherKtorTest {
+    private val classUnderTest: GBNetworkDispatcherKtor
 
     init {
         val mockEngine = MockEngine {
@@ -27,7 +27,7 @@ class DefaultGBNetworkDispatcherTest {
             )
         }
 
-        classUnderTest = DefaultGBNetworkDispatcher(
+        classUnderTest = GBNetworkDispatcherKtor(
             HttpClient(mockEngine)
         )
     }

@@ -1,6 +1,5 @@
 package com.sdk.growthbook.network
 
-import com.sdk.growthbook.utils.Resource
 import kotlinx.coroutines.Job
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -39,7 +38,7 @@ internal fun createDefaultHttpClient(): HttpClient =
 /**
  * Default Ktor Implementation for Network Dispatcher
  */
-class DefaultGBNetworkDispatcher(
+class GBNetworkDispatcherKtor(
 
     /**
      * Ktor http client instance for sending request

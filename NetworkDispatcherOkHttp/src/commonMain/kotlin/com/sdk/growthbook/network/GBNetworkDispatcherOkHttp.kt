@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit
 /**
  * Default Ktor Implementation for Network Dispatcher
  */
-class OkHttpGBNetworkDispatcher(
+class GBNetworkDispatcherOkHttp(
 
     /**
      * Ktor http client instance for sending request

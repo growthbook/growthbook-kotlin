@@ -9,5 +9,5 @@ pluginManagement {
 rootProject.name = "GrowthBook"
 include(":GrowthBook")
 include(":Core")
-include(":DefaultNetworkDispatcher")
-include(":OkHttpNetworkDispatcher")
+include(":NetworkDispatcherKtor")
+include(":NetworkDispatcherOkHttp")
