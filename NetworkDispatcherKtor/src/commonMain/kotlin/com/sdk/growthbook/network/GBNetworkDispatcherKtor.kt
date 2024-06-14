@@ -20,9 +20,8 @@ import com.sdk.growthbook.utils.readSse
 import kotlinx.coroutines.channels.awaitClose
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
-//import io.ktor.client.request.setBody
-//import com.sdk.growthbook.utils.toJsonElement
 import io.ktor.client.request.HttpRequestBuilder
+import com.sdk.growthbook.utils.Resource
 
 internal fun createDefaultHttpClient(): HttpClient =
     HttpClient {
