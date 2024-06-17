@@ -87,7 +87,7 @@ publishing {
             }*/
             credentials(HttpHeaderCredentials::class) {
                 name = "Authorization"
-                value = "Bearer $sonatypeUsername:$sonatypePassword"
+                value = "$sonatypeUsername:$sonatypePassword"
             }
             authentication {
                 create<HttpHeaderAuthentication>("header")
