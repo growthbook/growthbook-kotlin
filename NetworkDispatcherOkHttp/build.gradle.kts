@@ -3,7 +3,7 @@ plugins {
     id("com.android.library")
     id("maven-publish")
     id("signing")
-    id("org.jetbrains.dokka") version "1.8.10"
+    id("org.jetbrains.dokka") version "1.4.20"
 }
 
 group = "io.growthbook.sdk"
