@@ -440,10 +440,6 @@ internal class GBUtils {
                 context.stickyBucketAssignmentDocs = emptyMap()
             }
 
-            context.stickyBucketAssignmentDocs?.values?.forEach { doc ->
-                mergedAssignments.putAll(doc.assignments)
-            }
-
             fallbackKey?.let { fallback ->
                 stickyBucketAssignmentDocs[fallback]?.let { fallbackAssignments ->
                     mergedAssignments.putAll(fallbackAssignments.assignments)
