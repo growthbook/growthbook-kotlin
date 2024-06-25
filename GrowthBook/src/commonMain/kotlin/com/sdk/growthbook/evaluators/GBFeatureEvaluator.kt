@@ -253,21 +253,23 @@ internal class GBFeatureEvaluator {
                             val exp = GBExperiment(
                                 key = rule.key ?: featureKey,
                                 variations = variation,
-                                namespace = rule.namespace,
+                                coverage = rule.coverage,
+                                weights = rule.weights,
                                 hashAttribute = rule.hashAttribute,
                                 fallBackAttribute = rule.fallbackAttribute,
-                                hashVersion = rule.hashVersion,
                                 disableStickyBucketing = rule.disableStickyBucketing,
                                 bucketVersion = rule.bucketVersion,
                                 minBucketVersion = rule.minBucketVersion,
-                                weights = rule.weights,
-                                coverage = rule.coverage,
-                                ranges = rule.ranges,
+                                namespace = rule.namespace,
                                 meta = rule.meta,
-                                filters = rule.filters,
-                                seed = rule.seed,
+                                ranges = rule.ranges,
                                 name = rule.name,
-                                phase = rule.phase
+                                phase = rule.phase,
+                                seed = rule.seed,
+                                hashVersion = rule.hashVersion,
+                                filters = rule.filters,
+                                condition = rule.condition,
+                                parentConditions = rule.parentConditions
                             )
 
                             /**
