@@ -1,14 +1,10 @@
 package com.sdk.growthbook.network
 
-import com.sdk.growthbook.PlatformDependentIODispatcher
-import com.sdk.growthbook.utils.Resource
-import com.sdk.growthbook.utils.GBEventSourceHandler
-import com.sdk.growthbook.utils.GBEventSourceListener
-
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.launch
 import okhttp3.Call
 import okhttp3.Callback
@@ -20,6 +16,12 @@ import okhttp3.sse.EventSource
 import okhttp3.sse.EventSources
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+
+import com.sdk.growthbook.PlatformDependentIODispatcher
+import com.sdk.growthbook.utils.Resource
+import com.sdk.growthbook.utils.GBEventSourceHandler
+import com.sdk.growthbook.utils.GBEventSourceListener
+import kotlinx.coroutines.cancel
 
 /**
  * Default Ktor Implementation for Network Dispatcher
@@ -101,46 +103,38 @@ class GBNetworkDispatcherOkHttp(
         }
     }
 
-    override fun consumeSSEConnection(url: String): Flow<Resource<String>> = flow {
-        CoroutineScope(PlatformDependentIODispatcher).launch {
-            val sseHttpClient = OkHttpClient.Builder()
-                .retryOnConnectionFailure(true)
-                .connectTimeout(0, TimeUnit.SECONDS)
-                .readTimeout(0, TimeUnit.SECONDS)
-                .writeTimeout(0, TimeUnit.SECONDS)
-                .build()
+    override fun consumeSSEConnection(url: String): Flow<Resource<String>> {
+        val sseHttpClient = OkHttpClient.Builder()
+            .retryOnConnectionFailure(true)
+            .connectTimeout(0, TimeUnit.SECONDS)
+            .readTimeout(0, TimeUnit.SECONDS)
+            .writeTimeout(0, TimeUnit.SECONDS)
+            .build()
 
-            val request = Request.Builder()
-                .url(url)
-                .header("Accept", "application/json; q=0.5")
-                .addHeader("Accept", "text/event-stream")
-                .build()
+        val request = Request.Builder()
+            .url(url)
+            .header("Accept", "application/json; q=0.5")
+            .addHeader("Accept", "text/event-stream")
+            .build()
 
+        return callbackFlow {
             EventSources
                 .createFactory(sseHttpClient)
                 .newEventSource(
-                request = request,
-                listener = GBEventSourceListener(handler = object : GBEventSourceHandler {
-                    override fun onClose(eventSource: EventSource?) {
-                        eventSource?.cancel()
-                    }
-
-                    override fun onFeaturesResponse(featuresJsonResponse: String?) {
-                        CoroutineScope(PlatformDependentIODispatcher).launch {
-                            emit(Resource.Success(featuresJsonResponse!!))
+                    request = request,
+                    listener = GBEventSourceListener(handler = object : GBEventSourceHandler {
+                        override fun onClose(eventSource: EventSource?) {
+                            eventSource?.cancel()
+                            cancel()
                         }
-                    }
-                })
-            )
-            client.newCall(request).enqueue(object : Callback {
-                override fun onFailure(call: Call, e: IOException) {
-                    e.printStackTrace()
-                }
-
-                override fun onResponse(call: Call, response: Response) {
-                    println("DO nothing: cal: $call, res: $response")
-                }
-            })
+                        override fun onFeaturesResponse(featuresJsonResponse: String?) {
+                            featuresJsonResponse?.let {
+                                trySend(Resource.Success(it))
+                            }
+                        }
+                    })
+                )
+            awaitClose()
         }
     }
 }

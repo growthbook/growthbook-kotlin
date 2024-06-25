@@ -23,7 +23,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.2.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.0")
                 api("com.squareup.okhttp3:okhttp:4.9.0")
                 implementation("com.squareup.okhttp3:okhttp-sse:4.9.0")
 
