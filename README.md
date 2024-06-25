@@ -58,7 +58,7 @@ var sdkInstance: GrowthBookSDK = GBSDKBuilder(
     attributes = < Hashmap >,
     trackingCallback = { gbExperiment, gbExperimentResult -> },
     encryptionKey = <String?>,
-    networkDispatcher = <NetworkDispatcher>, // you can use DefaultGBNetworkClient
+    networkDispatcher = <NetworkDispatcher>, // you can use DefaultGBNetworkDispatcher()
 ).initialize()
 ```
 In next releases we plan to rename `initialize()` method to `build()`. If you are accessing features the first time there will be no features right after `initialize()` method call because features are not got from Backend yet. If you need to access features as soon as possible, you need to use `GBCacheRefreshHandler`. You can pass your implementation of `GBCacheRefreshHandler` through `setRefreshHandler()` method.

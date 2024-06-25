@@ -4,7 +4,7 @@ on:
   workflow_dispatch
 
 env:
-  LIB_VERSION: 1.1.59
+  LIB_VERSION: 1.1.60
 
 jobs:
   release:
@@ -22,15 +22,15 @@ jobs:
     - name: Gradle clean
       run: ./gradlew clean --info
     - name: Build with Gradle
-      run: ./gradlew -Pversion=$LIB_VERSION build --info
+      run: ./gradlew -Pversion=${{ env.LIB_VERSION }} build --info
     - name: release
       uses: actions/create-release@v1
       id: create_release
       with:
         draft: false
         prerelease: false
-        release_name: $LIB_VERSION
-        tag_name: $LIB_VERSION
+        release_name: ${{ env.LIB_VERSION }}
+        tag_name: ${{ env.LIB_VERSION }}
         body: ${{ github.event.head_commit.message }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -40,8 +40,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: GrowthBook/build/libs/GrowthBook-jvm-$LIB_VERSION.jar
-        asset_name: GrowthBook-$LIB_VERSION.jar
+        asset_path: GrowthBook/build/libs/GrowthBook-jvm-${{ env.LIB_VERSION }}.jar
+        asset_name: GrowthBook-${{ env.LIB_VERSION }}.jar
         asset_content_type: application/x-jar
     - name: Upload sources
       uses: actions/upload-release-asset@v1
@@ -49,8 +49,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: GrowthBook/build/libs/GrowthBook-kotlin-$LIB_VERSION-sources.jar
-        asset_name: GrowthBook-kotlin-$LIB_VERSION-sources.jar
+        asset_path: GrowthBook/build/libs/GrowthBook-kotlin-${{ env.LIB_VERSION }}-sources.jar
+        asset_name: GrowthBook-kotlin-${{ env.LIB_VERSION }}-sources.jar
         asset_content_type: application/x-jar
     - name: Upload metadata
       uses: actions/upload-release-asset@v1
@@ -58,6 +58,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: GrowthBook/build/libs/GrowthBook-metadata-$LIB_VERSION.jar
-        asset_name: GrowthBook-metadata-$LIB_VERSION-all.jar
+        asset_path: GrowthBook/build/libs/GrowthBook-metadata-${{ env.LIB_VERSION }}.jar
+        asset_name: GrowthBook-metadata-${{ env.LIB_VERSION }}-all.jar
         asset_content_type: application/x-jar

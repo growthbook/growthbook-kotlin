@@ -9,6 +9,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -282,7 +283,7 @@ internal class GBConditionEvaluator {
             conditionValue is JsonPrimitive &&
             (attributeValue is JsonPrimitive || attributeValue == null)
         ) {
-            return conditionValue.toString() == attributeValue.toString()
+            return conditionValue.jsonPrimitive.contentOrNull == attributeValue?.jsonPrimitive?.contentOrNull
         }
 
         if (conditionValue is JsonPrimitive && attributeValue == null) {

@@ -1,5 +1,8 @@
 package com.sdk.growthbook.network
 
+import java.net.UnknownHostException
+import java.util.concurrent.TimeoutException
+import com.sdk.growthbook.utils.Resource
 import kotlinx.coroutines.Job
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -14,6 +17,8 @@ import io.ktor.client.request.prepareGet
 import io.ktor.client.call.body
 import io.ktor.client.statement.HttpStatement
 import io.ktor.client.request.headers
+import io.ktor.client.plugins.ClientRequestException
+import io.ktor.client.plugins.ServerResponseException
 import kotlinx.coroutines.flow.callbackFlow
 import io.ktor.utils.io.ByteReadChannel
 import com.sdk.growthbook.utils.readSse
@@ -21,7 +26,6 @@ import kotlinx.coroutines.channels.awaitClose
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.client.request.HttpRequestBuilder
-import com.sdk.growthbook.utils.Resource
 
 internal fun createDefaultHttpClient(): HttpClient =
     HttpClient {
@@ -35,7 +39,7 @@ internal fun createDefaultHttpClient(): HttpClient =
     }
 
 /**
- * Default Ktor Implementation for Network Dispatcher
+ * Network Dispatcher based on Ktor
  */
 class GBNetworkDispatcherKtor(
 
@@ -55,11 +59,21 @@ class GBNetworkDispatcherKtor(
         onError: (Throwable) -> Unit
     ): Job =
         CoroutineScope(PlatformDependentIODispatcher).launch {
-            val result = client.get(request)
             try {
-                onSuccess(result.body())
-            } catch (ex: Exception) {
-                onError(ex)
+                val result = client.get(request)
+                try {
+                    onSuccess(result.body())
+                } catch (exception: Exception) {
+                    onError(exception)
+                }
+            } catch (exception: UnknownHostException) {
+                onError(exception)
+            } catch (exception: ClientRequestException) {
+                onError(exception)
+            } catch (exception: ServerResponseException) {
+                onError(exception)
+            } catch (exception: TimeoutException) {
+                onError(exception)
             }
         }
 
