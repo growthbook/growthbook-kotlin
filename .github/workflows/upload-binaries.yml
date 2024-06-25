@@ -4,7 +4,7 @@ on:
   workflow_dispatch
 
 env:
-  LIB_VERSION: 1.1.59
+  LIB_VERSION: 1.1.60
 
 jobs:
   release:
