@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "1.0.1"
+version = "1.0.2"
 
 kotlin {
     android {
@@ -111,7 +111,7 @@ publishing {
             artifact(javadocJar)
             pom {
                 name.set("kotlin")
-                description.set("Default network dispatcher for GrowthBook")
+                description.set("Network Dispatcher based on Ktor")
                 licenses {
                     license {
                         name.set("MIT")
