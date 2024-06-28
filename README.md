@@ -28,9 +28,9 @@ dependencies {
     implementation 'io.growthbook.sdk:GrowthBook:<version>' // 1.1.60 latest version when this file was edited
 
     // Add Network Dispatcher you prefer:
-    // NetworkDispatcherKtor artifact contains the Network Dispatcher based on Ktor artifact
+    // 1) NetworkDispatcherKtor artifact contains the Network Dispatcher based on Ktor artifact
     implementation 'io.growthbook.sdk:NetworkDispatcherKtor:1.0.2'
-    // NetworkDispatcherOkHttp artifact contains the Network Dispatcher based on OkHttp artifact
+    // 2) NetworkDispatcherOkHttp artifact contains the Network Dispatcher based on OkHttp artifact
     implementation 'io.growthbook.sdk:NetworkDispatcherOkHttp:1.0.0'
 }
 ```
