@@ -26,6 +26,8 @@ import kotlinx.coroutines.channels.awaitClose
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.utils.io.errors.IOException
+import javax.net.ssl.SSLHandshakeException
 
 internal fun createDefaultHttpClient(): HttpClient =
     HttpClient {
@@ -66,14 +68,18 @@ class GBNetworkDispatcherKtor(
                 } catch (exception: Exception) {
                     onError(exception)
                 }
-            } catch (exception: UnknownHostException) {
-                onError(exception)
-            } catch (exception: ClientRequestException) {
-                onError(exception)
-            } catch (exception: ServerResponseException) {
-                onError(exception)
-            } catch (exception: TimeoutException) {
-                onError(exception)
+            } catch (unknownHostException: UnknownHostException) {
+                onError(unknownHostException)
+            } catch (clientRequestException: ClientRequestException) {
+                onError(clientRequestException)
+            } catch (serverResponseException: ServerResponseException) {
+                onError(serverResponseException)
+            } catch (timeoutException: TimeoutException) {
+                onError(timeoutException)
+            } catch (sslHandshakeException: SSLHandshakeException) {
+                onError(sslHandshakeException)
+            } catch (ioException: IOException) {
+                onError(ioException)
             }
         }
 
