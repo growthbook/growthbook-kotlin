@@ -24,14 +24,21 @@ repositories {
 }
 
 dependencies {
-    implementation 'io.growthbook.sdk:GrowthBook:<version>' // 1.1.59 latest version when this file was edited
-    implementation 'io.growthbook.sdk:DefaultNetworkDispatcher:1.0.0'
+    // Add GrowthBook module:
+    implementation 'io.growthbook.sdk:GrowthBook:<version>' // 1.1.60 latest version when this file was edited
+
+    // Add Network Dispatcher you prefer:
+    // NetworkDispatcherKtor artifact contains the Network Dispatcher based on Ktor artifact
+    implementation 'io.growthbook.sdk:NetworkDispatcherKtor:1.0.2'
+    // NetworkDispatcherOkHttp artifact contains the Network Dispatcher based on OkHttp artifact
+    implementation 'io.growthbook.sdk:NetworkDispatcherOkHttp:1.0.0'
 }
 ```
-`DefaultNetworkDispatcher` artifact provides `NetworkDispatcher` implementation based on `ktor` network client.
-If you are using other network client for example `OkHttp` and don't want to have any other network client in your application,
-you can provide your own implementation of `NetworkDispatcher` for example based on `OkHttp` client.
-You will not need to include `DefaultNetworkDispatcher` artifact in this case.
+If you are not sure which dispatcher to choose we recommend to use network dispatcher based on Ktor.
+
+The main class of `NetworkDispatcherKtor` artifact is `GBNetworkDispatcherKtor` while the main class of `NetworkDispatcherOkHttp` artifact is `GBNetworkDispatcherOkHttp`.
+If you are using other network client for example `android-lite-http` and don't want to have any other network client in your application,
+you can provide your own implementation of `NetworkDispatcher` based on your network client.
 
 **Add Internet Permission to your AndroidManifest.xml, if not already added**
 
@@ -58,10 +65,10 @@ var sdkInstance: GrowthBookSDK = GBSDKBuilder(
     attributes = < Hashmap >,
     trackingCallback = { gbExperiment, gbExperimentResult -> },
     encryptionKey = <String?>,
-    networkDispatcher = <NetworkDispatcher>, // you can use DefaultGBNetworkDispatcher()
+    networkDispatcher = <NetworkDispatcher>, // you can use GBNetworkDispatcherKtor() or GBNetworkDispatcherOkHttp()
 ).initialize()
 ```
-In next releases we plan to rename `initialize()` method to `build()`. If you are accessing features the first time there will be no features right after `initialize()` method call because features are not got from Backend yet. If you need to access features as soon as possible, you need to use `GBCacheRefreshHandler`. You can pass your implementation of `GBCacheRefreshHandler` through `setRefreshHandler()` method.
+If you are accessing features the first time there will be no features right after `initialize()` method call because features are not got from Backend yet. If you need to access features as soon as possible, you need to use `GBCacheRefreshHandler`. You can pass your implementation of `GBCacheRefreshHandler` through `setRefreshHandler()` method.
 
 #### There are additional properties which can be setup at the time of initialization
 
