@@ -80,6 +80,8 @@ class GBNetworkDispatcherKtor(
                 onError(sslHandshakeException)
             } catch (ioException: IOException) {
                 onError(ioException)
+            } catch (exception: Exception) { // for the case if something was missed
+                onError(exception)
             }
         }
 
