@@ -1,14 +1,13 @@
 plugins {
     kotlin("multiplatform")
     id("com.android.library")
-    kotlin("plugin.serialization")
     id("maven-publish")
     id("signing")
-    id("org.jetbrains.dokka") version "1.8.10"
+    id("org.jetbrains.dokka") version "1.4.20"
 }
 
 group = "io.growthbook.sdk"
-version = "1.0.2"
+version = "1.0.0"
 
 kotlin {
     android {
@@ -24,7 +23,25 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.2.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.0")
+                api("com.squareup.okhttp3:okhttp:4.9.0")
+                implementation("com.squareup.okhttp3:okhttp-sse:4.9.0")
+
+                // https://mvnrepository.com/artifact/com.google.code.gson/gson
+                //implementation("com.google.code.gson:gson:2.11.0")
+
+                implementation("io.growthbook.sdk:Core:1.0.1")
+            }
+        }
+        val androidMain by getting {
+            dependencies {
+                implementation("com.squareup.okhttp3:okhttp:4.9.0")
+            }
+        }
+        val androidTest by getting {
+            dependencies {
+                implementation(kotlin("test-junit"))
+                implementation("com.squareup.okhttp3:mockwebserver:4.9.0")
             }
         }
     }
@@ -32,7 +49,7 @@ kotlin {
 
 android {
     compileSdk = 34
-    namespace = "com.sdk.growthbook.core"
+    namespace = "com.sdk.growthbook.okhttp_network_dispatcher"
     defaultConfig {
         minSdk = 21
     }
@@ -93,7 +110,7 @@ publishing {
             artifact(javadocJar)
             pom {
                 name.set("kotlin")
-                description.set("Core module of GrowthBook Kotlin SDK")
+                description.set("OkHttp network dispatcher for GrowthBook")
                 licenses {
                     license {
                         name.set("MIT")

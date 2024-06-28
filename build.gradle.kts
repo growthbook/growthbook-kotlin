@@ -1,15 +1,14 @@
 buildscript {
-
-    val kotlinVersion = "1.7.0"
-
     repositories {
         gradlePluginPortal()
         google()
         mavenCentral()
     }
     dependencies {
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
         classpath("com.android.tools.build:gradle:7.4.2")
+
+        val kotlinVersion = "1.7.0"
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
         classpath ("org.jetbrains.kotlin:kotlin-serialization:$kotlinVersion")
     }
 }

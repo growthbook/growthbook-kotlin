@@ -22,7 +22,7 @@ jobs:
     - name: Gradle clean
       run: ./gradlew clean --info
     - name: Build with Gradle
-      run: ./gradlew -Pversion=$DISPATCHER_VERSION :DefaultNetworkDispatcher:build --info
+      run: ./gradlew -Pversion=$DISPATCHER_VERSION :NetworkDispatcherKtor:build --info
     - name: Publish to maven central
       run: |
-        GPG_PRIVATE_KEY="${{secrets.GPG_PRIVATE_KEY}}" GPG_PRIVATE_PASSWORD="${{secrets.GPG_PRIVATE_PASSWORD}}" GB_SONATYPE_USERNAME='${{secrets.GB_SONATYPE_USERNAME}}' GB_SONATYPE_PASSWORD='${{secrets.GB_SONATYPE_PASSWORD}}' ./gradlew -Pversion=$DISPATCHER_VERSION :DefaultNetworkDispatcher:publish
+        GPG_PRIVATE_KEY="${{secrets.GPG_PRIVATE_KEY}}" GPG_PRIVATE_PASSWORD="${{secrets.GPG_PRIVATE_PASSWORD}}" GB_SONATYPE_USERNAME='${{secrets.GB_SONATYPE_USERNAME}}' GB_SONATYPE_PASSWORD='${{secrets.GB_SONATYPE_PASSWORD}}' ./gradlew -Pversion=$DISPATCHER_VERSION :NetworkDispatcherKtor:publish
