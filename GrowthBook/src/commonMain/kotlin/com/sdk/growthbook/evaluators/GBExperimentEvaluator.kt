@@ -175,7 +175,10 @@ internal class GBExperimentEvaluator {
              */
             if (experiment.condition != null) {
                 val attr = context.attributes.toJsonElement()
-                if (!GBConditionEvaluator().evalCondition(attr, experiment.condition!!)) {
+                val evaluationResult = GBConditionEvaluator().evalCondition(
+                    attr, experiment.condition!!, context.savedGroups?.toJsonElement()?.jsonObject
+                )
+                if (!evaluationResult) {
                     return getExperimentResult(
                         featureId = featureId,
                         experiment = experiment,
@@ -213,7 +216,8 @@ internal class GBExperimentEvaluator {
 
                     val evalCondition = GBConditionEvaluator().evalCondition(
                         attributes = evalObj.toJsonElement(),
-                        conditionObj = parentCondition.condition
+                        conditionObj = parentCondition.condition,
+                        context.savedGroups?.toJsonElement()?.jsonObject
                     )
 
                     /**

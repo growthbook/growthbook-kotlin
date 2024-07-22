@@ -11,6 +11,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -86,7 +87,7 @@ internal class GBConditionEvaluator {
      * - attributes is the user's attributes
      * - condition to be evaluated
      */
-    fun evalCondition(attributes: JsonElement, conditionObj: GBCondition): Boolean {
+    fun evalCondition(attributes: JsonElement, conditionObj: GBCondition, savedGroups: JsonObject?): Boolean {
 
         if (conditionObj is JsonArray) {
             return false
@@ -98,7 +99,7 @@ internal class GBConditionEvaluator {
                         // If conditionObj has a key $or, return evalOr(attributes, condition["$or"])
                         val targetItems = conditionObj.jsonObject[key] as? JsonArray
                         if (targetItems != null) {
-                            if (!evalOr(attributes, targetItems)) {
+                            if (!evalOr(attributes, targetItems, savedGroups)) {
                                 return false
                             }
                         }
@@ -108,7 +109,7 @@ internal class GBConditionEvaluator {
                         // If conditionObj has a key $nor, return !evalOr(attributes, condition["$nor"])
                         val targetItems = conditionObj.jsonObject[key] as? JsonArray
                         if (targetItems != null) {
-                            if (evalOr(attributes, targetItems)) {
+                            if (evalOr(attributes, targetItems, savedGroups)) {
                                 return false
                             }
                         }
@@ -118,7 +119,7 @@ internal class GBConditionEvaluator {
                         // If conditionObj has a key $and, return !evalAnd(attributes, condition["$and"])
                         val targetItems = conditionObj.jsonObject[key] as? JsonArray
                         if (targetItems != null) {
-                            if (!evalAnd(attributes, targetItems)) {
+                            if (!evalAnd(attributes, targetItems, savedGroups)) {
                                 return false
                             }
                         }
@@ -128,7 +129,7 @@ internal class GBConditionEvaluator {
                         // If conditionObj has a key $not, return !evalCondition(attributes, condition["$not"])
                         val targetItem = conditionObj.jsonObject[key]
                         if (targetItem != null) {
-                            if (evalCondition(attributes, targetItem)) {
+                            if (evalCondition(attributes, targetItem, savedGroups)) {
                                 return false
                             }
                         }
@@ -138,7 +139,7 @@ internal class GBConditionEvaluator {
                         val element = getPath(attributes, key)
                             // If evalConditionValue(value, getPath(attributes, key)) is false,
                             // break out of loop and return false
-                            if (!evalConditionValue(value, element)) {
+                            if (!evalConditionValue(value, element, savedGroups)) {
                                 return false
                             }
                     }
@@ -153,7 +154,7 @@ internal class GBConditionEvaluator {
     /**
      * Evaluate OR conditions against given attributes
      */
-    private fun evalOr(attributes: JsonElement, conditionObjs: JsonArray): Boolean {
+    private fun evalOr(attributes: JsonElement, conditionObjs: JsonArray, savedGroups: JsonObject?): Boolean {
         // If conditionObjs is empty, return true
         if (conditionObjs.isEmpty()) {
             return true
@@ -162,7 +163,7 @@ internal class GBConditionEvaluator {
             for (item in conditionObjs) {
                 // If evalCondition(attributes, conditionObjs[i]) is true,
                 // break out of the loop and return true
-                if (evalCondition(attributes, item)) {
+                if (evalCondition(attributes, item, savedGroups)) {
                     return true
                 }
             }
@@ -174,13 +175,13 @@ internal class GBConditionEvaluator {
     /**
      * Evaluate AND conditions against given attributes
      */
-    private fun evalAnd(attributes: JsonElement, conditionObjs: JsonArray): Boolean {
+    private fun evalAnd(attributes: JsonElement, conditionObjs: JsonArray, savedGroups: JsonObject?): Boolean {
 
         // Loop through the conditionObjects
         for (item in conditionObjs) {
             // If evalCondition(attributes, conditionObjs[i]) is false,
             // break out of the loop and return false
-            if (!evalCondition(attributes, item)) {
+            if (!evalCondition(attributes, item, savedGroups)) {
                 return false
             }
         }
@@ -275,7 +276,7 @@ internal class GBConditionEvaluator {
     /**
      * Evaluates Condition Value against given condition & attributes
      */
-    fun evalConditionValue(conditionValue: JsonElement, attributeValue: JsonElement?): Boolean {
+    fun evalConditionValue(conditionValue: JsonElement, attributeValue: JsonElement?, savedGroups: JsonObject?): Boolean {
 
         // If conditionValue is a string, number, boolean, return true
         // if it's "equal" to attributeValue and false if not.
@@ -319,7 +320,7 @@ internal class GBConditionEvaluator {
             if (isOperatorObject(conditionValue)) {
                 for (key in conditionValue.keys) {
                     // If evalOperatorCondition(key, attributeValue, value) is false, return false
-                    if (!evalOperatorCondition(key, attributeValue, conditionValue[key]!!)) {
+                    if (!evalOperatorCondition(key, attributeValue, conditionValue[key]!!, savedGroups)) {
                         return false
                     }
                 }
@@ -338,7 +339,7 @@ internal class GBConditionEvaluator {
      * This checks if attributeValue is an array,
      * and if so at least one of the array items must match the condition
      */
-    private fun elemMatch(attributeValue: JsonElement, condition: JsonElement): Boolean {
+    private fun elemMatch(attributeValue: JsonElement, condition: JsonElement, savedGroups: JsonObject?): Boolean {
 
         if (attributeValue is JsonArray) {
             // Loop through items in attributeValue
@@ -346,12 +347,12 @@ internal class GBConditionEvaluator {
                 // If isOperatorObject(condition)
                 if (isOperatorObject(condition)) {
                     // If evalConditionValue(condition, item), break out of loop and return true
-                    if (evalConditionValue(condition, item)) {
+                    if (evalConditionValue(condition, item, savedGroups)) {
                         return true
                     }
                 }
                 // Else if evalCondition(item, condition), break out of loop and return true
-                else if (evalCondition(item, condition)) {
+                else if (evalCondition(item, condition, savedGroups)) {
                     return true
                 }
             }
@@ -368,7 +369,8 @@ internal class GBConditionEvaluator {
     fun evalOperatorCondition(
         operator: String,
         attributeValue: JsonElement?,
-        conditionValue: JsonElement
+        conditionValue: JsonElement,
+        savedGroups: JsonObject?
     ): Boolean {
 
         // Evaluate TYPE operator - whether both are of same type
@@ -378,7 +380,7 @@ internal class GBConditionEvaluator {
 
         // Evaluate NOT operator - whether condition doesn't contain attribute
         if (operator == "\$not") {
-            return !evalConditionValue(conditionValue, attributeValue)
+            return !evalConditionValue(conditionValue, attributeValue, savedGroups)
         }
 
         // Evaluate EXISTS operator - whether condition contains attribute
@@ -416,7 +418,7 @@ internal class GBConditionEvaluator {
                         for (con in conditionValue) {
                             var result = false
                             for (attr in attributeValue) {
-                                if (evalConditionValue(con, attr)) {
+                                if (evalConditionValue(con, attr, savedGroups)) {
                                     result = true
                                 }
                             }
@@ -436,11 +438,11 @@ internal class GBConditionEvaluator {
             when (operator) {
                 // Evaluate ElemMATCH operator - whether condition matches attribute
                 "\$elemMatch" -> {
-                    return elemMatch(attributeValue, conditionValue)
+                    return elemMatch(attributeValue, conditionValue, savedGroups)
                 }
                 // Evaluate SIE operator - whether condition size is same as that of attribute
                 "\$size" -> {
-                    return evalConditionValue(conditionValue, JsonPrimitive(attributeValue.size))
+                    return evalConditionValue(conditionValue, JsonPrimitive(attributeValue.size), savedGroups)
                 }
             }
         } else if (attributeValue is JsonPrimitive? && conditionValue is JsonPrimitive) {
@@ -537,6 +539,22 @@ internal class GBConditionEvaluator {
                 // Evaluate VLTE operator - whether the first version is lesser
                 // than or equal the second version
                 "\$vlte" -> return paddedVersionSource <= paddedVersionTarget
+                "\$inGroup" -> {
+                    if (attributeValue != null && conditionValue != null) {
+                        return isIn(attributeValue, savedGroups?.get(conditionValue.content)?.jsonArray ?: JsonArray(
+                            emptyList()
+                        )
+                        )
+                    }
+                }
+                "\$notInGroup" -> {
+                    if (attributeValue != null && conditionValue != null) {
+                        return !isIn(attributeValue, savedGroups?.get(conditionValue.content)?.jsonArray ?: JsonArray(
+                            emptyList()
+                        )
+                        )
+                    }
+                }
             }
         }
 

@@ -75,6 +75,8 @@ class GBContext(
      * Flag which defines whether to use Remote Evaluation
      */
     val remoteEval: Boolean = false,
+
+    var savedGroups: Map<String, Any>? = null
 ) {
 
     // Keys are unique identifiers for the features and the values are Feature objects.

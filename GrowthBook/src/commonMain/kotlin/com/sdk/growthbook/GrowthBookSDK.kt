@@ -19,7 +19,9 @@ import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeatureResult
+import com.sdk.growthbook.utils.toHashMap
 import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.json.JsonObject
 
 typealias GBTrackingCallback = (GBExperiment, GBExperimentResult) -> Unit
 typealias GBFeatureUsageCallback = (featureKey: String, gbFeatureResult: GBFeatureResult) -> Unit
@@ -36,6 +38,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     private lateinit var featuresViewModel: FeaturesViewModel
     private var attributeOverrides: Map<String, Any> = emptyMap()
     private var forcedFeatures: Map<String, Any> = emptyMap()
+    private var savedGroups: Map<String, Any>? = emptyMap()
 
     //@ThreadLocal
     internal companion object {
@@ -46,7 +49,8 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         context: GBContext,
         refreshHandler: GBCacheRefreshHandler?,
         networkDispatcher: NetworkDispatcher,
-        features: GBFeatures? = null
+        features: GBFeatures? = null,
+        savedGroups: Map<String, Any>? = null
     ) : this() {
         gbContext = context
         this.refreshHandler = refreshHandler
@@ -68,7 +72,12 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
             refreshCache()
         }
         this.attributeOverrides = gbContext.attributes
+        this.savedGroups = savedGroups
         refreshStickyBucketService()
+    }
+
+    fun setSavedGroups(savedGroups: Map<String, Any>) {
+        gbContext.savedGroups = savedGroups
     }
 
     /**
@@ -139,6 +148,19 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
 
         if (isRemote) {
             this.refreshHandler?.invoke(false, error)
+        }
+    }
+
+    override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) {
+        if (isRemote) {
+            this.refreshHandler?.invoke(false, error)
+        }
+    }
+
+    override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) {
+        gbContext.savedGroups = savedGroups.toHashMap()
+        if (isRemote) {
+            this.refreshHandler?.invoke(true, null)
         }
     }
 

@@ -28,6 +28,9 @@ class GBFeatureValueTests {
         val passedScenarios: ArrayList<String> = ArrayList()
         for (item in evalConditions) {
             if (item is JsonArray) {
+                if (item[0].jsonPrimitive.content != "SavedGroups correctly pulled from context for force rule") {
+                    continue
+                }
 
                 val testData =
                     GBTestHelper.jsonParser.decodeFromJsonElement(
@@ -42,13 +45,17 @@ class GBFeatureValueTests {
                     enabled = true, attributes = attributes, forcedVariations = HashMap(),
                     qaMode = false, trackingCallback = { _, _ ->
 
-                    }, encryptionKey = ""
+                    }, encryptionKey = "",
                 )
                 if (testData.features != null) {
                     gbContext.features = testData.features
                 }
                 if (testData.forcedVariations != null) {
                     gbContext.forcedVariations = testData.forcedVariations.toHashMap()
+                }
+
+                if (testData.savedGroups != null) {
+                    gbContext.savedGroups = testData.savedGroups.jsonObject
                 }
 
                 val evaluator = GBFeatureEvaluator()

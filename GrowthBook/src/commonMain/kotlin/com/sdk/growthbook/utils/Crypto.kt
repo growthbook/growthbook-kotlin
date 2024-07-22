@@ -7,6 +7,7 @@ import com.soywiz.krypto.encoding.Base64
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 
 interface Crypto {
     fun decrypt(
@@ -71,4 +72,28 @@ fun getFeaturesFromEncryptedFeatures(
     val encryptString: String =
         encrypt.decodeToString()
     return encryptToFeaturesDataModel(encryptString)
+}
+
+fun getSavedGroupFromEncryptedSavedGroup(
+    encryptedString: String,
+    encryptionKey: String,
+    subtleCrypto: Crypto? = null,
+): JsonObject? {
+    val encryptedArrayData = encryptedString.split(".")
+
+    val iv = decodeBase64(encryptedArrayData[0])
+    val key = decodeBase64(encryptionKey)
+    val stringToDecrypt = decodeBase64(encryptedArrayData[1])
+
+    val cryptoLocal = subtleCrypto ?: DefaultCrypto()
+
+    val encrypt: ByteArray = cryptoLocal.decrypt(stringToDecrypt, key, iv)
+    val encryptString: String =
+        encrypt.decodeToString()
+
+    return try {
+        Json.decodeFromString(JsonObject.serializer(), encryptString)
+    } catch (e : Exception) {
+        null
+    }
 }
