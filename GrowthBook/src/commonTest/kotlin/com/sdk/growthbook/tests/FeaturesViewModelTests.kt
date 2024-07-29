@@ -9,6 +9,7 @@ import com.sdk.growthbook.features.FeaturesDataSource
 import com.sdk.growthbook.features.FeaturesFlowDelegate
 import com.sdk.growthbook.features.FeaturesViewModel
 import com.sdk.growthbook.model.GBContext
+import kotlinx.serialization.json.JsonObject
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -184,6 +185,16 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         isSuccess = false
         isError = true
         hasFeatures = false
+    }
+
+    override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) {
+        isSuccess = false
+        isError = true
+    }
+
+    override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) {
+        isSuccess = true
+        isError = false
     }
 
     override fun featuresAPIModelSuccessfully(model: FeaturesDataModel) {

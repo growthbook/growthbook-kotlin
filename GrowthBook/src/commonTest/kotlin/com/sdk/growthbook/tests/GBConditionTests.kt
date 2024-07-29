@@ -8,6 +8,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import org.intellij.lang.annotations.Language
 import kotlin.test.*
 
@@ -27,7 +28,12 @@ class GBConditionTests {
         for (item in evalConditions) {
             if (item is JsonArray) {
                 val evaluator = GBConditionEvaluator()
-                val result = evaluator.evalCondition(item[2], item[1])
+
+                val result: Boolean = if (item.size > 4) {
+                    evaluator.evalCondition(item[2], item[1], item[4].jsonObject)
+                } else {
+                    evaluator.evalCondition(item[2], item[1], null)
+                }
 
                 val status =
                     item[0].toString() + "\nExpected Result - " + item[3] +
@@ -53,7 +59,7 @@ class GBConditionTests {
     @Test
     fun testInValidConditionObj() {
         val evaluator = GBConditionEvaluator()
-        assertFalse(evaluator.evalCondition(JsonObject(HashMap()), JsonArray(ArrayList())))
+        assertFalse(evaluator.evalCondition(JsonObject(HashMap()), JsonArray(ArrayList()), null))
 
         assertFalse(evaluator.isOperatorObject(JsonObject(HashMap())))
 
@@ -61,13 +67,14 @@ class GBConditionTests {
 
         assertTrue(evaluator.getPath(JsonPrimitive("test"), "key") == null)
 
-        assertTrue(!evaluator.evalConditionValue(JsonObject(HashMap()), null))
+        assertTrue(!evaluator.evalConditionValue(JsonObject(HashMap()), null, null))
 
         assertTrue(
             evaluator.evalOperatorCondition(
                 "${"$"}lte",
                 JsonPrimitive("abc"),
-                JsonPrimitive("abc")
+                JsonPrimitive("abc"),
+                null
             )
         )
 
@@ -75,7 +82,8 @@ class GBConditionTests {
             evaluator.evalOperatorCondition(
                 "${"$"}gte",
                 JsonPrimitive("abc"),
-                JsonPrimitive("abc")
+                JsonPrimitive("abc"),
+                null
             )
         )
 
@@ -83,7 +91,8 @@ class GBConditionTests {
             evaluator.evalOperatorCondition(
                 "${"$"}vlt",
                 JsonPrimitive("0.9.0"),
-                JsonPrimitive("0.10.0")
+                JsonPrimitive("0.10.0"),
+                null
             )
         )
 
@@ -105,6 +114,7 @@ class GBConditionTests {
             false, GBConditionEvaluator().evalCondition(
                 Json.decodeFromString(JsonElement.serializer(), attributes),
                 Json.decodeFromString(GBCondition.serializer(), condition),
+                null
             )
         )
     }
@@ -129,6 +139,7 @@ class GBConditionTests {
             false, GBConditionEvaluator().evalCondition(
                 Json.decodeFromString(JsonElement.serializer(), attributes),
                 Json.decodeFromString(GBCondition.serializer(), condition),
+                null
             )
         )
     }
@@ -153,6 +164,7 @@ class GBConditionTests {
             true, GBConditionEvaluator().evalCondition(
                 Json.decodeFromString(JsonElement.serializer(), attributes),
                 Json.decodeFromString(GBCondition.serializer(), condition),
+                null
             )
         )
     }
@@ -177,6 +189,7 @@ class GBConditionTests {
             false, GBConditionEvaluator().evalCondition(
                 Json.decodeFromString(JsonElement.serializer(), attributes),
                 Json.decodeFromString(GBCondition.serializer(), condition),
+                null
             )
         )
     }

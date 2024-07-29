@@ -49,7 +49,8 @@ class GBExperimentRunTests {
                     trackingCallback = { _, _ ->
 
                     },
-                    encryptionKey = ""
+                    encryptionKey = "",
+                    savedGroups = testContext.savedGroups.jsonObject.toHashMap()
                 )
 
                 gbContext.features = testContext.features

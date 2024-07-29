@@ -4,11 +4,11 @@ plugins {
     kotlin("plugin.serialization")
     id("maven-publish")
     id("signing")
-    id("org.jetbrains.dokka") version "1.4.20"
+    id("org.jetbrains.dokka") version "1.8.10"
 }
 
 group = "io.growthbook.sdk"
-version = "1.1.60"
+version = "1.1.61"
 
 kotlin {
 

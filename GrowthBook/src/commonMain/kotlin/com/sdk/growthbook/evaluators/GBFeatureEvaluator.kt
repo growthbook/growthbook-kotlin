@@ -11,6 +11,7 @@ import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBFeatureSource
+import kotlinx.serialization.json.jsonObject
 
 /**
  * Feature Evaluator Class
@@ -102,7 +103,8 @@ internal class GBFeatureEvaluator {
 
                             val evalCondition = GBConditionEvaluator().evalCondition(
                                 attributes = evalObj.toJsonElement(),
-                                conditionObj = parentCondition.condition
+                                conditionObj = parentCondition.condition,
+                                savedGroups = context.savedGroups?.toJsonElement()?.jsonObject
                             )
 
                             if (!evalCondition) {
@@ -164,7 +166,8 @@ internal class GBFeatureEvaluator {
                                     context = context,
                                     attributeOverrides = attributeOverrides
                                 ).toJsonElement(),
-                                conditionObj = rule.condition
+                                conditionObj = rule.condition,
+                                savedGroups = context.savedGroups?.toJsonElement()?.jsonObject
                             )
                         ) {
                             /**
