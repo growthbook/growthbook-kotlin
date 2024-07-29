@@ -10,7 +10,9 @@ import com.sdk.growthbook.utils.getFeaturesFromEncryptedFeatures
 import com.sdk.growthbook.sandbox.CachingImpl
 import com.sdk.growthbook.sandbox.getData
 import com.sdk.growthbook.sandbox.putData
+import com.sdk.growthbook.utils.getSavedGroupFromEncryptedSavedGroup
 import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Interface for Feature API Completion Events
@@ -19,6 +21,8 @@ internal interface FeaturesFlowDelegate {
     fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean)
     fun featuresAPIModelSuccessfully(model: FeaturesDataModel)
     fun featuresFetchFailed(error: GBError, isRemote: Boolean)
+    fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean)
+    fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean)
 }
 
 /**
@@ -113,7 +117,9 @@ internal class FeaturesViewModel(
      */
     private fun prepareFeaturesData(dataModel: FeaturesDataModel?) {
         var features = dataModel?.features
+        var savedGroups = dataModel?.savedGroups
         val encryptedFeatures = dataModel?.encryptedFeatures
+        val encryptedSavedGroups = dataModel?.encryptedSavedGroups
 
         try {
             if (dataModel != null) {
@@ -129,6 +135,7 @@ internal class FeaturesViewModel(
                         features = features,
                         isRemote = true
                     )
+                    return
                 } else {
                     if (encryptedFeatures != null && encryptionKey != null) {
                         if (encryptionKey.isNotEmpty()) {
@@ -144,12 +151,14 @@ internal class FeaturesViewModel(
                                 features = features,
                                 isRemote = true
                             )
+                            return
                         } else {
                             features?.let {
                                 this.delegate.featuresFetchedSuccessfully(
                                     features = features,
                                     isRemote = true
                                 )
+                                return
                             }
                         }
                     } else {
@@ -157,11 +166,52 @@ internal class FeaturesViewModel(
                             error = GBError(Exception()),
                             isRemote = true
                         )
+                        return
+                    }
+                }
+
+                if (!savedGroups.isNullOrEmpty()) {
+                    this.delegate.savedGroupsFetchedSuccessfully(
+                        savedGroups = savedGroups,
+                        isRemote = true
+                    )
+                } else {
+                    if (encryptedSavedGroups != null && encryptionKey != null) {
+                        if (encryptionKey.isNotEmpty()) {
+                            val crypto = DefaultCrypto()
+                            savedGroups =
+                                getSavedGroupFromEncryptedSavedGroup(
+                                    encryptedString = encryptedSavedGroups,
+                                    encryptionKey = encryptionKey,
+                                    subtleCrypto = crypto
+                                ) ?: return
+
+                            this.delegate.savedGroupsFetchedSuccessfully(
+                                savedGroups = savedGroups,
+                                isRemote = true
+                            )
+                            return
+                        } else {
+                            savedGroups?.let {
+                                this.delegate.savedGroupsFetchedSuccessfully(
+                                    savedGroups = savedGroups,
+                                    isRemote = true
+                                )
+                                return
+                            }
+                        }
+                    } else {
+                        this.delegate.savedGroupsFetchFailed(
+                            error = GBError(Exception()),
+                            isRemote = true
+                        )
+                        return
                     }
                 }
             }
         } catch (error: Throwable) {
             this.delegate.featuresFetchFailed(error = GBError(error), isRemote = true)
+            return
         }
     }
 }
