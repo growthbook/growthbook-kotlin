@@ -4,7 +4,7 @@ on:
   workflow_dispatch
 
 env:
-  LIB_VERSION: 0.0.0.0 # experimental version
+  LIB_VERSION: 1.1.61
 
 jobs:
   release:
@@ -32,21 +32,21 @@ jobs:
     - name: Gradle clean
       run: ./gradlew clean --info
     - name: Build with Gradle
-      run: ./gradlew -Pversion=$LIB_VERSION build --info
-#    - name: release
-#      uses: actions/create-release@v1
-#      id: create_release
-#      with:
-#        draft: false
-#        prerelease: false
-#        release_name: $LIB_VERSION
-#        tag_name: $LIB_VERSION
-#        body: ${{ github.event.head_commit.message }}
-#      env:
-#        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: ./gradlew -Pversion=$LIB_VERSION :GrowthBook:build --info
+    - name: release
+      uses: actions/create-release@v1
+      id: create_release
+      with:
+        draft: false
+        prerelease: false
+        release_name: $LIB_VERSION
+        tag_name: $LIB_VERSION
+        body: ${{ github.event.head_commit.message }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     - name: Publish to maven central
       run: |
-        GPG_PRIVATE_KEY="${{secrets.GPG_PRIVATE_KEY}}" GPG_PRIVATE_PASSWORD="${{secrets.GPG_PRIVATE_PASSWORD}}" GB_SONATYPE_USERNAME='${{secrets.GB_SONATYPE_USERNAME}}' GB_SONATYPE_PASSWORD='${{secrets.GB_SONATYPE_PASSWORD}}' ./gradlew -Pversion=$LIB_VERSION publish
+        GPG_PRIVATE_KEY="${{secrets.GPG_PRIVATE_KEY}}" GPG_PRIVATE_PASSWORD="${{secrets.GPG_PRIVATE_PASSWORD}}" GB_SONATYPE_USERNAME='${{secrets.GB_SONATYPE_USERNAME}}' GB_SONATYPE_PASSWORD='${{secrets.GB_SONATYPE_PASSWORD}}' ./gradlew -Pversion=$LIB_VERSION :GrowthBook:publish
     - name: Upload binary
       uses: actions/upload-release-asset@v1
       env:
