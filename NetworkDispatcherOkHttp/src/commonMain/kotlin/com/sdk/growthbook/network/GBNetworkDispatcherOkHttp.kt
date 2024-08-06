@@ -54,11 +54,13 @@ class GBNetworkDispatcherOkHttp(
 
                 override fun onResponse(call: Call, response: Response) {
                     response.use {
-                        if (!response.isSuccessful) {
-                            // throw IOException("Unexpected code $response")
+                        if (response.isSuccessful) {
+                            response.body?.string()?.let {
+                                onSuccess(it)
+                            }
+                        } else {
                             onError(IOException("Unexpected code $response"))
                         }
-                        onSuccess(response.body?.string() ?: "")
                     }
                 }
             })
