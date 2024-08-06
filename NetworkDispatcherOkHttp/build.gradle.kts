@@ -40,7 +40,7 @@ kotlin {
         val androidTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
-                implementation("com.squareup.okhttp3:mockwebserver:$okhttpVersion")
+                // implementation("com.squareup.okhttp3:mockwebserver:$okhttpVersion")
             }
         }
     }
