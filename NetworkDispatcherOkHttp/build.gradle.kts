@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "1.0.0"
+version = "1.0.1"
 
 kotlin {
     android {
@@ -21,27 +21,26 @@ kotlin {
     }
 
     sourceSets {
+        val okhttpVersion = "4.9.2"
+
         val commonMain by getting {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.0")
-                api("com.squareup.okhttp3:okhttp:4.9.0")
-                implementation("com.squareup.okhttp3:okhttp-sse:4.9.0")
-
-                // https://mvnrepository.com/artifact/com.google.code.gson/gson
-                //implementation("com.google.code.gson:gson:2.11.0")
+                api("com.squareup.okhttp3:okhttp:$okhttpVersion")
+                implementation("com.squareup.okhttp3:okhttp-sse:$okhttpVersion")
 
                 implementation("io.growthbook.sdk:Core:1.0.1")
             }
         }
         val androidMain by getting {
             dependencies {
-                implementation("com.squareup.okhttp3:okhttp:4.9.0")
+                implementation("com.squareup.okhttp3:okhttp:$okhttpVersion")
             }
         }
         val androidTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
-                implementation("com.squareup.okhttp3:mockwebserver:4.9.0")
+                // implementation("com.squareup.okhttp3:mockwebserver:$okhttpVersion")
             }
         }
     }
