@@ -1,3 +1,6 @@
+import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackOutput
+import org.jetbrains.kotlin.gradle.targets.js.yarn.yarn
+
 plugins {
     kotlin("multiplatform")
     id("com.android.library")
@@ -20,15 +23,20 @@ kotlin {
         publishLibraryVariants("release")
     }
 
-    js(IR) {
-        browser()
-    }
-
-    jvm {
-        compilations.all {
-            kotlinOptions.jvmTarget = "17"
+    js {
+        yarn.lockFileDirectory = file("kotlin-js-store")
+        browser {
+            commonWebpackConfig {
+                output = KotlinWebpackOutput(
+                    library = project.name,
+                    libraryTarget = KotlinWebpackOutput.Target.UMD,
+                    globalObject = KotlinWebpackOutput.Target.WINDOW
+                )
+            }
         }
     }
+
+    jvm()
 
     sourceSets {
         val commonMain by getting {
@@ -39,7 +47,7 @@ kotlin {
                 implementation("com.soywiz.korlibs.krypto:krypto:$kryptoVersion")
 
                 // api("io.growthbook.sdk:Core:1.0.0")
-                api(project(":Core"))
+                api(projects.core)
                 api(
                     "org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion"
                 )

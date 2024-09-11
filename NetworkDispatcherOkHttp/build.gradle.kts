@@ -14,11 +14,7 @@ kotlin {
         publishLibraryVariants("release")
     }
 
-    jvm {
-        compilations.all {
-            kotlinOptions.jvmTarget = "17"
-        }
-    }
+    jvm()
 
     sourceSets {
         val okhttpVersion = "4.9.2"
@@ -29,8 +25,7 @@ kotlin {
                 api("com.squareup.okhttp3:okhttp:$okhttpVersion")
                 implementation("com.squareup.okhttp3:okhttp-sse:$okhttpVersion")
 
-                // implementation("io.growthbook.sdk:Core:1.0.1")
-                implementation(project(":Core"))
+                implementation(projects.core)
             }
         }
         val androidMain by getting {

@@ -1,3 +1,6 @@
+import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackOutput
+import org.jetbrains.kotlin.gradle.targets.js.yarn.yarn
+
 plugins {
     kotlin("multiplatform")
     id("com.android.library")
@@ -15,15 +18,20 @@ kotlin {
         publishLibraryVariants("release")
     }
 
-    js(IR) {
-        browser()
-    }
-
-    jvm {
-        compilations.all {
-            kotlinOptions.jvmTarget = "17"
+    js {
+        yarn.lockFileDirectory = file("kotlin-js-store")
+        browser {
+            commonWebpackConfig {
+                output = KotlinWebpackOutput(
+                    library = project.name,
+                    libraryTarget = KotlinWebpackOutput.Target.UMD,
+                    globalObject = KotlinWebpackOutput.Target.WINDOW
+                )
+            }
         }
     }
+
+    jvm()
 
     val ktorVersion = "2.1.2"
     sourceSets {
@@ -35,8 +43,7 @@ kotlin {
                 implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
 
-                // implementation("io.growthbook.sdk:Core:1.0.1")
-                implementation(project(":Core"))
+                implementation(projects.core)
             }
         }
         val androidMain by getting {

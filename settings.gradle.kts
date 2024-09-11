@@ -1,3 +1,5 @@
+enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
+
 pluginManagement {
     repositories {
         google()
@@ -6,7 +8,7 @@ pluginManagement {
     }
 }
 
-rootProject.name = "GrowthBook"
+rootProject.name = "GrowthBook-Kotlin"
 include(":GrowthBook")
 include(":Core")
 include(":NetworkDispatcherKtor")
