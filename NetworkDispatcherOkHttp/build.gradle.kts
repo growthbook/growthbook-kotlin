@@ -10,13 +10,13 @@ group = "io.growthbook.sdk"
 version = "1.0.1"
 
 kotlin {
-    android {
+    androidTarget {
         publishLibraryVariants("release")
     }
 
     jvm {
         compilations.all {
-            kotlinOptions.jvmTarget = "1.8"
+            kotlinOptions.jvmTarget = "17"
         }
     }
 
@@ -25,11 +25,12 @@ kotlin {
 
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
                 api("com.squareup.okhttp3:okhttp:$okhttpVersion")
                 implementation("com.squareup.okhttp3:okhttp-sse:$okhttpVersion")
 
-                implementation("io.growthbook.sdk:Core:1.0.1")
+                // implementation("io.growthbook.sdk:Core:1.0.1")
+                implementation(project(":Core"))
             }
         }
         val androidMain by getting {
@@ -37,7 +38,7 @@ kotlin {
                 implementation("com.squareup.okhttp3:okhttp:$okhttpVersion")
             }
         }
-        val androidTest by getting {
+        val androidUnitTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
                 // implementation("com.squareup.okhttp3:mockwebserver:$okhttpVersion")

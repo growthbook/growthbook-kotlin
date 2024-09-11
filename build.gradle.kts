@@ -5,9 +5,9 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath("com.android.tools.build:gradle:7.4.2")
+        classpath("com.android.tools.build:gradle:8.5.2")
 
-        val kotlinVersion = "1.7.0"
+        val kotlinVersion = "1.9.24"
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
         classpath ("org.jetbrains.kotlin:kotlin-serialization:$kotlinVersion")
     }
@@ -21,9 +21,9 @@ allprojects {
     }
 }
 
-tasks.register("clean", Delete::class) {
-    delete(rootProject.buildDir)
-}
+// tasks.register("clean", Delete::class) {
+//     delete(rootProject.buildDir)
+// }
 
 plugins {
     id("org.jetbrains.kotlinx.kover") version "0.5.0"

@@ -11,13 +11,17 @@ group = "io.growthbook.sdk"
 version = "1.0.2"
 
 kotlin {
-    android {
+    androidTarget {
         publishLibraryVariants("release")
+    }
+
+    js(IR) {
+        browser()
     }
 
     jvm {
         compilations.all {
-            kotlinOptions.jvmTarget = "1.8"
+            kotlinOptions.jvmTarget = "17"
         }
     }
 
@@ -25,13 +29,14 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.2.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 
                 api("io.ktor:ktor-client-core:$ktorVersion")
                 implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
 
-                implementation("io.growthbook.sdk:Core:1.0.1")
+                // implementation("io.growthbook.sdk:Core:1.0.1")
+                implementation(project(":Core"))
             }
         }
         val androidMain by getting {
@@ -39,7 +44,7 @@ kotlin {
                 implementation("io.ktor:ktor-client-android:$ktorVersion")
             }
         }
-        val androidTest by getting {
+        val androidUnitTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
                 implementation("io.ktor:ktor-client-mock:$ktorVersion")

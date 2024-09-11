@@ -16,13 +16,17 @@ kotlin {
     val serializationVersion = "1.3.3"
     val kryptoVersion = "2.7.0"
 
-    android {
+    androidTarget {
         publishLibraryVariants("release")
+    }
+
+    js(IR) {
+        browser()
     }
 
     jvm {
         compilations.all {
-            kotlinOptions.jvmTarget = "1.8"
+            kotlinOptions.jvmTarget = "17"
         }
     }
 
@@ -30,11 +34,12 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 implementation("org.jetbrains.kotlin:kotlin-stdlib-common")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.2.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
                 implementation("com.ionspin.kotlin:bignum:0.3.3")
                 implementation("com.soywiz.korlibs.krypto:krypto:$kryptoVersion")
 
-                api("io.growthbook.sdk:Core:1.0.0")
+                // api("io.growthbook.sdk:Core:1.0.0")
+                api(project(":Core"))
                 api(
                     "org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion"
                 )
@@ -56,7 +61,7 @@ kotlin {
                 implementation("com.soywiz.korlibs.krypto:krypto-android:$kryptoVersion")
             }
         }
-        val androidTest by getting {
+        val androidUnitTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
                 implementation("junit:junit:4.13.2")

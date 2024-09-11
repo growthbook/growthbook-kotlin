@@ -1,7 +1,7 @@
 package com.sdk.growthbook.network
 
-import java.net.UnknownHostException
-import java.util.concurrent.TimeoutException
+// import java.net.UnknownHostException
+// import java.util.concurrent.TimeoutException
 import com.sdk.growthbook.utils.Resource
 import kotlinx.coroutines.Job
 import io.ktor.client.HttpClient
@@ -27,7 +27,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.utils.io.errors.IOException
-import javax.net.ssl.SSLHandshakeException
+// import javax.net.ssl.SSLHandshakeException
 
 internal fun createDefaultHttpClient(): HttpClient =
     HttpClient {
@@ -68,16 +68,16 @@ class GBNetworkDispatcherKtor(
                 } catch (exception: Exception) {
                     onError(exception)
                 }
-            } catch (unknownHostException: UnknownHostException) {
-                onError(unknownHostException)
+            // } catch (unknownHostException: UnknownHostException) {
+            //     onError(unknownHostException)
             } catch (clientRequestException: ClientRequestException) {
                 onError(clientRequestException)
             } catch (serverResponseException: ServerResponseException) {
                 onError(serverResponseException)
-            } catch (timeoutException: TimeoutException) {
-                onError(timeoutException)
-            } catch (sslHandshakeException: SSLHandshakeException) {
-                onError(sslHandshakeException)
+            // } catch (timeoutException: TimeoutException) {
+            //     onError(timeoutException)
+            // } catch (sslHandshakeException: SSLHandshakeException) {
+            //     onError(sslHandshakeException)
             } catch (ioException: IOException) {
                 onError(ioException)
             } catch (exception: Exception) { // for the case if something was missed

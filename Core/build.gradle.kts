@@ -11,20 +11,24 @@ group = "io.growthbook.sdk"
 version = "1.0.2"
 
 kotlin {
-    android {
+    androidTarget {
         publishLibraryVariants("release")
+    }
+
+    js(IR) {
+        browser()
     }
 
     jvm {
         compilations.all {
-            kotlinOptions.jvmTarget = "1.8"
+            kotlinOptions.jvmTarget = "17"
         }
     }
 
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.2.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
             }
         }
     }
