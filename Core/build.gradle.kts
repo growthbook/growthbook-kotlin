@@ -21,10 +21,12 @@ kotlin {
         }
     }
 
+    ios()
+
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.2.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.3.9")
             }
         }
     }
