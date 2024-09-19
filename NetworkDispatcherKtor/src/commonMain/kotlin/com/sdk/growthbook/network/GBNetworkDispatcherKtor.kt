@@ -52,6 +52,8 @@ class GBNetworkDispatcherKtor(
 
 ) : NetworkDispatcher {
 
+    private var eTag: String? = null
+
     /**
      * Function that execute API Call to fetch features
      */
@@ -64,6 +66,8 @@ class GBNetworkDispatcherKtor(
             try {
                 val result = client.get(request)
                 try {
+                    // Capture the ETag from the response header
+                    eTag = result.headers["ETag"]
                     onSuccess(result.body())
                 } catch (exception: Exception) {
                     onError(exception)
@@ -96,6 +100,11 @@ class GBNetworkDispatcherKtor(
         client.prepareGet(url) {
             headers {
                 headers.forEach { (key, value) -> append(key, value) }
+                // Add If-None-Match header if ETag is present
+                eTag?.let {
+                    append("If-None-Match", it)
+                }
+                append("Cache-Control", "max-age=3600")
             }
             queryParams.forEach { (key, value) -> addOrReplaceParameter(key, value) }
         }
@@ -109,6 +118,7 @@ class GBNetworkDispatcherKtor(
         CoroutineScope(PlatformDependentIODispatcher).launch {
             try {
                 prepareGetRequest(url).execute { response ->
+                    eTag = response.headers["ETag"]
                     val channel: ByteReadChannel = response.body()
                     channel.readSse(
                         onSseEvent = { sseEvent ->
@@ -143,11 +153,11 @@ class GBNetworkDispatcherKtor(
                     }
                     contentType(ContentType.Application.Json)
                     //setBody(bodyParams.toJsonElement())
-                    println("body = $body")
+                    //println("body = $body")
                 }
                 onSuccess(response.body())
             } catch (e: Exception) {
-                println("exception $e")
+                //println("exception $e")
                 onError(e)
             }
         }
