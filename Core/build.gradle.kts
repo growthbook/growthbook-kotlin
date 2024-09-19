@@ -30,6 +30,7 @@ kotlin {
         iosSimulatorArm64()
     ).forEach {
         it.binaries.framework {
+            baseName = "GrowthBook"
             xcf.add(this)
         }
     }
@@ -40,6 +41,9 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.0")
             }
         }
+        val iosX64Main by getting
+        val iosArm64Main by getting
+        //val iosSimulatorArm64Main by getting
     }
 }
 
