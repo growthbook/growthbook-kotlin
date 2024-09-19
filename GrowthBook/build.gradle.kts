@@ -6,7 +6,7 @@ plugins {
     kotlin("plugin.serialization")
     id("maven-publish")
     id("signing")
-    id("org.jetbrains.dokka") version "1.4.20"
+    //id("org.jetbrains.dokka") version "1.4.20"
 }
 
 group = "io.growthbook.sdk"
@@ -107,16 +107,18 @@ android {
 
 val dokkaOutputDir = "$buildDir/dokka"
 
+/*
 tasks.dokkaHtml {
     outputDirectory.set(file(dokkaOutputDir))
 }
+*/
 
 val deleteDokkaOutputDir by tasks.register<Delete>("deleteDokkaOutputDirectory") {
     delete(dokkaOutputDir)
 }
 
 val javadocJar = tasks.register<Jar>("javadocJar") {
-    dependsOn(deleteDokkaOutputDir, tasks.dokkaHtml)
+    //dependsOn(deleteDokkaOutputDir, tasks.dokkaHtml)
     archiveClassifier.set("javadoc")
     from(dokkaOutputDir)
 }

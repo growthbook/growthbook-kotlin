@@ -19,8 +19,8 @@ jobs:
           java-version: 11
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
-#      - name: Gradle clean
-#        run: ./gradlew clean --info
+      - name: Gradle clean
+        run: ./gradlew clean --info
       - name: Build with Gradle
         run: ./gradlew -Pversion=$LIB_VERSION :GrowthBook:build --info
       - name: release
