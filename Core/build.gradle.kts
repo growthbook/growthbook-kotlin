@@ -23,10 +23,16 @@ kotlin {
         }
     }
 
-    ios()
-    iosX64()
-    iosArm64()
-    iosSimulatorArm64()
+    val xcf = XCFramework()
+    listOf(
+        iosX64(),
+        iosArm64(),
+        iosSimulatorArm64()
+    ).forEach {
+        it.binaries.framework {
+            xcf.add(this)
+        }
+    }
 
     sourceSets {
         val commonMain by getting {
