@@ -52,22 +52,26 @@ class GBNetworkDispatcherKtor(
 
 ) : NetworkDispatcher {
 
-    private var eTag: String? = null
+    // Regex to match the desired URL pattern: "/api/features/<clientKey>"
+    private val featuresPathPattern = Regex(".*/api/features/[^/]+")
+    private val eTagMap = mutableMapOf<String, String?>() // Store ETag per URI
 
     /**
      * Function that execute API Call to fetch features
      */
     override fun consumeGETRequest(
-        request: String,
+        url: String,
         onSuccess: (String) -> Unit,
         onError: (Throwable) -> Unit
     ): Job =
         CoroutineScope(PlatformDependentIODispatcher).launch {
             try {
-                val result = client.get(request)
+                val result = prepareGetRequest(url).execute()
                 try {
-                    // Capture the ETag from the response header
-                    eTag = result.headers["ETag"]
+                    // Store the ETag only if the URL matches featuresPathPattern
+                    if (featuresPathPattern.matches(url)) {
+                        eTagMap[url] = result.headers["ETag"]
+                    }
                     onSuccess(result.body())
                 } catch (exception: Exception) {
                     onError(exception)
@@ -100,9 +104,12 @@ class GBNetworkDispatcherKtor(
         client.prepareGet(url) {
             headers {
                 headers.forEach { (key, value) -> append(key, value) }
-                // Add If-None-Match header if ETag is present
-                eTag?.let {
-                    append("If-None-Match", it)
+                // Only add If-None-Match header if URL matches featuresPathPattern
+                if (featuresPathPattern.matches(url)) {
+                    // Add If-None-Match header if ETag is present
+                    eTagMap[url]?.let {
+                        append("If-None-Match", it)
+                    }
                 }
                 append("Cache-Control", "max-age=3600")
             }
@@ -118,7 +125,6 @@ class GBNetworkDispatcherKtor(
         CoroutineScope(PlatformDependentIODispatcher).launch {
             try {
                 prepareGetRequest(url).execute { response ->
-                    eTag = response.headers["ETag"]
                     val channel: ByteReadChannel = response.body()
                     channel.readSse(
                         onSseEvent = { sseEvent ->

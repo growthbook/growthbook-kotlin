@@ -12,9 +12,10 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.SerializationException
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.Pair
 import kotlin.test.assertEquals
 
-private const val FEATURES_ENDPOINT = "/api/features/"
+private const val FEATURES_ENDPOINT = "https://some.domain/api/features/abc-client-123"
 
 class GBNetworkDispatcherKtorTest {
     private val classUnderTest: GBNetworkDispatcherKtor
@@ -26,7 +27,7 @@ class GBNetworkDispatcherKtorTest {
                 status = HttpStatusCode.OK,
                 headers = headersOf(
                     Pair(HttpHeaders.ContentType, listOf("application/json")),
-                    Pair(HttpHeaders.ETag, listOf("12345")) // Add ETag header correctly
+                    Pair(HttpHeaders.ETag, listOf("12345")) // Add ETag header
                 )
             )
         }
@@ -42,15 +43,17 @@ class GBNetworkDispatcherKtorTest {
         var eTagValue: String? = null
 
         val job = classUnderTest.consumeGETRequest(
-            request = FEATURES_ENDPOINT,
+            url = FEATURES_ENDPOINT,
             onSuccess = { _ ->
                 wasOnSuccessCalled = true
 
-                // Access the private eTag field using reflection
-                eTagValue = GBNetworkDispatcherKtor::class.java
-                    .getDeclaredField("eTag")
+                // Access the private eTagMap using reflection
+                val eTagMapField = GBNetworkDispatcherKtor::class.java
+                    .getDeclaredField("eTagMap")
                     .apply { isAccessible = true }
-                    .get(classUnderTest) as String?
+
+                val eTagMap = eTagMapField.get(classUnderTest) as Map<*, *>
+                eTagValue = eTagMap[FEATURES_ENDPOINT]?.toString()
             },
             onError = {},
         )
@@ -68,7 +71,7 @@ class GBNetworkDispatcherKtorTest {
         var wasOnErrorCalled = false
 
         val job = classUnderTest.consumeGETRequest(
-            request = FEATURES_ENDPOINT,
+            url = FEATURES_ENDPOINT,
             onSuccess = {
                 // typically in onSuccess callback JSON is parsed
                 throw SerializationException()
@@ -96,7 +99,7 @@ class GBNetworkDispatcherKtorTest {
                     status = HttpStatusCode.OK,
                     headers = headersOf(
                         Pair(HttpHeaders.ContentType, listOf("application/json")),
-                        Pair(HttpHeaders.ETag, listOf("98765")) // Add ETag header correctly
+                        Pair(HttpHeaders.ETag, listOf("98765")) // Add ETag header
                     )
                 )
             } else {
@@ -115,14 +118,14 @@ class GBNetworkDispatcherKtorTest {
 
         // First request to capture the ETag
         networkDispatcher.consumeGETRequest(
-            request = FEATURES_ENDPOINT,
+            url = FEATURES_ENDPOINT,
             onSuccess = { },
             onError = { throw it }
         ).join()
 
         // Second request to verify If-None-Match header is sent
         networkDispatcher.consumeGETRequest(
-            request = FEATURES_ENDPOINT,
+            url = FEATURES_ENDPOINT,
             onSuccess = { },
             onError = { throw it }
         ).join()
