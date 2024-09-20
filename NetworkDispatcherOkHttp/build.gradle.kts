@@ -22,10 +22,11 @@ kotlin {
 
     sourceSets {
         val okhttpVersion = "4.9.2"
+        var kotlinxCoroutinesVersion = "1.6.0"
 
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutinesVersion")
                 api("com.squareup.okhttp3:okhttp:$okhttpVersion")
                 implementation("com.squareup.okhttp3:okhttp-sse:$okhttpVersion")
 
@@ -41,7 +42,7 @@ kotlin {
             dependencies {
                 implementation(kotlin("test-junit"))
                 implementation("com.squareup.okhttp3:mockwebserver:$okhttpVersion")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.6.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$kotlinxCoroutinesVersion")
             }
         }
     }
