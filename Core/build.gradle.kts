@@ -87,7 +87,7 @@ publishing {
             url = if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl
             credentials {
                 username = sonatypeUsername
-                password = password
+                password = sonatypePassword
             }
         }
     }
