@@ -2,6 +2,7 @@ package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.model.GBExperiment
+import io.ktor.http.ContentDisposition.Companion.File
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -20,7 +21,7 @@ class GBTestHelper {
 
         init {
             val usrDir = System.getProperty("user.dir")
-            val pathToFile = "$usrDir/src/commonTest/kotlin/com/sdk/growthbook/tests/cases.json"
+            val pathToFile = "$usrDir/src/jvmTest/kotlin/com/sdk/growthbook/tests/cases.json"
             val casesJsonFile = File(pathToFile)
 
             testData = jsonParser.decodeFromString(

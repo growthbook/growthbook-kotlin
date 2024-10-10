@@ -21,6 +21,10 @@ kotlin {
         }
     }
 
+    iosX64()
+    iosArm64()
+    iosSimulatorArm64()
+
     val ktorVersion = "2.1.2"
     sourceSets {
         val commonMain by getting {
@@ -31,7 +35,7 @@ kotlin {
                 implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
 
-                implementation("io.growthbook.sdk:Core:1.0.1")
+                implementation("io.growthbook.sdk:Core:1.0.2")
             }
         }
         val androidMain by getting {

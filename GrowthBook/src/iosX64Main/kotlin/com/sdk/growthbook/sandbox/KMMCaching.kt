@@ -4,11 +4,11 @@ import kotlinx.serialization.json.JsonElement
 
 internal actual object CachingImpl {
     actual fun getLayer() : CachingLayer {
-        return CachingJvm()
+        return CachingIOS()
     }
 }
 
-internal class CachingJvm : CachingLayer {
+internal class CachingIOS : CachingLayer {
     override fun saveContent(fileName: String, content: JsonElement){
 
     }

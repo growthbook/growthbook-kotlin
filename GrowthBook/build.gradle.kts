@@ -26,15 +26,19 @@ kotlin {
         }
     }
 
+    iosX64()
+    iosArm64()
+    iosSimulatorArm64()
+
     sourceSets {
         val commonMain by getting {
             dependencies {
                 implementation("org.jetbrains.kotlin:kotlin-stdlib-common")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.2.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.0")
                 implementation("com.ionspin.kotlin:bignum:0.3.3")
                 implementation("com.soywiz.korlibs.krypto:krypto:$kryptoVersion")
 
-                api("io.growthbook.sdk:Core:1.0.0")
+                api("io.growthbook.sdk:Core:1.0.2")
                 api(
                     "org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion"
                 )
