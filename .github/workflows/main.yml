@@ -53,7 +53,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: GrowthBook/build/libs/GrowthBook-jvm-${{LIB_VERSION}}.jar
+        asset_path: GrowthBook/build/libs/GrowthBook-jvm-$LIB_VERSION.jar
         asset_name: GrowthBook-$LIB_VERSION.jar
         asset_content_type: application/x-jar
     - name: Upload sources
