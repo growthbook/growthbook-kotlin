@@ -49,18 +49,26 @@ class GBNetworkDispatcherKtor(
 
 ) : NetworkDispatcher {
 
+    // Regex to match the desired URL pattern: "/api/features/<clientKey>"
+    private val featuresPathPattern = Regex(".*/api/features/[^/]+")
+    private val eTagMap = mutableMapOf<String, String?>() // Store ETag per URI
+
     /**
      * Function that execute API Call to fetch features
      */
     override fun consumeGETRequest(
-        request: String,
+        url: String,
         onSuccess: (String) -> Unit,
         onError: (Throwable) -> Unit
     ): Job =
         CoroutineScope(PlatformDependentIODispatcher).launch {
             try {
-                val result = client.get(request)
+                val result = prepareGetRequest(url).execute()
                 try {
+                    // Store the ETag only if the URL matches featuresPathPattern
+                    if (featuresPathPattern.matches(url)) {
+                        eTagMap[url] = result.headers["ETag"]
+                    }
                     onSuccess(result.body())
                 } catch (exception: Exception) {
                     onError(exception)
@@ -87,6 +95,14 @@ class GBNetworkDispatcherKtor(
         client.prepareGet(url) {
             headers {
                 headers.forEach { (key, value) -> append(key, value) }
+                // Only add If-None-Match header if URL matches featuresPathPattern
+                if (featuresPathPattern.matches(url)) {
+                    // Add If-None-Match header if ETag is present
+                    eTagMap[url]?.let {
+                        append("If-None-Match", it)
+                    }
+                }
+                append("Cache-Control", "max-age=3600")
             }
             queryParams.forEach { (key, value) -> addOrReplaceParameter(key, value) }
         }
@@ -134,11 +150,11 @@ class GBNetworkDispatcherKtor(
                     }
                     contentType(ContentType.Application.Json)
                     //setBody(bodyParams.toJsonElement())
-                    println("body = $body")
+                    //println("body = $body")
                 }
                 onSuccess(response.body())
             } catch (e: Exception) {
-                println("exception $e")
+                //println("exception $e")
                 onError(e)
             }
         }
