@@ -87,22 +87,12 @@ class GBError(error: Throwable?) {
     /**
      * Error Message for the caught error / exception
      */
-    private lateinit var errorMessage: String
+    val errorMessage: String = error?.message ?: ""
 
     /**
      * Error Stacktrace for the caught error / exception
      */
-    private lateinit var stackTrace: String
-
-    /**
-     * Constructor for initializing
-     */
-    init {
-        if (error != null) {
-            errorMessage = error.message ?: ""
-            stackTrace = error.stackTraceToString()
-        }
-    }
+    val stackTrace: String? = error?.stackTraceToString()
 }
 
 /**
