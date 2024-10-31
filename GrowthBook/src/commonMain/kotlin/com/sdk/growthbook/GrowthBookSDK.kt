@@ -65,7 +65,10 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         this.featuresViewModel =
             FeaturesViewModel(
                 delegate = this,
-                dataSource = FeaturesDataSource(dispatcher = networkDispatcher),
+                dataSource = FeaturesDataSource(
+                    dispatcher = networkDispatcher,
+                    enableLogging = context.enableLogging,
+                ),
                 encryptionKey = gbContext.encryptionKey,
             )
         if (features != null) {

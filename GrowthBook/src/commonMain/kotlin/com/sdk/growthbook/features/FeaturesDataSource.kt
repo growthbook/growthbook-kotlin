@@ -14,7 +14,10 @@ import kotlinx.serialization.json.Json
 /**
  * DataSource for Feature API
  */
-internal class FeaturesDataSource(private val dispatcher: NetworkDispatcher) {
+internal class FeaturesDataSource(
+    private val dispatcher: NetworkDispatcher,
+    private val enableLogging: Boolean = true,
+) {
 
     private val jsonParser: Json
         get() = Json { prettyPrint = true; isLenient = true; ignoreUnknownKeys = true }
@@ -90,7 +93,9 @@ internal class FeaturesDataSource(private val dispatcher: NetworkDispatcher) {
             payload["forcedVariations"] = params.forcedVariations
         }
 
-        println(payload)
+        if (enableLogging) {
+            println(payload)
+        }
 
         /**
          * Make POST request to server and send feature for further evaluation
