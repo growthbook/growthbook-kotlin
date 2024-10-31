@@ -76,6 +76,11 @@ class GBContext(
      */
     val remoteEval: Boolean = false,
 
+    /**
+     * If true, prints logging statements to stdout
+     */
+    val enableLogging: Boolean = false,
+
     var savedGroups: Map<String, Any>? = null
 ) {
 

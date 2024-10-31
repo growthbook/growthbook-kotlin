@@ -25,4 +25,6 @@ interface NetworkDispatcher {
         onSuccess: (String) -> Unit,
         onError: (Throwable) -> Unit
     )
+
+    fun setLoggingEnabled(enabled: Boolean)
 }
