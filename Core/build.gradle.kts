@@ -1,3 +1,5 @@
+import com.android.build.gradle.internal.utils.publishingFeatureOptIn
+import org.gradle.kotlin.dsl.support.kotlinCompilerOptions
 import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackOutput
 import org.jetbrains.kotlin.gradle.targets.js.yarn.yarn
 
@@ -14,7 +16,7 @@ group = "io.growthbook.sdk"
 version = "1.0.2"
 
 kotlin {
-    android {
+    androidTarget {
         publishLibraryVariants("release")
     }
 
@@ -65,8 +67,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
     }
 }
 

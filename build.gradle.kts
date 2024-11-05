@@ -19,6 +19,10 @@ allprojects {
         mavenCentral()
         maven("https://maven.pkg.jetbrains.space/public/p/kotlinx-html/maven")
     }
+
+    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
+        kotlinOptions.jvmTarget = "1.8"
+    }
 }
 
 plugins {
