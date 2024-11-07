@@ -34,6 +34,10 @@ class GBNetworkDispatcherOkHttp(
     private val client: OkHttpClient = OkHttpClient()
 
 ) : NetworkDispatcher {
+    // Regex to match the desired URL pattern: "/api/features/<clientKey>"
+    private val featuresPathPattern = Regex(".*/api/features/[^/]+")
+    private val eTagMap = mutableMapOf<String, String?>() // Store ETag per URI
+
 
     /**
      * Function that execute API Call to fetch features
@@ -46,6 +50,16 @@ class GBNetworkDispatcherOkHttp(
         CoroutineScope(PlatformDependentIODispatcher).launch {
             val getRequest = Request.Builder()
                 .url(request)
+                .addHeader("Cache-Control", "max-age=3600")
+                .apply {
+                    // Only add If-None-Match header if URL matches featuresPathPattern
+                    if (featuresPathPattern.matches(request)) {
+                        // Add If-None-Match header if ETag is present
+                        eTagMap[request]?.let {
+                            header("If-None-Match", it)
+                        }
+                    }
+                }
                 .build()
             client.newCall(getRequest).enqueue(object : Callback {
                 override fun onFailure(call: Call, e: IOException) {
@@ -55,6 +69,10 @@ class GBNetworkDispatcherOkHttp(
                 override fun onResponse(call: Call, response: Response) {
                     response.use {
                         if (response.isSuccessful) {
+                            // Store the ETag only if the URL matches featuresPathPattern
+                            if (featuresPathPattern.matches(request)) {
+                                eTagMap[request] = response.headers["ETag"]
+                            }
                             response.body?.string()?.let {
                                 onSuccess(it)
                             }
@@ -95,7 +113,6 @@ class GBNetworkDispatcherOkHttp(
                 override fun onResponse(call: Call, response: Response) {
                     response.use {
                         if (!response.isSuccessful) {
-                            // throw IOException("Unexpected code $response")
                             onError(IOException("Unexpected code $response"))
                         }
                         onSuccess(response.body?.string() ?: "")
@@ -117,6 +134,7 @@ class GBNetworkDispatcherOkHttp(
             .url(url)
             .header("Accept", "application/json; q=0.5")
             .addHeader("Accept", "text/event-stream")
+            .addHeader("Cache-Control", "max-age=3600")
             .build()
 
         return callbackFlow {
