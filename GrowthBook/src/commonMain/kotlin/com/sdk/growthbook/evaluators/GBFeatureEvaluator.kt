@@ -43,7 +43,9 @@ internal class GBFeatureEvaluator {
             /**
              * block that handle recursion
              */
-            print("evaluateFeature: circular dependency detected:")
+            if (context.enableLogging) {
+                println("evaluateFeature: circular dependency detected:")
+            }
             if (evalContext.evaluatedFeatures.contains(featureKey)) {
                 val featureResultWhenCircularDependencyDetected = prepareResult(
                     value = null,
@@ -113,7 +115,9 @@ internal class GBFeatureEvaluator {
                                  * blocking prerequisite eval failed: feature evaluation fails
                                  */
                                 if (parentCondition.gate != false) {
-                                    println("Feature blocked by prerequisite")
+                                    if (context.enableLogging) {
+                                        println("Feature blocked by prerequisite")
+                                    }
                                     
                                     val featureResultWhenBlockedByPrerequisite = prepareResult(
                                         value = null,

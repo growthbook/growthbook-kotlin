@@ -3,7 +3,10 @@ package com.sdk.growthbook.utils
 import okhttp3.sse.EventSource
 import okhttp3.sse.EventSourceListener
 
-class GBEventSourceListener(private val handler: GBEventSourceHandler): EventSourceListener() {
+class GBEventSourceListener(
+    private val handler: GBEventSourceHandler,
+    private val enableLogging: Boolean,
+): EventSourceListener() {
     override fun onClosed(eventSource: EventSource) {
         super.onClosed(eventSource)
         handler.onClose(eventSource)
@@ -17,7 +20,9 @@ class GBEventSourceListener(private val handler: GBEventSourceHandler): EventSou
         try {
             handler.onFeaturesResponse(data)
         } catch (e: Exception) {
-            println(e)
+            if (enableLogging) {
+                println(e)
+            }
         }
     }
 }

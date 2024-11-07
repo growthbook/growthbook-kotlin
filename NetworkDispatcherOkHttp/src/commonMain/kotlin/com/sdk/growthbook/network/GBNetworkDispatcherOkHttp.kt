@@ -35,6 +35,8 @@ class GBNetworkDispatcherOkHttp(
 
 ) : NetworkDispatcher {
 
+    private var enableLogging = false
+
     /**
      * Function that execute API Call to fetch features
      */
@@ -134,9 +136,15 @@ class GBNetworkDispatcherOkHttp(
                                 trySend(Resource.Success(it))
                             }
                         }
-                    })
+                    },
+                        enableLogging = enableLogging,
+                    )
                 )
             awaitClose()
         }
+    }
+
+    override fun setLoggingEnabled(enabled: Boolean) {
+        enableLogging = enabled
     }
 }

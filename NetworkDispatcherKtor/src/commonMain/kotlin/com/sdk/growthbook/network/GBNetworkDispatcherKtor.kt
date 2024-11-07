@@ -49,6 +49,8 @@ class GBNetworkDispatcherKtor(
 
 ) : NetworkDispatcher {
 
+    private var enableLogging = false
+
     /**
      * Function that execute API Call to fetch features
      */
@@ -134,14 +136,22 @@ class GBNetworkDispatcherKtor(
                     }
                     contentType(ContentType.Application.Json)
                     //setBody(bodyParams.toJsonElement())
-                    println("body = $body")
+                    if (enableLogging) {
+                        println("body = $body")
+                    }
                 }
                 onSuccess(response.body())
             } catch (e: Exception) {
-                println("exception $e")
+                if (enableLogging) {
+                    println("exception $e")
+                }
                 onError(e)
             }
         }
+    }
+
+    override fun setLoggingEnabled(enabled: Boolean) {
+        enableLogging = enabled
     }
 
     /**
