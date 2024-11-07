@@ -25,4 +25,4 @@ jobs:
         run: ./gradlew -Pversion=$DISPATCHER_VERSION :NetworkDispatcherOkHttp:build --info
       - name: Publish to maven central
         run: |
-         GPG_PRIVATE_KEY="${{secrets.GPG_PRIVATE_KEY}}" GPG_PRIVATE_PASSWORD="${{secrets.GPG_PRIVATE_PASSWORD}}" GB_SONATYPE_USERNAME='${{secrets.GB_SONATYPE_USERNAME}}' GB_SONATYPE_PASSWORD='${{secrets.GB_SONATYPE_PASSWORD}}' ./gradlew -Pversion=$DISPATCHER_VERSION :NetworkDispatcherOkHttp:publish
+         GPG_PRIVATE_KEY="${{secrets.GPG_PRIVATE_KEY}}" GPG_PRIVATE_PASSWORD="${{secrets.GPG_PRIVATE_PASSWORD}}" GB_SONATYPE_USERNAME='${{secrets.GB_SONATYPE_USERNAME}}' GB_SONATYPE_PASSWORD='${{secrets.GB_SONATYPE_PASSWORD}}' ./gradlew -Pversion=$DISPATCHER_VERSION kotlinUpgradeYarnLock :NetworkDispatcherOkHttp:publish
