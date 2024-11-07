@@ -3,7 +3,7 @@ plugins {
     id("com.android.library")
     id("maven-publish")
     id("signing")
-    id("org.jetbrains.dokka") version "1.8.10"
+    id("org.jetbrains.dokka") version "1.9.10"
 }
 
 group = "io.growthbook.sdk"
@@ -29,7 +29,7 @@ kotlin {
                 api("com.squareup.okhttp3:okhttp:$okhttpVersion")
                 implementation("com.squareup.okhttp3:okhttp-sse:$okhttpVersion")
 
-                implementation("io.growthbook.sdk:Core:1.0.1")
+                implementation(project(":Core"))
             }
         }
         val androidMain by getting {
@@ -37,7 +37,7 @@ kotlin {
                 implementation("com.squareup.okhttp3:okhttp:$okhttpVersion")
             }
         }
-        val androidTest by getting {
+        val androidUnitTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
                 // implementation("com.squareup.okhttp3:mockwebserver:$okhttpVersion")
@@ -61,8 +61,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
     }
 }
 
