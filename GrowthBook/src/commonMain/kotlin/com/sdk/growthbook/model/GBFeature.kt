@@ -15,7 +15,7 @@ import kotlinx.serialization.json.JsonElement
  * A Feature object consists of possible values plus rules for how to assign values to users.
  */
 @Serializable
-class GBFeature(
+data class GBFeature(
 
     /**
      * The default value (should use null if not specified)
@@ -32,7 +32,7 @@ class GBFeature(
  * Rule object consists of various definitions to apply to calculate feature value
  */
 @Serializable
-class GBFeatureRule(
+data class GBFeatureRule(
     /**
      * Unique feature rule id
      */
@@ -195,12 +195,13 @@ enum class GBFeatureSource {
 /**
  * Result for Feature
  */
-class GBFeatureResult(
+@Serializable
+data class GBFeatureResult(
 
     /**
      * The assigned value of the feature
      */
-    val value: Any?,
+    val value: JsonElement?,
 
     /**
      * The assigned value cast to a boolean
@@ -210,7 +211,7 @@ class GBFeatureResult(
     /**
      * The assigned value cast to a boolean and then negated
      */
-    val off: Boolean = true,
+    val off: Boolean = !on,
 
     /**
      * One of "unknownFeature", "defaultValue", "force", "experiment",
