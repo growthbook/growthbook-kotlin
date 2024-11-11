@@ -45,43 +45,27 @@ internal class FeaturesViewModel(
     fun fetchFeatures(remoteEval: Boolean = false, payload: GBRemoteEvalParams? = null) {
         try {
             // Check for cache data
-            val dataModel = manager.getLayer().getData(
-                Constants.FEATURE_CACHE,
-                FeaturesDataModel.serializer()
-            )
-
+            val dataModel = getDataFromCache()
             if (dataModel != null) {
                 // Call Success Delegate with mention of data available but its not remote
-                dataModel.features?.let {
-                    this.delegate.featuresFetchedSuccessfully(
-                        features = it,
-                        isRemote = false
-                    )
-                }
-                dataModel.encryptedFeatures?.let { encryptedFeatures: String ->
-                    encryptionKey?.let { encryptionKey ->
-                        val features = getFeaturesFromEncryptedFeatures(
-                            encryptedString = encryptedFeatures,
-                            encryptionKey = encryptionKey,
-                        )
-                        features?.let {
-                            this.delegate.featuresFetchedSuccessfully(
-                                features = it,
-                                isRemote = false
-                            )
-                        }
-                    }
-                }
+                handleFetchFeaturesWithoutRemoteEval(dataModel)
             }
         } catch (error: Throwable) {
             // Call Error Delegate with mention of data not available but its not remote
             this.delegate.featuresFetchFailed(GBError(error), false)
         }
+        handleFetchFeaturesWithRemoteEval(remoteEval, payload)
+    }
+
+    private fun handleFetchFeaturesWithRemoteEval(
+        remoteEval: Boolean,
+        payload: GBRemoteEvalParams?
+    ) {
         if (remoteEval) {
             dataSource.fetchRemoteEval(
                 params = payload,
                 success = { responseFeaturesDataModel ->
-                    prepareFeaturesData(responseFeaturesDataModel.data)
+                    prepareFeaturesDataForRemoteEval(responseFeaturesDataModel.data)
                 },
                 failure = { error ->
                     this.delegate.featuresFetchFailed(GBError(error.exception), true)
@@ -90,7 +74,7 @@ internal class FeaturesViewModel(
         } else {
             dataSource.fetchFeatures(
                 success = { dataModel ->
-                    prepareFeaturesData(dataModel)
+                    prepareFeaturesDataForRemoteEval(dataModel)
                 },
                 failure = { error ->
                     // Call Error Delegate with mention of data not available but its not remote
@@ -100,12 +84,43 @@ internal class FeaturesViewModel(
         }
     }
 
+    private fun handleFetchFeaturesWithoutRemoteEval(dataModel: FeaturesDataModel) {
+        dataModel.features?.let {
+            this.delegate.featuresFetchedSuccessfully(
+                features = it,
+                isRemote = false
+            )
+        }
+        dataModel.encryptedFeatures?.let { encryptedFeatures: String ->
+            encryptionKey?.let { encryptionKey ->
+                val features = getFeaturesFromEncryptedFeatures(
+                    encryptedString = encryptedFeatures,
+                    encryptionKey = encryptionKey,
+                )
+                features?.let {
+                    this.delegate.featuresFetchedSuccessfully(
+                        features = it,
+                        isRemote = false
+                    )
+                }
+            }
+        }
+    }
+
+    private fun getDataFromCache(): FeaturesDataModel? {
+        val dataModel = manager.getLayer().getData(
+            Constants.FEATURE_CACHE,
+            FeaturesDataModel.serializer()
+        )
+        return dataModel
+    }
+
     /**
      * Supportive method for automatically refresh features
      */
     fun autoRefreshFeatures(): Flow<Resource<GBFeatures?>> {
         return dataSource.autoRefresh(success = { dataModel ->
-            prepareFeaturesData(dataModel = dataModel)
+            prepareFeaturesDataForRemoteEval(dataModel = dataModel)
         }, failure = { error ->
             // Call Error Delegate with mention of data not available but its not remote
             this.delegate.featuresFetchFailed(GBError(error), true)
@@ -115,7 +130,7 @@ internal class FeaturesViewModel(
     /**
      * Cache API Response and push success event
      */
-    private fun prepareFeaturesData(dataModel: FeaturesDataModel?) {
+    private fun prepareFeaturesDataForRemoteEval(dataModel: FeaturesDataModel?) {
         var features = dataModel?.features
         var savedGroups = dataModel?.savedGroups
         val encryptedFeatures = dataModel?.encryptedFeatures
@@ -123,11 +138,7 @@ internal class FeaturesViewModel(
 
         try {
             if (dataModel != null) {
-                manager.getLayer().putData(
-                    fileName = Constants.FEATURE_CACHE,
-                    content = dataModel,
-                    serializer = FeaturesDataModel.serializer()
-                )
+                putDataToCache(dataModel)
 
                 delegate.featuresAPIModelSuccessfully(dataModel)
                 if (!features.isNullOrEmpty()) {
@@ -213,5 +224,13 @@ internal class FeaturesViewModel(
             this.delegate.featuresFetchFailed(error = GBError(error), isRemote = true)
             return
         }
+    }
+
+    private fun putDataToCache(dataModel: FeaturesDataModel) {
+        manager.getLayer().putData(
+            fileName = Constants.FEATURE_CACHE,
+            content = dataModel,
+            serializer = FeaturesDataModel.serializer()
+        )
     }
 }
