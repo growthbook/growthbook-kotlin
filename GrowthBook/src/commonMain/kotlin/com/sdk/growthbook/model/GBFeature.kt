@@ -189,7 +189,12 @@ enum class GBFeatureSource {
     /**
      * Prerequisite Value for the Feature is being processed
      */
-    prerequisite
+    prerequisite,
+
+    /**
+     * Override value for the Feature is being processed
+     */
+    override
 }
 
 /**
