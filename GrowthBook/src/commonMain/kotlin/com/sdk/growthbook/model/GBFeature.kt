@@ -6,6 +6,8 @@ import com.sdk.growthbook.utils.GBFilter
 import com.sdk.growthbook.utils.GBTrackData
 import com.sdk.growthbook.utils.GBVariationMeta
 import com.sdk.growthbook.utils.GBParentConditionInterface
+import com.sdk.growthbook.utils.OptionalProperty
+import com.sdk.growthbook.utils.OptionalPropertySerializer
 import com.sdk.growthbook.utils.RangeSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
@@ -57,8 +59,8 @@ class GBFeatureRule(
     /**
      * Immediately force a specific value (ignore every other option besides condition and coverage)
      */
-    val force: JsonElement? = null,
-
+    @Serializable(with = OptionalPropertySerializer::class)
+    val force: OptionalProperty<JsonElement?> = OptionalProperty.NotPresent,
     /**
      * Run an experiment (A/B test) and randomly choose between these variations
      */

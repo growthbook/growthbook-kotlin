@@ -11,6 +11,7 @@ import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBFeatureSource
+import com.sdk.growthbook.utils.OptionalProperty
 import kotlinx.serialization.json.jsonObject
 
 /**
@@ -160,7 +161,7 @@ internal class GBFeatureEvaluator {
                     /**
                      * Feature value is being forced
                      */
-                    if (rule.force != null) {
+                    if (rule.force is OptionalProperty.Present) {
 
                         /**
                          * If it's a conditional rule, skip if the condition doesn't pass
@@ -239,7 +240,7 @@ internal class GBFeatureEvaluator {
                         }
                         val forcedFeatureResult =
                             prepareResult(
-                                value = rule.force,
+                                value = rule.force.value,
                                 source = GBFeatureSource.force
                             )
 
