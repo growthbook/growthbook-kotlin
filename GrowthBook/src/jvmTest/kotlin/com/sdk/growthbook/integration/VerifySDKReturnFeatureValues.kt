@@ -1,5 +1,9 @@
 package com.sdk.growthbook.integration
 
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import org.intellij.lang.annotations.Language
 import org.junit.Test
 import kotlin.test.assertEquals
@@ -34,12 +38,14 @@ internal class VerifySDKReturnFeatureValues {
 
         val sdkInstance = buildSDK(json)
 
-        assertEquals(true, sdkInstance.feature("bool_feature_true").value)
-        assertEquals(false, sdkInstance.feature("bool_feature_false").value)
-        assertEquals("Default value", sdkInstance.feature("string_feature").value)
+        // maybe we should think about Generic type of value just like in Java SDK
 
-        assertEquals(888, sdkInstance.feature("number_feature").value)
-        assertEquals(-1, sdkInstance.feature("number_feature_negative").value)
+        assertEquals(true, sdkInstance.feature("bool_feature_true").value?.jsonPrimitive?.booleanOrNull)
+        assertEquals(false, sdkInstance.feature("bool_feature_false").value?.jsonPrimitive?.booleanOrNull)
+        assertEquals("Default value", sdkInstance.feature("string_feature").value?.jsonPrimitive?.contentOrNull)
+
+        assertEquals(888, sdkInstance.feature("number_feature").value?.jsonPrimitive?.intOrNull)
+        assertEquals(-1, sdkInstance.feature("number_feature_negative").value?.jsonPrimitive?.intOrNull)
     }
 
     @Test
@@ -77,7 +83,7 @@ internal class VerifySDKReturnFeatureValues {
         val sdkInstance = buildSDK(json, attributes)
         assertEquals(
             expected = "Default value for brand:KZ",
-            actual = sdkInstance.feature("string_feature").value
+            actual = sdkInstance.feature("string_feature").value?.jsonPrimitive?.contentOrNull
         )
     }
 

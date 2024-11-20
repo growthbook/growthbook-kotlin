@@ -13,6 +13,7 @@ import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBFeatureSource
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
+import com.sdk.growthbook.utils.OptionalProperty
 
 /**
  * Feature Evaluator Class
@@ -176,7 +177,7 @@ internal class GBFeatureEvaluator {
                     /**
                      * Feature value is being forced
                      */
-                    if (rule.force != null) {
+                    if (rule.force is OptionalProperty.Present) {
 
                         /**
                          * If it's a conditional rule, skip if the condition doesn't pass
@@ -228,10 +229,10 @@ internal class GBFeatureEvaluator {
                             rule.tracks.forEach { track: GBTrackData ->
                                 if (!GBExperimentHelper().isTracked(
                                         experiment = track.experiment,
-                                        result = track.result
+                                        result = track.result.experimentResult
                                     )
                                 ) {
-                                    context.trackingCallback(track.experiment, track.result)
+                                    context.trackingCallback(track.experiment, track.result.experimentResult)
                                 }
                             }
                         }
@@ -255,7 +256,7 @@ internal class GBFeatureEvaluator {
                         }
                         val forcedFeatureResult =
                             prepareResult(
-                                value = rule.force,
+                                value = rule.force.value,
                                 source = GBFeatureSource.force
                             )
 
@@ -366,7 +367,7 @@ internal class GBFeatureEvaluator {
      * on and off, which are just the value cast to booleans.
      */
     private fun prepareResult(
-        value: Any?,
+        value: JsonElement?,
         source: GBFeatureSource,
         experiment: GBExperiment? = null,
         experimentResult: GBExperimentResult? = null
@@ -377,7 +378,7 @@ internal class GBFeatureEvaluator {
 
 
         return GBFeatureResult(
-            value = GBUtils.convertToPrimitiveIfPossible(value),
+            value = value,
             on = !isFalse,
             off = isFalse,
             source = source,

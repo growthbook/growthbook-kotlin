@@ -82,7 +82,7 @@ class IntegrationTests {
             json = json,
             attributes = mapOf("id" to "someId"),
             trackingCallback = { _, gbExperimentResult ->
-                val variationName = gbExperimentResult.name
+                val variationName = gbExperimentResult?.name
                 assertTrue(
                     (variationName == "Button filled") || (variationName == "Control")
                 )
