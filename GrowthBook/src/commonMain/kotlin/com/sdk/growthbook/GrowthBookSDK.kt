@@ -22,6 +22,7 @@ import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.utils.toHashMap
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonElement
 
 typealias GBTrackingCallback = (GBExperiment, GBExperimentResult?) -> Unit
 typealias GBFeatureUsageCallback = (featureKey: String, gbFeatureResult: GBFeatureResult) -> Unit
@@ -37,7 +38,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     private lateinit var networkDispatcher: NetworkDispatcher
     private lateinit var featuresViewModel: FeaturesViewModel
     private var attributeOverrides: Map<String, Any> = emptyMap()
-    private var forcedFeatures: Map<String, Any> = emptyMap()
+    private var forcedFeatures: Map<String, JsonElement> = emptyMap()
     private var savedGroups: Map<String, Any>? = emptyMap()
 
     //@ThreadLocal
@@ -175,7 +176,8 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         return GBFeatureEvaluator().evaluateFeature(
             context = gbContext,
             featureKey = id,
-            attributeOverrides = attributeOverrides
+            attributeOverrides = attributeOverrides,
+            forcedFeature = this.forcedFeatures
         )
     }
 
@@ -201,7 +203,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     /**
      * The setForcedFeatures method setup the Map of user's (forced) features
      */
-    fun setForcedFeatures(forcedFeatures: Map<String, Any>) {
+    fun setForcedFeatures(forcedFeatures: Map<String, JsonElement>) {
         this.forcedFeatures = forcedFeatures
     }
 

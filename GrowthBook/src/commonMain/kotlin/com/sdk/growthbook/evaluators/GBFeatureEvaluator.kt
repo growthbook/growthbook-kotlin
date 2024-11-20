@@ -11,9 +11,9 @@ import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBFeatureSource
-import com.sdk.growthbook.utils.OptionalProperty
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
+import com.sdk.growthbook.utils.OptionalProperty
 
 /**
  * Feature Evaluator Class
@@ -33,7 +33,8 @@ internal class GBFeatureEvaluator {
         evalContext: FeatureEvalContext = FeatureEvalContext(
             id = featureKey,
             evaluatedFeatures = mutableSetOf()
-        )
+        ),
+        forcedFeature: Map<String, JsonElement> = emptyMap()
     ): GBFeatureResult {
         /**
          * This callback serves for listening for feature usage events
@@ -41,6 +42,20 @@ internal class GBFeatureEvaluator {
         val onFeatureUsageCallback = context.onFeatureUsage
         
         try {
+
+            /**
+             * Global override
+             */
+            if (forcedFeature.containsKey(featureKey)) {
+                if (context.enableLogging) {
+                    println("Global override for forced feature with key: $featureKey and value ${forcedFeature[featureKey]}")
+                }
+                return prepareResult(
+                    value = forcedFeature[featureKey],
+                    source = GBFeatureSource.override
+                )
+            }
+
 
             /**
              * block that handle recursion
