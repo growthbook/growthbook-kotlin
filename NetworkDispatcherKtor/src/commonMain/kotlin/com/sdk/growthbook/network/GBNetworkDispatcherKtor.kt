@@ -25,6 +25,10 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.utils.io.errors.IOException
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 internal fun createDefaultHttpClient(): HttpClient =
     HttpClient {
@@ -140,7 +144,14 @@ class GBNetworkDispatcherKtor(
                         println("body = $body")
                     }
                 }
-                onSuccess(response.body())
+                if (response.status.value in 200 .. 299) {
+                    onSuccess(response.body())
+                } else {
+                    onError(
+                        Exception(
+                            "Response not successful status code is : ${response.status.value} " +
+                                "and description : ${response.status.description}"))
+                }
             } catch (e: Exception) {
                 if (enableLogging) {
                     println("exception $e")
@@ -163,4 +174,35 @@ class GBNetworkDispatcherKtor(
             url.parameters.remove(key)
             url.parameters.append(key, it)
         } ?: Unit
+}
+
+internal fun Map<*, *>.toJsonElement(): JsonElement {
+    val map: MutableMap<String, JsonElement> = mutableMapOf()
+    this.forEach {
+        val key = it.key as? String ?: return@forEach
+        val value = it.value ?: return@forEach
+        map[key] = when (value) {
+            is Map<*, *> -> (value).toJsonElement()
+            is List<*> -> value.toJsonElement()
+            is Boolean -> JsonPrimitive(value)
+            is Number -> JsonPrimitive(value)
+            else -> JsonPrimitive(value.toString())
+        }
+    }
+    return JsonObject(map)
+}
+
+internal fun List<*>.toJsonElement(): JsonElement {
+    val list: MutableList<JsonElement> = mutableListOf()
+    this.forEach {
+        val value = it ?: return@forEach
+        when (value) {
+            is Map<*, *> -> list.add((value).toJsonElement())
+            is List<*> -> list.add(value.toJsonElement())
+            is Boolean -> list.add(JsonPrimitive(value))
+            is Number -> list.add(JsonPrimitive(value))
+            else -> list.add(JsonPrimitive(value.toString()))
+        }
+    }
+    return JsonArray(list)
 }
