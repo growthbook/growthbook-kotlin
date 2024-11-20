@@ -61,7 +61,7 @@ internal class GBExperimentEvaluator {
          * 4. If experiment.action is set to false, return immediately
          * (not in experiment, variationId 0)
          */
-        if (!(experiment.active)) {
+        if (experiment.active == false) {
             return getExperimentResult(
                 featureId = featureId,
                 experiment = experiment,

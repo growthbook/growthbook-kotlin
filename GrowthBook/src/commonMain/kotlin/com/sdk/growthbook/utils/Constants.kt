@@ -1,8 +1,8 @@
 package com.sdk.growthbook.utils
 
 import com.sdk.growthbook.model.GBExperiment
-import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeature
+import com.sdk.growthbook.model.GBFeatureResult
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -88,12 +88,22 @@ class GBError(error: Throwable?) {
     /**
      * Error Message for the caught error / exception
      */
-    val errorMessage: String = error?.message ?: ""
+    private lateinit var errorMessage: String
 
     /**
      * Error Stacktrace for the caught error / exception
      */
-    val stackTrace: String? = error?.stackTraceToString()
+    private lateinit var stackTrace: String
+
+    /**
+     * Constructor for initializing
+     */
+    init {
+        if (error != null) {
+            errorMessage = error.message ?: ""
+            stackTrace = error.stackTraceToString()
+        }
+    }
 }
 
 /**
@@ -167,7 +177,7 @@ data class GBTrackData(
     /**
      * result - ExperimentResult
      */
-    var result: GBExperimentResult
+    var result: GBFeatureResult
 )
 
 /**

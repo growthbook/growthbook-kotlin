@@ -424,8 +424,8 @@ internal class GBUtils {
 
             val (fallbackAttribute, fallbackValue) = getHashAttribute(
                 context = context,
-                attr = expFallBackAttribute,
-                fallback = null,
+                attr = null,
+                fallback = expFallBackAttribute,
                 attributeOverrides = attributeOverrides
             )
 

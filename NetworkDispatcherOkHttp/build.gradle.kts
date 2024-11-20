@@ -25,11 +25,12 @@ kotlin {
 
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
                 api("com.squareup.okhttp3:okhttp:$okhttpVersion")
                 implementation("com.squareup.okhttp3:okhttp-sse:$okhttpVersion")
 
                 implementation(project(":Core"))
+                implementation("io.ktor:ktor-serialization-kotlinx-json:2.1.2")
             }
         }
         val androidMain by getting {
@@ -59,10 +60,6 @@ android {
         debug {
             isMinifyEnabled = false
         }
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
     }
 }
 

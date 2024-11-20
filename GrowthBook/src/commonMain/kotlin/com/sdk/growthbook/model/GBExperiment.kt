@@ -16,7 +16,7 @@ import kotlinx.serialization.json.JsonObject
  */
 @Suppress("unused")
 @Serializable
-class GBExperiment(
+data class GBExperiment(
 
     /**
      * The globally unique tracking key for the experiment
@@ -46,7 +46,7 @@ class GBExperiment(
     /**
      * If set to false, always return the control (first variation)
      */
-    var active: Boolean = true,
+    var active: Boolean? = true,
 
     /**
      * What percent of users should be included in the experiment (between 0 and 1, inclusive)
