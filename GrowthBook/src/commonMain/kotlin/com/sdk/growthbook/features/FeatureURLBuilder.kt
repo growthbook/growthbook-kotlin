@@ -9,7 +9,7 @@ internal class FeatureURLBuilder {
          * Context Path for Fetching Feature Details - Web Service
          */
         private const val FEATURE_PATH = "api/features"
-        private const val EVENTS_PATH = "sub/"
+        private const val EVENTS_PATH = "sub"
         private const val REMOTE_FEATURE_PATH = "api/eval"
     }
 
