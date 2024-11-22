@@ -1,5 +1,3 @@
-import com.android.build.gradle.internal.utils.publishingFeatureOptIn
-import org.gradle.kotlin.dsl.support.kotlinCompilerOptions
 import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackOutput
 import org.jetbrains.kotlin.gradle.targets.js.yarn.yarn
 
