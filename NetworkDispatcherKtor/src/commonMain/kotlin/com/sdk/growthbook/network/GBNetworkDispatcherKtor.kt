@@ -49,11 +49,10 @@ class GBNetworkDispatcherKtor(
     /**
      * Ktor http client instance for sending request
      */
-    private val client: HttpClient = createDefaultHttpClient()
+    private val client: HttpClient = createDefaultHttpClient(),
 
+    private var enableLogging: Boolean = false,
 ) : NetworkDispatcher {
-
-    private var enableLogging = false
 
     /**
      * Function that execute API Call to fetch features
@@ -161,7 +160,7 @@ class GBNetworkDispatcherKtor(
         }
     }
 
-    override fun setLoggingEnabled(enabled: Boolean) {
+    fun setLoggingEnabled(enabled: Boolean) {
         enableLogging = enabled
     }
 

@@ -156,9 +156,7 @@ class GBSDKBuilder(
         return GrowthBookSDK(
             gbContext,
             refreshHandler,
-            networkDispatcher.apply {
-                setLoggingEnabled(enableLogging)
-            }
+            networkDispatcher,
         )
     }
 }

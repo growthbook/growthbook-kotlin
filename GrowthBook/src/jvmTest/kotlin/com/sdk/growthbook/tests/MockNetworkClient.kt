@@ -49,8 +49,6 @@ class MockNetworkClient(
             onError(ex)
         }
     }
-
-    override fun setLoggingEnabled(enabled: Boolean) = Unit
 }
 
 class MockResponse {
