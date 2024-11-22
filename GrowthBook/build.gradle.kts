@@ -1,14 +1,15 @@
+import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackOutput
+import org.jetbrains.kotlin.gradle.targets.js.yarn.yarn
+
 plugins {
     kotlin("multiplatform")
     id("com.android.library")
     kotlin("plugin.serialization")
-    id("maven-publish")
-    id("signing")
-    id("org.jetbrains.dokka") version "1.8.10"
+    id("org.jetbrains.dokka") version "1.9.10"
 }
 
 group = "io.growthbook.sdk"
-version = "1.1.62"
+version = "1.1.63"
 
 kotlin {
 
@@ -16,8 +17,21 @@ kotlin {
     val serializationVersion = "1.3.3"
     val kryptoVersion = "2.7.0"
 
-    android {
+    androidTarget {
         publishLibraryVariants("release")
+    }
+
+    js {
+        yarn.lockFileDirectory = file("kotlin-js-store")
+        browser {
+            commonWebpackConfig {
+                output = KotlinWebpackOutput(
+                    library = project.name,
+                    libraryTarget = KotlinWebpackOutput.Target.UMD,
+                    globalObject = KotlinWebpackOutput.Target.WINDOW
+                )
+            }
+        }
     }
 
     jvm {
@@ -38,7 +52,7 @@ kotlin {
                 implementation("com.ionspin.kotlin:bignum:0.3.3")
                 implementation("com.soywiz.korlibs.krypto:krypto:$kryptoVersion")
 
-                api("io.growthbook.sdk:Core:1.0.2")
+                api(project(":Core"))
                 api(
                     "org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion"
                 )
@@ -60,7 +74,7 @@ kotlin {
                 implementation("com.soywiz.korlibs.krypto:krypto-android:$kryptoVersion")
             }
         }
-        val androidTest by getting {
+        val androidUnitTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
                 implementation("junit:junit:4.13.2")
@@ -110,6 +124,10 @@ android {
                 "proguard-rules.pro"
             )
         }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
     }
 }
 
@@ -191,9 +209,5 @@ publishing {
  * Signing JAR using GPG Keys
  */
 signing {
-    useInMemoryPgpKeys(
-        System.getenv("GPG_PRIVATE_KEY"),
-        System.getenv("GPG_PRIVATE_PASSWORD")
-    )
     sign(publishing.publications)
 }

@@ -1,5 +1,6 @@
 package com.sdk.growthbook.model
 
+import com.sdk.growthbook.GBTrackingCallback
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.utils.GBStickyAssignmentsDocument
 import com.sdk.growthbook.utils.GBStickyAttributeKey
@@ -9,7 +10,7 @@ import com.sdk.growthbook.stickybucket.GBStickyBucketService
 /**
  * Defines the GrowthBook context.
  */
-class GBContext(
+data class GBContext(
 
     /**
      * Registered API Key for GrowthBook SDK
@@ -64,7 +65,7 @@ class GBContext(
     /**
      * A function that takes experiment and result as arguments.
      */
-    val trackingCallback: (GBExperiment, GBExperimentResult) -> Unit,
+    val trackingCallback: GBTrackingCallback,
 
     /**
      * A callback that will be invoked every time a feature is viewed. Listen for feature usage events
@@ -75,6 +76,11 @@ class GBContext(
      * Flag which defines whether to use Remote Evaluation
      */
     val remoteEval: Boolean = false,
+
+    /**
+     * If true, prints logging statements to stdout
+     */
+    val enableLogging: Boolean = false,
 
     var savedGroups: Map<String, Any>? = null
 ) {

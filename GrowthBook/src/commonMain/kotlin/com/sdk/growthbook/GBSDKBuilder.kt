@@ -16,6 +16,7 @@ import com.sdk.growthbook.utils.GBCacheRefreshHandler
  * EncryptionKey - Encryption key if you intend to use data encryption
  * Network Dispatcher - Network Dispatcher
  * Remote eval - Whether to use Remote Evaluation
+ * enableLogging - Prints logging statements to stdout
  */
 abstract class SDKBuilder(
     val apiKey: String,
@@ -25,6 +26,7 @@ abstract class SDKBuilder(
     val encryptionKey: String?,
     val networkDispatcher: NetworkDispatcher,
     val remoteEval: Boolean,
+    val enableLogging: Boolean,
 ) {
     internal var qaMode: Boolean = false
     internal var forcedVariations: Map<String, Int> = HashMap()
@@ -69,6 +71,7 @@ abstract class SDKBuilder(
  * EncryptionKey - Encryption key if you intend to use data encryption
  * Network Dispatcher - Network Dispatcher
  * Remote eval - Whether to use Remote Evaluation
+ * enableLogging - Prints logging statements to stdout
  */
 class GBSDKBuilder(
     apiKey: String,
@@ -78,9 +81,10 @@ class GBSDKBuilder(
     encryptionKey: String? = null,
     trackingCallback: GBTrackingCallback,
     remoteEval: Boolean = false,
+    enableLogging: Boolean = false,
 ) : SDKBuilder(
     apiKey, hostURL,
-    attributes, trackingCallback, encryptionKey, networkDispatcher, remoteEval
+    attributes, trackingCallback, encryptionKey, networkDispatcher, remoteEval, enableLogging
 ) {
 
     private var refreshHandler: GBCacheRefreshHandler? = null
@@ -145,13 +149,14 @@ class GBSDKBuilder(
             onFeatureUsage = featureUsageCallback,
             encryptionKey = encryptionKey,
             remoteEval = remoteEval,
+            enableLogging = enableLogging,
             stickyBucketService = stickyBucketService,
         )
 
         return GrowthBookSDK(
             gbContext,
             refreshHandler,
-            networkDispatcher
+            networkDispatcher,
         )
     }
 }

@@ -22,9 +22,9 @@ import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.utils.toHashMap
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonElement
 
-typealias GBTrackingCallback = (GBExperiment, GBExperimentResult) -> Unit
-typealias GBExperimentRunCallback = (GBExperiment, GBExperimentResult) -> Unit
+typealias GBTrackingCallback = (GBExperiment, GBExperimentResult?) -> Unit
 typealias GBFeatureUsageCallback = (featureKey: String, gbFeatureResult: GBFeatureResult) -> Unit
 
 /**
@@ -35,11 +35,10 @@ typealias GBFeatureUsageCallback = (featureKey: String, gbFeatureResult: GBFeatu
 class GrowthBookSDK() : FeaturesFlowDelegate {
 
     private var refreshHandler: GBCacheRefreshHandler? = null
-    private var subscriptions: MutableList<GBExperimentRunCallback> = mutableListOf()
     private lateinit var networkDispatcher: NetworkDispatcher
     private lateinit var featuresViewModel: FeaturesViewModel
     private var attributeOverrides: Map<String, Any> = emptyMap()
-    private var forcedFeatures: Map<String, Any> = emptyMap()
+    private var forcedFeatures: Map<String, JsonElement> = emptyMap()
     private var savedGroups: Map<String, Any>? = emptyMap()
 
     //@ThreadLocal
@@ -65,7 +64,10 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         this.featuresViewModel =
             FeaturesViewModel(
                 delegate = this,
-                dataSource = FeaturesDataSource(dispatcher = networkDispatcher),
+                dataSource = FeaturesDataSource(
+                    dispatcher = networkDispatcher,
+                    enableLogging = context.enableLogging,
+                ),
                 encryptionKey = gbContext.encryptionKey,
             )
         if (features != null) {
@@ -76,14 +78,6 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         this.attributeOverrides = gbContext.attributes
         this.savedGroups = savedGroups
         refreshStickyBucketService()
-    }
-
-    fun subscribe(callback: GBExperimentRunCallback) {
-        this.subscriptions.add(callback)
-    }
-
-    fun clearSubscriptions() {
-        this.subscriptions.clear()
     }
 
     fun setSavedGroups(savedGroups: Map<String, Any>) {
@@ -182,7 +176,8 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         return GBFeatureEvaluator().evaluateFeature(
             context = gbContext,
             featureKey = id,
-            attributeOverrides = attributeOverrides
+            attributeOverrides = attributeOverrides,
+            forcedFeature = this.forcedFeatures
         )
     }
 
@@ -198,23 +193,17 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
      * The run method takes an Experiment object and returns an ExperimentResult
      */
     fun run(experiment: GBExperiment): GBExperimentResult {
-        val result = GBExperimentEvaluator().evaluateExperiment(
+        return GBExperimentEvaluator().evaluateExperiment(
             context = gbContext,
             experiment = experiment,
             attributeOverrides = attributeOverrides
         )
-
-        this.subscriptions.forEach { subscription ->
-            subscription(experiment, result)
-        }
-
-        return result
     }
 
     /**
      * The setForcedFeatures method setup the Map of user's (forced) features
      */
-    fun setForcedFeatures(forcedFeatures: Map<String, Any>) {
+    fun setForcedFeatures(forcedFeatures: Map<String, JsonElement>) {
         this.forcedFeatures = forcedFeatures
     }
 

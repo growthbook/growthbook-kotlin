@@ -22,7 +22,7 @@ jobs:
     - name: Gradle clean
       run: ./gradlew clean --info
     - name: Build with Gradle
-      run: ./gradlew -Pversion=${{ env.LIB_VERSION }} build --info
+      run: ./gradlew -Pversion=${{ env.LIB_VERSION }} kotlinUpgradeYarnLock build --info
     - name: release
       uses: actions/create-release@v1
       id: create_release

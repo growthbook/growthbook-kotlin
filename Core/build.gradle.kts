@@ -1,18 +1,32 @@
+import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackOutput
+import org.jetbrains.kotlin.gradle.targets.js.yarn.yarn
+
 plugins {
     kotlin("multiplatform")
     id("com.android.library")
     kotlin("plugin.serialization")
-    id("maven-publish")
-    id("signing")
     id("org.jetbrains.dokka") version "1.8.10"
 }
 
 group = "io.growthbook.sdk"
-version = "1.0.2"
+version = "1.0.3"
 
 kotlin {
-    android {
+    androidTarget {
         publishLibraryVariants("release")
+    }
+
+    js {
+        yarn.lockFileDirectory = file("kotlin-js-store")
+        browser {
+            commonWebpackConfig {
+                output = KotlinWebpackOutput(
+                    library = project.name,
+                    libraryTarget = KotlinWebpackOutput.Target.UMD,
+                    globalObject = KotlinWebpackOutput.Target.WINDOW
+                )
+            }
+        }
     }
 
     jvm {
@@ -28,7 +42,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
             }
         }
     }
@@ -47,6 +61,10 @@ android {
         debug {
             isMinifyEnabled = false
         }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
     }
 }
 
@@ -128,9 +146,5 @@ publishing {
  * Signing JAR using GPG Keys
  */
 signing {
-    useInMemoryPgpKeys(
-        System.getenv("GPG_PRIVATE_KEY"),
-        System.getenv("GPG_PRIVATE_PASSWORD")
-    )
     sign(publishing.publications)
 }

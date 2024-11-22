@@ -11,7 +11,9 @@ import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBFeatureSource
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
+import com.sdk.growthbook.utils.OptionalProperty
 
 /**
  * Feature Evaluator Class
@@ -31,7 +33,8 @@ internal class GBFeatureEvaluator {
         evalContext: FeatureEvalContext = FeatureEvalContext(
             id = featureKey,
             evaluatedFeatures = mutableSetOf()
-        )
+        ),
+        forcedFeature: Map<String, JsonElement> = emptyMap()
     ): GBFeatureResult {
         /**
          * This callback serves for listening for feature usage events
@@ -41,9 +44,25 @@ internal class GBFeatureEvaluator {
         try {
 
             /**
+             * Global override
+             */
+            if (forcedFeature.containsKey(featureKey)) {
+                if (context.enableLogging) {
+                    println("Global override for forced feature with key: $featureKey and value ${forcedFeature[featureKey]}")
+                }
+                return prepareResult(
+                    value = forcedFeature[featureKey],
+                    source = GBFeatureSource.override
+                )
+            }
+
+
+            /**
              * block that handle recursion
              */
-            print("evaluateFeature: circular dependency detected:")
+            if (context.enableLogging) {
+                println("evaluateFeature: circular dependency detected:")
+            }
             if (evalContext.evaluatedFeatures.contains(featureKey)) {
                 val featureResultWhenCircularDependencyDetected = prepareResult(
                     value = null,
@@ -113,7 +132,9 @@ internal class GBFeatureEvaluator {
                                  * blocking prerequisite eval failed: feature evaluation fails
                                  */
                                 if (parentCondition.gate != false) {
-                                    println("Feature blocked by prerequisite")
+                                    if (context.enableLogging) {
+                                        println("Feature blocked by prerequisite")
+                                    }
                                     
                                     val featureResultWhenBlockedByPrerequisite = prepareResult(
                                         value = null,
@@ -156,7 +177,7 @@ internal class GBFeatureEvaluator {
                     /**
                      * Feature value is being forced
                      */
-                    if (rule.force != null) {
+                    if (rule.force is OptionalProperty.Present) {
 
                         /**
                          * If it's a conditional rule, skip if the condition doesn't pass
@@ -208,10 +229,10 @@ internal class GBFeatureEvaluator {
                             rule.tracks.forEach { track: GBTrackData ->
                                 if (!GBExperimentHelper().isTracked(
                                         experiment = track.experiment,
-                                        result = track.result
+                                        result = track.result.experimentResult
                                     )
                                 ) {
-                                    context.trackingCallback(track.experiment, track.result)
+                                    context.trackingCallback(track.experiment, track.result.experimentResult)
                                 }
                             }
                         }
@@ -235,7 +256,7 @@ internal class GBFeatureEvaluator {
                         }
                         val forcedFeatureResult =
                             prepareResult(
-                                value = rule.force,
+                                value = rule.force.value,
                                 source = GBFeatureSource.force
                             )
 
@@ -346,7 +367,7 @@ internal class GBFeatureEvaluator {
      * on and off, which are just the value cast to booleans.
      */
     private fun prepareResult(
-        value: Any?,
+        value: JsonElement?,
         source: GBFeatureSource,
         experiment: GBExperiment? = null,
         experimentResult: GBExperimentResult? = null
@@ -357,7 +378,7 @@ internal class GBFeatureEvaluator {
 
 
         return GBFeatureResult(
-            value = GBUtils.convertToPrimitiveIfPossible(value),
+            value = value,
             on = !isFalse,
             off = isFalse,
             source = source,

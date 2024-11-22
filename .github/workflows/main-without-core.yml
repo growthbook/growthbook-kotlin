@@ -23,7 +23,7 @@ jobs:
     - name: Gradle clean
       run: ./gradlew clean --info
     - name: Build with Gradle
-      run: ./gradlew :DefaultNetworkDispatcher:build :GrowthBook:build --info
+      run: ./gradlew kotlinUpgradeYarnLock :DefaultNetworkDispatcher:build :GrowthBook:build --info
 #    - name: release
 #      uses: actions/create-release@v1
 #      id: create_release

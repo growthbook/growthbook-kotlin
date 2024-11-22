@@ -1,13 +1,11 @@
 plugins {
     kotlin("multiplatform")
     id("com.android.library")
-    id("maven-publish")
-    id("signing")
-    id("org.jetbrains.dokka") version "1.8.10"
+    id("org.jetbrains.dokka") version "1.9.10"
 }
 
 group = "io.growthbook.sdk"
-version = "1.0.1"
+version = "1.0.2"
 
 kotlin {
     android {
@@ -25,11 +23,12 @@ kotlin {
 
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
                 api("com.squareup.okhttp3:okhttp:$okhttpVersion")
                 implementation("com.squareup.okhttp3:okhttp-sse:$okhttpVersion")
 
-                implementation("io.growthbook.sdk:Core:1.0.1")
+                implementation(project(":Core"))
+                implementation("io.ktor:ktor-serialization-kotlinx-json:2.1.2")
             }
         }
         val androidMain by getting {
@@ -37,7 +36,7 @@ kotlin {
                 implementation("com.squareup.okhttp3:okhttp:$okhttpVersion")
             }
         }
-        val androidTest by getting {
+        val androidUnitTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
                 // implementation("com.squareup.okhttp3:mockwebserver:$okhttpVersion")
@@ -140,9 +139,5 @@ publishing {
  * Signing JAR using GPG Keys
  */
 signing {
-    useInMemoryPgpKeys(
-        System.getenv("GPG_PRIVATE_KEY"),
-        System.getenv("GPG_PRIVATE_PASSWORD")
-    )
     sign(publishing.publications)
 }

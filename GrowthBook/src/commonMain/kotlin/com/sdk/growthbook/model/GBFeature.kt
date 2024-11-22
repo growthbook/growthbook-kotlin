@@ -6,6 +6,8 @@ import com.sdk.growthbook.utils.GBFilter
 import com.sdk.growthbook.utils.GBTrackData
 import com.sdk.growthbook.utils.GBVariationMeta
 import com.sdk.growthbook.utils.GBParentConditionInterface
+import com.sdk.growthbook.utils.OptionalProperty
+import com.sdk.growthbook.utils.OptionalPropertySerializer
 import com.sdk.growthbook.utils.RangeSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
@@ -15,7 +17,7 @@ import kotlinx.serialization.json.JsonElement
  * A Feature object consists of possible values plus rules for how to assign values to users.
  */
 @Serializable
-class GBFeature(
+data class GBFeature(
 
     /**
      * The default value (should use null if not specified)
@@ -32,7 +34,7 @@ class GBFeature(
  * Rule object consists of various definitions to apply to calculate feature value
  */
 @Serializable
-class GBFeatureRule(
+data class GBFeatureRule(
     /**
      * Unique feature rule id
      */
@@ -57,8 +59,8 @@ class GBFeatureRule(
     /**
      * Immediately force a specific value (ignore every other option besides condition and coverage)
      */
-    val force: JsonElement? = null,
-
+    @Serializable(with = OptionalPropertySerializer::class)
+    val force: OptionalProperty<JsonElement?> = OptionalProperty.NotPresent,
     /**
      * Run an experiment (A/B test) and randomly choose between these variations
      */
@@ -189,18 +191,24 @@ enum class GBFeatureSource {
     /**
      * Prerequisite Value for the Feature is being processed
      */
-    prerequisite
+    prerequisite,
+
+    /**
+     * Override value for the Feature is being processed
+     */
+    override
 }
 
 /**
  * Result for Feature
  */
-class GBFeatureResult(
+@Serializable
+data class GBFeatureResult(
 
     /**
      * The assigned value of the feature
      */
-    val value: Any?,
+    val value: JsonElement?,
 
     /**
      * The assigned value cast to a boolean
@@ -210,7 +218,7 @@ class GBFeatureResult(
     /**
      * The assigned value cast to a boolean and then negated
      */
-    val off: Boolean = true,
+    val off: Boolean = !on,
 
     /**
      * One of "unknownFeature", "defaultValue", "force", "experiment",

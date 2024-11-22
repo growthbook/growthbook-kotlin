@@ -9,6 +9,7 @@ import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeatureSource
 import com.sdk.growthbook.stickybucket.GBStickyBucketServiceImp
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -34,7 +35,7 @@ class GrowthBookSDKBuilderTests {
             testHostURL,
             attributes = testAttributes,
             encryptionKey = null,
-            trackingCallback = { _: GBExperiment, _: GBExperimentResult -> },
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
             networkDispatcher = MockNetworkClient(null, null),
             remoteEval = false
         ).initialize()
@@ -56,7 +57,7 @@ class GrowthBookSDKBuilderTests {
             testHostURL,
             attributes = testAttributes,
             encryptionKey = null,
-            trackingCallback = { _: GBExperiment, _: GBExperimentResult -> },
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
             networkDispatcher = MockNetworkClient(null, null),
             remoteEval = false
         ).setRefreshHandler { isRefreshed, gbError ->
@@ -80,7 +81,7 @@ class GrowthBookSDKBuilderTests {
             testHostURL,
             attributes = testAttributes,
             encryptionKey = null,
-            trackingCallback = { _: GBExperiment, _: GBExperimentResult -> },
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = false
         ).setRefreshHandler { isRefreshed, gbError ->
@@ -105,7 +106,7 @@ class GrowthBookSDKBuilderTests {
             testHostURL,
             attributes = testAttributes,
             encryptionKey = null,
-            trackingCallback = { _: GBExperiment, _: GBExperimentResult -> },
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = false
         ).setRefreshHandler { _, gbError ->
@@ -133,7 +134,7 @@ class GrowthBookSDKBuilderTests {
             testHostURL,
             encryptionKey = null,
             attributes = testAttributes,
-            trackingCallback = { _: GBExperiment, _: GBExperimentResult -> },
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = false
         ).setRefreshHandler { _, gbError ->
@@ -154,7 +155,7 @@ class GrowthBookSDKBuilderTests {
             testHostURL,
             attributes = testAttributes,
             encryptionKey = null,
-            trackingCallback = { _: GBExperiment, _: GBExperimentResult -> },
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = false
         ).setRefreshHandler { isRefreshed, gbError ->
@@ -189,7 +190,7 @@ class GrowthBookSDKBuilderTests {
             testHostURL,
             attributes = testAttributes,
             encryptionKey = null,
-            trackingCallback = { _: GBExperiment, _: GBExperimentResult -> },
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = false
         ).setPrefixForStickyBucketCachedDirectory(
@@ -207,7 +208,7 @@ class GrowthBookSDKBuilderTests {
             testHostURL,
             attributes = testAttributes,
             encryptionKey = null,
-            trackingCallback = { _: GBExperiment, _: GBExperimentResult -> },
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = false
         ).setStickyBucketService()
@@ -225,7 +226,7 @@ class GrowthBookSDKBuilderTests {
             testHostURL,
             attributes = testAttributes,
             encryptionKey = null,
-            trackingCallback = { _: GBExperiment, _: GBExperimentResult -> },
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = false
         ).setForcedVariations(expectedForcedVariation)
@@ -245,14 +246,12 @@ class GrowthBookSDKBuilderTests {
             testHostURL,
             attributes = testAttributes,
             encryptionKey = null,
-            trackingCallback = { _: GBExperiment, _: GBExperimentResult -> },
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = true
         ).setForcedVariations(expectedForcedVariation)
             .initialize()
-        sdkInstance.setForcedFeatures(mapOf("featureForce" to 112))
-
-        sdkInstance
+        sdkInstance.setForcedFeatures(mapOf("featureForce" to JsonPrimitive(112)))
 
         val actualForcedVariation = sdkInstance.getGBContext().forcedVariations
 
@@ -269,7 +268,7 @@ class GrowthBookSDKBuilderTests {
             testHostURL,
             attributes = expectedAttributes,
             encryptionKey = null,
-            trackingCallback = { _: GBExperiment, _: GBExperimentResult -> },
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = false
         )
@@ -291,7 +290,7 @@ class GrowthBookSDKBuilderTests {
             testHostURL,
             attributes = expectedAttributes,
             encryptionKey = null,
-            trackingCallback = { _: GBExperiment, _: GBExperimentResult -> },
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = true
         ).setStickyBucketService(GBStickyBucketServiceImp())
