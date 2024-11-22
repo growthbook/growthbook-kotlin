@@ -5,8 +5,6 @@ plugins {
     kotlin("multiplatform")
     id("com.android.library")
     kotlin("plugin.serialization")
-    id("maven-publish")
-    id("signing")
     id("org.jetbrains.dokka") version "1.9.10"
 }
 
@@ -211,9 +209,5 @@ publishing {
  * Signing JAR using GPG Keys
  */
 signing {
-    useInMemoryPgpKeys(
-        System.getenv("GPG_PRIVATE_KEY"),
-        System.getenv("GPG_PRIVATE_PASSWORD")
-    )
     sign(publishing.publications)
 }
