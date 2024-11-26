@@ -718,7 +718,7 @@ class GBStickyBucketServiceImp(
 
 ## Changelog
 - v1.1.63 2024-11-26
-    - the type of `value` field of `GBFeatureResult` class was changed to `kotlinx.serialization.json.JsonElement`;
+    - The type of `value` field of `GBFeatureResult` class was changed to `kotlinx.serialization.json.JsonElement`
 
 ## License
 
