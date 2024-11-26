@@ -715,6 +715,11 @@ class GBStickyBucketServiceImp(
     }
 }
 ```
+
+## Changelog
+- v1.1.63 2024-11-26
+    - the type of `value` field of `GBFeatureResult` class was changed to `kotlinx.serialization.json.JsonElement`;
+
 ## License
 
 This project uses the MIT license. The core GrowthBook app will always remain open and free, although we may add some
