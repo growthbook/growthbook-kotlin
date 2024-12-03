@@ -88,22 +88,12 @@ class GBError(error: Throwable?) {
     /**
      * Error Message for the caught error / exception
      */
-    private lateinit var errorMessage: String
+    val errorMessage: String = error?.message ?: ""
 
     /**
      * Error Stacktrace for the caught error / exception
      */
-    private lateinit var stackTrace: String
-
-    /**
-     * Constructor for initializing
-     */
-    init {
-        if (error != null) {
-            errorMessage = error.message ?: ""
-            stackTrace = error.stackTraceToString()
-        }
-    }
+    val stackTrace: String? = error?.stackTraceToString()
 }
 
 /**
@@ -319,7 +309,7 @@ object RangeSerializer {
  * Wrapper for deserialized model with optional field
  */
 sealed class OptionalProperty<out T> {
-    object NotPresent : OptionalProperty<Nothing>()
+    data object NotPresent : OptionalProperty<Nothing>()
     data class Present<T>(val value: T) : OptionalProperty<T>()
 }
 

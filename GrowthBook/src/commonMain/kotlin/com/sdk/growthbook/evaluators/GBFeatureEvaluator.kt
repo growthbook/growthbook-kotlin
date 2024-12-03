@@ -232,7 +232,9 @@ internal class GBFeatureEvaluator {
                                         result = track.result.experimentResult
                                     )
                                 ) {
-                                    context.trackingCallback(track.experiment, track.result.experimentResult)
+                                    track.result.experimentResult?.let {
+                                        context.trackingCallback(track.experiment, it)
+                                    }
                                 }
                             }
                         }
