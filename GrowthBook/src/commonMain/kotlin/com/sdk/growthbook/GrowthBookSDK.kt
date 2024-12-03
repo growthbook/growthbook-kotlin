@@ -79,7 +79,6 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         } else {
             refreshCache()
         }
-        this.attributeOverrides = gbContext.attributes
         this.savedGroups = savedGroups
         refreshStickyBucketService()
     }
