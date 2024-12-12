@@ -83,10 +83,6 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         refreshStickyBucketService()
     }
 
-    fun setSavedGroups(savedGroups: Map<String, Any>) {
-        gbContext.savedGroups = savedGroups
-    }
-
     /**
      * Manually Refresh Cache
      */
