@@ -1,5 +1,7 @@
 package com.sdk.growthbook.model
 
+import com.sdk.growthbook.serializable_model.SerializableGBFeature
+import com.sdk.growthbook.serializable_model.SerializableGBFeatureRule
 import com.sdk.growthbook.utils.GBBucketRange
 import com.sdk.growthbook.utils.GBCondition
 import com.sdk.growthbook.utils.GBFilter
@@ -7,33 +9,98 @@ import com.sdk.growthbook.utils.GBTrackData
 import com.sdk.growthbook.utils.GBVariationMeta
 import com.sdk.growthbook.utils.GBParentConditionInterface
 import com.sdk.growthbook.utils.OptionalProperty
-import com.sdk.growthbook.utils.OptionalPropertySerializer
 import com.sdk.growthbook.utils.RangeSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.double
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.float
+import kotlinx.serialization.json.floatOrNull
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.long
+import kotlinx.serialization.json.longOrNull
+
+data class GBBoolean(val value: Boolean): GBValue()
+data class GBString(val value: String): GBValue()
+data class GBNumber(val value: Number): GBValue()
+data class GBJson(val value: JsonObject): GBValue()
+
+sealed class GBValue {
+    data object Unknown: GBValue()
+
+    internal fun gbSerialize(): JsonElement =
+        when(this) {
+            is GBBoolean -> JsonPrimitive(this.value)
+            is GBString -> JsonPrimitive(this.value)
+            is GBNumber -> JsonPrimitive(this.value)
+            is GBJson -> this.value
+            is Unknown -> JsonNull
+        }
+
+    companion object {
+        internal fun from(anyObj: Any): GBValue =
+            when(anyObj) {
+                is Boolean -> GBBoolean(anyObj)
+                is String -> GBString(anyObj)
+                is Number -> GBNumber(anyObj)
+                else -> Unknown
+            }
+
+        internal fun from(jsonElement: JsonElement): GBValue =
+            when(jsonElement) {
+                is JsonPrimitive -> {
+                    when {
+                        jsonElement.isString -> GBString(jsonElement.content)
+                        jsonElement.intOrNull != null -> GBNumber(jsonElement.int)
+                        jsonElement.longOrNull != null -> GBNumber(jsonElement.long)
+                        jsonElement.floatOrNull != null -> GBNumber(jsonElement.float)
+                        jsonElement.doubleOrNull != null -> GBNumber(jsonElement.double)
+                        jsonElement.booleanOrNull != null -> GBBoolean(jsonElement.boolean)
+                        else -> GBValue.Unknown
+                    }
+                }
+                is JsonObject -> GBJson(jsonElement)
+                else -> GBValue.Unknown
+            }
+    }
+}
 
 /**
  * A Feature object consists of possible values plus rules for how to assign values to users.
  */
-@Serializable
 data class GBFeature(
 
     /**
      * The default value (should use null if not specified)
      */
-    val defaultValue: JsonElement? = null,
+    internal val defaultValue: GBValue? = null,
 
     /**
      * Array of Rule objects that determine when and how the defaultValue gets overridden
      */
     val rules: List<GBFeatureRule>? = null
-)
+) {
+    companion object {
+
+    }
+}
+
+internal fun GBFeature.gbSerialize() =
+    SerializableGBFeature(
+        defaultValue = defaultValue?.gbSerialize(),
+        rules = rules?.map { it.gbSerialize() },
+    )
 
 /**
  * Rule object consists of various definitions to apply to calculate feature value
  */
-@Serializable
 data class GBFeatureRule(
     /**
      * Unique feature rule id
@@ -59,8 +126,7 @@ data class GBFeatureRule(
     /**
      * Immediately force a specific value (ignore every other option besides condition and coverage)
      */
-    @Serializable(with = OptionalPropertySerializer::class)
-    val force: OptionalProperty<JsonElement?> = OptionalProperty.NotPresent,
+    val force: GBValue? = null,
     /**
      * Run an experiment (A/B test) and randomly choose between these variations
      */
@@ -156,7 +222,35 @@ data class GBFeatureRule(
      * Array of tracking calls to fire
      */
     val tracks: ArrayList<GBTrackData>? = null
-)
+) {
+    internal fun gbSerialize() =
+        SerializableGBFeatureRule(
+            id = id,
+            condition = condition,
+            parentConditions = parentConditions,
+            coverage = coverage,
+            force = if (force == null) OptionalProperty.NotPresent
+            else OptionalProperty.Present(force.gbSerialize()),
+            variations = variations,
+            key = key,
+            weights = weights,
+            namespace = namespace,
+            hashAttribute = hashAttribute,
+            hashVersion = hashVersion,
+            range = range,
+            ranges = ranges,
+            meta = meta,
+            filters = filters,
+            seed = seed,
+            name = name,
+            phase = phase,
+            fallbackAttribute = fallbackAttribute,
+            disableStickyBucketing = disableStickyBucketing,
+            bucketVersion = bucketVersion,
+            minBucketVersion = minBucketVersion,
+            tracks = tracks,
+        )
+}
 
 /**
  * Enum For defining feature value source
@@ -202,13 +296,12 @@ enum class GBFeatureSource {
 /**
  * Result for Feature
  */
-@Serializable
-data class GBFeatureResult(
+data class GBFeatureResult<T>(
 
     /**
      * The assigned value of the feature
      */
-    val value: JsonElement?,
+    val value: T?,
 
     /**
      * The assigned value cast to a boolean

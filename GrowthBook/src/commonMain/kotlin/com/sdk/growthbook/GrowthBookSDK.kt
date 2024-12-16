@@ -22,10 +22,9 @@ import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.utils.toHashMap
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonElement
 
 typealias GBTrackingCallback = (GBExperiment, GBExperimentResult) -> Unit
-typealias GBFeatureUsageCallback = (featureKey: String, gbFeatureResult: GBFeatureResult) -> Unit
+typealias GBFeatureUsageCallback = (featureKey: String, gbFeatureResult: GBFeatureResult<Any>) -> Unit
 typealias GBExperimentRunCallback = (GBExperiment, GBExperimentResult) -> Unit
 
 /**
@@ -39,7 +38,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     private lateinit var networkDispatcher: NetworkDispatcher
     private lateinit var featuresViewModel: FeaturesViewModel
     private var attributeOverrides: Map<String, Any> = emptyMap()
-    private var forcedFeatures: Map<String, JsonElement> = emptyMap()
+    private var forcedFeatures: Map<String, Any> = emptyMap()
     private var savedGroups: Map<String, Any>? = emptyMap()
     private var assigned: MutableMap<String, Pair<GBExperiment, GBExperimentResult>> =
         mutableMapOf()
@@ -175,12 +174,11 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
      * The feature method takes a single string argument,
      * which is the unique identifier for the feature and returns a FeatureResult object.
      */
-    fun feature(id: String): GBFeatureResult {
-        return GBFeatureEvaluator().evaluateFeature(
-            context = gbContext,
+    fun <V>feature(id: String): GBFeatureResult<V> {
+        val evaluator = GBFeatureEvaluator(gbContext, this.forcedFeatures)
+        return evaluator.evaluateFeature(
             featureKey = id,
             attributeOverrides = attributeOverrides,
-            forcedFeature = this.forcedFeatures
         )
     }
 
@@ -189,7 +187,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
      * which is the unique identifier for the feature and returns the feature state on/off
      */
     fun isOn(featureId: String): Boolean {
-        return feature(id = featureId).on
+        return feature<Any>(id = featureId).on
     }
 
     /**
@@ -209,7 +207,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     /**
      * The setForcedFeatures method setup the Map of user's (forced) features
      */
-    fun setForcedFeatures(forcedFeatures: Map<String, JsonElement>) {
+    fun setForcedFeatures(forcedFeatures: Map<String, Any>) {
         this.forcedFeatures = forcedFeatures
     }
 

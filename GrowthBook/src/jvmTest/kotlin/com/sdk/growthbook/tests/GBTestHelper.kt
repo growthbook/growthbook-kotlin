@@ -2,6 +2,7 @@ package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.model.GBExperiment
+import com.sdk.growthbook.serializable_model.SerializableGBFeature
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -81,11 +82,13 @@ class GBTestHelper {
     }
 }
 
+typealias SerializableFeatures = Map<String, SerializableGBFeature>
+
 @Serializable
 class GBContextTest(
     val attributes: JsonElement = JsonObject(HashMap()),
     val savedGroups: JsonElement = JsonObject(HashMap()),
-    val features: GBFeatures = emptyMap(),
+    val features: SerializableFeatures = emptyMap(),
     val qaMode: Boolean = false,
     val enabled: Boolean = true,
     val forcedVariations: HashMap<String, Int>? = null
@@ -93,7 +96,7 @@ class GBContextTest(
 
 @Serializable
 class GBFeaturesTest(
-    val features: GBFeatures? = null,
+    val features: SerializableFeatures? = null,
     val savedGroups: JsonElement? = null,
     val attributes: JsonElement = JsonObject(HashMap()),
     val forcedVariations: JsonObject? = null,
