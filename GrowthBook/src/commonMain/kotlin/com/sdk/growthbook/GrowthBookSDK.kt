@@ -24,8 +24,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonElement
 
-typealias GBTrackingCallback = (GBExperiment, GBExperimentResult?) -> Unit
+typealias GBTrackingCallback = (GBExperiment, GBExperimentResult) -> Unit
 typealias GBFeatureUsageCallback = (featureKey: String, gbFeatureResult: GBFeatureResult) -> Unit
+typealias GBExperimentRunCallback = (GBExperiment, GBExperimentResult) -> Unit
 
 /**
  * The main export of the libraries is a simple GrowthBook wrapper class
@@ -40,6 +41,9 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     private var attributeOverrides: Map<String, Any> = emptyMap()
     private var forcedFeatures: Map<String, JsonElement> = emptyMap()
     private var savedGroups: Map<String, Any>? = emptyMap()
+    private var assigned: MutableMap<String, Pair<GBExperiment, GBExperimentResult>> =
+        mutableMapOf()
+    private var subscriptions: MutableList<GBExperimentRunCallback> = mutableListOf()
 
     //@ThreadLocal
     internal companion object {
@@ -75,7 +79,6 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         } else {
             refreshCache()
         }
-        this.attributeOverrides = gbContext.attributes
         this.savedGroups = savedGroups
         refreshStickyBucketService()
     }
@@ -193,11 +196,14 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
      * The run method takes an Experiment object and returns an ExperimentResult
      */
     fun run(experiment: GBExperiment): GBExperimentResult {
-        return GBExperimentEvaluator().evaluateExperiment(
+        val result = GBExperimentEvaluator().evaluateExperiment(
             context = gbContext,
             experiment = experiment,
             attributeOverrides = attributeOverrides
         )
+
+        fireSubscriptions(experiment, result)
+        return result
     }
 
     /**
@@ -282,5 +288,26 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
             gbContext.forcedVariations
         )
         featuresViewModel.fetchFeatures(gbContext.remoteEval, payload)
+    }
+
+    private fun fireSubscriptions(experiment: GBExperiment, experimentResult: GBExperimentResult) {
+        val key = experiment.key
+        // If assigned variation has changed, fire subscriptions
+        val prevAssignedExperiment = this.assigned[key]
+        if (prevAssignedExperiment == null
+            || prevAssignedExperiment.second.inExperiment != experimentResult.inExperiment
+            || prevAssignedExperiment.second.variationId != experimentResult.variationId
+        ) {
+            this.assigned[key] = experiment to experimentResult
+        }
+        for (callback in subscriptions) {
+            try {
+                callback.invoke(experiment, experimentResult)
+            } catch (e: Exception) {
+                if (gbContext.enableLogging) {
+                    println("Error while run subscriptions: " + e.message)
+                }
+            }
+        }
     }
 }
