@@ -1,11 +1,12 @@
 package com.sdk.growthbook.tests
 
-import com.sdk.growthbook.network.NetworkDispatcher
-import com.sdk.growthbook.utils.Resource
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
+import com.sdk.growthbook.utils.Resource
+import com.sdk.growthbook.network.NetworkDispatcher
 
-class MockNetworkClient(
+open class MockNetworkClient(
     private val successResponse: String?,
     private val error: Throwable?
 ) : NetworkDispatcher {
@@ -30,7 +31,7 @@ class MockNetworkClient(
     }
 
     override fun consumeSSEConnection(url: String): Flow<Resource<String>> {
-        TODO("Not yet implemented")
+        return emptyFlow()
     }
 
     override fun consumePOSTRequest(
