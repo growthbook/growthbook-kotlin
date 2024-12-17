@@ -9,7 +9,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.coroutines.CoroutineScope
 import com.sdk.growthbook.PlatformDependentIODispatcher
 import kotlinx.coroutines.launch
-import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.prepareGet
 import io.ktor.client.call.body
@@ -24,6 +23,9 @@ import kotlinx.coroutines.channels.awaitClose
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.request.setBody
+import io.ktor.http.HttpStatusCode
+import io.ktor.utils.io.core.use
 import io.ktor.utils.io.errors.IOException
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -63,21 +65,27 @@ class GBNetworkDispatcherKtor(
         onError: (Throwable) -> Unit
     ): Job =
         CoroutineScope(PlatformDependentIODispatcher).launch {
-            try {
-                val result = client.get(request)
+            client.use {
                 try {
-                    onSuccess(result.body())
-                } catch (exception: Exception) {
+                    val result = prepareGetRequest(request).execute()
+                    try {
+                        if (result.status == HttpStatusCode.OK) {
+                            onSuccess(result.body())
+                        } else {
+                            onError(Exception("Response status in not ok: Response is: ${result.body<String>()}"))
+                        }
+                    } catch (exception: Exception) {
+                        onError(exception)
+                    }
+                } catch (clientRequestException: ClientRequestException) {
+                    onError(clientRequestException)
+                } catch (serverResponseException: ServerResponseException) {
+                    onError(serverResponseException)
+                } catch (ioException: IOException) {
+                    onError(ioException)
+                } catch (exception: Exception) { // for the case if something was missed
                     onError(exception)
                 }
-            } catch (clientRequestException: ClientRequestException) {
-                onError(clientRequestException)
-            } catch (serverResponseException: ServerResponseException) {
-                onError(serverResponseException)
-            } catch (ioException: IOException) {
-                onError(ioException)
-            } catch (exception: Exception) { // for the case if something was missed
-                onError(exception)
             }
         }
 
@@ -131,31 +139,35 @@ class GBNetworkDispatcherKtor(
         onError: (Throwable) -> Unit
     ) {
         CoroutineScope(PlatformDependentIODispatcher).launch {
-            try {
-                val response = client.post(url) {
-                    headers {
-                        append("Content-Type", "application/json")
-                        append("Accept", "application/json")
+            client.use { okHttpClient ->
+                try {
+                    val response = okHttpClient.post(url) {
+                        headers {
+                            append("Content-Type", "application/json")
+                            append("Accept", "application/json")
+                        }
+                        contentType(ContentType.Application.Json)
+                        setBody(bodyParams.toJsonElement())
+                        if (enableLogging) {
+                            println("body = $body")
+                        }
                     }
-                    contentType(ContentType.Application.Json)
-                    //setBody(bodyParams.toJsonElement())
+                    if (response.status.value in 200..299) {
+                        onSuccess(response.body())
+                    } else {
+                        onError(
+                            Exception(
+                                "Response not successful status code is : ${response.status.value} " +
+                                    "and description : ${response.status.description}"
+                            )
+                        )
+                    }
+                } catch (e: Exception) {
                     if (enableLogging) {
-                        println("body = $body")
+                        println("exception $e")
                     }
+                    onError(e)
                 }
-                if (response.status.value in 200 .. 299) {
-                    onSuccess(response.body())
-                } else {
-                    onError(
-                        Exception(
-                            "Response not successful status code is : ${response.status.value} " +
-                                "and description : ${response.status.description}"))
-                }
-            } catch (e: Exception) {
-                if (enableLogging) {
-                    println("exception $e")
-                }
-                onError(e)
             }
         }
     }
