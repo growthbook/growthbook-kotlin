@@ -58,9 +58,8 @@ class GBFeatureValueTests {
                     gbContext.savedGroups = testData.savedGroups.jsonObject
                 }
 
-                val evaluator = GBFeatureEvaluator()
-                val result = evaluator.evaluateFeature(
-                    context = gbContext,
+                val evaluator = GBFeatureEvaluator(gbContext)
+                val result = evaluator.evaluateFeature<Any>(
                     featureKey = item[2].jsonPrimitive.content,
                     attributeOverrides = attributes
                 )
@@ -134,7 +133,7 @@ class GBFeatureValueTests {
 
         for (item in evalConditions) {
             if (item is JsonArray) {
-                sdk.feature(id = item[2].jsonPrimitive.content)
+                sdk.feature<Any>(id = item[2].jsonPrimitive.content)
                 break
             }
         }
@@ -178,9 +177,8 @@ class GBFeatureValueTests {
                     gbContext.forcedVariations = testData.forcedVariations.toHashMap()
                 }
 
-                val evaluator = GBFeatureEvaluator()
-                evaluator.evaluateFeature(
-                    context = gbContext,
+                val evaluator = GBFeatureEvaluator(gbContext)
+                evaluator.evaluateFeature<Any>(
                     featureKey = item[2].jsonPrimitive.content,
                     attributeOverrides = attributes
                 )

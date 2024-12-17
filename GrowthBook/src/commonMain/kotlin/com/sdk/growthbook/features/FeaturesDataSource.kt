@@ -2,6 +2,8 @@ package com.sdk.growthbook.features
 
 import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.network.NetworkDispatcher
+import com.sdk.growthbook.serializable_model.SerializableFeaturesDataModel
+import com.sdk.growthbook.serializable_model.gbDeserialize
 import com.sdk.growthbook.utils.FeatureRefreshStrategy
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.utils.GBRemoteEvalParams
@@ -43,10 +45,10 @@ internal class FeaturesDataSource(
         dispatcher.consumeGETRequest(request = getEndpoint(),
             onSuccess = { rawContent ->
                 val result = jsonParser.decodeFromString(
-                    deserializer = FeaturesDataModel.serializer(),
+                    deserializer = SerializableFeaturesDataModel.serializer(),
                     string = rawContent
                 )
-                result.also(success)
+                success.invoke(result.gbDeserialize())
             },
             onError = { apiTimeError ->
                 apiTimeError.also(failure)
@@ -105,10 +107,14 @@ internal class FeaturesDataSource(
             bodyParams = payload,
             onSuccess = { rawContent ->
                 val featureDataModel = jsonParser.decodeFromString(
-                    deserializer = FeaturesDataModel.serializer(),
+                    deserializer = SerializableFeaturesDataModel.serializer(),
                     string = rawContent
                 )
-                Resource.Success(featureDataModel).also(success)
+                success.invoke(
+                    Resource.Success(
+                        featureDataModel.gbDeserialize()
+                    )
+                )
             },
             onError = { error ->
                 Resource.Error(Exception(error.message)).also(failure)

@@ -1,8 +1,8 @@
 package com.sdk.growthbook.utils
 
 import com.sdk.growthbook.model.GBExperiment
+import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeature
-import com.sdk.growthbook.model.GBFeatureResult
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -41,7 +41,7 @@ internal class Constants {
 /**
  * Type Alias for Feature in GrowthBook
  */
-internal typealias GBFeatures = Map<String, GBFeature>
+typealias GBFeatures = Map<String, GBFeature>
 
 /**
  * Type Alias for Condition Element in GrowthBook Rules
@@ -167,7 +167,7 @@ data class GBTrackData(
     /**
      * result - ExperimentResult
      */
-    var result: GBFeatureResult
+    var result: GBExperimentResult
 )
 
 /**

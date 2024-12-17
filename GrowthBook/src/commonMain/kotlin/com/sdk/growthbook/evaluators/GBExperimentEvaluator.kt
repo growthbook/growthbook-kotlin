@@ -197,11 +197,11 @@ internal class GBExperimentEvaluator {
              */
             if (experiment.parentConditions != null) {
                 for (parentCondition in experiment.parentConditions) {
-                    val parentResult = GBFeatureEvaluator().evaluateFeature(
-                        context = context,
-                        featureKey = parentCondition.id,
-                        attributeOverrides = parentCondition.condition.jsonObject.toMap()
-                    )
+                    val parentResult = GBFeatureEvaluator(context)
+                        .evaluateFeature<Any>(
+                            featureKey = parentCondition.id,
+                            attributeOverrides = parentCondition.condition.jsonObject.toMap()
+                        )
                     if (parentResult.source == GBFeatureSource.cyclicPrerequisite) {
                         return getExperimentResult(
                             featureId = featureId,

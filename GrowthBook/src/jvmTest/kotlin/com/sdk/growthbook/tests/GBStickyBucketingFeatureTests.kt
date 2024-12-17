@@ -96,9 +96,8 @@ class GBStickyBucketingFeatureTests {
                         Json.decodeFromJsonElement(GBStickyAssignmentsDocument.serializer(), doc.value)
                 }
 
-                val evaluator = GBFeatureEvaluator()
-                val actualExperimentResult = evaluator.evaluateFeature(
-                    context = gbContext,
+                val evaluator = GBFeatureEvaluator(gbContext)
+                val actualExperimentResult = evaluator.evaluateFeature<Any>(
                     featureKey = item[3].jsonPrimitive.content,
                     attributeOverrides = attributes
                 ).experimentResult
