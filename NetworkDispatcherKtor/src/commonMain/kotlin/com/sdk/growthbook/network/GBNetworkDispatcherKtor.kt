@@ -147,7 +147,7 @@ class GBNetworkDispatcherKtor(
                             append("Accept", "application/json")
                         }
                         contentType(ContentType.Application.Json)
-                        setBody(bodyParams.toJsonElement()) // don't comment this code. Here we pass request body for POST request
+                        setBody(bodyParams.toJsonElement())
                         if (enableLogging) {
                             println("body = $body")
                         }
