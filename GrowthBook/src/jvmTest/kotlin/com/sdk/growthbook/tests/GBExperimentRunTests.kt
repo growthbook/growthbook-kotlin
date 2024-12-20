@@ -4,6 +4,7 @@ import com.sdk.growthbook.utils.toHashMap
 import com.sdk.growthbook.evaluators.GBExperimentEvaluator
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBExperiment
+import com.sdk.growthbook.serializable_model.gbDeserialize
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlin.test.BeforeTest
@@ -54,6 +55,7 @@ class GBExperimentRunTests {
                 )
 
                 gbContext.features = testContext.features
+                    .mapValues { it.value.gbDeserialize() }
 
                 val evaluator = GBExperimentEvaluator()
                 val result = evaluator.evaluateExperiment(

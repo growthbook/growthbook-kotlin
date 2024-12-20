@@ -1,6 +1,8 @@
 package com.sdk.growthbook.utils
 
 import com.sdk.growthbook.model.GBFeature
+import com.sdk.growthbook.serializable_model.SerializableGBFeature
+import com.sdk.growthbook.serializable_model.gbDeserialize
 import com.soywiz.krypto.AES
 import com.soywiz.krypto.Padding
 import com.soywiz.krypto.encoding.Base64
@@ -45,11 +47,11 @@ fun encryptToFeaturesDataModel(string: String): GBFeatures? {
     val jsonParser = Json { prettyPrint = true; isLenient = true; ignoreUnknownKeys = true }
 
     return try {
-        val result: GBFeatures = jsonParser.decodeFromString(
-            deserializer = MapSerializer(String.serializer(), GBFeature.serializer()),
+        val serializableGBFeatures: Map<String, SerializableGBFeature> = jsonParser.decodeFromString(
+            deserializer = MapSerializer(String.serializer(), SerializableGBFeature.serializer()),
             string = string
         )
-        result
+        serializableGBFeatures.mapValues { it.value.gbDeserialize() }
     } catch (e: Exception) {
         null
     }

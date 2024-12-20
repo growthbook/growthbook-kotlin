@@ -10,6 +10,9 @@ import com.sdk.growthbook.utils.getFeaturesFromEncryptedFeatures
 import com.sdk.growthbook.sandbox.CachingImpl
 import com.sdk.growthbook.sandbox.getData
 import com.sdk.growthbook.sandbox.putData
+import com.sdk.growthbook.serializable_model.SerializableFeaturesDataModel
+import com.sdk.growthbook.serializable_model.SerializableGBFeature
+import com.sdk.growthbook.serializable_model.gbDeserialize
 import com.sdk.growthbook.utils.getSavedGroupFromEncryptedSavedGroup
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonObject
@@ -110,9 +113,9 @@ internal class FeaturesViewModel(
     private fun getDataFromCache(): FeaturesDataModel? {
         val dataModel = manager.getLayer().getData(
             Constants.FEATURE_CACHE,
-            FeaturesDataModel.serializer()
+            SerializableFeaturesDataModel.serializer()
         )
-        return dataModel
+        return dataModel?.gbDeserialize()
     }
 
     /**
@@ -229,8 +232,8 @@ internal class FeaturesViewModel(
     private fun putDataToCache(dataModel: FeaturesDataModel) {
         manager.getLayer().putData(
             fileName = Constants.FEATURE_CACHE,
-            content = dataModel,
-            serializer = FeaturesDataModel.serializer()
+            content = dataModel.gbSerialize(),
+            serializer = SerializableFeaturesDataModel.serializer()
         )
     }
 }

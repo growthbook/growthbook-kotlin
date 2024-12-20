@@ -4509,7 +4509,7 @@
           "featureId": "inGroup_experiment_rule",
           "hashAttribute": "id",
           "hashUsed": true,
-          "hashValue": 123,
+          "hashValue": "123",
           "inExperiment": true,
           "key": "0",
           "value": 1,
