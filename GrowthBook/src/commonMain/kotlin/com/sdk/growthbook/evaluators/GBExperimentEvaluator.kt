@@ -198,7 +198,7 @@ internal class GBExperimentEvaluator {
             if (experiment.parentConditions != null) {
                 for (parentCondition in experiment.parentConditions) {
                     val parentResult = GBFeatureEvaluator(context)
-                        .evaluateFeature<Any>(
+                        .evaluateFeature(
                             featureKey = parentCondition.id,
                             attributeOverrides = parentCondition.condition.jsonObject.toMap()
                         )

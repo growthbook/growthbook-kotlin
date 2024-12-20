@@ -19,7 +19,7 @@ data class SerializableGBFeature(
     val rules: List<SerializableGBFeatureRule>? = null
 )
 
-internal fun SerializableGBFeature.gbDeserialize(): GBFeature =
+fun SerializableGBFeature.gbDeserialize(): GBFeature =
     GBFeature(
         defaultValue = defaultValue?.let { GBValue.from(it) },
         rules = rules?.map { it.gbDeserialize() }

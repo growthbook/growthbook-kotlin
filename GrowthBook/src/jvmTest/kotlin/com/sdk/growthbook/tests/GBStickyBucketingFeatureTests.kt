@@ -3,6 +3,7 @@ package com.sdk.growthbook.tests
 import com.sdk.growthbook.utils.toHashMap
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
 import com.sdk.growthbook.model.GBContext
+import com.sdk.growthbook.serializable_model.gbDeserialize
 import com.sdk.growthbook.stickybucket.GBStickyBucketServiceImp
 import com.sdk.growthbook.utils.GBStickyAssignmentsDocument
 import com.sdk.growthbook.utils.GBStickyAttributeKey
@@ -57,6 +58,7 @@ class GBStickyBucketingFeatureTests {
 
                 if (testData.features != null) {
                     gbContext.features = testData.features
+                        .mapValues { it.value.gbDeserialize() }
                 }
                 if (testData.forcedVariations != null) {
                     gbContext.forcedVariations = testData.forcedVariations.toHashMap()
@@ -97,7 +99,7 @@ class GBStickyBucketingFeatureTests {
                 }
 
                 val evaluator = GBFeatureEvaluator(gbContext)
-                val actualExperimentResult = evaluator.evaluateFeature<Any>(
+                val actualExperimentResult = evaluator.evaluateFeature(
                     featureKey = item[3].jsonPrimitive.content,
                     attributeOverrides = attributes
                 ).experimentResult

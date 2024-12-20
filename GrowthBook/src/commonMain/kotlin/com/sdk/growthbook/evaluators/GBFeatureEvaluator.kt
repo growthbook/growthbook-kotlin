@@ -5,12 +5,14 @@ import com.sdk.growthbook.utils.GBTrackData
 import com.sdk.growthbook.utils.GBUtils
 import com.sdk.growthbook.utils.toJsonElement
 import com.sdk.growthbook.model.FeatureEvalContext
+import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBFeatureSource
+import com.sdk.growthbook.model.GBValue
 import kotlinx.serialization.json.jsonObject
 
 /**
@@ -27,14 +29,14 @@ internal class GBFeatureEvaluator(
      * Takes Context and Feature Key
      * Returns Calculated Feature Result against that key
      */
-    fun <V>evaluateFeature(
+    fun evaluateFeature(
         featureKey: String,
         attributeOverrides: Map<String, Any>,
         evalContext: FeatureEvalContext = FeatureEvalContext(
             id = featureKey,
             evaluatedFeatures = mutableSetOf()
         ),
-    ): GBFeatureResult<V> {
+    ): GBFeatureResult<GBValue> {
         /**
          * This callback serves for listening for feature usage events
          */
@@ -49,10 +51,10 @@ internal class GBFeatureEvaluator(
                 if (context.enableLogging) {
                     println("Global override for forced feature with key: $featureKey and value ${forcedFeature[featureKey]}")
                 }
-                return prepareResult<V>(
+                return prepareResult(
                     featureKey = featureKey,
-                    value = forcedFeature[featureKey],
-                    source = GBFeatureSource.override
+                    gbValue = forcedFeature[featureKey]?.let(GBValue::from),
+                    source = GBFeatureSource.override,
                 )
             }
 
@@ -64,15 +66,10 @@ internal class GBFeatureEvaluator(
                 println("evaluateFeature: circular dependency detected:")
             }
             if (evalContext.evaluatedFeatures.contains(featureKey)) {
-                val featureResultWhenCircularDependencyDetected = prepareResult<V>(
+                val featureResultWhenCircularDependencyDetected = prepareResult(
                     featureKey = featureKey,
-                    value = null,
+                    gbValue = null,
                     source = GBFeatureSource.cyclicPrerequisite
-                )
-                
-                onFeatureUsageCallback?.invoke(
-                    featureKey,
-                    prepareResult(featureKey, null, GBFeatureSource.cyclicPrerequisite)
                 )
 
                 return featureResultWhenCircularDependencyDetected
@@ -94,7 +91,7 @@ internal class GBFeatureEvaluator(
                      */
                     if (rule.parentConditions != null) {
                         for (parentCondition in rule.parentConditions) {
-                            val parentResult = evaluateFeature<V>(
+                            val parentResult = evaluateFeature(
                                 featureKey = parentCondition.id,
                                 attributeOverrides = attributeOverrides,
                                 evalContext = evalContext
@@ -282,7 +279,7 @@ internal class GBFeatureEvaluator(
                             if (result.inExperiment && (result.passthrough != true)) {
                                 return prepareResult(
                                     featureKey = featureKey,
-                                    value = result.value,
+                                    gbValue = GBValue.from(result.value),
                                     source = GBFeatureSource.experiment,
                                     experiment = exp,
                                     experimentResult = result
@@ -300,7 +297,7 @@ internal class GBFeatureEvaluator(
              */
             return prepareResult(
                 featureKey = featureKey,
-                value = targetFeature.defaultValue,
+                gbValue = targetFeature.defaultValue,
                 source = GBFeatureSource.defaultValue
             )
         } catch (exception: Exception) {
@@ -310,7 +307,7 @@ internal class GBFeatureEvaluator(
              */
             return prepareResult(
                 featureKey = featureKey,
-                value = null,
+                gbValue = null,
                 source = GBFeatureSource.unknownFeature
             )
         }
@@ -321,23 +318,22 @@ internal class GBFeatureEvaluator(
      * Besides the passed-in arguments, there are two derived values -
      * on and off, which are just the value cast to booleans.
      */
-    private fun <V>prepareResult(
+    private fun prepareResult(
         featureKey: String,
-        value: Any?,
+        gbValue: GBValue?,
         source: GBFeatureSource,
         experiment: GBExperiment? = null,
         experimentResult: GBExperimentResult? = null
-    ): GBFeatureResult<V> {
+    ): GBFeatureResult<GBValue> {
 
-        val isFalse = value == null || value.toString() == "false" || value.toString()
-            .isEmpty() || value.toString() == "0"
+        val isFalse = gbValue == null || (gbValue is GBBoolean && !gbValue.value)
 
-        val castResult = value as? V
+        //val castResult = gbValue as? V
         val gbFeatureResult = GBFeatureResult(
-            value = castResult,
+            value = gbValue,
             on = !isFalse,
             off = isFalse,
-            source = if (castResult == null) GBFeatureSource.unknownFeature else source,
+            source = source,
             experiment = experiment,
             experimentResult = experimentResult
         )

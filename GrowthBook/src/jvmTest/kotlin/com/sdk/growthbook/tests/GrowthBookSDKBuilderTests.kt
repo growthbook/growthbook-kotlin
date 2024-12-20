@@ -161,7 +161,7 @@ class GrowthBookSDKBuilderTests {
         ).setRefreshHandler { isRefreshed, gbError ->
         }.initialize()
 
-        val featureValue = sdkInstance.feature("fwrfewrfe")
+        val featureValue = sdkInstance.feature<Any>("fwrfewrfe")
         assertEquals(featureValue.source, GBFeatureSource.unknownFeature)
 
         val expValue = sdkInstance.run(GBExperiment("fwewrwefw"))

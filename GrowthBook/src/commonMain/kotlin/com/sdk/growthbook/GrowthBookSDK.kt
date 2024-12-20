@@ -15,10 +15,15 @@ import com.sdk.growthbook.features.FeaturesDataModel
 import com.sdk.growthbook.features.FeaturesDataSource
 import com.sdk.growthbook.features.FeaturesFlowDelegate
 import com.sdk.growthbook.features.FeaturesViewModel
+import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeatureResult
+import com.sdk.growthbook.model.GBJson
+import com.sdk.growthbook.model.GBNumber
+import com.sdk.growthbook.model.GBString
+import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.utils.toHashMap
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonObject
@@ -176,9 +181,29 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
      */
     fun <V>feature(id: String): GBFeatureResult<V> {
         val evaluator = GBFeatureEvaluator(gbContext, this.forcedFeatures)
-        return evaluator.evaluateFeature(
+        val gbFeatureResult = evaluator.evaluateFeature(
             featureKey = id,
             attributeOverrides = attributeOverrides,
+        )
+/*
+        when(gbFeatureResult.value) {
+            is GBBoolean -> return gbFeatureResult.copy(value = gbFeatureResult.value as? V)
+        }
+*/
+        return GBFeatureResult(
+            value = when(gbFeatureResult.value) {
+                is GBBoolean -> gbFeatureResult.value.value as? V
+                is GBString -> gbFeatureResult.value.value as? V
+                is GBNumber -> gbFeatureResult.value.value as? V
+                is GBJson -> gbFeatureResult.value.value as? V
+                is GBValue.Unknown -> null
+                null -> null
+            },
+            on = gbFeatureResult.on,
+            off = gbFeatureResult.off,
+            source = gbFeatureResult.source,
+            experiment = gbFeatureResult.experiment,
+            experimentResult = gbFeatureResult.experimentResult
         )
     }
 
