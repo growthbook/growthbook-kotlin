@@ -93,6 +93,9 @@ kotlin {
             dependencies {
                 implementation ("org.jetbrains.kotlin:kotlin-test-junit")
                 implementation("com.soywiz.korlibs.krypto:krypto-jvm:$kryptoVersion")
+
+                // https://mvnrepository.com/artifact/org.jetbrains.kotlinx/kotlinx-coroutines-test
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
             }
         }
 
