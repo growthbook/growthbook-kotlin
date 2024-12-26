@@ -1,15 +1,18 @@
 package com.sdk.growthbook.tests
 
-import com.sdk.growthbook.utils.toHashMap
-import com.sdk.growthbook.evaluators.GBExperimentEvaluator
-import com.sdk.growthbook.model.GBContext
-import com.sdk.growthbook.model.GBExperiment
-import com.sdk.growthbook.serializable_model.gbDeserialize
+import kotlin.test.Test
+import kotlin.test.BeforeTest
+import kotlin.test.assertTrue
+import kotlin.test.assertEquals
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonObject
-import kotlin.test.BeforeTest
-import kotlin.test.Test
-import kotlin.test.assertTrue
+import kotlinx.serialization.json.JsonPrimitive
+import com.sdk.growthbook.integration.buildSDK
+import com.sdk.growthbook.model.GBContext
+import com.sdk.growthbook.model.GBExperiment
+import com.sdk.growthbook.utils.toHashMap
+import com.sdk.growthbook.serializable_model.gbDeserialize
+import com.sdk.growthbook.evaluators.GBExperimentEvaluator
 
 class GBExperimentRunTests {
 
@@ -132,5 +135,32 @@ class GBExperimentRunTests {
             println("Count of calls TrackingCallback - $countTrackingCallback")
             assertTrue(countTrackingCallback == 1)
         }
+    }
+
+    @Test
+    fun `forcing example`() {
+        val gb = buildSDK(
+            json = "",
+            attributes = mapOf("id" to 1)
+        )
+        val experimentKey = "key-576"
+        val experiment = GBExperiment(
+            key = experimentKey,
+            variations = listOf(JsonPrimitive(0), JsonPrimitive(1))
+        )
+
+        val result1 = gb.run(experiment)
+        assertTrue(result1.inExperiment)
+        assertTrue(result1.hashUsed == true)
+        assertEquals(result1.value, JsonPrimitive(1))
+
+        gb.setForcedVariations(
+            mapOf(experimentKey to 0)
+        )
+
+        val result2 = gb.run(experiment)
+        assertTrue(result2.inExperiment)
+        assertTrue(result2.hashUsed == false)
+        assertEquals(result2.value, JsonPrimitive(0))
     }
 }

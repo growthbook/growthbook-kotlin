@@ -1,8 +1,13 @@
 package com.sdk.growthbook.integration
 
-import org.intellij.lang.annotations.Language
 import org.junit.Test
 import kotlin.test.assertTrue
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.test.TestScope
+import org.intellij.lang.annotations.Language
+import com.sdk.growthbook.utils.Resource
+import com.sdk.growthbook.tests.MockNetworkClient
 
 class IntegrationTests {
 
@@ -82,7 +87,7 @@ class IntegrationTests {
             json = json,
             attributes = mapOf("id" to "someId"),
             trackingCallback = { _, gbExperimentResult ->
-                val variationName = gbExperimentResult?.name
+                val variationName = gbExperimentResult.name
                 assertTrue(
                     (variationName == "Button filled") || (variationName == "Control")
                 )
@@ -90,5 +95,36 @@ class IntegrationTests {
         )
 
         growthBookSdk.feature<Boolean>("post-appointment-all-video-appointments-button")
+    }
+
+    @Test
+    fun `autoRefreshFeatures() method usage example`() {
+        val growthBookSdk = buildSDK("")
+
+        growthBookSdk
+            .autoRefreshFeatures()
+            .launchIn(TestScope())
+    }
+
+    @Test
+    fun `autoRefreshFeatures() method triggers consumeSSEConnection()`() {
+        var wasMethodCalled = false
+
+        val networkDispatcher = object: MockNetworkClient("", null) {
+            override fun consumeSSEConnection(url: String): Flow<Resource<String>> {
+                wasMethodCalled = true
+                return super.consumeSSEConnection(url)
+            }
+        }
+
+        val growthBookSdk = buildSDK(
+            json = "",
+            attributes = mapOf("id" to "someId"),
+            networkDispatcher = networkDispatcher,
+        )
+
+        growthBookSdk.autoRefreshFeatures()
+
+        assertTrue(wasMethodCalled)
     }
 }
