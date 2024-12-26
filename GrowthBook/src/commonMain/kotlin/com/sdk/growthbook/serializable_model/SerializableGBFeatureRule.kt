@@ -163,6 +163,7 @@ internal fun SerializableGBFeatureRule.gbDeserialize() =
         weights = weights,
         namespace = namespace,
         hashAttribute = hashAttribute,
+        hashVersion = hashVersion,
         range = range,
         ranges = ranges,
         meta = meta,

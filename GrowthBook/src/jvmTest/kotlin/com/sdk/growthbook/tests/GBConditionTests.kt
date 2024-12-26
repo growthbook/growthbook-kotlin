@@ -6,6 +6,7 @@ import com.sdk.growthbook.evaluators.GBConditionEvaluator
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
@@ -28,11 +29,17 @@ class GBConditionTests {
         for (item in evalConditions) {
             if (item is JsonArray) {
                 val evaluator = GBConditionEvaluator()
+                val item2JsonObject = item[2] as? JsonObject
+                val attributes = if (item2JsonObject == null) {
+                    emptyMap<String, JsonElement>()
+                } else {
+                    HashMap(item2JsonObject)
+                }
 
                 val result: Boolean = if (item.size > 4) {
-                    evaluator.evalCondition(item[2], item[1], item[4].jsonObject)
+                    evaluator.evalCondition(attributes, item[1], item[4].jsonObject)
                 } else {
-                    evaluator.evalCondition(item[2], item[1], null)
+                    evaluator.evalCondition(attributes, item[1], null)
                 }
 
                 val status =
@@ -65,7 +72,7 @@ class GBConditionTests {
 
         assertEquals(evaluator.getType(null).toString(), GBAttributeType.GbUnknown.toString())
 
-        assertTrue(evaluator.getPath(JsonPrimitive("test"), "key") == null)
+        assertTrue(evaluator.getPath(mapOf("value" to JsonPrimitive("test")), "key") is JsonNull)
 
         assertTrue(!evaluator.evalConditionValue(JsonObject(HashMap()), null, null))
 
@@ -100,10 +107,7 @@ class GBConditionTests {
 
     @Test
     fun testConditionFailAttributeDoesNotExist() {
-        @Language("json")
-        val attributes = """
-            {"country":"IN"}
-        """.trimIndent()
+        val attributes = mapOf("country" to JsonPrimitive("IN"))
 
         @Language("json")
         val condition = """
@@ -112,7 +116,7 @@ class GBConditionTests {
 
         assertEquals(
             false, GBConditionEvaluator().evalCondition(
-                Json.decodeFromString(JsonElement.serializer(), attributes),
+                attributes,
                 Json.decodeFromString(GBCondition.serializer(), condition),
                 null
             )
@@ -121,10 +125,7 @@ class GBConditionTests {
 
     @Test
     fun testConditionDoesNotExistAttributeExist() {
-        @Language("json")
-        val attributes = """
-            {"userId":"1199"}
-        """.trimIndent()
+        val attributes = mapOf("userId" to JsonPrimitive("1199"))
 
         @Language("json")
         val condition = """
@@ -137,7 +138,7 @@ class GBConditionTests {
 
         assertEquals(
             false, GBConditionEvaluator().evalCondition(
-                Json.decodeFromString(JsonElement.serializer(), attributes),
+                attributes,
                 Json.decodeFromString(GBCondition.serializer(), condition),
                 null
             )
@@ -146,10 +147,7 @@ class GBConditionTests {
 
     @Test
     fun testConditionExistAttributeExist() {
-        @Language("json")
-        val attributes = """
-            {"userId":"1199"}
-        """.trimIndent()
+        val attributes = mapOf("userId" to JsonPrimitive("1199"))
 
         @Language("json")
         val condition = """
@@ -162,7 +160,7 @@ class GBConditionTests {
 
         assertEquals(
             true, GBConditionEvaluator().evalCondition(
-                Json.decodeFromString(JsonElement.serializer(), attributes),
+                attributes,
                 Json.decodeFromString(GBCondition.serializer(), condition),
                 null
             )
@@ -171,10 +169,7 @@ class GBConditionTests {
 
     @Test
     fun testConditionExistAttributeDoesNotExist() {
-        @Language("json")
-        val attributes = """
-            {"user_id_not_exist":"1199"}
-        """.trimIndent()
+        val attributes = mapOf("user_id_not_exist" to JsonPrimitive("1199"))
 
         @Language("json")
         val condition = """
@@ -187,7 +182,7 @@ class GBConditionTests {
 
         assertEquals(
             false, GBConditionEvaluator().evalCondition(
-                Json.decodeFromString(JsonElement.serializer(), attributes),
+                attributes,
                 Json.decodeFromString(GBCondition.serializer(), condition),
                 null
             )

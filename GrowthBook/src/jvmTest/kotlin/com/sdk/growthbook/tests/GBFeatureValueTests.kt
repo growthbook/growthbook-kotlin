@@ -31,12 +31,6 @@ class GBFeatureValueTests {
         val passedScenarios: ArrayList<String> = ArrayList()
         for (item in evalConditions) {
             if (item is JsonArray) {
-/*
-                if (item[0].jsonPrimitive.content != "uses custom values - string") {
-                    continue
-                }
-*/
-
                 val testData =
                     GBTestHelper.jsonParser.decodeFromJsonElement(
                         GBFeaturesTest.serializer(),

@@ -12,6 +12,7 @@ import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBFeatureSource
+import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBValue
 import kotlinx.serialization.json.jsonObject
 
@@ -37,10 +38,6 @@ internal class GBFeatureEvaluator(
             evaluatedFeatures = mutableSetOf()
         ),
     ): GBFeatureResult<GBValue> {
-        /**
-         * This callback serves for listening for feature usage events
-         */
-        val onFeatureUsageCallback = context.onFeatureUsage
         
         try {
 
@@ -107,11 +104,11 @@ internal class GBFeatureEvaluator(
                             }
 
                             val evalObj = parentResult.value?.let { value ->
-                                mapOf("value" to value)
+                                mapOf("value" to value.gbSerialize())
                             } ?: emptyMap()
 
                             val evalCondition = GBConditionEvaluator().evalCondition(
-                                attributes = evalObj.toJsonElement(),
+                                attributes = evalObj,
                                 conditionObj = parentCondition.condition,
                                 savedGroups = context.savedGroups?.toJsonElement()?.jsonObject
                             )
@@ -166,7 +163,9 @@ internal class GBFeatureEvaluator(
                                 attributes = getAttributes(
                                     context = context,
                                     attributeOverrides = attributeOverrides
-                                ).toJsonElement(),
+                                )
+                                    .mapValues { GBValue.from(it.value).gbSerialize() }
+                                ,
                                 conditionObj = rule.condition,
                                 savedGroups = context.savedGroups?.toJsonElement()?.jsonObject
                             )
@@ -225,9 +224,9 @@ internal class GBFeatureEvaluator(
                                     continue@ruleLoop
                                 }
                                 val hashFNV = GBUtils.hash(
-                                    seed = featureKey,
+                                    seed = rule.seed,
                                     stringValue = attributeValue,
-                                    hashVersion = 1
+                                    hashVersion = rule.hashVersion,
                                 ) ?: 0f
                                 if (hashFNV > rule.coverage) {
                                     continue@ruleLoop
@@ -326,7 +325,9 @@ internal class GBFeatureEvaluator(
         experimentResult: GBExperimentResult? = null
     ): GBFeatureResult<GBValue> {
 
-        val isFalse = gbValue == null || (gbValue is GBBoolean && !gbValue.value)
+        val gate2 = (gbValue is GBBoolean && !gbValue.value)
+        val gate3 = (gbValue is GBNumber && (gbValue.value == 0))
+        val isFalse = gbValue == null || gate2 || gate3
 
         //val castResult = gbValue as? V
         val gbFeatureResult = GBFeatureResult(

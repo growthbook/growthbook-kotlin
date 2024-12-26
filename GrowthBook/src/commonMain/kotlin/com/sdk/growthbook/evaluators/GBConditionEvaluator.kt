@@ -87,7 +87,7 @@ internal class GBConditionEvaluator {
      * - attributes is the user's attributes
      * - condition to be evaluated
      */
-    fun evalCondition(attributes: JsonElement, conditionObj: GBCondition, savedGroups: JsonObject?): Boolean {
+    fun evalCondition(attributes: Map<String, JsonElement>, conditionObj: GBCondition, savedGroups: JsonObject?): Boolean {
 
         if (conditionObj is JsonArray) {
             return false
@@ -154,7 +154,7 @@ internal class GBConditionEvaluator {
     /**
      * Evaluate OR conditions against given attributes
      */
-    private fun evalOr(attributes: JsonElement, conditionObjs: JsonArray, savedGroups: JsonObject?): Boolean {
+    private fun evalOr(attributes: Map<String, JsonElement>, conditionObjs: JsonArray, savedGroups: JsonObject?): Boolean {
         // If conditionObjs is empty, return true
         if (conditionObjs.isEmpty()) {
             return true
@@ -175,7 +175,7 @@ internal class GBConditionEvaluator {
     /**
      * Evaluate AND conditions against given attributes
      */
-    private fun evalAnd(attributes: JsonElement, conditionObjs: JsonArray, savedGroups: JsonObject?): Boolean {
+    private fun evalAnd(attributes: Map<String, JsonElement>, conditionObjs: JsonArray, savedGroups: JsonObject?): Boolean {
 
         // Loop through the conditionObjects
         for (item in conditionObjs) {
@@ -246,8 +246,7 @@ internal class GBConditionEvaluator {
      * Given attributes and a dot-separated path string,
      * @return the value at that path (or null if the path doesn't exist)
      */
-    fun getPath(obj: JsonElement, key: String): JsonElement? {
-
+    fun getPath(attributes: Map<String, JsonElement>, key: String): JsonElement {
         val paths: ArrayList<String>
 
         if (key.contains(".")) {
@@ -257,16 +256,11 @@ internal class GBConditionEvaluator {
             paths.add(key)
         }
 
-        var element: JsonElement? = obj
+        var element: JsonElement = attributes[paths[0]] ?: JsonNull
 
-        for (path in paths) {
-            if (element == null || element is JsonArray) {
-                return null
-            }
+        for (path in paths.subList(1, paths.size)) {
             if (element is JsonObject) {
-                element = element[path]
-            } else {
-                return null
+                element = element[path] ?: JsonNull
             }
         }
 
@@ -352,7 +346,7 @@ internal class GBConditionEvaluator {
                     }
                 }
                 // Else if evalCondition(item, condition), break out of loop and return true
-                else if (evalCondition(item, condition, savedGroups)) {
+                else if (evalCondition(mapOf("value" to item), condition, savedGroups)) {
                     return true
                 }
             }
@@ -386,7 +380,8 @@ internal class GBConditionEvaluator {
         // Evaluate EXISTS operator - whether condition contains attribute
         if (operator == "\$exists") {
             val targetPrimitiveValue = conditionValue.jsonPrimitive.content
-            if (targetPrimitiveValue == "false" && attributeValue == null) {
+            val gate2 = (attributeValue == null || attributeValue is JsonNull)
+            if (targetPrimitiveValue == "false" && gate2) {
                 return true
             } else if (targetPrimitiveValue == "true" && attributeValue != null) {
                 return true
@@ -540,7 +535,7 @@ internal class GBConditionEvaluator {
                 // than or equal the second version
                 "\$vlte" -> return paddedVersionSource <= paddedVersionTarget
                 "\$inGroup" -> {
-                    if (attributeValue != null && conditionValue != null) {
+                    if (attributeValue != null) {
                         return isIn(attributeValue, savedGroups?.get(conditionValue.content)?.jsonArray ?: JsonArray(
                             emptyList()
                         )
@@ -548,7 +543,7 @@ internal class GBConditionEvaluator {
                     }
                 }
                 "\$notInGroup" -> {
-                    if (attributeValue != null && conditionValue != null) {
+                    if (attributeValue != null /*&& conditionValue != null*/) {
                         return !isIn(attributeValue, savedGroups?.get(conditionValue.content)?.jsonArray ?: JsonArray(
                             emptyList()
                         )

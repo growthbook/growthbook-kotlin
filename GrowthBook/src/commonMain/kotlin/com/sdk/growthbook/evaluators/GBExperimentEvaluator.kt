@@ -6,6 +6,7 @@ import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeatureSource
+import com.sdk.growthbook.model.GBValue
 import kotlinx.serialization.json.jsonObject
 
 /**
@@ -42,7 +43,7 @@ internal class GBExperimentEvaluator {
         }
 
         /**
-         * 3. If context.forcedVariations[experiment.trackingKey] is defined,
+         * 3. If context.forcedVariations[GBExperiment.key] is defined,
          * return immediately (not in experiment, forced variation)
          */
         val forcedVariation = context.forcedVariations[experiment.key]
@@ -176,7 +177,8 @@ internal class GBExperimentEvaluator {
              * return immediately (not in experiment, variationId 0)
              */
             if (experiment.condition != null) {
-                val attr = context.attributes.toJsonElement()
+                val attr = context.attributes
+                    .mapValues { GBValue.from(it.value).gbSerialize() }
                 val evaluationResult = GBConditionEvaluator().evalCondition(
                     attr, experiment.condition!!, context.savedGroups?.toJsonElement()?.jsonObject
                 )
@@ -213,11 +215,11 @@ internal class GBExperimentEvaluator {
                         )
                     }
                     val evalObj = parentResult.value?.let {
-                        mapOf("value" to GBUtils.convertToPrimitiveIfPossible(it))
+                        mapOf("value" to it.gbSerialize())
                     } ?: emptyMap()
 
                     val evalCondition = GBConditionEvaluator().evalCondition(
-                        attributes = evalObj.toJsonElement(),
+                        attributes = evalObj,
                         conditionObj = parentCondition.condition,
                         context.savedGroups?.toJsonElement()?.jsonObject
                     )
