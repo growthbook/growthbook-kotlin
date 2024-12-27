@@ -63,11 +63,11 @@ sealed class GBValue {
                         jsonElement.floatOrNull != null -> GBNumber(jsonElement.float)
                         jsonElement.doubleOrNull != null -> GBNumber(jsonElement.double)
                         jsonElement.booleanOrNull != null -> GBBoolean(jsonElement.boolean)
-                        else -> GBValue.Unknown
+                        else -> Unknown
                     }
                 }
                 is JsonObject -> GBJson(jsonElement)
-                else -> GBValue.Unknown
+                else -> Unknown
             }
     }
 }
@@ -86,11 +86,7 @@ data class GBFeature(
      * Array of Rule objects that determine when and how the defaultValue gets overridden
      */
     val rules: List<GBFeatureRule>? = null
-) {
-    companion object {
-
-    }
-}
+)
 
 internal fun GBFeature.gbSerialize() =
     SerializableGBFeature(
