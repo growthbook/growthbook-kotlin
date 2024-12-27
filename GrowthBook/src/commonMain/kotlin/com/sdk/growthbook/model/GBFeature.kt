@@ -30,7 +30,9 @@ import kotlinx.serialization.json.longOrNull
 data class GBBoolean(val value: Boolean): GBValue()
 data class GBString(val value: String): GBValue()
 data class GBNumber(val value: Number): GBValue()
-data class GBJson(val value: JsonObject): GBValue()
+data class GBJson(
+    private val value: Map<String, GBValue>,
+): GBValue(), Map<String, GBValue> by value
 
 sealed class GBValue {
     data object Unknown: GBValue()
@@ -40,7 +42,9 @@ sealed class GBValue {
             is GBBoolean -> JsonPrimitive(this.value)
             is GBString -> JsonPrimitive(this.value)
             is GBNumber -> JsonPrimitive(this.value)
-            is GBJson -> this.value
+            is GBJson -> JsonObject(
+                this.mapValues { it.value.gbSerialize() }
+            )
             is Unknown -> JsonNull
         }
 
@@ -66,7 +70,9 @@ sealed class GBValue {
                         else -> Unknown
                     }
                 }
-                is JsonObject -> GBJson(jsonElement)
+                is JsonObject -> GBJson(
+                    jsonElement.mapValues { from(it.value) }
+                )
                 else -> Unknown
             }
     }

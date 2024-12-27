@@ -188,7 +188,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
                 is GBBoolean -> gbFeatureResult.value.value as? V
                 is GBString -> gbFeatureResult.value.value as? V
                 is GBNumber -> gbFeatureResult.value.value as? V
-                is GBJson -> gbFeatureResult.value.value as? V
+                is GBJson -> gbFeatureResult.value as? V
                 is GBValue.Unknown -> null
                 null -> null
             },
