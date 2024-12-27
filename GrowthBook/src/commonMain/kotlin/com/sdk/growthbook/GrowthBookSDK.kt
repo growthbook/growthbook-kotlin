@@ -181,11 +181,8 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
             featureKey = id,
             attributeOverrides = attributeOverrides,
         )
-/*
-        when(gbFeatureResult.value) {
-            is GBBoolean -> return gbFeatureResult.copy(value = gbFeatureResult.value as? V)
-        }
-*/
+
+        @Suppress("UNCHECKED_CAST")
         return GBFeatureResult(
             value = when(gbFeatureResult.value) {
                 is GBBoolean -> gbFeatureResult.value.value as? V
