@@ -338,6 +338,12 @@ internal class GBConditionEvaluator {
         if (attributeValue is JsonArray) {
             // Loop through items in attributeValue
             for (item in attributeValue) {
+                val attributes = if (item is JsonObject) {
+                    HashMap(item)
+                } else {
+                    mapOf("value" to item)
+                }
+
                 // If isOperatorObject(condition)
                 if (isOperatorObject(condition)) {
                     // If evalConditionValue(condition, item), break out of loop and return true
@@ -346,7 +352,7 @@ internal class GBConditionEvaluator {
                     }
                 }
                 // Else if evalCondition(item, condition), break out of loop and return true
-                else if (evalCondition(mapOf("value" to item), condition, savedGroups)) {
+                else if (evalCondition(attributes, condition, savedGroups)) {
                     return true
                 }
             }
@@ -383,8 +389,13 @@ internal class GBConditionEvaluator {
             val gate2 = (attributeValue == null || attributeValue is JsonNull)
             if (targetPrimitiveValue == "false" && gate2) {
                 return true
-            } else if (targetPrimitiveValue == "true" && attributeValue != null) {
-                return true
+            } else {
+                val gate3 = (targetPrimitiveValue == "true")
+                val gate4 = (attributeValue != null)
+                val gate5 = (attributeValue !is JsonNull)
+                if (gate3 && gate4 && gate5) {
+                    return true
+                }
             }
         }
 
@@ -446,6 +457,14 @@ internal class GBConditionEvaluator {
             val paddedVersionTarget = GBUtils.paddedVersionString(targetPrimitiveValue)
             val paddedVersionSource = GBUtils.paddedVersionString(sourcePrimitiveValue ?: "0")
 
+            fun template(
+                stringComparator: (String, String) -> Boolean,
+                numberComparator: (Double, Double) -> Boolean,
+            ) = comparisonTemplate(
+                attributeValue, conditionValue,
+                stringComparator, numberComparator
+            )
+
             when (operator) {
                 // Evaluate EQ operator - whether condition equals to attribute
                 "\$eq" -> {
@@ -457,55 +476,47 @@ internal class GBConditionEvaluator {
                 }
                 // Evaluate LT operator - whether attribute less than to condition
                 "\$lt" -> {
-                    if (
-                        attributeValue?.doubleOrNull != null && conditionValue.doubleOrNull != null
-                    ) {
-                        return (attributeValue?.doubleOrNull!! < conditionValue.doubleOrNull!!)
-                    }
-                    return if (sourcePrimitiveValue == null) {
-                        0.0 < targetPrimitiveValue.toDouble()
-                    } else {
-                        sourcePrimitiveValue < targetPrimitiveValue
-                    }
+                    return template(
+                        stringComparator = { actual, expected ->
+                            actual < expected
+                        },
+                        numberComparator = { actual, expected ->
+                            actual < expected
+                        },
+                    )
                 }
                 // Evaluate LTE operator - whether attribute less than or equal to condition
                 "\$lte" -> {
-                    if (
-                        attributeValue?.doubleOrNull != null && conditionValue.doubleOrNull != null
-                    ) {
-                        return (attributeValue?.doubleOrNull!! <= conditionValue.doubleOrNull!!)
-                    }
-                    return if (sourcePrimitiveValue == null) {
-                        0.0 <= targetPrimitiveValue.toDouble()
-                    } else {
-                        sourcePrimitiveValue <= targetPrimitiveValue
-                    }
+                    return template(
+                        stringComparator = { actual, expected ->
+                            actual <= expected
+                        },
+                        numberComparator = { actual, expected ->
+                            actual <= expected
+                        },
+                    )
                 }
                 // Evaluate GT operator - whether attribute greater than to condition
                 "\$gt" -> {
-                    if (
-                        attributeValue?.doubleOrNull != null && conditionValue.doubleOrNull != null
-                    ) {
-                        return (attributeValue?.doubleOrNull!! > conditionValue.doubleOrNull!!)
-                    }
-                    return if (sourcePrimitiveValue == null) {
-                        0.0 > targetPrimitiveValue.toDouble()
-                    } else {
-                        sourcePrimitiveValue > targetPrimitiveValue
-                    }
+                    return template(
+                        stringComparator = { actual, expected ->
+                            actual > expected
+                        },
+                        numberComparator = { actual, expected ->
+                            actual > expected
+                        },
+                    )
                 }
                 // Evaluate GTE operator - whether attribute greater than or equal to condition
                 "\$gte" -> {
-                    if (
-                        attributeValue?.doubleOrNull != null && conditionValue.doubleOrNull != null
-                    ) {
-                        return (attributeValue?.doubleOrNull!! >= conditionValue.doubleOrNull!!)
-                    }
-                    return if (sourcePrimitiveValue == null) {
-                        0.0 >= targetPrimitiveValue.toDouble()
-                    } else {
-                        sourcePrimitiveValue >= targetPrimitiveValue
-                    }
+                    return template(
+                        stringComparator = { actual, expected ->
+                            actual >= expected
+                        },
+                        numberComparator = { actual, expected ->
+                            actual >= expected
+                        },
+                    )
                 }
                 // Evaluate REGEX operator - whether attribute contains condition regex
                 "\$regex" -> {
@@ -573,5 +584,35 @@ internal class GBConditionEvaluator {
             }
         }
         return false
+    }
+
+    private enum class ComparisonType  {
+        Alphabetic, Numeric, Unknown,
+    }
+
+    private fun comparisonTemplate(
+        actualJsonPrimitive: JsonPrimitive?,
+        expectedJsonPrimitive: JsonPrimitive,
+        stringComparator: (String, String) -> Boolean,
+        numberComparator: (Double, Double) -> Boolean,
+    ): Boolean {
+        val gate1 = actualJsonPrimitive?.isString == true
+        val gate2 = (actualJsonPrimitive?.doubleOrNull != null) || actualJsonPrimitive is JsonNull
+        val comparisonType: ComparisonType = when {
+            gate1 && expectedJsonPrimitive.isString -> ComparisonType.Alphabetic
+            gate2 && expectedJsonPrimitive.doubleOrNull != null -> ComparisonType.Numeric
+            else -> ComparisonType.Unknown
+        }
+
+        val val0 = if (actualJsonPrimitive is JsonNull) 0.0
+        else actualJsonPrimitive?.doubleOrNull
+        val actualValue = val0 ?: 0.0
+        val expectedValue = expectedJsonPrimitive.doubleOrNull ?: 0.0
+
+        return when(comparisonType) {
+            ComparisonType.Alphabetic -> stringComparator.invoke(actualJsonPrimitive?.content ?: "", expectedJsonPrimitive.content)
+            ComparisonType.Numeric -> numberComparator.invoke(actualValue, expectedValue)
+            else -> false
+        }
     }
 }
