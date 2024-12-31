@@ -10,7 +10,6 @@ import com.sdk.growthbook.utils.GBRemoteEvalParams
 import com.sdk.growthbook.utils.Resource
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.transform
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
 /**
@@ -64,8 +63,10 @@ internal class FeaturesDataSource(
         url = getEndpoint(FeatureRefreshStrategy.SERVER_SENT_EVENTS),
     ).transform { resource ->
         if (resource is Resource.Success) {
-            val featuresDataModel = jsonParser
-                .decodeFromString<FeaturesDataModel>(resource.data)
+            val serializableFeaturesDataModel = jsonParser.decodeFromString(
+                SerializableFeaturesDataModel.serializer(), resource.data
+            )
+            val featuresDataModel = serializableFeaturesDataModel.gbDeserialize()
 
             val gbFeatures = featuresDataModel.features
             emit(Resource.Success(gbFeatures))
