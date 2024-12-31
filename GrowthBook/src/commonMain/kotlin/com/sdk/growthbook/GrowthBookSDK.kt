@@ -173,31 +173,35 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
 
     /**
      * The feature method takes a single string argument,
-     * which is the unique identifier for the feature and returns a FeatureResult object.
+     * which is the unique identifier for the feature and
+     * @returns a [GBFeatureResult] object
      */
-    fun <V>feature(id: String): GBFeatureResult<V> {
+    fun feature(id: String): GBFeatureResult<GBValue> {
         val evaluator = GBFeatureEvaluator(gbContext, this.forcedFeatures)
-        val gbFeatureResult = evaluator.evaluateFeature(
+        return evaluator.evaluateFeature(
             featureKey = id,
             attributeOverrides = attributeOverrides,
         )
+    }
+
+    /**
+     * The feature method takes a single string argument,
+     * which is the unique identifier, and the type of the accessed feature
+     * @returns a feature value typed with specified type
+     */
+    fun <V>feature(id: String): V? {
+        val gbFeatureResult = feature(id)
+        val resultValue = gbFeatureResult.value
 
         @Suppress("UNCHECKED_CAST")
-        return GBFeatureResult(
-            value = when(gbFeatureResult.value) {
-                is GBBoolean -> gbFeatureResult.value.value as? V
-                is GBString -> gbFeatureResult.value.value as? V
-                is GBNumber -> gbFeatureResult.value.value as? V
-                is GBJson -> gbFeatureResult.value as? V
-                is GBValue.Unknown -> null
-                null -> null
-            },
-            on = gbFeatureResult.on,
-            off = gbFeatureResult.off,
-            source = gbFeatureResult.source,
-            experiment = gbFeatureResult.experiment,
-            experimentResult = gbFeatureResult.experimentResult
-        )
+        return when(resultValue) {
+            is GBBoolean -> resultValue.value as? V
+            is GBString -> resultValue.value as? V
+            is GBNumber -> resultValue.value as? V
+            is GBJson -> resultValue as? V
+            is GBValue.Unknown -> null
+            null -> null
+        }
     }
 
     /**
@@ -205,7 +209,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
      * which is the unique identifier for the feature and returns the feature state on/off
      */
     fun isOn(featureId: String): Boolean {
-        return feature<Any>(id = featureId).on
+        return feature(id = featureId).on
     }
 
     /**
