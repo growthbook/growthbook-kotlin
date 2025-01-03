@@ -185,16 +185,27 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     }
 
     /**
-     * The feature method takes a single string argument,
-     * which is the unique identifier, and the type of the accessed feature
+     * The feature method takes a string argument,
+     * which is the unique identifier, and the type of the accessed feature.
+     * The supported types of accessed features are:
+     * [Boolean], [String], [Number], [Short],
+     * [Int], [Long], [Float], [Double], [GBJson]
+     *
      * @returns a feature value typed with specified type
      */
-    fun <V>feature(id: String): V? {
-        val gbFeatureResult = feature(id)
-        val resultValue = gbFeatureResult.value
+    inline fun <reified V>feature(id: String): V? {
+        val listOfSupportedTypes = listOf(
+            Boolean::class, String::class,
+            Number::class, Short::class, Int::class,
+            Long::class, Float::class, Double::class,
+            GBJson::class,
+        )
+        if (V::class !in listOfSupportedTypes) {
+            return null
+        }
 
-        @Suppress("UNCHECKED_CAST")
-        return when(resultValue) {
+        val gbFeatureResult = feature(id)
+        return when(val resultValue = gbFeatureResult.value) {
             is GBBoolean -> resultValue.value as? V
             is GBString -> resultValue.value as? V
             is GBNumber -> resultValue.value as? V

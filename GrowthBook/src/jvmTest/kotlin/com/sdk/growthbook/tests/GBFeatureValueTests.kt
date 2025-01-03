@@ -136,7 +136,7 @@ class GBFeatureValueTests {
 
         for (item in evalConditions) {
             if (item is JsonArray) {
-                sdk.feature<Any>(id = item[2].jsonPrimitive.content)
+                sdk.feature(id = item[2].jsonPrimitive.content)
                 break
             }
         }
