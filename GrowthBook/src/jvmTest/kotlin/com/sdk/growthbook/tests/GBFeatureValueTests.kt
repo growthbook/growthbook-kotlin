@@ -70,7 +70,7 @@ class GBFeatureValueTests {
                         item[3]
                     )
 
-                val resultJsonElement: JsonElement? = result.value?.gbSerialize()
+                val resultJsonElement: JsonElement? = result.gbValue?.gbSerialize()
                 val resultJsonPrimitive =  resultJsonElement as? JsonPrimitive?
                 val status = item[0].toString() +
                     "\nExpected Result - " +

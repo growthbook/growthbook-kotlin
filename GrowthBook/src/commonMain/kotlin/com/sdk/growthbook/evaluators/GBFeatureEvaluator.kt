@@ -37,7 +37,7 @@ internal class GBFeatureEvaluator(
             id = featureKey,
             evaluatedFeatures = mutableSetOf()
         ),
-    ): GBFeatureResult<GBValue> {
+    ): GBFeatureResult {
         
         try {
 
@@ -103,7 +103,7 @@ internal class GBFeatureEvaluator(
                                 )
                             }
 
-                            val evalObj = parentResult.value?.let { value ->
+                            val evalObj = parentResult.gbValue?.let { value ->
                                 mapOf("value" to value.gbSerialize())
                             } ?: emptyMap()
 
@@ -323,7 +323,7 @@ internal class GBFeatureEvaluator(
         source: GBFeatureSource,
         experiment: GBExperiment? = null,
         experimentResult: GBExperimentResult? = null
-    ): GBFeatureResult<GBValue> {
+    ): GBFeatureResult {
 
         val gate2 = (gbValue is GBBoolean && !gbValue.value)
         val gate3 = (gbValue is GBNumber && (gbValue.value == 0))
@@ -331,7 +331,7 @@ internal class GBFeatureEvaluator(
 
         //val castResult = gbValue as? V
         val gbFeatureResult = GBFeatureResult(
-            value = gbValue,
+            gbValue = gbValue,
             on = !isFalse,
             off = isFalse,
             source = source,
@@ -340,15 +340,7 @@ internal class GBFeatureEvaluator(
         )
 
         context.onFeatureUsage?.invoke(
-            featureKey,
-            GBFeatureResult(
-                value = gbFeatureResult.value as? Any,
-                on = gbFeatureResult.on,
-                off = gbFeatureResult.off,
-                source = gbFeatureResult.source,
-                experiment = gbFeatureResult.experiment,
-                experimentResult = gbFeatureResult.experimentResult
-            ),
+            featureKey, gbFeatureResult,
         )
 
         return gbFeatureResult

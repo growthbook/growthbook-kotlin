@@ -29,7 +29,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonObject
 
 typealias GBTrackingCallback = (GBExperiment, GBExperimentResult) -> Unit
-typealias GBFeatureUsageCallback = (featureKey: String, gbFeatureResult: GBFeatureResult<Any>) -> Unit
+typealias GBFeatureUsageCallback = (featureKey: String, gbFeatureResult: GBFeatureResult) -> Unit
 typealias GBExperimentRunCallback = (GBExperiment, GBExperimentResult) -> Unit
 
 /**
@@ -176,7 +176,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
      * which is the unique identifier for the feature and
      * @returns a [GBFeatureResult] object
      */
-    fun feature(id: String): GBFeatureResult<GBValue> {
+    fun feature(id: String): GBFeatureResult {
         val evaluator = GBFeatureEvaluator(gbContext, this.forcedFeatures)
         return evaluator.evaluateFeature(
             featureKey = id,
@@ -205,11 +205,11 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         }
 
         val gbFeatureResult = feature(id)
-        return when(val resultValue = gbFeatureResult.value) {
-            is GBBoolean -> resultValue.value as? V
-            is GBString -> resultValue.value as? V
-            is GBNumber -> resultValue.value as? V
-            is GBJson -> resultValue as? V
+        return when(val gbResultValue = gbFeatureResult.gbValue) {
+            is GBBoolean -> gbResultValue.value as? V
+            is GBString -> gbResultValue.value as? V
+            is GBNumber -> gbResultValue.value as? V
+            is GBJson -> gbResultValue as? V
             is GBValue.Unknown -> null
             null -> null
         }

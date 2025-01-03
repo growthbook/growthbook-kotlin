@@ -234,12 +234,12 @@ enum class GBFeatureSource {
 /**
  * Result for Feature
  */
-data class GBFeatureResult<T>(
+data class GBFeatureResult(
 
     /**
      * The assigned value of the feature
      */
-    val value: T?,
+    val gbValue: GBValue?,
 
     /**
      * The assigned value cast to a boolean

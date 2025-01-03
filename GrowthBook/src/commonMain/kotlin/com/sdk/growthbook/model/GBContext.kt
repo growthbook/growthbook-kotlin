@@ -70,7 +70,7 @@ data class GBContext(
     /**
      * A callback that will be invoked every time a feature is viewed. Listen for feature usage events
      */
-    val onFeatureUsage: ((String, GBFeatureResult<Any>) -> Unit)? = null,
+    val onFeatureUsage: ((String, GBFeatureResult) -> Unit)? = null,
 
     /**
      * Flag which defines whether to use Remote Evaluation

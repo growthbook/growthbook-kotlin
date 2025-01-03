@@ -214,7 +214,7 @@ internal class GBExperimentEvaluator {
                             attributeOverrides = attributeOverrides
                         )
                     }
-                    val evalObj = parentResult.value?.let {
+                    val evalObj = parentResult.gbValue?.let {
                         mapOf("value" to it.gbSerialize())
                     } ?: emptyMap()
 
