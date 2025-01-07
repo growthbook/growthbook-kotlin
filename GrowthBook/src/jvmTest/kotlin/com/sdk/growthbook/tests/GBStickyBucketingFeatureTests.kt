@@ -98,7 +98,16 @@ class GBStickyBucketingFeatureTests {
                         Json.decodeFromJsonElement(GBStickyAssignmentsDocument.serializer(), doc.value)
                 }
 
-                val evaluator = GBFeatureEvaluator(gbContext)
+                val testScopeEvalContext =
+                    GBTestHelper.createTestScopeEvaluationContext(
+                        gbContext.features, attributes,
+                        stickyBucketService = service,
+                        stickyBucketAssignmentDocs = mapOfDocForContext,
+                        savedGroups = gbContext.savedGroups,
+                        forcedVariations = gbContext.forcedVariations,
+                    )
+
+                val evaluator = GBFeatureEvaluator(testScopeEvalContext)
                 val actualExperimentResult = evaluator.evaluateFeature(
                     featureKey = item[3].jsonPrimitive.content,
                     attributeOverrides = attributes
@@ -158,7 +167,7 @@ class GBStickyBucketingFeatureTests {
                     && expectedExperimentResult?.hashUsed == actualExperimentResult?.hashUsed
                     && expectedExperimentResult?.passthrough == actualExperimentResult?.passthrough
 
-                    && expectedStickyAssignmentDocs == gbContext.stickyBucketAssignmentDocs
+                    && expectedStickyAssignmentDocs == testScopeEvalContext.userContext.stickyBucketAssignmentDocs
                 ) {
                     passedScenarios.add(status)
                 } else {

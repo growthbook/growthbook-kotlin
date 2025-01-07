@@ -1,5 +1,6 @@
 package com.sdk.growthbook
 
+import com.sdk.growthbook.evaluators.EvaluationContext
 import com.sdk.growthbook.network.NetworkDispatcher
 import com.sdk.growthbook.utils.Crypto
 import com.sdk.growthbook.utils.GBCacheRefreshHandler
@@ -11,6 +12,7 @@ import com.sdk.growthbook.utils.Resource
 import com.sdk.growthbook.utils.getFeaturesFromEncryptedFeatures
 import com.sdk.growthbook.evaluators.GBExperimentEvaluator
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
+import com.sdk.growthbook.evaluators.UserContext
 import com.sdk.growthbook.features.FeaturesDataModel
 import com.sdk.growthbook.features.FeaturesDataSource
 import com.sdk.growthbook.features.FeaturesFlowDelegate
@@ -177,7 +179,9 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
      * @returns a [GBFeatureResult] object
      */
     fun feature(id: String): GBFeatureResult {
-        val evaluator = GBFeatureEvaluator(gbContext, this.forcedFeatures)
+        val evaluator = GBFeatureEvaluator(
+            createEvaluationContext(), this.forcedFeatures,
+        )
         return evaluator.evaluateFeature(
             featureKey = id,
             attributeOverrides = attributeOverrides,
@@ -227,8 +231,10 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
      * The run method takes an Experiment object and returns an ExperimentResult
      */
     fun run(experiment: GBExperiment): GBExperimentResult {
-        val result = GBExperimentEvaluator().evaluateExperiment(
-            context = gbContext,
+        val evaluator = GBExperimentEvaluator(
+            createEvaluationContext()
+        )
+        val result = evaluator.evaluateExperiment(
             experiment = experiment,
             attributeOverrides = attributeOverrides
         )
@@ -341,4 +347,22 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
             }
         }
     }
+
+    private fun createEvaluationContext() =
+        EvaluationContext(
+            enabled = gbContext.enabled,
+            features = gbContext.features,
+            loggingEnabled = gbContext.enableLogging,
+            savedGroups = gbContext.savedGroups,
+            forcedVariations = gbContext.forcedVariations,
+            trackingCallback = gbContext.trackingCallback,
+            stickyBucketService = gbContext.stickyBucketService,
+            onFeatureUsage = gbContext.onFeatureUsage,
+            userContext = UserContext(
+                qaMode = gbContext.qaMode,
+                attributes = gbContext.attributes,
+                stickyBucketAssignmentDocs = gbContext.stickyBucketAssignmentDocs,
+            )
+        )
+
 }

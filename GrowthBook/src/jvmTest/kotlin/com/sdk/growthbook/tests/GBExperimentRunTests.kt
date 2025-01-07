@@ -13,6 +13,8 @@ import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.utils.toHashMap
 import com.sdk.growthbook.serializable_model.gbDeserialize
 import com.sdk.growthbook.evaluators.GBExperimentEvaluator
+import com.sdk.growthbook.evaluators.EvaluationContext
+import com.sdk.growthbook.evaluators.UserContext
 
 class GBExperimentRunTests {
 
@@ -60,9 +62,24 @@ class GBExperimentRunTests {
                 gbContext.features = testContext.features
                     .mapValues { it.value.gbDeserialize() }
 
-                val evaluator = GBExperimentEvaluator()
+                val testScopeEvaluationContext = EvaluationContext(
+                    enabled = gbContext.enabled,
+                    features = gbContext.features,
+                    loggingEnabled = true,
+                    savedGroups = gbContext.savedGroups,
+                    forcedVariations = gbContext.forcedVariations,
+                    trackingCallback = gbContext.trackingCallback,
+                    stickyBucketService = gbContext.stickyBucketService,
+                    onFeatureUsage = gbContext.onFeatureUsage,
+                    userContext = UserContext(
+                        qaMode = gbContext.qaMode,
+                        attributes = gbContext.attributes,
+                        stickyBucketAssignmentDocs = gbContext.stickyBucketAssignmentDocs,
+                    )
+                )
+
+                val evaluator = GBExperimentEvaluator(testScopeEvaluationContext)
                 val result = evaluator.evaluateExperiment(
-                    context = gbContext,
                     experiment = experiment,
                     attributeOverrides = attributes
                 )
@@ -107,27 +124,32 @@ class GBExperimentRunTests {
                     item[2]
                 )
             val attributes = testContext.attributes.jsonObject.toHashMap()
-            val gbContext = GBContext(
-                apiKey = "",
-                hostURL = "",
+
+            val testScopeEvalContext = EvaluationContext(
                 enabled = testContext.enabled,
-                attributes = attributes,
-                forcedVariations = testContext.forcedVariations ?: HashMap(),
-                qaMode = testContext.qaMode,
+                features = testContext.features.mapValues { it.value.gbDeserialize() },
+                loggingEnabled = true,
+                savedGroups = null,
+                forcedVariations = testContext.forcedVariations ?: emptyMap(),
                 trackingCallback = { _, _ ->
                     countTrackingCallback += 1
-                }, encryptionKey = ""
+                },
+                stickyBucketService = null,
+                onFeatureUsage = null,
+                userContext = UserContext(
+                    attributes = attributes,
+                    qaMode = testContext.qaMode,
+                    stickyBucketAssignmentDocs = null,
+                )
             )
-            val evaluator = GBExperimentEvaluator()
+            val evaluator = GBExperimentEvaluator(testScopeEvalContext)
 
             evaluator.evaluateExperiment(
-                context = gbContext,
                 experiment = experiment,
                 attributeOverrides = attributes
             )
 
             evaluator.evaluateExperiment(
-                context = gbContext,
                 experiment = experiment,
                 attributeOverrides = attributes
             ) // second time for test count of callbacks
