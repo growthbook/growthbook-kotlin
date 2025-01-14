@@ -275,7 +275,7 @@ internal class GBFeatureEvaluator(
                             if (result.inExperiment && (result.passthrough != true)) {
                                 return prepareResult(
                                     featureKey = featureKey,
-                                    gbValue = GBValue.from(result.value),
+                                    gbValue = result.value,
                                     source = GBFeatureSource.experiment,
                                     experiment = exp,
                                     experimentResult = result

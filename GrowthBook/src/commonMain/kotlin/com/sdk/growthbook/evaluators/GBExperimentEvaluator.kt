@@ -437,9 +437,9 @@ internal class GBExperimentEvaluator(
         return GBExperimentResult(
             inExperiment = inExperiment,
             variationId = targetVariationIndex,
-            value = if (experiment.variations.size > targetVariationIndex)
+            value = if (targetVariationIndex < experiment.variations.size)
                 experiment.variations[targetVariationIndex]
-            else mapOf(null to null).toJsonElement(),
+            else GBValue.Unknown,
             hashAttribute = hashAttribute,
             hashValue = hashValue,
             key = meta?.key ?: "$targetVariationIndex",

@@ -6,7 +6,6 @@ import kotlin.test.assertTrue
 import kotlin.test.assertEquals
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import com.sdk.growthbook.integration.buildSDK
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBExperiment
@@ -15,6 +14,8 @@ import com.sdk.growthbook.serializable_model.gbDeserialize
 import com.sdk.growthbook.evaluators.GBExperimentEvaluator
 import com.sdk.growthbook.evaluators.EvaluationContext
 import com.sdk.growthbook.evaluators.UserContext
+import com.sdk.growthbook.model.GBNumber
+import com.sdk.growthbook.serializable_model.SerializableGBExperiment
 
 class GBExperimentRunTests {
 
@@ -31,15 +32,14 @@ class GBExperimentRunTests {
         val passedScenarios: ArrayList<String> = ArrayList()
         for (item in evalConditions) {
             if (item is JsonArray) {
-
                 val testContext =
                     GBTestHelper.jsonParser.decodeFromJsonElement(
                         GBContextTest.serializer(),
                         item[1]
                     )
-                val experiment =
+                val serializableGbExperiment =
                     GBTestHelper.jsonParser.decodeFromJsonElement(
-                        GBExperiment.serializer(),
+                        SerializableGBExperiment.serializer(),
                         item[2]
                     )
 
@@ -80,16 +80,17 @@ class GBExperimentRunTests {
 
                 val evaluator = GBExperimentEvaluator(testScopeEvaluationContext)
                 val result = evaluator.evaluateExperiment(
-                    experiment = experiment,
-                    attributeOverrides = attributes
+                    attributeOverrides = attributes,
+                    experiment = serializableGbExperiment.gbDeserialize(),
                 )
 
+                val resultJsonElement = result.value.gbSerialize()
                 val status =
                     item[0].toString() + "\nExpected Result - " + item[3] + " & " + item[4] +
-                        "\nActual result - " + result.value.toString() + " & " +
+                        "\nActual result - " + resultJsonElement.toString() + " & " +
                         result.inExperiment + "\n\n"
 
-                if (item[3].toString() == result.value.toString()
+                if (item[3].toString() == resultJsonElement.toString()
                     && item[4].toString() == result.inExperiment.toString()
                 ) {
                     passedScenarios.add(status)
@@ -118,9 +119,9 @@ class GBExperimentRunTests {
                     GBContextTest.serializer(),
                     item[1]
                 )
-            val experiment =
+            val serializableGbExperiment =
                 GBTestHelper.jsonParser.decodeFromJsonElement(
-                    GBExperiment.serializer(),
+                    SerializableGBExperiment.serializer(),
                     item[2]
                 )
             val attributes = testContext.attributes.jsonObject.toHashMap()
@@ -142,15 +143,16 @@ class GBExperimentRunTests {
                     stickyBucketAssignmentDocs = null,
                 )
             )
-            val evaluator = GBExperimentEvaluator(testScopeEvalContext)
 
+            val gbExperiment = serializableGbExperiment.gbDeserialize()
+            val evaluator = GBExperimentEvaluator(testScopeEvalContext)
             evaluator.evaluateExperiment(
-                experiment = experiment,
+                experiment = gbExperiment,
                 attributeOverrides = attributes
             )
 
             evaluator.evaluateExperiment(
-                experiment = experiment,
+                experiment = gbExperiment,
                 attributeOverrides = attributes
             ) // second time for test count of callbacks
 
@@ -168,13 +170,13 @@ class GBExperimentRunTests {
         val experimentKey = "key-576"
         val experiment = GBExperiment(
             key = experimentKey,
-            variations = listOf(JsonPrimitive(0), JsonPrimitive(1))
+            variations = listOf(GBNumber(0), GBNumber(1)),
         )
 
         val result1 = gb.run(experiment)
         assertTrue(result1.inExperiment)
         assertTrue(result1.hashUsed == true)
-        assertEquals(result1.value, JsonPrimitive(1))
+        assertEquals(result1.value, GBNumber(1))
 
         gb.setForcedVariations(
             mapOf(experimentKey to 0)
@@ -183,6 +185,6 @@ class GBExperimentRunTests {
         val result2 = gb.run(experiment)
         assertTrue(result2.inExperiment)
         assertTrue(result2.hashUsed == false)
-        assertEquals(result2.value, JsonPrimitive(0))
+        assertEquals(result2.value, GBNumber(0))
     }
 }
