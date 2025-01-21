@@ -42,7 +42,7 @@ data class GBContext(
     /**
      * Force specific experiments to always assign a specific variation (used for QA)
      */
-    var forcedVariations: Map<String, Any>,
+    var forcedVariations: Map<String, Number>,
 
     /**
      * Map of Sticky Bucket documents

@@ -286,7 +286,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
      * The setForcedVariations method setup the Map of user's (forced) variations
      * to assign a specific variation (used for QA)
      */
-    fun setForcedVariations(forcedVariations: Map<String, Any>) {
+    fun setForcedVariations(forcedVariations: Map<String, Number>) {
         gbContext.forcedVariations = forcedVariations
         refreshForRemoteEval()
     }

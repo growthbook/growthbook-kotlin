@@ -48,7 +48,7 @@ class GBStickyBucketingFeatureTests {
                     hostURL = "",
                     enabled = true,
                     attributes = attributes,
-                    forcedVariations = testData.forcedVariations ?: HashMap(),
+                    forcedVariations = emptyMap(),
                     qaMode = false,
                     trackingCallback = { _, _ ->
 
@@ -60,9 +60,6 @@ class GBStickyBucketingFeatureTests {
                 if (testData.features != null) {
                     gbContext.features = testData.features
                         .mapValues { it.value.gbDeserialize() }
-                }
-                if (testData.forcedVariations != null) {
-                    gbContext.forcedVariations = testData.forcedVariations.toHashMap()
                 }
 
                 val listActualStickyAssignmentsDoc =

@@ -9,6 +9,7 @@ import com.sdk.growthbook.serializable_model.gbDeserialize
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.BeforeTest
@@ -51,7 +52,10 @@ class GBFeatureValueTests {
                         .mapValues { it.value.gbDeserialize() }
                 }
                 if (testData.forcedVariations != null) {
-                    gbContext.forcedVariations = testData.forcedVariations.toHashMap()
+                    gbContext.forcedVariations = testData.forcedVariations
+                        .mapValues {
+                            it.value.jsonPrimitive.intOrNull ?: 0
+                        }
                 }
 
                 if (testData.savedGroups != null) {
