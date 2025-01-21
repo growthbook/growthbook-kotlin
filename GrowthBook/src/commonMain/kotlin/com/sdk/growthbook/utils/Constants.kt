@@ -1,5 +1,6 @@
 package com.sdk.growthbook.utils
 
+import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
@@ -237,7 +238,7 @@ data class GBRemoteEvalParams(
     /**
      * Force features that created by user for remote evaluation
      */
-    val forcedFeatures: List<List<Any>>,
+    val forcedFeatures: Map<String, GBValue>,
 
     /**
      * Force specific experiments to always assign a specific variation (used for QA)

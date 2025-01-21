@@ -8,8 +8,8 @@ import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeatureSource
+import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.stickybucket.GBStickyBucketServiceImp
-import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -251,7 +251,7 @@ class GrowthBookSDKBuilderTests {
             remoteEval = true
         ).setForcedVariations(expectedForcedVariation)
             .initialize()
-        sdkInstance.setForcedFeatures(mapOf("featureForce" to JsonPrimitive(112)))
+        sdkInstance.setForcedFeatures(mapOf("featureForce" to GBNumber(112)))
 
         val actualForcedVariation = sdkInstance.getGBContext().forcedVariations
 

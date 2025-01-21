@@ -45,7 +45,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     private lateinit var networkDispatcher: NetworkDispatcher
     private lateinit var featuresViewModel: FeaturesViewModel
     private var attributeOverrides: Map<String, Any> = emptyMap()
-    private var forcedFeatures: Map<String, Any> = emptyMap()
+    private var forcedFeatures: Map<String, GBValue> = emptyMap()
     private var savedGroups: Map<String, Any>? = emptyMap()
     private var assigned: MutableMap<String, Pair<GBExperiment, GBExperimentResult>> =
         mutableMapOf()
@@ -246,15 +246,15 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     /**
      * The setForcedFeatures method setup the Map of user's (forced) features
      */
-    fun setForcedFeatures(forcedFeatures: Map<String, Any>) {
+    fun setForcedFeatures(forcedFeatures: Map<String, GBValue>) {
         this.forcedFeatures = forcedFeatures
     }
 
     /**
      * The getForcedFeatures method for mapping model object for request's body type
      */
-    fun getForcedFeatures(): List<List<Any>> {
-        return this.forcedFeatures.map { listOf(it.key, it.value) }
+    fun getForcedFeatures(): Map<String, GBValue> {
+        return this.forcedFeatures
     }
 
     /**
