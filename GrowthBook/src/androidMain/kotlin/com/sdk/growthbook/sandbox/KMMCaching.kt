@@ -5,6 +5,11 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import java.io.File
 import java.io.FileInputStream
+import java.security.SecureRandom
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+import javax.crypto.spec.IvParameterSpec
 
 /**
  * Actual Implementation for Caching in Android - As expected in KMM
@@ -18,12 +23,19 @@ internal actual object CachingImpl {
 /**
  * Android Caching Layer
  */
-class CachingAndroid: CachingLayer {
+class CachingAndroid : CachingLayer {
 
     /**
      * JSON Parser SetUp
      */
     private val json = Json { prettyPrint = true; isLenient = true; ignoreUnknownKeys = true }
+
+    /**
+     * For Secret Key Generation
+     */
+    private val secretKey = generateSecretKey()
+
+    private val iv = generateIv()
 
     /**
      * Save Content in Android App Specific Internal Memory
@@ -41,9 +53,9 @@ class CachingAndroid: CachingLayer {
             file.createNewFile()
 
             val jsonContents = json.encodeToString(JsonElement.serializer(), content)
-
+            val encryptedContent = encrypt(jsonContents, secretKey, iv)
             // Save contents in file
-            file.appendText(jsonContents)
+            file.writeBytes(encryptedContent)
         }
     }
 
@@ -56,9 +68,10 @@ class CachingAndroid: CachingLayer {
 
         if (file != null && file.exists()) {
             // Read File Contents
-            val inputAsString = FileInputStream(file).bufferedReader().use { it.readText() }
+            val encryptedData = FileInputStream(file).use { it.readBytes() }
+            val decryptedContent = decrypt(encryptedData, secretKey, iv)
             // return File Contents
-            return json.decodeFromString(JsonElement.serializer(), inputAsString)
+            return json.decodeFromString(JsonElement.serializer(), decryptedContent)
         }
 
         // Return null if file doesn't exist
@@ -83,6 +96,26 @@ class CachingAndroid: CachingLayer {
         return File(letDirectory, "$targetFileName.txt")
     }
 
+    /**
+     * To encrypt the cache file content
+     */
+    private fun encrypt(data: String, secretKey: SecretKey, iv: ByteArray): ByteArray {
+        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+        val ivSpec = IvParameterSpec(iv)
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey, ivSpec)
+        return cipher.doFinal(data.toByteArray(Charsets.UTF_8))
+    }
+
+    /**
+     * To decrypt the cache file content
+     */
+    private fun decrypt(data: ByteArray, secretKey: SecretKey, iv: ByteArray): String {
+        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+        val ivSpec = IvParameterSpec(iv)
+        cipher.init(Cipher.DECRYPT_MODE, secretKey, ivSpec)
+        return String(cipher.doFinal(data), Charsets.UTF_8)
+    }
+
     companion object {
         internal var filesDir: File? = null
 
@@ -91,6 +124,18 @@ class CachingAndroid: CachingLayer {
          */
         fun consumeContext(context: Context) {
             filesDir = context.filesDir
+        }
+
+        fun generateSecretKey(): SecretKey {
+            val keyGen = KeyGenerator.getInstance("AES")
+            keyGen.init(256)
+            return keyGen.generateKey()
+        }
+
+        fun generateIv(): ByteArray {
+            val iv = ByteArray(16)
+            SecureRandom().nextBytes(iv)
+            return iv
         }
     }
 }
