@@ -9,12 +9,13 @@ import kotlinx.serialization.json.jsonObject
 import com.sdk.growthbook.integration.buildSDK
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBExperiment
-import com.sdk.growthbook.utils.toHashMap
 import com.sdk.growthbook.serializable_model.gbDeserialize
 import com.sdk.growthbook.evaluators.GBExperimentEvaluator
 import com.sdk.growthbook.evaluators.EvaluationContext
 import com.sdk.growthbook.evaluators.UserContext
 import com.sdk.growthbook.model.GBNumber
+import com.sdk.growthbook.model.GBValue
+import com.sdk.growthbook.model.toGbNumber
 import com.sdk.growthbook.serializable_model.SerializableGBExperiment
 
 class GBExperimentRunTests {
@@ -43,7 +44,9 @@ class GBExperimentRunTests {
                         item[2]
                     )
 
-                val attributes = testContext.attributes.jsonObject.toHashMap()
+                val attributes = testContext
+                    .attributes.jsonObject
+                    .mapValues { GBValue.from(it.value) }
 
                 val gbContext = GBContext(
                     apiKey = "",
@@ -56,7 +59,7 @@ class GBExperimentRunTests {
 
                     },
                     encryptionKey = "",
-                    savedGroups = testContext.savedGroups.jsonObject.toHashMap()
+                    savedGroups = testContext.savedGroups.jsonObject.mapValues { GBValue.from(it.value) },
                 )
 
                 gbContext.features = testContext.features
@@ -124,7 +127,9 @@ class GBExperimentRunTests {
                     SerializableGBExperiment.serializer(),
                     item[2]
                 )
-            val attributes = testContext.attributes.jsonObject.toHashMap()
+            val attributes = testContext
+                .attributes.jsonObject
+                .mapValues { GBValue.from(it.value) }
 
             val testScopeEvalContext = EvaluationContext(
                 enabled = testContext.enabled,
@@ -165,7 +170,7 @@ class GBExperimentRunTests {
     fun `forcing example`() {
         val gb = buildSDK(
             json = "",
-            attributes = mapOf("id" to 1)
+            attributes = mapOf("id" to 1.toGbNumber())
         )
         val experimentKey = "key-576"
         val experiment = GBExperiment(

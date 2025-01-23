@@ -13,6 +13,7 @@ import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBFeatureSource
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBValue
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
 /**
@@ -30,7 +31,7 @@ internal class GBFeatureEvaluator(
      */
     fun evaluateFeature(
         featureKey: String,
-        attributeOverrides: Map<String, Any>,
+        attributeOverrides: Map<String, GBValue>,
         evalContext: FeatureEvalContext = FeatureEvalContext(
             id = featureKey,
             evaluatedFeatures = mutableSetOf()
@@ -162,10 +163,14 @@ internal class GBFeatureEvaluator(
                                     attributeOverrides = attributeOverrides,
                                     attributes = evaluationContext.userContext.attributes,
                                 )
-                                    .mapValues { GBValue.from(it.value).gbSerialize() }
+                                    .mapValues { it.value.gbSerialize() }
                                 ,
                                 conditionObj = rule.condition,
-                                savedGroups = evaluationContext.savedGroups?.toJsonElement()?.jsonObject
+                                savedGroups = JsonObject(
+                                    evaluationContext.savedGroups
+                                        ?.mapValues { it.value.gbSerialize() }
+                                        ?: emptyMap()
+                                )
                             )
                         ) {
                             /**
@@ -347,8 +352,8 @@ internal class GBFeatureEvaluator(
      * The method that merge together attributes of Context and override attribute
      */
     private fun getAttributes(
-        attributes: Map<String, Any>, attributeOverrides: Map<String, Any>,
-    ): Map<String, Any> {
+        attributes: Map<String, GBValue>, attributeOverrides: Map<String, GBValue>,
+    ): Map<String, GBValue> {
         attributes.toMutableMap().putAll(attributeOverrides)
         return attributes
     }

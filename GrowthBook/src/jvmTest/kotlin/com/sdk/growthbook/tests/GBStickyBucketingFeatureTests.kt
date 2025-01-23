@@ -1,6 +1,5 @@
 package com.sdk.growthbook.tests
 
-import com.sdk.growthbook.utils.toHashMap
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBValue
@@ -41,7 +40,9 @@ class GBStickyBucketingFeatureTests {
                         item[1]
                     )
 
-                val attributes = testData.attributes.jsonObject.toHashMap()
+                val attributes = testData
+                    .attributes.jsonObject
+                    .mapValues { GBValue.from(it.value) }
 
                 val gbContext = GBContext(
                     apiKey = "",

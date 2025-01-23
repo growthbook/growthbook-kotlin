@@ -3,6 +3,7 @@ package com.sdk.growthbook.tests
 import com.sdk.growthbook.evaluators.EvaluationContext
 import com.sdk.growthbook.evaluators.UserContext
 import com.sdk.growthbook.utils.GBFeatures
+import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.StickyBucketAssignmentDocsType
 import com.sdk.growthbook.serializable_model.SerializableGBExperiment
@@ -87,8 +88,8 @@ class GBTestHelper {
 
         internal fun createTestScopeEvaluationContext(
             features: GBFeatures,
-            attributes: Map<String, Any>,
-            savedGroups: Map<String, Any>? = null,
+            attributes: Map<String, GBValue>,
+            savedGroups: Map<String, GBValue>? = null,
             forcedVariations: Map<String, Any> = emptyMap(),
             stickyBucketService: GBStickyBucketService? = null,
             onFeatureUsage: ((String, GBFeatureResult) -> Unit)? = null,

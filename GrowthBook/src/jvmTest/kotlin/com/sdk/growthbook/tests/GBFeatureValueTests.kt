@@ -2,9 +2,9 @@ package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.GBSDKBuilder
 import com.sdk.growthbook.GrowthBookSDK
-import com.sdk.growthbook.utils.toHashMap
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
 import com.sdk.growthbook.model.GBContext
+import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.serializable_model.gbDeserialize
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -38,7 +38,9 @@ class GBFeatureValueTests {
                         item[1]
                     )
 
-                val attributes = testData.attributes.jsonObject.toHashMap()
+                val attributes = testData
+                    .attributes.jsonObject
+                    .mapValues { GBValue.from(it.value) }
 
                 val gbContext = GBContext(
                     apiKey = "", hostURL = "",
@@ -59,7 +61,9 @@ class GBFeatureValueTests {
                 }
 
                 if (testData.savedGroups != null) {
-                    gbContext.savedGroups = testData.savedGroups.jsonObject
+                    gbContext.savedGroups = testData
+                        .savedGroups.jsonObject
+                        .mapValues { GBValue.from(it.value) }
                 }
 
                 val evaluator = GBFeatureEvaluator(
@@ -167,7 +171,9 @@ class GBFeatureValueTests {
                         item[1]
                     )
 
-                val attributes = testData.attributes.jsonObject.toHashMap()
+                val attributes = testData
+                    .attributes.jsonObject
+                    .mapValues { GBValue.from(it.value) }
 
                 val testScopeEvalContext = GBTestHelper.createTestScopeEvaluationContext(
                     attributes = attributes,

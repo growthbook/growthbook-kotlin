@@ -5,17 +5,16 @@ import com.sdk.growthbook.evaluators.EvaluationContext
 import com.sdk.growthbook.evaluators.UserContext
 import com.sdk.growthbook.features.FeaturesDataModel
 import com.sdk.growthbook.model.GBContext
+import com.sdk.growthbook.model.GBString
+import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.StickyBucketAssignmentDocsType
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.floatOrNull
 import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlin.math.pow
@@ -260,7 +259,7 @@ internal class GBUtils {
          */
         fun isFilteredOut(
             filters: List<GBFilter>?,
-            attributeOverrides: Map<String, Any>?,
+            attributeOverrides: Map<String, GBValue>?,
             evaluationContext: EvaluationContext,
 
             ): Boolean {
@@ -270,16 +269,14 @@ internal class GBUtils {
             return filters.any { filter: GBFilter ->
                 val hashAttribute: String = filter.attribute ?: "id"
 
-                val hashValueElement: JsonElement =
+                val hashValueElement: GBValue =
                     evaluationContext.userContext
-                        .attributes.toJsonElement()
-                        .jsonObject.getValue(hashAttribute)
+                        .attributes.getValue(hashAttribute)
 
-                if (hashValueElement is JsonNull) return@any true
-                if (hashValueElement !is JsonPrimitive) return@any true
+                if (hashValueElement is GBValue.Unknown) return@any true
+                if (hashValueElement.gbSerialize() !is JsonPrimitive) return@any true
 
-                val hashValuePrimitive: JsonPrimitive = hashValueElement.jsonPrimitive
-                val hashValue: String = hashValuePrimitive.toString()
+                val hashValue: String = hashValueElement.toHashValue()
 
                 if (hashValue.isEmpty()) return@any true
                 val hashVersion: Int = filter.hashVersion ?: 2
@@ -303,8 +300,8 @@ internal class GBUtils {
          * Determines if the user is part of a gradual feature rollout.
          */
         fun isIncludedInRollout(
-            attributes: Map<String, Any>,
-            attributeOverrides: Map<String, Any>,
+            attributes: Map<String, GBValue>,
+            attributeOverrides: Map<String, GBValue>,
             seed: String?,
             hashAttribute: String?,
             fallbackAttribute: String?,
@@ -344,7 +341,7 @@ internal class GBUtils {
         fun refreshStickyBuckets(
             context: GBContext,
             data: FeaturesDataModel?,
-            attributeOverrides: Map<String, Any>
+            attributeOverrides: Map<String, GBValue>
         ) {
             val stickyBucketService = context.stickyBucketService ?: return
 
@@ -363,7 +360,7 @@ internal class GBUtils {
         private fun getStickyBucketAttributes(
             context: GBContext,
             data: FeaturesDataModel?,
-            attributeOverrides: Map<String, Any>
+            attributeOverrides: Map<String, GBValue>
         ): Map<String, String> {
             val attributes = mutableMapOf<String, String>()
             context.stickyBucketIdentifierAttributes = context.stickyBucketIdentifierAttributes
@@ -414,8 +411,8 @@ internal class GBUtils {
             userContext: UserContext,
             expHashAttribute: String?,
             expFallBackAttribute: String?,
-            attributes: Map<String, Any>,
-            attributeOverrides: Map<String, Any>
+            attributes: Map<String, GBValue>,
+            attributeOverrides: Map<String, GBValue>
         ): Map<String, String> {
 
             val mergedAssignments = mutableMapOf<String, String>()
@@ -445,8 +442,9 @@ internal class GBUtils {
             val leftOperand =
                 stickyBucketAssignmentDocs["$expFallBackAttribute" +
                     "||${attributeOverrides[expFallBackAttribute]}"]?.attributeValue
+            val rightOperand = attributeOverrides[expFallBackAttribute]?.gbSerialize()?.jsonPrimitive?.content
 
-            if (leftOperand != attributeOverrides[expFallBackAttribute]) {
+            if (leftOperand != rightOperand) {
                 userContext.stickyBucketAssignmentDocs = emptyMap()
             }
 
@@ -474,7 +472,7 @@ internal class GBUtils {
             meta: List<GBVariationMeta> = emptyList(),
             expFallBackAttribute: String? = null,
             expHashAttribute: String? = "id",
-            attributeOverrides: Map<String, Any>
+            attributeOverrides: Map<String, GBValue>
         ): Pair<Int, Boolean?> {
             val id = getStickyBucketExperimentKey(experimentKey, experimentBucketVersion)
             val assignments = getStickyBucketAssignments(
@@ -551,24 +549,25 @@ internal class GBUtils {
         fun getHashAttribute(
             attr: String?,
             fallback: String? = null,
-            attributes: Map<String, Any>,
-            attributeOverrides: Map<String, Any>
+            attributes: Map<String, GBValue>,
+            attributeOverrides: Map<String, GBValue>
         ): Pair<String, String> {
             var hashAttribute = attr ?: "id"
             var hashValue = ""
 
             if (attributeOverrides[hashAttribute] != null) {
-                hashValue = attributeOverrides[hashAttribute].toString()
+                // hashValue = attributeOverrides[hashAttribute].toString()
+                hashValue = attributeOverrides[hashAttribute].toHashValue()
             } else if (attributes[hashAttribute] != null) {
-                hashValue = attributes[hashAttribute].toString()
+                hashValue = attributes[hashAttribute].toHashValue()
             }
 
             // if no match, try fallback
             if (hashValue.isEmpty() && fallback != null) {
                 if (attributeOverrides[fallback] != null) {
-                    hashValue = attributeOverrides[fallback].toString()
+                    hashValue = attributeOverrides[fallback].toHashValue()
                 } else if (attributes[fallback] != null) {
-                    hashValue = attributes[fallback].toString()
+                    hashValue = attributes[fallback].toHashValue()
                 }
 
                 if (hashValue.isNotEmpty()) {
@@ -596,5 +595,11 @@ internal class GBUtils {
                 jsonElement
             }
         }
+
+        private fun GBValue?.toHashValue(): String =
+            when(this) {
+                is GBString -> this.value // without quotes
+                else -> this?.gbSerialize().toString()
+            }
     }
 }
