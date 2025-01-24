@@ -3,6 +3,7 @@ package com.sdk.growthbook.tests
 import com.sdk.growthbook.utils.toHashMap
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
 import com.sdk.growthbook.model.GBContext
+import com.sdk.growthbook.serializable_model.gbDeserialize
 import com.sdk.growthbook.stickybucket.GBStickyBucketServiceImp
 import com.sdk.growthbook.utils.GBStickyAssignmentsDocument
 import com.sdk.growthbook.utils.GBStickyAttributeKey
@@ -57,6 +58,7 @@ class GBStickyBucketingFeatureTests {
 
                 if (testData.features != null) {
                     gbContext.features = testData.features
+                        .mapValues { it.value.gbDeserialize() }
                 }
                 if (testData.forcedVariations != null) {
                     gbContext.forcedVariations = testData.forcedVariations.toHashMap()
@@ -96,9 +98,17 @@ class GBStickyBucketingFeatureTests {
                         Json.decodeFromJsonElement(GBStickyAssignmentsDocument.serializer(), doc.value)
                 }
 
-                val evaluator = GBFeatureEvaluator()
+                val testScopeEvalContext =
+                    GBTestHelper.createTestScopeEvaluationContext(
+                        gbContext.features, attributes,
+                        stickyBucketService = service,
+                        stickyBucketAssignmentDocs = mapOfDocForContext,
+                        savedGroups = gbContext.savedGroups,
+                        forcedVariations = gbContext.forcedVariations,
+                    )
+
+                val evaluator = GBFeatureEvaluator(testScopeEvalContext)
                 val actualExperimentResult = evaluator.evaluateFeature(
-                    context = gbContext,
                     featureKey = item[3].jsonPrimitive.content,
                     attributeOverrides = attributes
                 ).experimentResult
@@ -157,7 +167,7 @@ class GBStickyBucketingFeatureTests {
                     && expectedExperimentResult?.hashUsed == actualExperimentResult?.hashUsed
                     && expectedExperimentResult?.passthrough == actualExperimentResult?.passthrough
 
-                    && expectedStickyAssignmentDocs == gbContext.stickyBucketAssignmentDocs
+                    && expectedStickyAssignmentDocs == testScopeEvalContext.userContext.stickyBucketAssignmentDocs
                 ) {
                     passedScenarios.add(status)
                 } else {

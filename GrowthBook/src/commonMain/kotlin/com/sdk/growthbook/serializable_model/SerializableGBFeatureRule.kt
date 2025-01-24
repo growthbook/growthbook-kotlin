@@ -1,45 +1,24 @@
-package com.sdk.growthbook.model
+package com.sdk.growthbook.serializable_model
 
-import com.sdk.growthbook.serializable_model.SerializableGBFeature
-import com.sdk.growthbook.serializable_model.SerializableGBFeatureRule
+import com.sdk.growthbook.model.GBFeatureRule
+import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.utils.GBBucketRange
-import com.sdk.growthbook.utils.GBCondition
 import com.sdk.growthbook.utils.GBFilter
+import com.sdk.growthbook.utils.GBParentConditionInterface
 import com.sdk.growthbook.utils.GBTrackData
 import com.sdk.growthbook.utils.GBVariationMeta
-import com.sdk.growthbook.utils.GBParentConditionInterface
 import com.sdk.growthbook.utils.OptionalProperty
+import com.sdk.growthbook.utils.OptionalPropertySerializer
 import com.sdk.growthbook.utils.RangeSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 
 /**
- * A Feature object consists of possible values plus rules for how to assign values to users.
- */
-data class GBFeature(
-
-    /**
-     * The default value (should use null if not specified)
-     */
-    internal val defaultValue: GBValue? = null,
-
-    /**
-     * Array of Rule objects that determine when and how the defaultValue gets overridden
-     */
-    val rules: List<GBFeatureRule>? = null
-)
-
-internal fun GBFeature.gbSerialize() =
-    SerializableGBFeature(
-        defaultValue = defaultValue?.gbSerialize(),
-        rules = rules?.map { it.gbSerialize() },
-    )
-
-/**
  * Rule object consists of various definitions to apply to calculate feature value
  */
-data class GBFeatureRule(
+@Serializable
+data class SerializableGBFeatureRule(
     /**
      * Unique feature rule id
      */
@@ -47,7 +26,7 @@ data class GBFeatureRule(
     /**
      * Optional targeting condition
      */
-    val condition: GBCondition? = null,
+    val condition: JsonElement? = null,
 
     /**
      * Each item defines a prerequisite where a `condition` must evaluate against
@@ -64,7 +43,8 @@ data class GBFeatureRule(
     /**
      * Immediately force a specific value (ignore every other option besides condition and coverage)
      */
-    val force: GBValue? = null,
+    @Serializable(with = OptionalPropertySerializer::class)
+    val force: OptionalProperty<JsonElement?> = OptionalProperty.NotPresent,
     /**
      * Run an experiment (A/B test) and randomly choose between these variations
      */
@@ -160,110 +140,40 @@ data class GBFeatureRule(
      * Array of tracking calls to fire
      */
     val tracks: ArrayList<GBTrackData>? = null
-) {
-    internal fun gbSerialize() =
-        SerializableGBFeatureRule(
-            id = id,
-            condition = condition,
-            parentConditions = parentConditions,
-            coverage = coverage,
-            force = if (force == null) OptionalProperty.NotPresent
-            else OptionalProperty.Present(force.gbSerialize()),
-            variations = variations,
-            key = key,
-            weights = weights,
-            namespace = namespace,
-            hashAttribute = hashAttribute,
-            hashVersion = hashVersion,
-            range = range,
-            ranges = ranges,
-            meta = meta,
-            filters = filters,
-            seed = seed,
-            name = name,
-            phase = phase,
-            fallbackAttribute = fallbackAttribute,
-            disableStickyBucketing = disableStickyBucketing,
-            bucketVersion = bucketVersion,
-            minBucketVersion = minBucketVersion,
-            tracks = tracks,
-        )
-}
-
-/**
- * Enum For defining feature value source
- */
-@Suppress("EnumEntryName")
-enum class GBFeatureSource {
-    /**
-     * Queried Feature doesn't exist in GrowthBook
-     */
-    unknownFeature,
-
-    /**
-     * Default Value for the Feature is being processed
-     */
-    defaultValue,
-
-    /**
-     * Forced Value for the Feature is being processed
-     */
-    force,
-
-    /**
-     * Experiment Value for the Feature is being processed
-     */
-    experiment,
-
-    /**
-     * CyclicPrerequisite Value for the Feature is being processed
-     */
-    cyclicPrerequisite,
-
-    /**
-     * Prerequisite Value for the Feature is being processed
-     */
-    prerequisite,
-
-    /**
-     * Override value for the Feature is being processed
-     */
-    override
-}
-
-/**
- * Result for Feature
- */
-data class GBFeatureResult(
-
-    /**
-     * The assigned value of the feature
-     */
-    val gbValue: GBValue?,
-
-    /**
-     * The assigned value cast to a boolean
-     */
-    val on: Boolean = false,
-
-    /**
-     * The assigned value cast to a boolean and then negated
-     */
-    val off: Boolean = !on,
-
-    /**
-     * One of "unknownFeature", "defaultValue", "force", "experiment",
-     * "cyclicPrerequisite" or "prerequisite"
-     */
-    val source: GBFeatureSource,
-
-    /**
-     * When source is "experiment", this will be the Experiment object used
-     */
-    val experiment: GBExperiment? = null,
-
-    /**
-     * When source is "experiment", this will be an ExperimentResult object
-     */
-    val experimentResult: GBExperimentResult? = null
 )
+
+internal fun SerializableGBFeatureRule.gbDeserialize() =
+    GBFeatureRule(
+        id = id,
+        condition = condition,
+        parentConditions = parentConditions,
+        coverage = coverage,
+        force = when(force) {
+            is OptionalProperty.Present -> {
+                if (force.value == null) null
+                else GBValue.from(force.value)
+            }
+            is OptionalProperty.NotPresent -> {
+                null
+            }
+        },
+
+        variations = variations,
+        key = key,
+        weights = weights,
+        namespace = namespace,
+        hashAttribute = hashAttribute,
+        hashVersion = hashVersion,
+        range = range,
+        ranges = ranges,
+        meta = meta,
+        filters = filters,
+        seed = seed,
+        name = name,
+        phase = phase,
+        fallbackAttribute = fallbackAttribute,
+        disableStickyBucketing = disableStickyBucketing,
+        bucketVersion = bucketVersion,
+        minBucketVersion = minBucketVersion,
+        tracks = tracks,
+    )

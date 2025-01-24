@@ -1,5 +1,6 @@
 package com.sdk.growthbook
 
+import com.sdk.growthbook.evaluators.EvaluationContext
 import com.sdk.growthbook.network.NetworkDispatcher
 import com.sdk.growthbook.utils.Crypto
 import com.sdk.growthbook.utils.GBCacheRefreshHandler
@@ -11,18 +12,23 @@ import com.sdk.growthbook.utils.Resource
 import com.sdk.growthbook.utils.getFeaturesFromEncryptedFeatures
 import com.sdk.growthbook.evaluators.GBExperimentEvaluator
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
+import com.sdk.growthbook.evaluators.UserContext
 import com.sdk.growthbook.features.FeaturesDataModel
 import com.sdk.growthbook.features.FeaturesDataSource
 import com.sdk.growthbook.features.FeaturesFlowDelegate
 import com.sdk.growthbook.features.FeaturesViewModel
+import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeatureResult
+import com.sdk.growthbook.model.GBJson
+import com.sdk.growthbook.model.GBNumber
+import com.sdk.growthbook.model.GBString
+import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.utils.toHashMap
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonElement
 
 typealias GBTrackingCallback = (GBExperiment, GBExperimentResult) -> Unit
 typealias GBFeatureUsageCallback = (featureKey: String, gbFeatureResult: GBFeatureResult) -> Unit
@@ -39,7 +45,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     private lateinit var networkDispatcher: NetworkDispatcher
     private lateinit var featuresViewModel: FeaturesViewModel
     private var attributeOverrides: Map<String, Any> = emptyMap()
-    private var forcedFeatures: Map<String, JsonElement> = emptyMap()
+    private var forcedFeatures: Map<String, Any> = emptyMap()
     private var savedGroups: Map<String, Any>? = emptyMap()
     private var assigned: MutableMap<String, Pair<GBExperiment, GBExperimentResult>> =
         mutableMapOf()
@@ -169,15 +175,48 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
 
     /**
      * The feature method takes a single string argument,
-     * which is the unique identifier for the feature and returns a FeatureResult object.
+     * which is the unique identifier for the feature and
+     * @returns a [GBFeatureResult] object
      */
     fun feature(id: String): GBFeatureResult {
-        return GBFeatureEvaluator().evaluateFeature(
-            context = gbContext,
+        val evaluator = GBFeatureEvaluator(
+            createEvaluationContext(), this.forcedFeatures,
+        )
+        return evaluator.evaluateFeature(
             featureKey = id,
             attributeOverrides = attributeOverrides,
-            forcedFeature = this.forcedFeatures
         )
+    }
+
+    /**
+     * The feature method takes a string argument,
+     * which is the unique identifier, and the type of the accessed feature.
+     * The supported types of accessed features are:
+     * [Boolean], [String], [Number], [Short],
+     * [Int], [Long], [Float], [Double], [GBJson]
+     *
+     * @returns a feature value typed with specified type
+     */
+    inline fun <reified V>feature(id: String): V? {
+        val listOfSupportedTypes = listOf(
+            Boolean::class, String::class,
+            Number::class, Short::class, Int::class,
+            Long::class, Float::class, Double::class,
+            GBJson::class,
+        )
+        if (V::class !in listOfSupportedTypes) {
+            return null
+        }
+
+        val gbFeatureResult = feature(id)
+        return when(val gbResultValue = gbFeatureResult.gbValue) {
+            is GBBoolean -> gbResultValue.value as? V
+            is GBString -> gbResultValue.value as? V
+            is GBNumber -> gbResultValue.value as? V
+            is GBJson -> gbResultValue as? V
+            is GBValue.Unknown -> null
+            null -> null
+        }
     }
 
     /**
@@ -192,8 +231,10 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
      * The run method takes an Experiment object and returns an ExperimentResult
      */
     fun run(experiment: GBExperiment): GBExperimentResult {
-        val result = GBExperimentEvaluator().evaluateExperiment(
-            context = gbContext,
+        val evaluator = GBExperimentEvaluator(
+            createEvaluationContext()
+        )
+        val result = evaluator.evaluateExperiment(
             experiment = experiment,
             attributeOverrides = attributeOverrides
         )
@@ -205,7 +246,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     /**
      * The setForcedFeatures method setup the Map of user's (forced) features
      */
-    fun setForcedFeatures(forcedFeatures: Map<String, JsonElement>) {
+    fun setForcedFeatures(forcedFeatures: Map<String, Any>) {
         this.forcedFeatures = forcedFeatures
     }
 
@@ -306,4 +347,22 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
             }
         }
     }
+
+    private fun createEvaluationContext() =
+        EvaluationContext(
+            enabled = gbContext.enabled,
+            features = gbContext.features,
+            loggingEnabled = gbContext.enableLogging,
+            savedGroups = gbContext.savedGroups,
+            forcedVariations = gbContext.forcedVariations,
+            trackingCallback = gbContext.trackingCallback,
+            stickyBucketService = gbContext.stickyBucketService,
+            onFeatureUsage = gbContext.onFeatureUsage,
+            userContext = UserContext(
+                qaMode = gbContext.qaMode,
+                attributes = gbContext.attributes,
+                stickyBucketAssignmentDocs = gbContext.stickyBucketAssignmentDocs,
+            )
+        )
+
 }

@@ -1,7 +1,13 @@
 package com.sdk.growthbook.tests
 
+import com.sdk.growthbook.evaluators.EvaluationContext
+import com.sdk.growthbook.evaluators.UserContext
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.model.GBExperiment
+import com.sdk.growthbook.model.GBFeatureResult
+import com.sdk.growthbook.model.StickyBucketAssignmentDocsType
+import com.sdk.growthbook.serializable_model.SerializableGBFeature
+import com.sdk.growthbook.stickybucket.GBStickyBucketService
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -78,14 +84,41 @@ class GBTestHelper {
             val array = testData.jsonObject["stickyBucket"] as JsonArray
             return array
         }
+
+        internal fun createTestScopeEvaluationContext(
+            features: GBFeatures,
+            attributes: Map<String, Any>,
+            savedGroups: Map<String, Any>? = null,
+            forcedVariations: Map<String, Any> = emptyMap(),
+            stickyBucketService: GBStickyBucketService? = null,
+            onFeatureUsage: ((String, GBFeatureResult) -> Unit)? = null,
+            stickyBucketAssignmentDocs: StickyBucketAssignmentDocsType? = null,
+        ) =
+            EvaluationContext(
+                enabled = true,
+                features = features,
+                loggingEnabled = true,
+                savedGroups = savedGroups,
+                trackingCallback = { _, _ -> },
+                onFeatureUsage = onFeatureUsage,
+                forcedVariations = forcedVariations,
+                stickyBucketService = stickyBucketService,
+                userContext = UserContext(
+                    qaMode = false,
+                    attributes = attributes,
+                    stickyBucketAssignmentDocs = stickyBucketAssignmentDocs,
+                )
+            )
     }
 }
+
+typealias SerializableFeatures = Map<String, SerializableGBFeature>
 
 @Serializable
 class GBContextTest(
     val attributes: JsonElement = JsonObject(HashMap()),
     val savedGroups: JsonElement = JsonObject(HashMap()),
-    val features: GBFeatures = emptyMap(),
+    val features: SerializableFeatures = emptyMap(),
     val qaMode: Boolean = false,
     val enabled: Boolean = true,
     val forcedVariations: HashMap<String, Int>? = null
@@ -93,7 +126,7 @@ class GBContextTest(
 
 @Serializable
 class GBFeaturesTest(
-    val features: GBFeatures? = null,
+    val features: SerializableFeatures? = null,
     val savedGroups: JsonElement? = null,
     val attributes: JsonElement = JsonObject(HashMap()),
     val forcedVariations: JsonObject? = null,

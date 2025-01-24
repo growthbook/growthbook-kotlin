@@ -94,7 +94,7 @@ class IntegrationTests {
             }
         )
 
-        growthBookSdk.feature("post-appointment-all-video-appointments-button")
+        growthBookSdk.feature<Boolean>("post-appointment-all-video-appointments-button")
     }
 
     @Test

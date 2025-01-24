@@ -87,7 +87,7 @@ internal class GBConditionEvaluator {
      * - attributes is the user's attributes
      * - condition to be evaluated
      */
-    fun evalCondition(attributes: JsonElement, conditionObj: GBCondition, savedGroups: JsonObject?): Boolean {
+    fun evalCondition(attributes: Map<String, JsonElement>, conditionObj: GBCondition, savedGroups: JsonObject?): Boolean {
 
         if (conditionObj is JsonArray) {
             return false
@@ -154,7 +154,7 @@ internal class GBConditionEvaluator {
     /**
      * Evaluate OR conditions against given attributes
      */
-    private fun evalOr(attributes: JsonElement, conditionObjs: JsonArray, savedGroups: JsonObject?): Boolean {
+    private fun evalOr(attributes: Map<String, JsonElement>, conditionObjs: JsonArray, savedGroups: JsonObject?): Boolean {
         // If conditionObjs is empty, return true
         if (conditionObjs.isEmpty()) {
             return true
@@ -175,7 +175,7 @@ internal class GBConditionEvaluator {
     /**
      * Evaluate AND conditions against given attributes
      */
-    private fun evalAnd(attributes: JsonElement, conditionObjs: JsonArray, savedGroups: JsonObject?): Boolean {
+    private fun evalAnd(attributes: Map<String, JsonElement>, conditionObjs: JsonArray, savedGroups: JsonObject?): Boolean {
 
         // Loop through the conditionObjects
         for (item in conditionObjs) {
@@ -246,8 +246,7 @@ internal class GBConditionEvaluator {
      * Given attributes and a dot-separated path string,
      * @return the value at that path (or null if the path doesn't exist)
      */
-    fun getPath(obj: JsonElement, key: String): JsonElement? {
-
+    fun getPath(attributes: Map<String, JsonElement>, key: String): JsonElement {
         val paths: ArrayList<String>
 
         if (key.contains(".")) {
@@ -257,16 +256,11 @@ internal class GBConditionEvaluator {
             paths.add(key)
         }
 
-        var element: JsonElement? = obj
+        var element: JsonElement = attributes[paths[0]] ?: JsonNull
 
-        for (path in paths) {
-            if (element == null || element is JsonArray) {
-                return null
-            }
+        for (path in paths.subList(1, paths.size)) {
             if (element is JsonObject) {
-                element = element[path]
-            } else {
-                return null
+                element = element[path] ?: JsonNull
             }
         }
 
@@ -344,6 +338,12 @@ internal class GBConditionEvaluator {
         if (attributeValue is JsonArray) {
             // Loop through items in attributeValue
             for (item in attributeValue) {
+                val attributes = if (item is JsonObject) {
+                    HashMap(item)
+                } else {
+                    mapOf("value" to item)
+                }
+
                 // If isOperatorObject(condition)
                 if (isOperatorObject(condition)) {
                     // If evalConditionValue(condition, item), break out of loop and return true
@@ -352,7 +352,7 @@ internal class GBConditionEvaluator {
                     }
                 }
                 // Else if evalCondition(item, condition), break out of loop and return true
-                else if (evalCondition(item, condition, savedGroups)) {
+                else if (evalCondition(attributes, condition, savedGroups)) {
                     return true
                 }
             }
@@ -386,10 +386,16 @@ internal class GBConditionEvaluator {
         // Evaluate EXISTS operator - whether condition contains attribute
         if (operator == "\$exists") {
             val targetPrimitiveValue = conditionValue.jsonPrimitive.content
-            if (targetPrimitiveValue == "false" && attributeValue == null) {
+            val gate2 = (attributeValue == null || attributeValue is JsonNull)
+            if (targetPrimitiveValue == "false" && gate2) {
                 return true
-            } else if (targetPrimitiveValue == "true" && attributeValue != null) {
-                return true
+            } else {
+                val gate3 = (targetPrimitiveValue == "true")
+                val gate4 = (attributeValue != null)
+                val gate5 = (attributeValue !is JsonNull)
+                if (gate3 && gate4 && gate5) {
+                    return true
+                }
             }
         }
 
@@ -451,6 +457,14 @@ internal class GBConditionEvaluator {
             val paddedVersionTarget = GBUtils.paddedVersionString(targetPrimitiveValue)
             val paddedVersionSource = GBUtils.paddedVersionString(sourcePrimitiveValue ?: "0")
 
+            fun template(
+                stringComparator: (String, String) -> Boolean,
+                numberComparator: (Double, Double) -> Boolean,
+            ) = comparisonTemplate(
+                attributeValue, conditionValue,
+                stringComparator, numberComparator
+            )
+
             when (operator) {
                 // Evaluate EQ operator - whether condition equals to attribute
                 "\$eq" -> {
@@ -462,55 +476,47 @@ internal class GBConditionEvaluator {
                 }
                 // Evaluate LT operator - whether attribute less than to condition
                 "\$lt" -> {
-                    if (
-                        attributeValue?.doubleOrNull != null && conditionValue.doubleOrNull != null
-                    ) {
-                        return (attributeValue?.doubleOrNull!! < conditionValue.doubleOrNull!!)
-                    }
-                    return if (sourcePrimitiveValue == null) {
-                        0.0 < targetPrimitiveValue.toDouble()
-                    } else {
-                        sourcePrimitiveValue < targetPrimitiveValue
-                    }
+                    return template(
+                        stringComparator = { actual, expected ->
+                            actual < expected
+                        },
+                        numberComparator = { actual, expected ->
+                            actual < expected
+                        },
+                    )
                 }
                 // Evaluate LTE operator - whether attribute less than or equal to condition
                 "\$lte" -> {
-                    if (
-                        attributeValue?.doubleOrNull != null && conditionValue.doubleOrNull != null
-                    ) {
-                        return (attributeValue?.doubleOrNull!! <= conditionValue.doubleOrNull!!)
-                    }
-                    return if (sourcePrimitiveValue == null) {
-                        0.0 <= targetPrimitiveValue.toDouble()
-                    } else {
-                        sourcePrimitiveValue <= targetPrimitiveValue
-                    }
+                    return template(
+                        stringComparator = { actual, expected ->
+                            actual <= expected
+                        },
+                        numberComparator = { actual, expected ->
+                            actual <= expected
+                        },
+                    )
                 }
                 // Evaluate GT operator - whether attribute greater than to condition
                 "\$gt" -> {
-                    if (
-                        attributeValue?.doubleOrNull != null && conditionValue.doubleOrNull != null
-                    ) {
-                        return (attributeValue?.doubleOrNull!! > conditionValue.doubleOrNull!!)
-                    }
-                    return if (sourcePrimitiveValue == null) {
-                        0.0 > targetPrimitiveValue.toDouble()
-                    } else {
-                        sourcePrimitiveValue > targetPrimitiveValue
-                    }
+                    return template(
+                        stringComparator = { actual, expected ->
+                            actual > expected
+                        },
+                        numberComparator = { actual, expected ->
+                            actual > expected
+                        },
+                    )
                 }
                 // Evaluate GTE operator - whether attribute greater than or equal to condition
                 "\$gte" -> {
-                    if (
-                        attributeValue?.doubleOrNull != null && conditionValue.doubleOrNull != null
-                    ) {
-                        return (attributeValue?.doubleOrNull!! >= conditionValue.doubleOrNull!!)
-                    }
-                    return if (sourcePrimitiveValue == null) {
-                        0.0 >= targetPrimitiveValue.toDouble()
-                    } else {
-                        sourcePrimitiveValue >= targetPrimitiveValue
-                    }
+                    return template(
+                        stringComparator = { actual, expected ->
+                            actual >= expected
+                        },
+                        numberComparator = { actual, expected ->
+                            actual >= expected
+                        },
+                    )
                 }
                 // Evaluate REGEX operator - whether attribute contains condition regex
                 "\$regex" -> {
@@ -540,7 +546,7 @@ internal class GBConditionEvaluator {
                 // than or equal the second version
                 "\$vlte" -> return paddedVersionSource <= paddedVersionTarget
                 "\$inGroup" -> {
-                    if (attributeValue != null && conditionValue != null) {
+                    if (attributeValue != null) {
                         return isIn(attributeValue, savedGroups?.get(conditionValue.content)?.jsonArray ?: JsonArray(
                             emptyList()
                         )
@@ -548,7 +554,7 @@ internal class GBConditionEvaluator {
                     }
                 }
                 "\$notInGroup" -> {
-                    if (attributeValue != null && conditionValue != null) {
+                    if (attributeValue != null /*&& conditionValue != null*/) {
                         return !isIn(attributeValue, savedGroups?.get(conditionValue.content)?.jsonArray ?: JsonArray(
                             emptyList()
                         )
@@ -578,5 +584,35 @@ internal class GBConditionEvaluator {
             }
         }
         return false
+    }
+
+    private enum class ComparisonType  {
+        Alphabetic, Numeric, Unknown,
+    }
+
+    private fun comparisonTemplate(
+        actualJsonPrimitive: JsonPrimitive?,
+        expectedJsonPrimitive: JsonPrimitive,
+        stringComparator: (String, String) -> Boolean,
+        numberComparator: (Double, Double) -> Boolean,
+    ): Boolean {
+        val gate1 = actualJsonPrimitive?.isString == true
+        val gate2 = (actualJsonPrimitive?.doubleOrNull != null) || actualJsonPrimitive is JsonNull
+        val comparisonType: ComparisonType = when {
+            gate1 && expectedJsonPrimitive.isString -> ComparisonType.Alphabetic
+            gate2 && expectedJsonPrimitive.doubleOrNull != null -> ComparisonType.Numeric
+            else -> ComparisonType.Unknown
+        }
+
+        val val0 = if (actualJsonPrimitive is JsonNull) 0.0
+        else actualJsonPrimitive?.doubleOrNull
+        val actualValue = val0 ?: 0.0
+        val expectedValue = expectedJsonPrimitive.doubleOrNull ?: 0.0
+
+        return when(comparisonType) {
+            ComparisonType.Alphabetic -> stringComparator.invoke(actualJsonPrimitive?.content ?: "", expectedJsonPrimitive.content)
+            ComparisonType.Numeric -> numberComparator.invoke(actualValue, expectedValue)
+            else -> false
+        }
     }
 }
