@@ -439,9 +439,9 @@ internal class GBUtils {
             val fallbackKey = if (fallbackValue.isEmpty()) null
             else "$fallbackAttribute||$fallbackValue"
 
-            val leftOperand =
-                stickyBucketAssignmentDocs["$expFallBackAttribute" +
-                    "||${attributeOverrides[expFallBackAttribute]}"]?.attributeValue
+            val tempKey = "$expFallBackAttribute" +
+                "||" + attributeOverrides[expFallBackAttribute].toHashValue()
+            val leftOperand = stickyBucketAssignmentDocs[tempKey]?.attributeValue
             val rightOperand = attributeOverrides[expFallBackAttribute]?.gbSerialize()?.jsonPrimitive?.content
 
             if (leftOperand != rightOperand) {
