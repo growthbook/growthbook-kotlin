@@ -103,7 +103,7 @@ internal class GBFeatureEvaluator(
                             }
 
                             val evalObj = parentResult.gbValue?.let { value ->
-                                mapOf("value" to value.gbSerialize())
+                                mapOf("value" to value)
                             } ?: emptyMap()
 
                             val evalCondition = GBConditionEvaluator().evalCondition(
@@ -162,9 +162,7 @@ internal class GBFeatureEvaluator(
                                 attributes = getAttributes(
                                     attributeOverrides = attributeOverrides,
                                     attributes = evaluationContext.userContext.attributes,
-                                )
-                                    .mapValues { it.value.gbSerialize() }
-                                ,
+                                ),
                                 conditionObj = rule.condition,
                                 savedGroups = JsonObject(
                                     evaluationContext.savedGroups

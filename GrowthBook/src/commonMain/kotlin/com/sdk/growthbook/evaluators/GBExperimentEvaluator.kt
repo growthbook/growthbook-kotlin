@@ -173,7 +173,6 @@ internal class GBExperimentEvaluator(
              */
             if (experiment.condition != null) {
                 val attr = evaluationContext.userContext.attributes
-                    .mapValues { it.value.gbSerialize() }
                 val evaluationResult = GBConditionEvaluator().evalCondition(
                     attr, experiment.condition!!,
                     JsonObject(
@@ -213,7 +212,7 @@ internal class GBExperimentEvaluator(
                         )
                     }
                     val evalObj = parentResult.gbValue?.let {
-                        mapOf("value" to it.gbSerialize())
+                        mapOf("value" to it)
                     } ?: emptyMap()
 
                     val evalCondition = GBConditionEvaluator().evalCondition(

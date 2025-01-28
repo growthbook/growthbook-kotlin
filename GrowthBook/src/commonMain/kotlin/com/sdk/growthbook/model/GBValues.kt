@@ -16,6 +16,7 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.long
 import kotlinx.serialization.json.longOrNull
 
+data object GBNull: GBValue()
 data class GBBoolean(val value: Boolean): GBValue()
 data class GBString(val value: String): GBValue()
 data class GBNumber(val value: Number): GBValue()
@@ -29,8 +30,15 @@ data class GBJson(
 sealed class GBValue {
     data object Unknown: GBValue()
 
+    fun isPrimitiveValue(): Boolean =
+        when(this) {
+            is GBNull, is GBBoolean, is GBString, is GBNumber -> true
+            else -> false
+        }
+
     internal fun gbSerialize(): JsonElement =
         when(this) {
+            is GBNull -> JsonNull
             is GBBoolean -> JsonPrimitive(this.value)
             is GBString -> JsonPrimitive(this.value)
             is GBNumber -> JsonPrimitive(this.value)
@@ -56,6 +64,7 @@ sealed class GBValue {
             when(jsonElement) {
                 is JsonPrimitive -> {
                     when {
+                        jsonElement is JsonNull -> GBNull
                         jsonElement.isString -> GBString(jsonElement.content)
                         jsonElement.intOrNull != null -> GBNumber(jsonElement.int)
                         jsonElement.longOrNull != null -> GBNumber(jsonElement.long)
