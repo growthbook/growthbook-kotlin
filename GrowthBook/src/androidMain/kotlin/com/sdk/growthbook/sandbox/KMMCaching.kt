@@ -5,6 +5,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import java.io.File
 import java.io.FileInputStream
+import java.security.MessageDigest
 import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -38,7 +39,7 @@ class CachingAndroid(localEncryptionKey: String? = null): CachingLayer {
         getFixedSecretKey(it)
     }
 
-    private val iv = generateIv()
+    private val iv = generateIvFromKey(localEncryptionKey ?: "")
 
     /**
      * Save Content in Android App Specific Internal Memory
@@ -152,16 +153,10 @@ class CachingAndroid(localEncryptionKey: String? = null): CachingLayer {
             return SecretKeySpec(keyBytesPadded, "AES")
         }
 
-        fun generateSecretKey(): SecretKey {
-            val keyGen = KeyGenerator.getInstance("AES")
-            keyGen.init(256)
-            return keyGen.generateKey()
-        }
-
-        fun generateIv(): ByteArray {
-            val iv = ByteArray(16)
-            SecureRandom().nextBytes(iv)
-            return iv
+        fun generateIvFromKey(secretKeyString: String): ByteArray {
+            val digest = MessageDigest.getInstance("SHA-256")
+            val hash = digest.digest(secretKeyString.toByteArray(Charsets.UTF_8))
+            return hash.copyOf(16) // Use the first 16 bytes as IV
         }
     }
 }
