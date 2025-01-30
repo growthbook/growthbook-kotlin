@@ -73,6 +73,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
                     enableLogging = context.enableLogging,
                 ),
                 encryptionKey = gbContext.encryptionKey,
+                localEncryptionKey = gbContext.localEncryptionKey
             )
         if (features != null) {
             gbContext.features = features

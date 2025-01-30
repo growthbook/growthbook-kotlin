@@ -33,6 +33,12 @@ data class GBContext(
     val encryptionKey: String?,
 
     /**
+     * Encryption key for Local Cache encrypted feature
+     */
+    val localEncryptionKey: String? = null,
+
+
+    /**
      * Map of user attributes that are used to assign variations
      */
     internal var attributes: Map<String, Any>,

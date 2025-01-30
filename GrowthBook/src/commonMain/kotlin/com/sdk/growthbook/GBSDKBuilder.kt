@@ -24,6 +24,7 @@ abstract class SDKBuilder(
     val attributes: Map<String, Any>,
     val trackingCallback: GBTrackingCallback,
     val encryptionKey: String?,
+    val localEncryptionKey: String? = null,
     val networkDispatcher: NetworkDispatcher,
     val remoteEval: Boolean,
     val enableLogging: Boolean,
@@ -79,12 +80,20 @@ class GBSDKBuilder(
     networkDispatcher: NetworkDispatcher,
     attributes: Map<String, Any>,
     encryptionKey: String? = null,
+    localEncryptionKey: String? = null,
     trackingCallback: GBTrackingCallback,
     remoteEval: Boolean = false,
     enableLogging: Boolean = false,
 ) : SDKBuilder(
-    apiKey, hostURL,
-    attributes, trackingCallback, encryptionKey, networkDispatcher, remoteEval, enableLogging
+    apiKey,
+    hostURL,
+    attributes,
+    trackingCallback,
+    encryptionKey,
+    localEncryptionKey,
+    networkDispatcher,
+    remoteEval,
+    enableLogging
 ) {
 
     private var refreshHandler: GBCacheRefreshHandler? = null
@@ -104,7 +113,7 @@ class GBSDKBuilder(
      */
     fun setStickyBucketService(
         stickyBucketService: GBStickyBucketService = GBStickyBucketServiceImp(
-            localStorage = CachingImpl.getLayer()
+            localStorage = CachingImpl.getLayer(localEncryptionKey)
         )
     ): GBSDKBuilder {
         this.stickyBucketService = stickyBucketService
@@ -120,7 +129,10 @@ class GBSDKBuilder(
     fun setPrefixForStickyBucketCachedDirectory(
         prefix: String = "gbStickyBuckets__"
     ): GBSDKBuilder {
-        this.stickyBucketService = GBStickyBucketServiceImp(prefix, CachingImpl.getLayer())
+        this.stickyBucketService = GBStickyBucketServiceImp(
+            prefix,
+            CachingImpl.getLayer(localEncryptionKey)
+        )
         return this
     }
 
@@ -148,6 +160,7 @@ class GBSDKBuilder(
             trackingCallback = trackingCallback,
             onFeatureUsage = featureUsageCallback,
             encryptionKey = encryptionKey,
+            localEncryptionKey = localEncryptionKey,
             remoteEval = remoteEval,
             enableLogging = enableLogging,
             stickyBucketService = stickyBucketService,
