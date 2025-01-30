@@ -1,8 +1,11 @@
 package com.sdk.growthbook.utils
 
 import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.sdk.growthbook.evaluators.EvaluationContext
+import com.sdk.growthbook.evaluators.UserContext
 import com.sdk.growthbook.features.FeaturesDataModel
 import com.sdk.growthbook.model.GBContext
+import com.sdk.growthbook.model.StickyBucketAssignmentDocsType
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -258,7 +261,7 @@ internal class GBUtils {
         fun isFilteredOut(
             filters: List<GBFilter>?,
             attributeOverrides: Map<String, Any>?,
-            context: GBContext,
+            evaluationContext: EvaluationContext,
 
             ): Boolean {
             if (filters == null) return false
@@ -268,7 +271,9 @@ internal class GBUtils {
                 val hashAttribute: String = filter.attribute ?: "id"
 
                 val hashValueElement: JsonElement =
-                    context.attributes.toJsonElement().jsonObject.getValue(hashAttribute)
+                    evaluationContext.userContext
+                        .attributes.toJsonElement()
+                        .jsonObject.getValue(hashAttribute)
 
                 if (hashValueElement is JsonNull) return@any true
                 if (hashValueElement !is JsonPrimitive) return@any true
@@ -298,6 +303,7 @@ internal class GBUtils {
          * Determines if the user is part of a gradual feature rollout.
          */
         fun isIncludedInRollout(
+            attributes: Map<String, Any>,
             attributeOverrides: Map<String, Any>,
             seed: String?,
             hashAttribute: String?,
@@ -305,15 +311,14 @@ internal class GBUtils {
             range: GBBucketRange?,
             coverage: Float?,
             hashVersion: Int?,
-            context: GBContext
         ): Boolean {
             if (range == null && coverage == null) return true
 
             val (_, hashValue) = getHashAttribute(
                 attr = hashAttribute,
                 fallback = fallbackAttribute,
+                attributes = attributes,
                 attributeOverrides = attributeOverrides,
-                context = context
             )
 
             val hash = hash(
@@ -367,7 +372,11 @@ internal class GBUtils {
 
             context.stickyBucketIdentifierAttributes?.forEach { attr ->
                 val hashValue =
-                    getHashAttribute(context, attr, attributeOverrides = attributeOverrides)
+                    getHashAttribute(
+                        attr = attr,
+                        attributes = context.attributes,
+                        attributeOverrides = attributeOverrides
+                    )
                 attributes[attr] = hashValue.second
             }
             return attributes
@@ -402,30 +411,31 @@ internal class GBUtils {
          * Also this method handle if assignments belong to user
          */
         private fun getStickyBucketAssignments(
-            context: GBContext,
+            userContext: UserContext,
             expHashAttribute: String?,
             expFallBackAttribute: String?,
+            attributes: Map<String, Any>,
             attributeOverrides: Map<String, Any>
         ): Map<String, String> {
 
             val mergedAssignments = mutableMapOf<String, String>()
 
             val stickyBucketAssignmentDocs =
-                context.stickyBucketAssignmentDocs ?: return mergedAssignments
+                userContext.stickyBucketAssignmentDocs ?: return mergedAssignments
 
             val (hashAttribute, hashValue) = getHashAttribute(
-                context = context,
                 attr = expHashAttribute,
                 fallback = null,
+                attributes = attributes,
                 attributeOverrides = attributeOverrides
             )
 
             val hashKey = "$hashAttribute||$hashValue"
 
             val (fallbackAttribute, fallbackValue) = getHashAttribute(
-                context = context,
                 attr = null,
                 fallback = expFallBackAttribute,
+                attributes = attributes,
                 attributeOverrides = attributeOverrides
             )
 
@@ -437,7 +447,7 @@ internal class GBUtils {
                     "||${attributeOverrides[expFallBackAttribute]}"]?.attributeValue
 
             if (leftOperand != attributeOverrides[expFallBackAttribute]) {
-                context.stickyBucketAssignmentDocs = emptyMap()
+                userContext.stickyBucketAssignmentDocs = emptyMap()
             }
 
             fallbackKey?.let { fallback ->
@@ -457,8 +467,8 @@ internal class GBUtils {
          * Method to get Sticky Bucket variations
          */
         fun getStickyBucketVariation(
-            context: GBContext,
             experimentKey: String,
+            userContext: UserContext,
             experimentBucketVersion: Int = 0,
             minExperimentBucketVersion: Int = 0,
             meta: List<GBVariationMeta> = emptyList(),
@@ -468,10 +478,11 @@ internal class GBUtils {
         ): Pair<Int, Boolean?> {
             val id = getStickyBucketExperimentKey(experimentKey, experimentBucketVersion)
             val assignments = getStickyBucketAssignments(
-                context = context,
+                userContext = userContext,
                 expHashAttribute = expHashAttribute,
                 expFallBackAttribute = expFallBackAttribute,
-                attributeOverrides = attributeOverrides
+                attributes = userContext.attributes,
+                attributeOverrides = attributeOverrides,
             )
 
             if (minExperimentBucketVersion > 0) {
@@ -505,16 +516,16 @@ internal class GBUtils {
          * Method for generate Sticky Bucket Assignment document
          */
         fun generateStickyBucketAssignmentDoc(
-            context: GBContext,
             attributeName: String,
             attributeValue: String,
-            assignments: Map<String, String>
+            assignments: Map<String, String>,
+            stickyBucketAssignmentDocs: StickyBucketAssignmentDocsType?,
         ): Triple<String, GBStickyAssignmentsDocument, Boolean> {
 
             val key = "$attributeName||$attributeValue"
 
             val existingAssignments =
-                context.stickyBucketAssignmentDocs?.get(key)?.assignments ?: emptyMap()
+                stickyBucketAssignmentDocs?.get(key)?.assignments ?: emptyMap()
 
             val newAssignments =
                 existingAssignments.toMutableMap().apply {
@@ -538,9 +549,9 @@ internal class GBUtils {
          * Method for get hash value by identifier
          */
         fun getHashAttribute(
-            context: GBContext,
             attr: String?,
             fallback: String? = null,
+            attributes: Map<String, Any>,
             attributeOverrides: Map<String, Any>
         ): Pair<String, String> {
             var hashAttribute = attr ?: "id"
@@ -548,16 +559,16 @@ internal class GBUtils {
 
             if (attributeOverrides[hashAttribute] != null) {
                 hashValue = attributeOverrides[hashAttribute].toString()
-            } else if (context.attributes[hashAttribute] != null) {
-                hashValue = context.attributes[hashAttribute].toString()
+            } else if (attributes[hashAttribute] != null) {
+                hashValue = attributes[hashAttribute].toString()
             }
 
             // if no match, try fallback
             if (hashValue.isEmpty() && fallback != null) {
                 if (attributeOverrides[fallback] != null) {
                     hashValue = attributeOverrides[fallback].toString()
-                } else if (context.attributes[fallback] != null) {
-                    hashValue = context.attributes[fallback].toString()
+                } else if (attributes[fallback] != null) {
+                    hashValue = attributes[fallback].toString()
                 }
 
                 if (hashValue.isNotEmpty()) {

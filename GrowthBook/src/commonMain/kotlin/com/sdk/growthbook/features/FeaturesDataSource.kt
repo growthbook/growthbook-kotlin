@@ -2,13 +2,14 @@ package com.sdk.growthbook.features
 
 import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.network.NetworkDispatcher
+import com.sdk.growthbook.serializable_model.SerializableFeaturesDataModel
+import com.sdk.growthbook.serializable_model.gbDeserialize
 import com.sdk.growthbook.utils.FeatureRefreshStrategy
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.utils.GBRemoteEvalParams
 import com.sdk.growthbook.utils.Resource
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.transform
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
 /**
@@ -43,10 +44,10 @@ internal class FeaturesDataSource(
         dispatcher.consumeGETRequest(request = getEndpoint(),
             onSuccess = { rawContent ->
                 val result = jsonParser.decodeFromString(
-                    deserializer = FeaturesDataModel.serializer(),
+                    deserializer = SerializableFeaturesDataModel.serializer(),
                     string = rawContent
                 )
-                result.also(success)
+                success.invoke(result.gbDeserialize())
             },
             onError = { apiTimeError ->
                 apiTimeError.also(failure)
@@ -62,8 +63,10 @@ internal class FeaturesDataSource(
         url = getEndpoint(FeatureRefreshStrategy.SERVER_SENT_EVENTS),
     ).transform { resource ->
         if (resource is Resource.Success) {
-            val featuresDataModel = jsonParser
-                .decodeFromString<FeaturesDataModel>(resource.data)
+            val serializableFeaturesDataModel = jsonParser.decodeFromString(
+                SerializableFeaturesDataModel.serializer(), resource.data
+            )
+            val featuresDataModel = serializableFeaturesDataModel.gbDeserialize()
 
             val gbFeatures = featuresDataModel.features
             emit(Resource.Success(gbFeatures))
@@ -105,10 +108,14 @@ internal class FeaturesDataSource(
             bodyParams = payload,
             onSuccess = { rawContent ->
                 val featureDataModel = jsonParser.decodeFromString(
-                    deserializer = FeaturesDataModel.serializer(),
+                    deserializer = SerializableFeaturesDataModel.serializer(),
                     string = rawContent
                 )
-                Resource.Success(featureDataModel).also(success)
+                success.invoke(
+                    Resource.Success(
+                        featureDataModel.gbDeserialize()
+                    )
+                )
             },
             onError = { error ->
                 Resource.Error(Exception(error.message)).also(failure)

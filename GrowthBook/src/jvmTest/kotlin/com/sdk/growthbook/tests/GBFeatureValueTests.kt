@@ -5,7 +5,10 @@ import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.utils.toHashMap
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
 import com.sdk.growthbook.model.GBContext
+import com.sdk.growthbook.serializable_model.gbDeserialize
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.BeforeTest
@@ -28,10 +31,6 @@ class GBFeatureValueTests {
         val passedScenarios: ArrayList<String> = ArrayList()
         for (item in evalConditions) {
             if (item is JsonArray) {
-                if (item[0].jsonPrimitive.content != "SavedGroups correctly pulled from context for force rule") {
-                    continue
-                }
-
                 val testData =
                     GBTestHelper.jsonParser.decodeFromJsonElement(
                         GBFeaturesTest.serializer(),
@@ -49,6 +48,7 @@ class GBFeatureValueTests {
                 )
                 if (testData.features != null) {
                     gbContext.features = testData.features
+                        .mapValues { it.value.gbDeserialize() }
                 }
                 if (testData.forcedVariations != null) {
                     gbContext.forcedVariations = testData.forcedVariations.toHashMap()
@@ -58,9 +58,14 @@ class GBFeatureValueTests {
                     gbContext.savedGroups = testData.savedGroups.jsonObject
                 }
 
-                val evaluator = GBFeatureEvaluator()
+                val evaluator = GBFeatureEvaluator(
+                    GBTestHelper.createTestScopeEvaluationContext(
+                        gbContext.features, attributes,
+                        savedGroups = gbContext.savedGroups,
+                        forcedVariations = gbContext.forcedVariations,
+                    )
+                )
                 val result = evaluator.evaluateFeature(
-                    context = gbContext,
                     featureKey = item[2].jsonPrimitive.content,
                     attributeOverrides = attributes
                 )
@@ -71,6 +76,8 @@ class GBFeatureValueTests {
                         item[3]
                     )
 
+                val resultJsonElement: JsonElement? = result.gbValue?.gbSerialize()
+                val resultJsonPrimitive =  resultJsonElement as? JsonPrimitive?
                 val status = item[0].toString() +
                     "\nExpected Result - " +
                     "\nValue - " + expectedResult.value.content +
@@ -80,14 +87,15 @@ class GBFeatureValueTests {
                     "\nExperiment - " + expectedResult.experiment?.key +
                     "\nExperiment Result - " + expectedResult.experimentResult?.variationId +
                     "\nActual result - " +
-                    "\nValue - " + result.value.toString() +
+                    "\nValue - " + resultJsonPrimitive?.content.toString() +
                     "\nOn - " + result.on.toString() +
                     "\nOff - " + result.off.toString() +
                     "\nSource - " + result.source +
                     "\nExperiment - " + result.experiment?.key +
                     "\nExperiment Result - " + result.experimentResult?.variationId + "\n\n"
 
-                if (result.value.toString() == expectedResult.value.content &&
+                if (
+                    resultJsonPrimitive?.content.toString() == expectedResult.value.content &&
                     result.on.toString() == expectedResult.on.toString() &&
                     result.off.toString() == expectedResult.off.toString() &&
                     result.source.toString() == expectedResult.source &&
@@ -149,7 +157,6 @@ class GBFeatureValueTests {
 
         for (item in evalConditions) {
             if (item is JsonArray) {
-
                 val testData =
                     GBTestHelper.jsonParser.decodeFromJsonElement(
                         GBFeaturesTest.serializer(),
@@ -158,29 +165,21 @@ class GBFeatureValueTests {
 
                 val attributes = testData.attributes.jsonObject.toHashMap()
 
-                val gbContext = GBContext(
-                    apiKey = "",
-                    hostURL = "",
-                    enabled = true,
+                val testScopeEvalContext = GBTestHelper.createTestScopeEvaluationContext(
                     attributes = attributes,
-                    forcedVariations = HashMap(),
-                    qaMode = false,
-                    trackingCallback = { _, _ -> },
+                    features = if (testData.features != null) {
+                        testData.features
+                            .mapValues { it.value.gbDeserialize() }
+                    } else {
+                        emptyMap()
+                    },
                     onFeatureUsage = { _, _ ->
                         actualNumberOfOnFeatureUsageCalls++
-                    },
-                    encryptionKey = ""
+                    }
                 )
-                if (testData.features != null) {
-                    gbContext.features = testData.features
-                }
-                if (testData.forcedVariations != null) {
-                    gbContext.forcedVariations = testData.forcedVariations.toHashMap()
-                }
 
-                val evaluator = GBFeatureEvaluator()
+                val evaluator = GBFeatureEvaluator(testScopeEvalContext)
                 evaluator.evaluateFeature(
-                    context = gbContext,
                     featureKey = item[2].jsonPrimitive.content,
                     attributeOverrides = attributes
                 )

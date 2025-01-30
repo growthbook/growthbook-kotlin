@@ -4,8 +4,10 @@ import com.sdk.growthbook.GBTrackingCallback
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.utils.GBStickyAssignmentsDocument
 import com.sdk.growthbook.utils.GBStickyAttributeKey
-import com.sdk.growthbook.evaluators.GBExperimentHelper
 import com.sdk.growthbook.stickybucket.GBStickyBucketService
+
+internal typealias FeatureUsageFuncCallback = (String, GBFeatureResult) -> Unit
+internal typealias StickyBucketAssignmentDocsType = Map<GBStickyAttributeKey, GBStickyAssignmentsDocument>
 
 /**
  * Defines the GrowthBook context.
@@ -51,7 +53,7 @@ data class GBContext(
     /**
      * Map of Sticky Bucket documents
      */
-    var stickyBucketAssignmentDocs: Map<GBStickyAttributeKey, GBStickyAssignmentsDocument>? = null,
+    var stickyBucketAssignmentDocs: StickyBucketAssignmentDocsType? = null,
 
     /**
      * List of user's attributes keys
@@ -76,7 +78,7 @@ data class GBContext(
     /**
      * A callback that will be invoked every time a feature is viewed. Listen for feature usage events
      */
-    val onFeatureUsage: ((String, GBFeatureResult) -> Unit)? = null,
+    val onFeatureUsage: FeatureUsageFuncCallback? = null,
 
     /**
      * Flag which defines whether to use Remote Evaluation
@@ -94,8 +96,6 @@ data class GBContext(
     // Keys are unique identifiers for the features and the values are Feature objects.
     // Feature definitions - To be pulled from API / Cache
     internal var features: GBFeatures = HashMap()
-
-    internal val experimentHelper: GBExperimentHelper = GBExperimentHelper()
 }
 
 /**

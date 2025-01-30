@@ -5,41 +5,37 @@ import com.sdk.growthbook.utils.GBTrackData
 import com.sdk.growthbook.utils.GBUtils
 import com.sdk.growthbook.utils.toJsonElement
 import com.sdk.growthbook.model.FeatureEvalContext
-import com.sdk.growthbook.model.GBContext
+import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBFeatureSource
-import kotlinx.serialization.json.JsonElement
+import com.sdk.growthbook.model.GBNumber
+import com.sdk.growthbook.model.GBValue
 import kotlinx.serialization.json.jsonObject
-import com.sdk.growthbook.utils.OptionalProperty
 
 /**
  * Feature Evaluator Class
  * Takes Context and Feature Key
  * Returns Calculated Feature Result against that key
  */
-internal class GBFeatureEvaluator {
-
+internal class GBFeatureEvaluator(
+    private val evaluationContext: EvaluationContext,
+    private val forcedFeature: Map<String, Any> = emptyMap()
+) {
     /**
      * Takes Context and Feature Key
      * Returns Calculated Feature Result against that key
      */
     fun evaluateFeature(
-        context: GBContext,
         featureKey: String,
         attributeOverrides: Map<String, Any>,
         evalContext: FeatureEvalContext = FeatureEvalContext(
             id = featureKey,
             evaluatedFeatures = mutableSetOf()
         ),
-        forcedFeature: Map<String, JsonElement> = emptyMap()
     ): GBFeatureResult {
-        /**
-         * This callback serves for listening for feature usage events
-         */
-        val onFeatureUsageCallback = context.onFeatureUsage
         
         try {
 
@@ -47,12 +43,13 @@ internal class GBFeatureEvaluator {
              * Global override
              */
             if (forcedFeature.containsKey(featureKey)) {
-                if (context.enableLogging) {
+                if (evaluationContext.loggingEnabled) {
                     println("Global override for forced feature with key: $featureKey and value ${forcedFeature[featureKey]}")
                 }
                 return prepareResult(
-                    value = forcedFeature[featureKey],
-                    source = GBFeatureSource.override
+                    featureKey = featureKey,
+                    gbValue = forcedFeature[featureKey]?.let(GBValue::from),
+                    source = GBFeatureSource.override,
                 )
             }
 
@@ -60,25 +57,21 @@ internal class GBFeatureEvaluator {
             /**
              * block that handle recursion
              */
-            if (context.enableLogging) {
+            if (evaluationContext.loggingEnabled) {
                 println("evaluateFeature: circular dependency detected:")
             }
             if (evalContext.evaluatedFeatures.contains(featureKey)) {
                 val featureResultWhenCircularDependencyDetected = prepareResult(
-                    value = null,
+                    featureKey = featureKey,
+                    gbValue = null,
                     source = GBFeatureSource.cyclicPrerequisite
-                )
-                
-                onFeatureUsageCallback?.invoke(
-                    featureKey, 
-                    featureResultWhenCircularDependencyDetected
                 )
 
                 return featureResultWhenCircularDependencyDetected
             }
             evalContext.evaluatedFeatures.add(featureKey)
 
-            val targetFeature: GBFeature = context.features.getValue(featureKey)
+            val targetFeature: GBFeature = evaluationContext.features.getValue(featureKey)
 
             /**
              * Loop through the feature rules (if any)
@@ -94,7 +87,6 @@ internal class GBFeatureEvaluator {
                     if (rule.parentConditions != null) {
                         for (parentCondition in rule.parentConditions) {
                             val parentResult = evaluateFeature(
-                                context = context,
                                 featureKey = parentCondition.id,
                                 attributeOverrides = attributeOverrides,
                                 evalContext = evalContext
@@ -103,27 +95,20 @@ internal class GBFeatureEvaluator {
                              * break out for cyclic prerequisites
                              */
                             if (parentResult.source == GBFeatureSource.cyclicPrerequisite) {
-                                val featureResultWhenCircularDependencyDetected = prepareResult(
-                                    value = null,
-                                    source = GBFeatureSource.cyclicPrerequisite
+                                return prepareResult(
+                                    featureKey, null,
+                                    GBFeatureSource.cyclicPrerequisite,
                                 )
-                                
-                                onFeatureUsageCallback?.invoke(
-                                    featureKey,
-                                    featureResultWhenCircularDependencyDetected
-                                )
-
-                                return featureResultWhenCircularDependencyDetected
                             }
 
-                            val evalObj = parentResult.value?.let { value ->
-                                mapOf("value" to value)
+                            val evalObj = parentResult.gbValue?.let { value ->
+                                mapOf("value" to value.gbSerialize())
                             } ?: emptyMap()
 
                             val evalCondition = GBConditionEvaluator().evalCondition(
-                                attributes = evalObj.toJsonElement(),
+                                attributes = evalObj,
                                 conditionObj = parentCondition.condition,
-                                savedGroups = context.savedGroups?.toJsonElement()?.jsonObject
+                                savedGroups = evaluationContext.savedGroups?.toJsonElement()?.jsonObject
                             )
 
                             if (!evalCondition) {
@@ -132,21 +117,11 @@ internal class GBFeatureEvaluator {
                                  * blocking prerequisite eval failed: feature evaluation fails
                                  */
                                 if (parentCondition.gate != false) {
-                                    if (context.enableLogging) {
+                                    if (evaluationContext.loggingEnabled) {
                                         println("Feature blocked by prerequisite")
                                     }
                                     
-                                    val featureResultWhenBlockedByPrerequisite = prepareResult(
-                                        value = null,
-                                        source = GBFeatureSource.prerequisite
-                                    )
-                                    
-                                    onFeatureUsageCallback?.invoke(
-                                        featureKey, 
-                                        featureResultWhenBlockedByPrerequisite
-                                    )
-                                    
-                                    return featureResultWhenBlockedByPrerequisite
+                                    return prepareResult(featureKey, null, GBFeatureSource.prerequisite)
                                 }
                                 /**
                                  * non-blocking prerequisite eval failed: break out
@@ -163,8 +138,8 @@ internal class GBFeatureEvaluator {
                     if (rule.filters != null) {
                         if (GBUtils.isFilteredOut(
                                 filters = rule.filters,
-                                attributeOverrides = context.attributes,
-                                context = context
+                                evaluationContext = evaluationContext,
+                                attributeOverrides = evaluationContext.userContext.attributes,
                             )
                         ) {
                             /**
@@ -177,18 +152,20 @@ internal class GBFeatureEvaluator {
                     /**
                      * Feature value is being forced
                      */
-                    if (rule.force is OptionalProperty.Present) {
+                    if (rule.force != null) {
 
                         /**
                          * If it's a conditional rule, skip if the condition doesn't pass
                          */
                         if (rule.condition != null && !GBConditionEvaluator().evalCondition(
                                 attributes = getAttributes(
-                                    context = context,
-                                    attributeOverrides = attributeOverrides
-                                ).toJsonElement(),
+                                    attributeOverrides = attributeOverrides,
+                                    attributes = evaluationContext.userContext.attributes,
+                                )
+                                    .mapValues { GBValue.from(it.value).gbSerialize() }
+                                ,
                                 conditionObj = rule.condition,
-                                savedGroups = context.savedGroups?.toJsonElement()?.jsonObject
+                                savedGroups = evaluationContext.savedGroups?.toJsonElement()?.jsonObject
                             )
                         ) {
                             /**
@@ -197,7 +174,7 @@ internal class GBFeatureEvaluator {
                             continue
                         }
 
-                        val gate1 = (context.stickyBucketService != null)
+                        val gate1 = (evaluationContext.stickyBucketService != null)
                         val gate2 = (rule.disableStickyBucketing != true)
                         val shouldFallbackAttributeBePassed = gate1 && gate2
 
@@ -212,8 +189,8 @@ internal class GBFeatureEvaluator {
                                 range = rule.range,
                                 coverage = rule.coverage,
                                 hashVersion = rule.hashVersion,
-                                context = context,
-                                attributeOverrides = attributeOverrides
+                                attributeOverrides = attributeOverrides,
+                                attributes = evaluationContext.userContext.attributes,
                             )
                         ) {
                             /**
@@ -229,12 +206,10 @@ internal class GBFeatureEvaluator {
                             rule.tracks.forEach { track: GBTrackData ->
                                 if (!GBExperimentHelper().isTracked(
                                         experiment = track.experiment,
-                                        result = track.result.experimentResult
+                                        result = track.result
                                     )
                                 ) {
-                                    track.result.experimentResult?.let {
-                                        context.trackingCallback(track.experiment, it)
-                                    }
+                                    evaluationContext.trackingCallback(track.experiment, track.result)
                                 }
                             }
                         }
@@ -242,32 +217,22 @@ internal class GBFeatureEvaluator {
                         if (rule.range == null) {
                             if (rule.coverage != null) {
                                 val key = rule.hashAttribute ?: Constants.ID_ATTRIBUTE_KEY
-                                val attributeValue = context.attributes[key]?.toString()
+                                val attributeValue = evaluationContext.userContext.attributes[key]?.toString()
                                 if (attributeValue.isNullOrEmpty()) {
                                     continue@ruleLoop
                                 }
                                 val hashFNV = GBUtils.hash(
-                                    seed = featureKey,
+                                    seed = rule.seed,
                                     stringValue = attributeValue,
-                                    hashVersion = 1
+                                    hashVersion = rule.hashVersion,
                                 ) ?: 0f
                                 if (hashFNV > rule.coverage) {
                                     continue@ruleLoop
                                 }
                             }
                         }
-                        val forcedFeatureResult =
-                            prepareResult(
-                                value = rule.force.value,
-                                source = GBFeatureSource.force
-                            )
 
-                        onFeatureUsageCallback?.invoke(
-                            featureKey,
-                            forcedFeatureResult
-                        )
-
-                        return forcedFeatureResult
+                        return prepareResult(featureKey, rule.force, GBFeatureSource.force)
                     } else {
 
                         val variation = rule.variations
@@ -301,27 +266,20 @@ internal class GBFeatureEvaluator {
                             /**
                              * Only return a value if the user is part of the experiment
                              */
-                            val result = GBExperimentEvaluator()
+                            val result = GBExperimentEvaluator(evaluationContext)
                                 .evaluateExperiment(
                                     featureId = featureKey,
-                                    context = context,
                                     experiment = exp,
                                     attributeOverrides = attributeOverrides
                                 )
                             if (result.inExperiment && (result.passthrough != true)) {
-                                val experimentFeatureResult = prepareResult(
-                                    value = result.value,
+                                return prepareResult(
+                                    featureKey = featureKey,
+                                    gbValue = GBValue.from(result.value),
                                     source = GBFeatureSource.experiment,
                                     experiment = exp,
                                     experimentResult = result
                                 )
-
-                                onFeatureUsageCallback?.invoke(
-                                    featureKey,
-                                    experimentFeatureResult
-                                )
-
-                                return experimentFeatureResult
                             }
                         } else {
                             continue
@@ -333,33 +291,21 @@ internal class GBFeatureEvaluator {
             /**
              * Return (value = defaultValue or null, source = defaultValue)
              */
-            val defaultFeatureResult = prepareResult(
-                value = targetFeature.defaultValue,
+            return prepareResult(
+                featureKey = featureKey,
+                gbValue = targetFeature.defaultValue,
                 source = GBFeatureSource.defaultValue
             )
-
-            onFeatureUsageCallback?.invoke(
-                featureKey,
-                defaultFeatureResult
-            )
-
-            return defaultFeatureResult
         } catch (exception: Exception) {
             /**
              * If the key doesn't exist in context.features, return immediately
              * (value = null, source = unknownFeature).
              */
-            val emptyFeatureResult = prepareResult(
-                value = null,
+            return prepareResult(
+                featureKey = featureKey,
+                gbValue = null,
                 source = GBFeatureSource.unknownFeature
             )
-
-            onFeatureUsageCallback?.invoke(
-                featureKey,
-                emptyFeatureResult
-            )
-
-            return emptyFeatureResult
         }
     }
 
@@ -369,33 +315,41 @@ internal class GBFeatureEvaluator {
      * on and off, which are just the value cast to booleans.
      */
     private fun prepareResult(
-        value: JsonElement?,
+        featureKey: String,
+        gbValue: GBValue?,
         source: GBFeatureSource,
         experiment: GBExperiment? = null,
         experimentResult: GBExperimentResult? = null
     ): GBFeatureResult {
 
-        val isFalse = value == null || value.toString() == "false" || value.toString()
-            .isEmpty() || value.toString() == "0"
+        val gate2 = (gbValue is GBBoolean && !gbValue.value)
+        val gate3 = (gbValue is GBNumber && (gbValue.value == 0))
+        val isFalse = gbValue == null || gate2 || gate3
 
-
-        return GBFeatureResult(
-            value = value,
+        //val castResult = gbValue as? V
+        val gbFeatureResult = GBFeatureResult(
+            gbValue = gbValue,
             on = !isFalse,
             off = isFalse,
             source = source,
             experiment = experiment,
             experimentResult = experimentResult
         )
+
+        evaluationContext.onFeatureUsage?.invoke(
+            featureKey, gbFeatureResult,
+        )
+
+        return gbFeatureResult
     }
 
     /**
      * The method that merge together attributes of Context and override attribute
      */
     private fun getAttributes(
-        context: GBContext, attributeOverrides: Map<String, Any>,
+        attributes: Map<String, Any>, attributeOverrides: Map<String, Any>,
     ): Map<String, Any> {
-        context.attributes.toMutableMap().putAll(attributeOverrides)
-        return context.attributes
+        attributes.toMutableMap().putAll(attributeOverrides)
+        return attributes
     }
 }

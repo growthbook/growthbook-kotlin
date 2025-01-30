@@ -40,12 +40,12 @@ internal class VerifySDKReturnFeatureValues {
 
         // maybe we should think about Generic type of value just like in Java SDK
 
-        assertEquals(true, sdkInstance.feature("bool_feature_true").value?.jsonPrimitive?.booleanOrNull)
-        assertEquals(false, sdkInstance.feature("bool_feature_false").value?.jsonPrimitive?.booleanOrNull)
-        assertEquals("Default value", sdkInstance.feature("string_feature").value?.jsonPrimitive?.contentOrNull)
+        assertEquals(true, sdkInstance.feature<Boolean>("bool_feature_true"))
+        assertEquals(false, sdkInstance.feature<Boolean>("bool_feature_false"))
+        assertEquals("Default value", sdkInstance.feature<String>("string_feature"))
 
-        assertEquals(888, sdkInstance.feature("number_feature").value?.jsonPrimitive?.intOrNull)
-        assertEquals(-1, sdkInstance.feature("number_feature_negative").value?.jsonPrimitive?.intOrNull)
+        assertEquals(888, sdkInstance.feature<Int>("number_feature"))
+        assertEquals(-1, sdkInstance.feature<Int>("number_feature_negative"))
     }
 
     @Test
@@ -83,7 +83,7 @@ internal class VerifySDKReturnFeatureValues {
         val sdkInstance = buildSDK(json, attributes)
         assertEquals(
             expected = "Default value for brand:KZ",
-            actual = sdkInstance.feature("string_feature").value?.jsonPrimitive?.contentOrNull
+            actual = sdkInstance.feature<String>("string_feature"),
         )
     }
 
