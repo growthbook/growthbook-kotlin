@@ -40,7 +40,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         val viewModel = FeaturesViewModel(
             this,
             FeaturesDataSource(MockNetworkClient(MockResponse.successResponse, null)),
-            "3tfeoyW0wlo47bDnbWDkxg=="
+            "3tfeoyW0wlo47bDnbWDkxg==", false,
         )
 
         viewModel.fetchFeatures()
@@ -60,7 +60,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 MockNetworkClient(
                     MockResponse.successResponseEncryptedFeatures, null
                 )
-            ), "3tfeoyW0wlo47bDnbWDkxg=="
+            ), "3tfeoyW0wlo47bDnbWDkxg==", false,
         )
 
         viewModel.fetchFeatures()
@@ -81,7 +81,8 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 MockNetworkClient(
                     null, Throwable("UNKNOWN", null)
                 )
-            )
+            ),
+            cachingEnabled = false,
         )
 
         viewModel.fetchFeatures()
@@ -104,6 +105,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 )
             ),
             encryptionKey = "",
+            cachingEnabled = false,
         )
         viewModel.fetchFeatures()
 
@@ -126,7 +128,8 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                     error = null
                 )
             ),
-            encryptionKey = "3tfeoyW0wlo47bDnbWDkxg=="
+            encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
+            cachingEnabled = false,
         )
         val forcedFeature = mapOf("feature" to 123)
         val forcedVariation = mapOf("feature" to 123)
@@ -157,7 +160,8 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                     error = Error()
                 )
             ),
-            encryptionKey = "3tfeoyW0wlo47bDnbWDkxg=="
+            encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
+            cachingEnabled = false,
         )
         val forcedFeature = mapOf("feature" to 123)
         val forcedVariation = mapOf("feature" to 123)
