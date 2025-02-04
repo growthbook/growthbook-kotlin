@@ -21,7 +21,7 @@ data class GBFeature(
     /**
      * The default value (should use null if not specified)
      */
-    internal val defaultValue: GBValue? = null,
+    val defaultValue: GBValue? = null,
 
     /**
      * Array of Rule objects that determine when and how the defaultValue gets overridden
