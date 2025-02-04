@@ -23,7 +23,7 @@ class AndroidCachingTest {
     @Test
     fun testActualLayer() {
         val cachingMgr = CachingImpl
-        assertTrue(cachingMgr.getLayer() is CachingAndroid)
+        assertTrue(cachingMgr.getLayer("") is CachingAndroid)
     }
 
     @Test

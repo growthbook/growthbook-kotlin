@@ -3,7 +3,7 @@ package com.sdk.growthbook.sandbox
 import kotlinx.serialization.json.JsonElement
 
 internal actual object CachingImpl {
-    actual fun getLayer() : CachingLayer {
+    actual fun getLayer(localEncryptionKey: String?): CachingLayer {
         return CachingJvm()
     }
 }

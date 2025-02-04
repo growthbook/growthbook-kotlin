@@ -41,5 +41,5 @@ internal fun <T> CachingLayer.putData(
  * Expectation of Implementation of Caching Layer in respective Library - Android, iOS, JS
  */
 internal expect object CachingImpl {
-    fun getLayer(): CachingLayer
+    fun getLayer(localEncryptionKey: String?): CachingLayer
 }
