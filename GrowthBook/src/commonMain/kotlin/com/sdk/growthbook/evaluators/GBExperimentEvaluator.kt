@@ -1,6 +1,7 @@
 package com.sdk.growthbook.evaluators
 
 import kotlinx.serialization.json.jsonObject
+import com.sdk.growthbook.model.GBJson
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBFeatureSource
@@ -171,8 +172,10 @@ internal class GBExperimentEvaluator(
              */
             if (experiment.condition != null) {
                 val attr = evaluationContext.userContext.attributes
+                val conditionObj: GBJson = experiment.condition!!.let(GBValue::from) as? GBJson
+                    ?: GBJson(emptyMap())
                 val evaluationResult = GBConditionEvaluator().evalCondition(
-                    attr, experiment.condition!!.let(GBValue::from),
+                    attr, conditionObj,
                     evaluationContext.savedGroups,
                 )
                 if (!evaluationResult) {
@@ -210,9 +213,11 @@ internal class GBExperimentEvaluator(
                         mapOf("value" to it)
                     } ?: emptyMap()
 
+                    val conditionObj: GBJson = parentCondition.condition.let(GBValue::from) as? GBJson
+                        ?: GBJson(emptyMap())
                     val evalCondition = GBConditionEvaluator().evalCondition(
                         attributes = evalObj,
-                        conditionObj = parentCondition.condition.let(GBValue::from),
+                        conditionObj = conditionObj,
                         savedGroups = evaluationContext.savedGroups,
                     )
 

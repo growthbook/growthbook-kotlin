@@ -81,63 +81,55 @@ internal class GBConditionEvaluator {
      * - attributes is the user's attributes
      * - condition to be evaluated
      */
-    fun evalCondition(attributes: Map<String, GBValue>, conditionObj: GBValue, savedGroups: Map<String, GBValue>?): Boolean {
-
-        if (conditionObj is GBArray) {
-            return false
-        } else {
-            val gbJson = conditionObj as? GBJson ?: return true
-
-            // Loop through the conditionObj key/value pairs
-            for ((key, value) in gbJson) {
-                when (key) {
-                    "\$or" -> {
-                        // If conditionObj has a key $or, return evalOr(attributes, condition["$or"])
-                        val targetItems = conditionObj[key] as? GBArray
-                        if (targetItems != null) {
-                            if (!evalOr(attributes, targetItems, savedGroups)) {
-                                return false
-                            }
+    fun evalCondition(attributes: Map<String, GBValue>, conditionObj: GBJson, savedGroups: Map<String, GBValue>?): Boolean {
+        for ((key, value) in conditionObj) {
+            when (key) {
+                "\$or" -> {
+                    // If conditionObj has a key $or, return evalOr(attributes, condition["$or"])
+                    val targetItems = conditionObj[key] as? GBArray
+                    if (targetItems != null) {
+                        if (!evalOr(attributes, targetItems, savedGroups)) {
+                            return false
                         }
                     }
+                }
 
-                    "\$nor" -> {
-                        // If conditionObj has a key $nor, return !evalOr(attributes, condition["$nor"])
-                        val targetItems = conditionObj[key] as? GBArray
-                        if (targetItems != null) {
-                            if (evalOr(attributes, targetItems, savedGroups)) {
-                                return false
-                            }
+                "\$nor" -> {
+                    // If conditionObj has a key $nor, return !evalOr(attributes, condition["$nor"])
+                    val targetItems = conditionObj[key] as? GBArray
+                    if (targetItems != null) {
+                        if (evalOr(attributes, targetItems, savedGroups)) {
+                            return false
                         }
                     }
+                }
 
-                    "\$and" -> {
-                        // If conditionObj has a key $and, return !evalAnd(attributes, condition["$and"])
-                        val targetItems = conditionObj[key] as? GBArray
-                        if (targetItems != null) {
-                            if (!evalAnd(attributes, targetItems, savedGroups)) {
-                                return false
-                            }
+                "\$and" -> {
+                    // If conditionObj has a key $and, return !evalAnd(attributes, condition["$and"])
+                    val targetItems = conditionObj[key] as? GBArray
+                    if (targetItems != null) {
+                        if (!evalAnd(attributes, targetItems, savedGroups)) {
+                            return false
                         }
                     }
+                }
 
-                    "\$not" -> {
-                        // If conditionObj has a key $not, return !evalCondition(attributes, condition["$not"])
-                        val targetItem = conditionObj[key]
-                        if (targetItem != null) {
-                            if (evalCondition(attributes, targetItem, savedGroups)) {
-                                return false
-                            }
+                "\$not" -> {
+                    // If conditionObj has a key $not, return !evalCondition(attributes, condition["$not"])
+                    val targetItem = conditionObj[key] as? GBJson
+                    if (targetItem != null) {
+                        if (evalCondition(attributes, targetItem, savedGroups)) {
+                            return false
                         }
                     }
+                }
 
-                    else -> {
-                        val element = getPath(attributes, key)
-                            // If evalConditionValue(value, getPath(attributes, key)) is false,
-                            // break out of loop and return false
-                            if (!evalConditionValue(value, element, savedGroups)) {
-                                return false
-                            }
+                else -> {
+                    val element = getPath(attributes, key)
+                    // If evalConditionValue(value, getPath(attributes, key)) is false,
+                    // break out of loop and return false
+                    if (!evalConditionValue(value, element, savedGroups)) {
+                        return false
                     }
                 }
             }
@@ -157,9 +149,11 @@ internal class GBConditionEvaluator {
         } else {
             // Loop through the conditionObjects
             for (item in conditionObjs) {
+                val gbJson = item as? GBJson ?: return false
+
                 // If evalCondition(attributes, conditionObjs[i]) is true,
                 // break out of the loop and return true
-                if (evalCondition(attributes, item, savedGroups)) {
+                if (evalCondition(attributes, gbJson, savedGroups)) {
                     return true
                 }
             }
@@ -175,9 +169,11 @@ internal class GBConditionEvaluator {
 
         // Loop through the conditionObjects
         for (item in conditionObjs) {
+            val gbJson = item as? GBJson ?: return false
+
             // If evalCondition(attributes, conditionObjs[i]) is false,
             // break out of the loop and return false
-            if (!evalCondition(attributes, item, savedGroups)) {
+            if (!evalCondition(attributes, gbJson, savedGroups)) {
                 return false
             }
         }
@@ -345,7 +341,7 @@ internal class GBConditionEvaluator {
                     }
                 }
                 // Else if evalCondition(item, condition), break out of loop and return true
-                else if (evalCondition(attributes, condition, savedGroups)) {
+                else if (evalCondition(attributes, condition as? GBJson ?: GBJson(emptyMap()), savedGroups)) {
                     return true
                 }
             }

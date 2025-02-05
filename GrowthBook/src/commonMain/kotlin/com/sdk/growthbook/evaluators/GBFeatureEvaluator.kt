@@ -1,5 +1,6 @@
 package com.sdk.growthbook.evaluators
 
+import com.sdk.growthbook.model.GBJson
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBBoolean
@@ -103,9 +104,12 @@ internal class GBFeatureEvaluator(
                                 mapOf("value" to value)
                             } ?: emptyMap()
 
+                            val conditionObj = parentCondition
+                                .condition.let(GBValue::from) as? GBJson
+                                ?: GBJson(emptyMap())
                             val evalCondition = GBConditionEvaluator().evalCondition(
                                 attributes = evalObj,
-                                conditionObj = parentCondition.condition.let(GBValue::from),
+                                conditionObj = conditionObj,
                                 savedGroups = evaluationContext.savedGroups,
                             )
 
@@ -160,7 +164,7 @@ internal class GBFeatureEvaluator(
                                     attributeOverrides = attributeOverrides,
                                     attributes = evaluationContext.userContext.attributes,
                                 ),
-                                conditionObj = rule.condition.let(GBValue::from),
+                                conditionObj = rule.condition.let(GBValue::from) as? GBJson ?: GBJson(emptyMap()),
                                 savedGroups = evaluationContext.savedGroups,
                             )
                         ) {

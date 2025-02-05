@@ -3,7 +3,6 @@ package com.sdk.growthbook.tests
 import com.sdk.growthbook.utils.GBCondition
 import com.sdk.growthbook.evaluators.GBAttributeType
 import com.sdk.growthbook.evaluators.GBConditionEvaluator
-import com.sdk.growthbook.model.GBArray
 import com.sdk.growthbook.model.GBJson
 import com.sdk.growthbook.model.GBNull
 import com.sdk.growthbook.model.GBString
@@ -40,13 +39,16 @@ class GBConditionTests {
                     HashMap(item2JsonObject.mapValues { GBValue.from(it.value) })
                 }
 
+                val conditionObj = GBJson(
+                    item[1].jsonObject.mapValues { GBValue.from(it.value) }
+                )
                 val result: Boolean = if (item.size > 4) {
                     val savedGroupsJsonObject = item[4].jsonObject
                     val savedGroups = savedGroupsJsonObject
                         .mapValues { GBValue.from(it.value) }
-                    evaluator.evalCondition(attributes, item[1].let(GBValue::from), savedGroups)
+                    evaluator.evalCondition(attributes, conditionObj, savedGroups)
                 } else {
-                    evaluator.evalCondition(attributes, item[1].let(GBValue::from), null)
+                    evaluator.evalCondition(attributes, conditionObj, null)
                 }
 
                 val status =
@@ -73,7 +75,6 @@ class GBConditionTests {
     @Test
     fun testInValidConditionObj() {
         val evaluator = GBConditionEvaluator()
-        assertFalse(evaluator.evalCondition(emptyMap(), GBArray(emptyList()), null))
 
         assertFalse(evaluator.isOperatorObject(GBJson(emptyMap())))
 
@@ -177,7 +178,7 @@ class GBConditionTests {
         assertEquals(
             true, GBConditionEvaluator().evalCondition(
                 attributes,
-                Json.decodeFromString(GBCondition.serializer(), condition).let(GBValue::from),
+                Json.decodeFromString(GBCondition.serializer(), condition).jsonObject.let(GBValue::from) as GBJson,
                 null
             )
         )
@@ -199,7 +200,7 @@ class GBConditionTests {
         assertEquals(
             false, GBConditionEvaluator().evalCondition(
                 attributes,
-                Json.decodeFromString(GBCondition.serializer(), condition).let(GBValue::from),
+                Json.decodeFromString(GBCondition.serializer(), condition).jsonObject.let(GBValue::from) as GBJson,
                 null
             )
         )
