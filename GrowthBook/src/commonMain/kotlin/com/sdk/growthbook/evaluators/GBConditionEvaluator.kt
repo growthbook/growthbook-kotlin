@@ -188,7 +188,7 @@ internal class GBConditionEvaluator {
     }
 
     /**
-     * This accepts a parsed JSON object as input and returns true
+     * This accepts a GBJson as input and returns true
      * if every key in the object starts with $
      */
     fun isOperatorObject(obj: GBJson): Boolean {
@@ -216,9 +216,6 @@ internal class GBConditionEvaluator {
         }
 
         if (obj?.isPrimitiveValue() == true) {
-
-            // val primitiveValue = obj.jsonPrimitive
-
             return when (obj) {
                 is GBString -> GBAttributeType.GbString
                 is GBBoolean -> GBAttributeType.GbBoolean
