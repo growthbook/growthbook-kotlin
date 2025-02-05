@@ -46,7 +46,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     private lateinit var featuresViewModel: FeaturesViewModel
     private var attributeOverrides: Map<String, GBValue> = emptyMap()
     private var forcedFeatures: Map<String, GBValue> = emptyMap()
-    private var savedGroups: Map<String, Any>? = emptyMap()
+    private var savedGroups: Map<String, GBValue>? = emptyMap()
     private var assigned: MutableMap<String, Pair<GBExperiment, GBExperimentResult>> =
         mutableMapOf()
     private var subscriptions: MutableList<GBExperimentRunCallback> = mutableListOf()
@@ -61,7 +61,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         refreshHandler: GBCacheRefreshHandler?,
         networkDispatcher: NetworkDispatcher,
         features: GBFeatures? = null,
-        savedGroups: Map<String, Any>? = null
+        savedGroups: Map<String, GBValue>? = null
     ) : this() {
         gbContext = context
         this.refreshHandler = refreshHandler
