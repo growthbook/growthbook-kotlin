@@ -1,16 +1,13 @@
 package com.sdk.growthbook.evaluators
 
-import com.sdk.growthbook.model.GBArray
-import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.model.GBJson
 import com.sdk.growthbook.model.GBNull
+import com.sdk.growthbook.model.GBArray
+import com.sdk.growthbook.model.GBValue
+import com.sdk.growthbook.utils.GBUtils
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBString
-import com.sdk.growthbook.model.GBValue
-import com.sdk.growthbook.utils.GBCondition
-import com.sdk.growthbook.utils.GBUtils
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.jsonObject
+import com.sdk.growthbook.model.GBBoolean
 
 /**
  * Both experiments and features can define targeting conditions using a syntax modeled
@@ -84,17 +81,19 @@ internal class GBConditionEvaluator {
      * - attributes is the user's attributes
      * - condition to be evaluated
      */
-    fun evalCondition(attributes: Map<String, GBValue>, conditionObj: GBCondition, savedGroups: Map<String, GBValue>?): Boolean {
+    fun evalCondition(attributes: Map<String, GBValue>, conditionObj: GBValue, savedGroups: Map<String, GBValue>?): Boolean {
 
-        if (conditionObj is JsonArray) {
+        if (conditionObj is GBArray) {
             return false
         } else {
+            val gbJson = conditionObj as? GBJson ?: return true
+
             // Loop through the conditionObj key/value pairs
-            for ((key, value) in conditionObj.jsonObject) {
+            for ((key, value) in gbJson) {
                 when (key) {
                     "\$or" -> {
                         // If conditionObj has a key $or, return evalOr(attributes, condition["$or"])
-                        val targetItems = conditionObj.jsonObject[key] as? JsonArray
+                        val targetItems = conditionObj[key] as? GBArray
                         if (targetItems != null) {
                             if (!evalOr(attributes, targetItems, savedGroups)) {
                                 return false
@@ -104,7 +103,7 @@ internal class GBConditionEvaluator {
 
                     "\$nor" -> {
                         // If conditionObj has a key $nor, return !evalOr(attributes, condition["$nor"])
-                        val targetItems = conditionObj.jsonObject[key] as? JsonArray
+                        val targetItems = conditionObj[key] as? GBArray
                         if (targetItems != null) {
                             if (evalOr(attributes, targetItems, savedGroups)) {
                                 return false
@@ -114,7 +113,7 @@ internal class GBConditionEvaluator {
 
                     "\$and" -> {
                         // If conditionObj has a key $and, return !evalAnd(attributes, condition["$and"])
-                        val targetItems = conditionObj.jsonObject[key] as? JsonArray
+                        val targetItems = conditionObj[key] as? GBArray
                         if (targetItems != null) {
                             if (!evalAnd(attributes, targetItems, savedGroups)) {
                                 return false
@@ -124,7 +123,7 @@ internal class GBConditionEvaluator {
 
                     "\$not" -> {
                         // If conditionObj has a key $not, return !evalCondition(attributes, condition["$not"])
-                        val targetItem = conditionObj.jsonObject[key]
+                        val targetItem = conditionObj[key]
                         if (targetItem != null) {
                             if (evalCondition(attributes, targetItem, savedGroups)) {
                                 return false
@@ -136,7 +135,7 @@ internal class GBConditionEvaluator {
                         val element = getPath(attributes, key)
                             // If evalConditionValue(value, getPath(attributes, key)) is false,
                             // break out of loop and return false
-                            if (!evalConditionValue(GBValue.from(value), element, savedGroups)) {
+                            if (!evalConditionValue(value, element, savedGroups)) {
                                 return false
                             }
                     }
@@ -151,7 +150,7 @@ internal class GBConditionEvaluator {
     /**
      * Evaluate OR conditions against given attributes
      */
-    private fun evalOr(attributes: Map<String, GBValue>, conditionObjs: JsonArray, savedGroups: Map<String, GBValue>?): Boolean {
+    private fun evalOr(attributes: Map<String, GBValue>, conditionObjs: GBArray, savedGroups: Map<String, GBValue>?): Boolean {
         // If conditionObjs is empty, return true
         if (conditionObjs.isEmpty()) {
             return true
@@ -172,7 +171,7 @@ internal class GBConditionEvaluator {
     /**
      * Evaluate AND conditions against given attributes
      */
-    private fun evalAnd(attributes: Map<String, GBValue>, conditionObjs: JsonArray, savedGroups: Map<String, GBValue>?): Boolean {
+    private fun evalAnd(attributes: Map<String, GBValue>, conditionObjs: GBArray, savedGroups: Map<String, GBValue>?): Boolean {
 
         // Loop through the conditionObjects
         for (item in conditionObjs) {
@@ -346,7 +345,7 @@ internal class GBConditionEvaluator {
                     }
                 }
                 // Else if evalCondition(item, condition), break out of loop and return true
-                else if (evalCondition(attributes, condition.gbSerialize(), savedGroups)) {
+                else if (evalCondition(attributes, condition, savedGroups)) {
                     return true
                 }
             }

@@ -3,10 +3,13 @@ package com.sdk.growthbook.tests
 import com.sdk.growthbook.utils.GBCondition
 import com.sdk.growthbook.evaluators.GBAttributeType
 import com.sdk.growthbook.evaluators.GBConditionEvaluator
+import com.sdk.growthbook.model.GBArray
 import com.sdk.growthbook.model.GBJson
 import com.sdk.growthbook.model.GBNull
 import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBValue
+import com.sdk.growthbook.model.toGbBoolean
+import com.sdk.growthbook.model.toGbString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -41,9 +44,9 @@ class GBConditionTests {
                     val savedGroupsJsonObject = item[4].jsonObject
                     val savedGroups = savedGroupsJsonObject
                         .mapValues { GBValue.from(it.value) }
-                    evaluator.evalCondition(attributes, item[1], savedGroups)
+                    evaluator.evalCondition(attributes, item[1].let(GBValue::from), savedGroups)
                 } else {
-                    evaluator.evalCondition(attributes, item[1], null)
+                    evaluator.evalCondition(attributes, item[1].let(GBValue::from), null)
                 }
 
                 val status =
@@ -70,7 +73,7 @@ class GBConditionTests {
     @Test
     fun testInValidConditionObj() {
         val evaluator = GBConditionEvaluator()
-        assertFalse(evaluator.evalCondition(emptyMap(), JsonArray(ArrayList()), null))
+        assertFalse(evaluator.evalCondition(emptyMap(), GBArray(emptyList()), null))
 
         assertFalse(evaluator.isOperatorObject(GBJson(emptyMap())))
 
@@ -115,15 +118,12 @@ class GBConditionTests {
     fun testConditionFailAttributeDoesNotExist() {
         val attributes = mapOf("country" to GBString("IN"))
 
-        @Language("json")
-        val condition = """
-            {"brand":"KZ"}
-        """.trimIndent()
-
         assertEquals(
             false, GBConditionEvaluator().evalCondition(
                 attributes,
-                Json.decodeFromString(GBCondition.serializer(), condition),
+                GBJson(
+                    mapOf("brand" to "KZ".toGbString())
+                ),
                 null
             )
         )
@@ -133,6 +133,7 @@ class GBConditionTests {
     fun testConditionDoesNotExistAttributeExist() {
         val attributes = mapOf("userId" to GBString("1199"))
 
+/*
         @Language("json")
         val condition = """
             {
@@ -141,11 +142,20 @@ class GBConditionTests {
               }
             }
         """.trimIndent()
+*/
 
         assertEquals(
             false, GBConditionEvaluator().evalCondition(
                 attributes,
-                Json.decodeFromString(GBCondition.serializer(), condition),
+                GBJson(
+                    mapOf(
+                        "userId" to GBJson(
+                            mapOf(
+                                "${'$'}exists" to false.toGbBoolean(),
+                            )
+                        )
+                    )
+                ),
                 null
             )
         )
@@ -167,7 +177,7 @@ class GBConditionTests {
         assertEquals(
             true, GBConditionEvaluator().evalCondition(
                 attributes,
-                Json.decodeFromString(GBCondition.serializer(), condition),
+                Json.decodeFromString(GBCondition.serializer(), condition).let(GBValue::from),
                 null
             )
         )
@@ -189,7 +199,7 @@ class GBConditionTests {
         assertEquals(
             false, GBConditionEvaluator().evalCondition(
                 attributes,
-                Json.decodeFromString(GBCondition.serializer(), condition),
+                Json.decodeFromString(GBCondition.serializer(), condition).let(GBValue::from),
                 null
             )
         )

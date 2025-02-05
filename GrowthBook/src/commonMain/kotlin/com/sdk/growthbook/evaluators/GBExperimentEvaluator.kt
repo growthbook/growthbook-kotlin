@@ -172,7 +172,7 @@ internal class GBExperimentEvaluator(
             if (experiment.condition != null) {
                 val attr = evaluationContext.userContext.attributes
                 val evaluationResult = GBConditionEvaluator().evalCondition(
-                    attr, experiment.condition!!,
+                    attr, experiment.condition!!.let(GBValue::from),
                     evaluationContext.savedGroups,
                 )
                 if (!evaluationResult) {
@@ -212,7 +212,7 @@ internal class GBExperimentEvaluator(
 
                     val evalCondition = GBConditionEvaluator().evalCondition(
                         attributes = evalObj,
-                        conditionObj = parentCondition.condition,
+                        conditionObj = parentCondition.condition.let(GBValue::from),
                         savedGroups = evaluationContext.savedGroups,
                     )
 

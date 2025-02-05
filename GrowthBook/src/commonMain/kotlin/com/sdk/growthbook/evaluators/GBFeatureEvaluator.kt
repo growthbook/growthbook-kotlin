@@ -105,7 +105,7 @@ internal class GBFeatureEvaluator(
 
                             val evalCondition = GBConditionEvaluator().evalCondition(
                                 attributes = evalObj,
-                                conditionObj = parentCondition.condition,
+                                conditionObj = parentCondition.condition.let(GBValue::from),
                                 savedGroups = evaluationContext.savedGroups,
                             )
 
@@ -160,7 +160,7 @@ internal class GBFeatureEvaluator(
                                     attributeOverrides = attributeOverrides,
                                     attributes = evaluationContext.userContext.attributes,
                                 ),
-                                conditionObj = rule.condition,
+                                conditionObj = rule.condition.let(GBValue::from),
                                 savedGroups = evaluationContext.savedGroups,
                             )
                         ) {

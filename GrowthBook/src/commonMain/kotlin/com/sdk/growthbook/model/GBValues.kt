@@ -86,4 +86,5 @@ sealed class GBValue {
 }
 
 fun Number.toGbNumber() = GBNumber(this)
+fun String.toGbString() = GBString(this)
 fun Boolean.toGbBoolean() = GBBoolean(this)
