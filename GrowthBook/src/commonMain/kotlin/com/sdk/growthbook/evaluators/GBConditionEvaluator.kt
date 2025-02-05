@@ -10,7 +10,6 @@ import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.utils.GBCondition
 import com.sdk.growthbook.utils.GBUtils
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
 /**
@@ -85,7 +84,7 @@ internal class GBConditionEvaluator {
      * - attributes is the user's attributes
      * - condition to be evaluated
      */
-    fun evalCondition(attributes: Map<String, GBValue>, conditionObj: GBCondition, savedGroups: JsonObject?): Boolean {
+    fun evalCondition(attributes: Map<String, GBValue>, conditionObj: GBCondition, savedGroups: Map<String, GBValue>?): Boolean {
 
         if (conditionObj is JsonArray) {
             return false
@@ -137,7 +136,7 @@ internal class GBConditionEvaluator {
                         val element = getPath(attributes, key)
                             // If evalConditionValue(value, getPath(attributes, key)) is false,
                             // break out of loop and return false
-                            if (!evalConditionValue(GBValue.from(value), element, savedGroups?.let(GBValue::from))) {
+                            if (!evalConditionValue(GBValue.from(value), element, savedGroups)) {
                                 return false
                             }
                     }
@@ -152,7 +151,7 @@ internal class GBConditionEvaluator {
     /**
      * Evaluate OR conditions against given attributes
      */
-    private fun evalOr(attributes: Map<String, GBValue>, conditionObjs: JsonArray, savedGroups: JsonObject?): Boolean {
+    private fun evalOr(attributes: Map<String, GBValue>, conditionObjs: JsonArray, savedGroups: Map<String, GBValue>?): Boolean {
         // If conditionObjs is empty, return true
         if (conditionObjs.isEmpty()) {
             return true
@@ -173,7 +172,7 @@ internal class GBConditionEvaluator {
     /**
      * Evaluate AND conditions against given attributes
      */
-    private fun evalAnd(attributes: Map<String, GBValue>, conditionObjs: JsonArray, savedGroups: JsonObject?): Boolean {
+    private fun evalAnd(attributes: Map<String, GBValue>, conditionObjs: JsonArray, savedGroups: Map<String, GBValue>?): Boolean {
 
         // Loop through the conditionObjects
         for (item in conditionObjs) {
@@ -267,7 +266,7 @@ internal class GBConditionEvaluator {
     /**
      * Evaluates Condition Value against given condition & attributes
      */
-    fun evalConditionValue(conditionValue: GBValue, attributeValue: GBValue?, savedGroups: GBValue?): Boolean {
+    fun evalConditionValue(conditionValue: GBValue, attributeValue: GBValue?, savedGroups: Map<String, GBValue>?): Boolean {
 
         // If conditionValue is a string, number, boolean, return true
         // if it's "equal" to attributeValue and false if not.
@@ -298,7 +297,7 @@ internal class GBConditionEvaluator {
             if (isOperatorObject(conditionValue)) {
                 for (key in conditionValue.keys) {
                     // If evalOperatorCondition(key, attributeValue, value) is false, return false
-                    if (!evalOperatorCondition(key, attributeValue, conditionValue[key]!!, savedGroups as? GBJson)) {
+                    if (!evalOperatorCondition(key, attributeValue, conditionValue[key]!!, savedGroups)) {
                         return false
                     }
                 }
@@ -331,7 +330,7 @@ internal class GBConditionEvaluator {
      * This checks if attributeValue is an array,
      * and if so at least one of the array items must match the condition
      */
-    private fun elemMatch(attributeValue: GBValue, condition: GBValue, savedGroups: GBJson?): Boolean {
+    private fun elemMatch(attributeValue: GBValue, condition: GBValue, savedGroups: Map<String, GBValue>?): Boolean {
 
         if (attributeValue is GBArray) {
             // Loop through items in attributeValue
@@ -350,7 +349,7 @@ internal class GBConditionEvaluator {
                     }
                 }
                 // Else if evalCondition(item, condition), break out of loop and return true
-                else if (evalCondition(attributes, condition.gbSerialize(), JsonObject(savedGroups?.mapValues { it.value.gbSerialize() } ?: emptyMap()))) {
+                else if (evalCondition(attributes, condition.gbSerialize(), savedGroups)) {
                     return true
                 }
             }
@@ -368,7 +367,7 @@ internal class GBConditionEvaluator {
         operator: String,
         attributeValue: GBValue?,
         conditionValue: GBValue,
-        savedGroups: GBJson?
+        savedGroups: Map<String, GBValue>?,
     ): Boolean {
 
         // Evaluate TYPE operator - whether both are of same type

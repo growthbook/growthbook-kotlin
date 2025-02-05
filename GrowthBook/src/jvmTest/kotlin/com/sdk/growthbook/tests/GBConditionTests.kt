@@ -38,7 +38,10 @@ class GBConditionTests {
                 }
 
                 val result: Boolean = if (item.size > 4) {
-                    evaluator.evalCondition(attributes, item[1], item[4].jsonObject)
+                    val savedGroupsJsonObject = item[4].jsonObject
+                    val savedGroups = savedGroupsJsonObject
+                        .mapValues { GBValue.from(it.value) }
+                    evaluator.evalCondition(attributes, item[1], savedGroups)
                 } else {
                     evaluator.evalCondition(attributes, item[1], null)
                 }

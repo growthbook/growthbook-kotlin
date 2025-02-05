@@ -6,8 +6,6 @@ import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBFeatureSource
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.utils.GBUtils
-import com.sdk.growthbook.utils.toJsonElement
-import kotlinx.serialization.json.JsonObject
 
 /**
  * Experiment Evaluator Class
@@ -175,10 +173,7 @@ internal class GBExperimentEvaluator(
                 val attr = evaluationContext.userContext.attributes
                 val evaluationResult = GBConditionEvaluator().evalCondition(
                     attr, experiment.condition!!,
-                    JsonObject(
-                        evaluationContext.savedGroups.orEmpty()
-                            .mapValues { it.value.gbSerialize() }
-                    )
+                    evaluationContext.savedGroups,
                 )
                 if (!evaluationResult) {
                     return getExperimentResult(
@@ -218,7 +213,7 @@ internal class GBExperimentEvaluator(
                     val evalCondition = GBConditionEvaluator().evalCondition(
                         attributes = evalObj,
                         conditionObj = parentCondition.condition,
-                        evaluationContext.savedGroups?.toJsonElement()?.jsonObject
+                        savedGroups = evaluationContext.savedGroups,
                     )
 
                     /**

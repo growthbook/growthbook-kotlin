@@ -1,20 +1,17 @@
 package com.sdk.growthbook.evaluators
 
+import com.sdk.growthbook.model.GBValue
+import com.sdk.growthbook.model.GBNumber
+import com.sdk.growthbook.model.GBBoolean
+import com.sdk.growthbook.model.GBFeature
+import com.sdk.growthbook.model.GBExperiment
+import com.sdk.growthbook.model.GBFeatureSource
+import com.sdk.growthbook.model.GBFeatureResult
+import com.sdk.growthbook.model.FeatureEvalContext
+import com.sdk.growthbook.model.GBExperimentResult
+import com.sdk.growthbook.utils.GBUtils
 import com.sdk.growthbook.utils.Constants
 import com.sdk.growthbook.utils.GBTrackData
-import com.sdk.growthbook.utils.GBUtils
-import com.sdk.growthbook.utils.toJsonElement
-import com.sdk.growthbook.model.FeatureEvalContext
-import com.sdk.growthbook.model.GBBoolean
-import com.sdk.growthbook.model.GBExperiment
-import com.sdk.growthbook.model.GBExperimentResult
-import com.sdk.growthbook.model.GBFeature
-import com.sdk.growthbook.model.GBFeatureResult
-import com.sdk.growthbook.model.GBFeatureSource
-import com.sdk.growthbook.model.GBNumber
-import com.sdk.growthbook.model.GBValue
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
 
 /**
  * Feature Evaluator Class
@@ -109,7 +106,7 @@ internal class GBFeatureEvaluator(
                             val evalCondition = GBConditionEvaluator().evalCondition(
                                 attributes = evalObj,
                                 conditionObj = parentCondition.condition,
-                                savedGroups = evaluationContext.savedGroups?.toJsonElement()?.jsonObject
+                                savedGroups = evaluationContext.savedGroups,
                             )
 
                             if (!evalCondition) {
@@ -164,11 +161,7 @@ internal class GBFeatureEvaluator(
                                     attributes = evaluationContext.userContext.attributes,
                                 ),
                                 conditionObj = rule.condition,
-                                savedGroups = JsonObject(
-                                    evaluationContext.savedGroups
-                                        ?.mapValues { it.value.gbSerialize() }
-                                        ?: emptyMap()
-                                )
+                                savedGroups = evaluationContext.savedGroups,
                             )
                         ) {
                             /**
