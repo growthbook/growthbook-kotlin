@@ -1,9 +1,14 @@
 package com.sdk.growthbook.integration
 
-import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonPrimitive
+import io.mockk.mockk
+import io.mockk.every
+import com.sdk.growthbook.GrowthBookSDK
+import com.sdk.growthbook.model.GBNumber
+import com.sdk.growthbook.model.GBBoolean
+import com.sdk.growthbook.model.GBFeatureResult
+import com.sdk.growthbook.model.GBFeatureSource
+import com.sdk.growthbook.model.GBString
+import com.sdk.growthbook.model.toGbNumber
 import org.intellij.lang.annotations.Language
 import org.junit.Test
 import kotlin.test.assertEquals
@@ -77,7 +82,7 @@ internal class VerifySDKReturnFeatureValues {
         """.trimMargin()
 
         val attributes = mapOf(
-            "brand" to "KZ"
+            "brand" to GBString("KZ")
         )
 
         val sdkInstance = buildSDK(json, attributes)
@@ -115,32 +120,47 @@ internal class VerifySDKReturnFeatureValues {
 """.trimMargin()
 
         //Check casting with Integer value
-        val sdkInstance = buildSDK(json = json, attributes = mapOf("user_id" to 123))
-        val intAttributeValue = sdkInstance.getGBContext().attributes["user_id"]?.toString() ?: ""
+        val sdkInstance = buildSDK(json = json, attributes = mapOf("user_id" to 123.toGbNumber()))
+        val intAttributeValue = sdkInstance.getGBContext().attributes["user_id"]?.gbSerialize()?.toString() ?: ""
         assertEquals("123", intAttributeValue)
         val intFeature = sdkInstance.feature("test_feature")
         assertEquals("experiment", intFeature.source.name)
 
         //Check casting with Boolean value
-        sdkInstance.setAttributes(attributes = mapOf("user_id" to true))
-        val boolAttributeValue = sdkInstance.getGBContext().attributes["user_id"]?.toString() ?: ""
+        sdkInstance.setAttributes(attributes = mapOf("user_id" to GBBoolean(true)))
+        val boolAttributeValue = sdkInstance.getGBContext().attributes["user_id"]?.gbSerialize()?.toString() ?: ""
         assertEquals("true", boolAttributeValue)
         val boolFeature = sdkInstance.feature("test_feature")
         assertEquals("experiment", boolFeature.source.name)
 
         //Check casting with Float value
-        sdkInstance.setAttributes(attributes = mapOf("user_id" to 1.8f))
-        val floatAttributeValue = sdkInstance.getGBContext().attributes["user_id"]?.toString() ?: ""
+        sdkInstance.setAttributes(attributes = mapOf("user_id" to 1.8f.toGbNumber()))
+        val floatAttributeValue = sdkInstance.getGBContext().attributes["user_id"]?.gbSerialize()?.toString() ?: ""
         assertEquals("1.8", floatAttributeValue)
         val floatFeature = sdkInstance.feature("test_feature")
         assertEquals("experiment", floatFeature.source.name)
 
         //Checking with wrong attribute key
-        sdkInstance.setAttributes(attributes = mapOf("user_id" to 5))
+        sdkInstance.setAttributes(attributes = mapOf("user_id" to 5.toGbNumber()))
         val wrongKeyAttributeValue =
             sdkInstance.getGBContext().attributes["user_iiii"]?.toString() ?: "wrongIdDefaultValue"
         assertEquals("wrongIdDefaultValue", wrongKeyAttributeValue)
         val wrongKeyFeature = sdkInstance.feature("test_feature")
         assertEquals("experiment", wrongKeyFeature.source.name)
+    }
+
+    @Test
+    fun `It should be possible to mock feature() method with mockk`() {
+        val someFeatureKey = "some-feature-key"
+        val expectedFeatureValue = 5
+        val mockedResult = GBFeatureResult(
+            gbValue = GBNumber(expectedFeatureValue),
+            source = GBFeatureSource.defaultValue,
+        )
+        val gb: GrowthBookSDK = mockk {
+            every { feature(someFeatureKey) } returns mockedResult
+        }
+        val featureValue = gb.feature<Int>(someFeatureKey)
+        assertEquals(expectedFeatureValue, featureValue)
     }
 }

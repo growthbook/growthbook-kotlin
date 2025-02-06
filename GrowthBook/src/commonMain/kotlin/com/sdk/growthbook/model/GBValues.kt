@@ -1,5 +1,6 @@
 package com.sdk.growthbook.model
 
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -18,6 +19,9 @@ import kotlinx.serialization.json.longOrNull
 data class GBBoolean(val value: Boolean): GBValue()
 data class GBString(val value: String): GBValue()
 data class GBNumber(val value: Number): GBValue()
+internal class GBArray(
+    value: List<GBValue>
+): GBValue(), List<GBValue> by value
 data class GBJson(
     private val value: Map<String, GBValue>,
 ): GBValue(), Map<String, GBValue> by value
@@ -30,6 +34,9 @@ sealed class GBValue {
             is GBBoolean -> JsonPrimitive(this.value)
             is GBString -> JsonPrimitive(this.value)
             is GBNumber -> JsonPrimitive(this.value)
+            is GBArray -> JsonArray(
+                this.map { it.gbSerialize() }
+            )
             is GBJson -> JsonObject(
                 this.mapValues { it.value.gbSerialize() }
             )
@@ -58,6 +65,9 @@ sealed class GBValue {
                         else -> Unknown
                     }
                 }
+                is JsonArray -> GBArray(
+                    jsonElement.map { from(it) }
+                )
                 is JsonObject -> GBJson(
                     jsonElement.mapValues { from(it.value) }
                 )
@@ -65,3 +75,6 @@ sealed class GBValue {
             }
     }
 }
+
+fun Number.toGbNumber() = GBNumber(this)
+fun Boolean.toGbBoolean() = GBBoolean(this)

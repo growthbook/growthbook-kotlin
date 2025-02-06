@@ -1,8 +1,8 @@
 package com.sdk.growthbook.tests
 
-import com.sdk.growthbook.utils.toHashMap
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
 import com.sdk.growthbook.model.GBContext
+import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.serializable_model.gbDeserialize
 import com.sdk.growthbook.stickybucket.GBStickyBucketServiceImp
 import com.sdk.growthbook.utils.GBStickyAssignmentsDocument
@@ -40,14 +40,16 @@ class GBStickyBucketingFeatureTests {
                         item[1]
                     )
 
-                val attributes = testData.attributes.jsonObject.toHashMap()
+                val attributes = testData
+                    .attributes.jsonObject
+                    .mapValues { GBValue.from(it.value) }
 
                 val gbContext = GBContext(
                     apiKey = "",
                     hostURL = "",
                     enabled = true,
                     attributes = attributes,
-                    forcedVariations = testData.forcedVariations ?: HashMap(),
+                    forcedVariations = emptyMap(),
                     qaMode = false,
                     trackingCallback = { _, _ ->
 
@@ -59,9 +61,6 @@ class GBStickyBucketingFeatureTests {
                 if (testData.features != null) {
                     gbContext.features = testData.features
                         .mapValues { it.value.gbDeserialize() }
-                }
-                if (testData.forcedVariations != null) {
-                    gbContext.forcedVariations = testData.forcedVariations.toHashMap()
                 }
 
                 val listActualStickyAssignmentsDoc =
@@ -147,16 +146,16 @@ class GBStickyBucketingFeatureTests {
                         "9) ${expectedExperimentResult?.featureId} END"
                 )
 
-
-                println()
                 val status =
                     item[0].toString() +
                         "\nExpected Result - " + item[4] + " & " + expectedStickyAssignmentDocs + "\n\n" +
                         "\nActual result - " + actualExperimentResult.toString() + " & " +
                         gbContext.stickyBucketAssignmentDocs + "\n\n"
 
+                val actualValue = actualExperimentResult?.value
+                val expectedValue = expectedExperimentResult?.value?.let(GBValue::from)
                 if (
-                    expectedExperimentResult?.value == actualExperimentResult?.value
+                    expectedValue == actualValue
                     && expectedExperimentResult?.inExperiment == actualExperimentResult
                         ?.inExperiment
                     && expectedExperimentResult?.stickyBucketUsed == actualExperimentResult

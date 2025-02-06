@@ -12,7 +12,6 @@ import com.sdk.growthbook.utils.OptionalProperty
 import com.sdk.growthbook.utils.RangeSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
 
 /**
  * A Feature object consists of possible values plus rules for how to assign values to users.
@@ -68,7 +67,7 @@ data class GBFeatureRule(
     /**
      * Run an experiment (A/B test) and randomly choose between these variations
      */
-    val variations: List<JsonElement>? = null,
+    val variations: List<GBValue>? = null,
 
     /**
      * The globally unique tracking key for the experiment (default to the feature key)
@@ -169,7 +168,7 @@ data class GBFeatureRule(
             coverage = coverage,
             force = if (force == null) OptionalProperty.NotPresent
             else OptionalProperty.Present(force.gbSerialize()),
-            variations = variations,
+            variations = variations?.map { it.gbSerialize() },
             key = key,
             weights = weights,
             namespace = namespace,
@@ -186,7 +185,11 @@ data class GBFeatureRule(
             disableStickyBucketing = disableStickyBucketing,
             bucketVersion = bucketVersion,
             minBucketVersion = minBucketVersion,
-            tracks = tracks,
+            tracks = tracks?.let {
+                ArrayList(
+                    tracks.map { it.gbSerialize() }
+                )
+            },
         )
 }
 

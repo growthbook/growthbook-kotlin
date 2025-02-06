@@ -1,22 +1,24 @@
 package com.sdk.growthbook.utils
 
+import com.sdk.growthbook.model.GBValue
+import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
-import com.sdk.growthbook.model.GBFeature
+import com.sdk.growthbook.serializable_model.SerializableGBTrackData
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.SerializationException
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.PairSerializer
-import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.floatOrNull
 import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.floatOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
@@ -100,7 +102,6 @@ class GBError(error: Throwable?) {
  * Object used for mutual exclusion and filtering users out of experiments based on random hashes.
  * Has the following properties
  */
-@Suppress("unused")
 @Serializable
 class GBFilter(
 
@@ -128,6 +129,7 @@ class GBFilter(
     /**
      * When using sticky bucketing, can be used as a fallback to assign variations
      */
+    @Suppress("unused")
     var fallbackAttribute: String? = null
 )
 
@@ -156,7 +158,6 @@ data class GBVariationMeta(
 /**
  * Used for remote feature evaluation to trigger the TrackingCallback. An object with 2 properties
  */
-@Serializable
 data class GBTrackData(
 
     /**
@@ -167,8 +168,14 @@ data class GBTrackData(
     /**
      * result - ExperimentResult
      */
-    var result: GBExperimentResult
-)
+    var result: GBExperimentResult,
+) {
+    internal fun gbSerialize() =
+        SerializableGBTrackData(
+            result = result.gbSerialize(),
+            experiment = experiment.gbSerialize(),
+        )
+}
 
 /**
  * Sticky Bucket documents contain three fields
@@ -231,7 +238,7 @@ data class GBRemoteEvalParams(
     /**
      * Force features that created by user for remote evaluation
      */
-    val forcedFeatures: List<List<Any>>,
+    val forcedFeatures: Map<String, GBValue>,
 
     /**
      * Force specific experiments to always assign a specific variation (used for QA)

@@ -2,14 +2,17 @@ package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.GBSDKBuilder
 import com.sdk.growthbook.GrowthBookSDK
+import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.utils.GBCacheRefreshHandler
 import com.sdk.growthbook.utils.GBError
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeatureSource
+import com.sdk.growthbook.model.GBNumber
+import com.sdk.growthbook.model.GBValue
+import com.sdk.growthbook.model.toGbBoolean
 import com.sdk.growthbook.stickybucket.GBStickyBucketServiceImp
-import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -21,7 +24,7 @@ class GrowthBookSDKBuilderTests {
     val testApiKey = "4r23r324f23"
     val testHostURL = "https://host.com"
     val testKeyString = "3tfeoyW0wlo47bDnbWDkxg=="
-    val testAttributes: HashMap<String, Any> = HashMap()
+    val testAttributes: HashMap<String, GBValue> = HashMap()
 
     @BeforeTest
     fun setUp() {
@@ -251,18 +254,18 @@ class GrowthBookSDKBuilderTests {
             remoteEval = true
         ).setForcedVariations(expectedForcedVariation)
             .initialize()
-        sdkInstance.setForcedFeatures(mapOf("featureForce" to JsonPrimitive(112)))
+        sdkInstance.forcedFeatures = mapOf("featureForce" to GBNumber(112))
 
         val actualForcedVariation = sdkInstance.getGBContext().forcedVariations
 
         assertTrue { actualForcedVariation.isNotEmpty() }
         assertEquals(actualForcedVariation, expectedForcedVariation)
-        assertTrue { sdkInstance.getForcedFeatures().isNotEmpty() }
+        assertTrue { sdkInstance.forcedFeatures.isNotEmpty() }
     }
 
     @Test
     fun test_setAttributesOverrides_Ok() {
-        val expectedAttributes = mapOf("user" to false)
+        val expectedAttributes = mapOf("user" to false.toGbBoolean())
         val sdkInstance = GBSDKBuilder(
             testApiKey,
             testHostURL,
@@ -284,7 +287,7 @@ class GrowthBookSDKBuilderTests {
 
     @Test
     fun test_setAttributesOverridesWithStickyBucketing_Ok() {
-        val expectedAttributes = mapOf("user" to false)
+        val expectedAttributes = mapOf("user" to GBBoolean(false))
         val sdkInstance = GBSDKBuilder(
             testApiKey,
             testHostURL,
@@ -307,7 +310,7 @@ class GrowthBookSDKBuilderTests {
 
     private fun buildSDK(
         json: String,
-        attributes: Map<String, Any> = mapOf(),
+        attributes: Map<String, GBValue> = mapOf(),
         encryptionKey: String?
     ): GrowthBookSDK {
         return GBSDKBuilder(

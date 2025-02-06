@@ -1,6 +1,7 @@
 package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.GBSDKBuilder
+import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.utils.DefaultCrypto
 import com.sdk.growthbook.utils.encryptToFeaturesDataModel
 import com.soywiz.krypto.encoding.Base64
@@ -43,7 +44,7 @@ class GBEncryptedFeatures {
 
     private val testApiKey = "4r23r324f23"
     private val testHostURL = "https://host.com"
-    private val testAttributes: HashMap<String, Any> = HashMap()
+    private val testAttributes: HashMap<String, GBValue> = HashMap()
 
     @Test
     fun testEncrypt() {
