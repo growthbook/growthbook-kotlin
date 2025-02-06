@@ -1,6 +1,12 @@
 package com.sdk.growthbook.integration
 
+import io.mockk.mockk
+import io.mockk.every
+import com.sdk.growthbook.GrowthBookSDK
+import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBBoolean
+import com.sdk.growthbook.model.GBFeatureResult
+import com.sdk.growthbook.model.GBFeatureSource
 import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.toGbNumber
 import org.intellij.lang.annotations.Language
@@ -141,5 +147,20 @@ internal class VerifySDKReturnFeatureValues {
         assertEquals("wrongIdDefaultValue", wrongKeyAttributeValue)
         val wrongKeyFeature = sdkInstance.feature("test_feature")
         assertEquals("experiment", wrongKeyFeature.source.name)
+    }
+
+    @Test
+    fun `It should be possible to mock feature() method with mockk`() {
+        val someFeatureKey = "some-feature-key"
+        val expectedFeatureValue = 5
+        val mockedResult = GBFeatureResult(
+            gbValue = GBNumber(expectedFeatureValue),
+            source = GBFeatureSource.defaultValue,
+        )
+        val gb: GrowthBookSDK = mockk {
+            every { feature(someFeatureKey) } returns mockedResult
+        }
+        val featureValue = gb.feature<Int>(someFeatureKey)
+        assertEquals(expectedFeatureValue, featureValue)
     }
 }
