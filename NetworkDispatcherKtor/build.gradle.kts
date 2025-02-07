@@ -12,7 +12,7 @@ group = "io.growthbook.sdk"
 version = "1.0.4"
 
 kotlin {
-    android {
+    androidTarget {
         publishLibraryVariants("release")
     }
 
@@ -39,7 +39,7 @@ kotlin {
     iosArm64()
     iosSimulatorArm64()
 
-    val ktorVersion = "2.1.2"
+    val ktorVersion = "3.0.3"
     sourceSets {
         val commonMain by getting {
             dependencies {
