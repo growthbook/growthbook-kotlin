@@ -11,3 +11,4 @@
 local.properties
 *.zip
 xcframework/*
+.kotlin

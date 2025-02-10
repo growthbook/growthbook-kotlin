@@ -1,15 +1,16 @@
 package com.sdk.growthbook.utils
 
-import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.serializable_model.SerializableGBFeature
 import com.sdk.growthbook.serializable_model.gbDeserialize
-import com.soywiz.krypto.AES
-import com.soywiz.krypto.Padding
-import com.soywiz.krypto.encoding.Base64
+import dev.whyoleg.cryptography.CryptographyProvider
+import dev.whyoleg.cryptography.DelicateCryptographyApi
+import dev.whyoleg.cryptography.algorithms.AES
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 interface Crypto {
     fun decrypt(
@@ -26,19 +27,25 @@ interface Crypto {
     ): ByteArray
 }
 
+@OptIn(DelicateCryptographyApi::class)
 class DefaultCrypto : Crypto {
 
-    private val padding = Padding.PKCS7Padding
+    private fun getCipher(key: ByteArray) = CryptographyProvider.Default
+        .get(AES.CBC)
+        .keyDecoder()
+        .decodeFromByteArrayBlocking(AES.Key.Format.RAW, key)
+        .cipher(padding = true)
 
     override fun decrypt(cipherText: ByteArray, key: ByteArray, iv: ByteArray): ByteArray {
-        return AES.decryptAesCbc(cipherText, key, iv, padding)
+        return getCipher(key).decryptWithIvBlocking(iv, cipherText)
     }
 
     override fun encrypt(inputText: ByteArray, key: ByteArray, iv: ByteArray): ByteArray {
-        return AES.encryptAesCbc(inputText, key, iv, padding)
+        return getCipher(key).encryptWithIvBlocking(iv, inputText)
     }
 }
 
+@OptIn(ExperimentalEncodingApi::class)
 fun decodeBase64(base64: String): ByteArray {
     return Base64.decode(base64)
 }

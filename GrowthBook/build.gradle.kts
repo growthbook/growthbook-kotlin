@@ -1,3 +1,6 @@
+@file:OptIn(ExperimentalWasmDsl::class)
+
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackOutput
 import org.jetbrains.kotlin.gradle.targets.js.yarn.yarn
 
@@ -14,8 +17,8 @@ version = "2.0.0"
 kotlin {
 
     val ktorVersion = "3.0.3"
-    val serializationVersion = "1.3.3"
-    val kryptoVersion = "2.7.0"
+    val serializationVersion = "1.6.1"
+    val cryptographyVersion = "0.4.0"
 
     androidTarget {
         publishLibraryVariants("release")
@@ -40,6 +43,10 @@ kotlin {
         }
     }
 
+    wasmJs {
+        nodejs()
+    }
+
     iosX64()
     iosArm64()
     iosSimulatorArm64()
@@ -48,9 +55,9 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 implementation("org.jetbrains.kotlin:kotlin-stdlib-common")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.0")
-                implementation("com.ionspin.kotlin:bignum:0.3.3")
-                implementation("com.soywiz.korlibs.krypto:krypto:$kryptoVersion")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
+                implementation("com.ionspin.kotlin:bignum:0.3.9")
+                implementation("dev.whyoleg.cryptography:cryptography-core:$cryptographyVersion")
 
                 api(project(":Core"))
                 api(
@@ -71,7 +78,7 @@ kotlin {
         val androidMain by getting {
             dependencies {
                 implementation("androidx.startup:startup-runtime:1.1.1")
-                implementation("com.soywiz.korlibs.krypto:krypto-android:$kryptoVersion")
+                implementation("dev.whyoleg.cryptography:cryptography-provider-jdk:$cryptographyVersion")
             }
         }
         val androidUnitTest by getting {
@@ -86,19 +93,28 @@ kotlin {
         val jvmMain by getting {
             dependencies {
                 implementation("io.ktor:ktor-client-java:$ktorVersion")
-                implementation("com.soywiz.korlibs.krypto:krypto-jvm:$kryptoVersion")
+                implementation("dev.whyoleg.cryptography:cryptography-provider-jdk:$cryptographyVersion")
             }
         }
         val jvmTest by getting {
             dependencies {
                 implementation ("org.jetbrains.kotlin:kotlin-test-junit")
-                implementation("com.soywiz.korlibs.krypto:krypto-jvm:$kryptoVersion")
+                implementation("dev.whyoleg.cryptography:cryptography-provider-jdk:$cryptographyVersion")
 
                 // https://mvnrepository.com/artifact/org.jetbrains.kotlinx/kotlinx-coroutines-test
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
             }
         }
-
+        val jsMain by getting {
+            dependencies {
+                implementation("dev.whyoleg.cryptography:cryptography-provider-webcrypto:$cryptographyVersion")
+            }
+        }
+        val wasmJsMain by getting {
+            dependencies {
+                implementation("dev.whyoleg.cryptography:cryptography-provider-webcrypto:$cryptographyVersion")
+            }
+        }
     }
 
 }
