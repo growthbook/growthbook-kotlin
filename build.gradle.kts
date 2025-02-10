@@ -26,7 +26,7 @@ allprojects {
 }
 
 plugins {
-    id("org.jetbrains.kotlinx.kover") version "0.9.1"
+    id("org.jetbrains.kotlinx.kover") version "0.5.0"
     id("signing")
     id("maven-publish")
 }
