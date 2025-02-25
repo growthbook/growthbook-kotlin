@@ -13,7 +13,7 @@ version = "3.0.0-alpha"
 
 kotlin {
 
-    val ktorVersion = "2.1.2"
+    val ktorVersion = "3.0.3"
     val serializationVersion = "1.3.3"
     val kryptoVersion = "2.7.0"
 
