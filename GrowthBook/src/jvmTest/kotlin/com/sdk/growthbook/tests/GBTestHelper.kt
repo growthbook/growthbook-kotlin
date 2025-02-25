@@ -3,9 +3,10 @@ package com.sdk.growthbook.tests
 import com.sdk.growthbook.evaluators.EvaluationContext
 import com.sdk.growthbook.evaluators.UserContext
 import com.sdk.growthbook.utils.GBFeatures
-import com.sdk.growthbook.model.GBExperiment
+import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.StickyBucketAssignmentDocsType
+import com.sdk.growthbook.serializable_model.SerializableGBExperiment
 import com.sdk.growthbook.serializable_model.SerializableGBFeature
 import com.sdk.growthbook.stickybucket.GBStickyBucketService
 import kotlinx.serialization.Serializable
@@ -87,8 +88,8 @@ class GBTestHelper {
 
         internal fun createTestScopeEvaluationContext(
             features: GBFeatures,
-            attributes: Map<String, Any>,
-            savedGroups: Map<String, Any>? = null,
+            attributes: Map<String, GBValue>,
+            savedGroups: Map<String, GBValue>? = null,
             forcedVariations: Map<String, Any> = emptyMap(),
             stickyBucketService: GBStickyBucketService? = null,
             onFeatureUsage: ((String, GBFeatureResult) -> Unit)? = null,
@@ -138,7 +139,7 @@ class GBFeatureResultTest(
     val on: Boolean,
     val off: Boolean,
     val source: String,
-    val experiment: GBExperiment? = null,
+    val experiment: SerializableGBExperiment? = null,
     val experimentResult: GBExperimentResultTest? = null
 )
 

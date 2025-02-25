@@ -1,5 +1,7 @@
 package com.sdk.growthbook.integration
 
+import com.sdk.growthbook.model.GBValue
+import com.sdk.growthbook.model.toGbNumber
 import org.junit.Test
 import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.Flow
@@ -14,8 +16,8 @@ class IntegrationTests {
     @Test
     fun verifyIsInTheListRule() {
         // User attributes for targeting and assigning users to experiment variations
-        val attrs = HashMap<String, Any>()
-        attrs["appBuildNumber"] = 3432
+        val attrs = HashMap<String, GBValue>()
+        attrs["appBuildNumber"] = 3432.toGbNumber()
 
         @Language("json")
         val json = """
@@ -85,7 +87,7 @@ class IntegrationTests {
 
         val growthBookSdk = buildSDK(
             json = json,
-            attributes = mapOf("id" to "someId"),
+            // attributes = mapOf("id" to "someId"),
             trackingCallback = { _, gbExperimentResult ->
                 val variationName = gbExperimentResult.name
                 assertTrue(
@@ -119,7 +121,7 @@ class IntegrationTests {
 
         val growthBookSdk = buildSDK(
             json = "",
-            attributes = mapOf("id" to "someId"),
+            // attributes = mapOf("id" to "someId"),
             networkDispatcher = networkDispatcher,
         )
 

@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "2.0.0"
+version = "3.0.0-alpha"
 
 kotlin {
 
@@ -96,6 +96,8 @@ kotlin {
 
                 // https://mvnrepository.com/artifact/org.jetbrains.kotlinx/kotlinx-coroutines-test
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+
+                implementation("io.mockk:mockk:1.13.16")
             }
         }
 
