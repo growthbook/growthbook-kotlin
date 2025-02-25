@@ -1,13 +1,12 @@
 package com.sdk.growthbook.evaluators
 
 import kotlinx.serialization.json.jsonObject
+import com.sdk.growthbook.model.GBJson
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBFeatureSource
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.utils.GBUtils
-import com.sdk.growthbook.utils.toJsonElement
-import kotlinx.serialization.json.JsonObject
 
 /**
  * Experiment Evaluator Class
@@ -173,13 +172,11 @@ internal class GBExperimentEvaluator(
              */
             if (experiment.condition != null) {
                 val attr = evaluationContext.userContext.attributes
-                    .mapValues { it.value.gbSerialize() }
+                val conditionObj: GBJson = experiment.condition!!.let(GBValue::from) as? GBJson
+                    ?: GBJson(emptyMap())
                 val evaluationResult = GBConditionEvaluator().evalCondition(
-                    attr, experiment.condition!!,
-                    JsonObject(
-                        evaluationContext.savedGroups.orEmpty()
-                            .mapValues { it.value.gbSerialize() }
-                    )
+                    attr, conditionObj,
+                    evaluationContext.savedGroups,
                 )
                 if (!evaluationResult) {
                     return getExperimentResult(
@@ -213,13 +210,15 @@ internal class GBExperimentEvaluator(
                         )
                     }
                     val evalObj = parentResult.gbValue?.let {
-                        mapOf("value" to it.gbSerialize())
+                        mapOf("value" to it)
                     } ?: emptyMap()
 
+                    val conditionObj: GBJson = parentCondition.condition.let(GBValue::from) as? GBJson
+                        ?: GBJson(emptyMap())
                     val evalCondition = GBConditionEvaluator().evalCondition(
                         attributes = evalObj,
-                        conditionObj = parentCondition.condition,
-                        evaluationContext.savedGroups?.toJsonElement()?.jsonObject
+                        conditionObj = conditionObj,
+                        savedGroups = evaluationContext.savedGroups,
                     )
 
                     /**
