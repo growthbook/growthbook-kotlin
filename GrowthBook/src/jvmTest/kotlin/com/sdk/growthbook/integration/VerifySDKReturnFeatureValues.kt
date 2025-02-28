@@ -142,4 +142,21 @@ internal class VerifySDKReturnFeatureValues {
         val wrongKeyFeature = sdkInstance.feature("test_feature")
         assertEquals("experiment", wrongKeyFeature.source.name)
     }
+
+/*
+    @Test
+    fun `It should be possible to mock feature() method with mockk`() {
+        val someFeatureKey = "some-feature-key"
+        val expectedFeatureValue = 5
+        val mockedResult = GBFeatureResult(
+            gbValue = GBNumber(expectedFeatureValue),
+            source = GBFeatureSource.defaultValue,
+        )
+        val gb: GrowthBookSDK = mockk {
+            every { feature(someFeatureKey) } returns mockedResult
+        }
+        val featureValue = gb.feature<Int>(someFeatureKey)
+        assertEquals(expectedFeatureValue, featureValue)
+    }
+*/
 }

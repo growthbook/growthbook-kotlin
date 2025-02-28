@@ -42,12 +42,12 @@ typealias GBExperimentRunCallback = (GBExperiment, GBExperimentResult) -> Unit
  */
 class GrowthBookSDK() : FeaturesFlowDelegate {
 
+    /* visible for test */ var forcedFeatures: Map<String, GBValue> = emptyMap()
     private var refreshHandler: GBCacheRefreshHandler? = null
     private lateinit var networkDispatcher: NetworkDispatcher
     private lateinit var featuresViewModel: FeaturesViewModel
     private var attributeOverrides: Map<String, GBValue> = emptyMap()
-    private var forcedFeatures: Map<String, GBValue> = emptyMap()
-    private var savedGroups: Map<String, Any>? = emptyMap()
+    private var savedGroups: Map<String, GBValue>? = emptyMap()
     private var assigned: MutableMap<String, Pair<GBExperiment, GBExperimentResult>> =
         mutableMapOf()
     private var subscriptions: MutableList<GBExperimentRunCallback> = mutableListOf()
@@ -62,7 +62,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         refreshHandler: GBCacheRefreshHandler?,
         networkDispatcher: NetworkDispatcher,
         features: GBFeatures? = null,
-        savedGroups: Map<String, Any>? = null
+        savedGroups: Map<String, GBValue>? = null
     ) : this() {
         gbContext = context
         this.refreshHandler = refreshHandler
@@ -247,20 +247,6 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     }
 
     /**
-     * The setForcedFeatures method setup the Map of user's (forced) features
-     */
-    fun setForcedFeatures(forcedFeatures: Map<String, GBValue>) {
-        this.forcedFeatures = forcedFeatures
-    }
-
-    /**
-     * The getForcedFeatures method for mapping model object for request's body type
-     */
-    fun getForcedFeatures(): Map<String, GBValue> {
-        return this.forcedFeatures
-    }
-
-    /**
      * The setAttributes method replaces the Map of user attributes
      * that are used to assign variations
      */
@@ -324,8 +310,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         }
         val payload = GBRemoteEvalParams(
             gbContext.attributes,
-            this.getForcedFeatures(),
-            gbContext.forcedVariations
+            this.forcedFeatures, gbContext.forcedVariations
         )
         featuresViewModel.fetchFeatures(gbContext.remoteEval, payload)
     }
