@@ -61,7 +61,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         refreshHandler: GBCacheRefreshHandler?,
         networkDispatcher: NetworkDispatcher,
         features: GBFeatures? = null,
-        savedGroups: Map<String, GBValue>? = null
+        savedGroups: Map<String, GBValue>? = null,
         cachingEnabled: Boolean,
     ) : this() {
         gbContext = context
