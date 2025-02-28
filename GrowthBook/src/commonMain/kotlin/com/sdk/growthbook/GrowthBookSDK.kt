@@ -17,6 +17,7 @@ import com.sdk.growthbook.features.FeaturesDataModel
 import com.sdk.growthbook.features.FeaturesDataSource
 import com.sdk.growthbook.features.FeaturesFlowDelegate
 import com.sdk.growthbook.features.FeaturesViewModel
+import com.sdk.growthbook.model.GBArray
 import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBExperiment
@@ -26,7 +27,6 @@ import com.sdk.growthbook.model.GBJson
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBValue
-import com.sdk.growthbook.utils.toHashMap
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonObject
 
@@ -41,12 +41,12 @@ typealias GBExperimentRunCallback = (GBExperiment, GBExperimentResult) -> Unit
  */
 class GrowthBookSDK() : FeaturesFlowDelegate {
 
+    /* visible for test */ var forcedFeatures: Map<String, GBValue> = emptyMap()
     private var refreshHandler: GBCacheRefreshHandler? = null
     private lateinit var networkDispatcher: NetworkDispatcher
     private lateinit var featuresViewModel: FeaturesViewModel
-    private var attributeOverrides: Map<String, Any> = emptyMap()
-    private var forcedFeatures: Map<String, Any> = emptyMap()
-    private var savedGroups: Map<String, Any>? = emptyMap()
+    private var attributeOverrides: Map<String, GBValue> = emptyMap()
+    private var savedGroups: Map<String, GBValue>? = emptyMap()
     private var assigned: MutableMap<String, Pair<GBExperiment, GBExperimentResult>> =
         mutableMapOf()
     private var subscriptions: MutableList<GBExperimentRunCallback> = mutableListOf()
@@ -61,7 +61,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         refreshHandler: GBCacheRefreshHandler?,
         networkDispatcher: NetworkDispatcher,
         features: GBFeatures? = null,
-        savedGroups: Map<String, Any>? = null,
+        savedGroups: Map<String, GBValue>? = null
         cachingEnabled: Boolean,
     ) : this() {
         gbContext = context
@@ -169,7 +169,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     }
 
     override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) {
-        gbContext.savedGroups = savedGroups.toHashMap()
+        gbContext.savedGroups = savedGroups.mapValues { GBValue.from(it.value) }
         if (isRemote) {
             this.refreshHandler?.invoke(true, null)
         }
@@ -217,6 +217,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
             is GBNumber -> gbResultValue.value as? V
             is GBJson -> gbResultValue as? V
             is GBValue.Unknown -> null
+            is GBArray -> null
             null -> null
         }
     }
@@ -246,24 +247,10 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     }
 
     /**
-     * The setForcedFeatures method setup the Map of user's (forced) features
-     */
-    fun setForcedFeatures(forcedFeatures: Map<String, Any>) {
-        this.forcedFeatures = forcedFeatures
-    }
-
-    /**
-     * The getForcedFeatures method for mapping model object for request's body type
-     */
-    fun getForcedFeatures(): List<List<Any>> {
-        return this.forcedFeatures.map { listOf(it.key, it.value) }
-    }
-
-    /**
      * The setAttributes method replaces the Map of user attributes
      * that are used to assign variations
      */
-    fun setAttributes(attributes: Map<String, Any>) {
+    fun setAttributes(attributes: Map<String, GBValue>) {
         gbContext.attributes = attributes
         refreshStickyBucketService()
     }
@@ -272,7 +259,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
      * The setAttributeOverrides method replaces the Map of user overrides attribute
      * that are used for Sticky Bucketing
      */
-    fun setAttributeOverrides(overrides: Map<String, Any>) {
+    fun setAttributeOverrides(overrides: Map<String, GBValue>) {
         attributeOverrides = overrides
         if (gbContext.stickyBucketService != null) {
             refreshStickyBucketService()
@@ -288,7 +275,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
      * The setForcedVariations method setup the Map of user's (forced) variations
      * to assign a specific variation (used for QA)
      */
-    fun setForcedVariations(forcedVariations: Map<String, Any>) {
+    fun setForcedVariations(forcedVariations: Map<String, Number>) {
         gbContext.forcedVariations = forcedVariations
         refreshForRemoteEval()
     }
@@ -323,8 +310,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         }
         val payload = GBRemoteEvalParams(
             gbContext.attributes,
-            this.getForcedFeatures(),
-            gbContext.forcedVariations
+            this.forcedFeatures, gbContext.forcedVariations
         )
         featuresViewModel.fetchFeatures(gbContext.remoteEval, payload)
     }

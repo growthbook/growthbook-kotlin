@@ -9,6 +9,7 @@ import com.sdk.growthbook.features.FeaturesDataSource
 import com.sdk.growthbook.features.FeaturesFlowDelegate
 import com.sdk.growthbook.features.FeaturesViewModel
 import com.sdk.growthbook.model.GBContext
+import com.sdk.growthbook.model.GBNumber
 import kotlinx.serialization.json.JsonObject
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -131,13 +132,13 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = false,
         )
-        val forcedFeature = mapOf("feature" to 123)
+        val forcedFeature = mapOf("feature" to GBNumber(123))
         val forcedVariation = mapOf("feature" to 123)
         val attributes = emptyMap<String, Any>()
         val payload = GBRemoteEvalParams(
             attributes = attributes,
-            forcedFeatures = forcedFeature.map { listOf(it.key, it.value) },
-            forcedVariations = forcedVariation
+            forcedFeatures = forcedFeature,
+            forcedVariations = forcedVariation,
         )
 
         viewModel.fetchFeatures(remoteEval = true, payload = payload)
@@ -163,12 +164,12 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = false,
         )
-        val forcedFeature = mapOf("feature" to 123)
+        val forcedFeature = mapOf("feature" to GBNumber(123))
         val forcedVariation = mapOf("feature" to 123)
         val attributes = emptyMap<String, Any>()
         val payload = GBRemoteEvalParams(
             attributes = attributes,
-            forcedFeatures = forcedFeature.map { listOf(it.key, it.value) },
+            forcedFeatures = forcedFeature,
             forcedVariations = forcedVariation
         )
 

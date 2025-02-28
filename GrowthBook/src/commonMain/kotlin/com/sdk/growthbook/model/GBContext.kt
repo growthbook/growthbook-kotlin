@@ -37,12 +37,12 @@ data class GBContext(
     /**
      * Map of user attributes that are used to assign variations
      */
-    internal var attributes: Map<String, Any>,
+    internal var attributes: Map<String, GBValue>,
 
     /**
      * Force specific experiments to always assign a specific variation (used for QA)
      */
-    var forcedVariations: Map<String, Any>,
+    var forcedVariations: Map<String, Number>,
 
     /**
      * Map of Sticky Bucket documents
@@ -84,7 +84,7 @@ data class GBContext(
      */
     val enableLogging: Boolean = false,
 
-    var savedGroups: Map<String, Any>? = null
+    var savedGroups: Map<String, GBValue>? = null
 ) {
 
     // Keys are unique identifiers for the features and the values are Feature objects.

@@ -1,5 +1,6 @@
 package com.sdk.growthbook
 
+import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.network.NetworkDispatcher
 import com.sdk.growthbook.sandbox.CachingImpl
@@ -21,7 +22,7 @@ import com.sdk.growthbook.utils.GBCacheRefreshHandler
 abstract class SDKBuilder(
     val apiKey: String,
     val hostURL: String,
-    val attributes: Map<String, Any>,
+    val attributes: Map<String, GBValue>,
     val trackingCallback: GBTrackingCallback,
     val encryptionKey: String?,
     val networkDispatcher: NetworkDispatcher,
@@ -77,7 +78,7 @@ class GBSDKBuilder(
     apiKey: String,
     hostURL: String,
     networkDispatcher: NetworkDispatcher,
-    attributes: Map<String, Any>,
+    attributes: Map<String, GBValue>,
     encryptionKey: String? = null,
     trackingCallback: GBTrackingCallback,
     remoteEval: Boolean = false,
