@@ -23,5 +23,5 @@ internal fun buildSDK(
         encryptionKey = "",
         trackingCallback = trackingCallback,
         networkDispatcher = networkDispatcher,
-    ).initialize()
+    ).javaCompatibleInitialize()
 }
