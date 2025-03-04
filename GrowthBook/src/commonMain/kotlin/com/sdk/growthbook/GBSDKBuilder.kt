@@ -62,8 +62,8 @@ abstract class SDKBuilder(
     /**
      * This method is open to be overridden by subclasses
      */
-    abstract suspend fun initialize(waitForCall: Boolean = true): GrowthBookSDK
-    abstract fun javaCompatibleInitialize(): GrowthBookSDK
+    abstract suspend fun initialize(): GrowthBookSDK
+    abstract fun initializeWithoutCall(): GrowthBookSDK
 }
 
 /**
@@ -141,33 +141,36 @@ class GBSDKBuilder(
     /**
      * Initialize the Kotlin SDK
      */
-    override suspend fun initialize(waitForCall: Boolean): GrowthBookSDK {
+    override suspend fun initialize(): GrowthBookSDK {
         val gbContext = createGbContext()
 
-        return if (waitForCall) {
-            suspendCoroutine { continuationObject ->
-                WaitForCallCaseHelper(
-                    gbContext = gbContext,
-                    onResult = {
-                        continuationObject.resume(it)
-                    }
-                )
-            }
-        } else {
-            GrowthBookSDK(
-                gbContext,
-                refreshHandler,
-                networkDispatcher,
-                cachingEnabled = cachingEnabled,
+        return suspendCoroutine { continuationObject ->
+            WaitForCallCaseHelper(
+                gbContext = gbContext,
+                onResult = {
+                    continuationObject.resume(it)
+                }
             )
         }
     }
 
     /**
-     * Initialize the Kotlin SDK (non-suspend method)
+     * Initialize the Kotlin SDK
+     * This init method takes less time than suspend version
      */
-    override fun javaCompatibleInitialize(): GrowthBookSDK {
+    override fun initializeWithoutCall(): GrowthBookSDK {
         val gbContext = createGbContext()
+
+        if (enableLogging && !cachingEnabled) {
+            println(
+                """
+                    GrowthBook warning: calling #initializeWithoutCall with caching
+                    disabled will cause feature values nulls. We recommend to enable
+                    caching or calling suspend method #initialize
+                """.trimIndent()
+            )
+        }
+
         return GrowthBookSDK(
             gbContext,
             refreshHandler,
@@ -204,6 +207,13 @@ class GBSDKBuilder(
         init {
             val internalRefreshHandler: GBCacheRefreshHandler = { arg1, arg2 ->
                 refreshHandler?.invoke(arg1, arg2)
+
+                if (arg2 != null && enableLogging) {
+                    println(
+                        "GrowthBook error: " + arg2.errorMessage
+                    )
+                }
+
                 handleWaitForCallCallback.invoke()
             }
             growthBookSDK = GrowthBookSDK(
