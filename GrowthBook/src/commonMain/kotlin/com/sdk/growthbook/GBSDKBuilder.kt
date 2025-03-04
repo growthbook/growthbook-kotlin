@@ -172,6 +172,7 @@ class GBSDKBuilder(
             gbContext,
             refreshHandler,
             networkDispatcher,
+            cachingEnabled = cachingEnabled,
         )
     }
 
