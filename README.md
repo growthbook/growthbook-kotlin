@@ -334,6 +334,12 @@ class GBStickyBucketServiceImp(
     - user attributes type was changed (map of GB values);
     - attributesOverride is map of GB values;
     - forced features is map of GB values
+- **v4.0.0-alpha** 2025-03-03
+    - `initialize()` method was changed from non-suspend to suspend method
+in order to get rid of null on the first access. It is expected that user of
+the SDK calls `initialize()` from coroutine. For those who doesn't use coroutines,
+they can use `initializeWithoutCall()` method
+
 
 ## License
 
