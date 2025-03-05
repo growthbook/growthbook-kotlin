@@ -27,6 +27,7 @@ import com.sdk.growthbook.model.GBJson
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBValue
+import com.sdk.growthbook.kotlinx.serialization.from
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonObject
 
