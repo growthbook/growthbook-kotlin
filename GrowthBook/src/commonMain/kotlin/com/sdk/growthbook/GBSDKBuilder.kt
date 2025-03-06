@@ -63,7 +63,7 @@ abstract class SDKBuilder(
      * This method is open to be overridden by subclasses
      */
     abstract suspend fun initialize(): GrowthBookSDK
-    abstract fun initializeWithoutCall(): GrowthBookSDK
+    abstract fun initializeWithoutWaitForCall(): GrowthBookSDK
 }
 
 /**
@@ -158,7 +158,7 @@ class GBSDKBuilder(
      * Initialize the Kotlin SDK
      * This init method takes less time than suspend version
      */
-    override fun initializeWithoutCall(): GrowthBookSDK {
+    override fun initializeWithoutWaitForCall(): GrowthBookSDK {
         val gbContext = createGbContext()
 
         if (enableLogging && !cachingEnabled) {
