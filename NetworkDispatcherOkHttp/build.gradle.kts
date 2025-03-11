@@ -8,7 +8,7 @@ group = "io.growthbook.sdk"
 version = "1.0.2"
 
 kotlin {
-    android {
+    androidTarget {
         publishLibraryVariants("release")
     }
 
