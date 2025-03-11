@@ -17,16 +17,17 @@ import com.sdk.growthbook.features.FeaturesDataModel
 import com.sdk.growthbook.features.FeaturesDataSource
 import com.sdk.growthbook.features.FeaturesFlowDelegate
 import com.sdk.growthbook.features.FeaturesViewModel
-import com.sdk.growthbook.model.GBArray
-import com.sdk.growthbook.model.GBBoolean
-import com.sdk.growthbook.model.GBContext
-import com.sdk.growthbook.model.GBExperiment
-import com.sdk.growthbook.model.GBExperimentResult
-import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBJson
+import com.sdk.growthbook.model.GBNull
+import com.sdk.growthbook.model.GBArray
+import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBString
-import com.sdk.growthbook.model.GBValue
+import com.sdk.growthbook.model.GBContext
+import com.sdk.growthbook.model.GBBoolean
+import com.sdk.growthbook.model.GBExperiment
+import com.sdk.growthbook.model.GBFeatureResult
+import com.sdk.growthbook.model.GBExperimentResult
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonObject
@@ -177,10 +178,10 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     }
 
     /**
-     * The wrapper for feature() method.
+     * The wrapper for the feature() method.
      * This method accesses a feature only if
      * features were successfully fetched from remote source.
-     * If call in progress, it wait for call result. If network
+     * If a call is in progress, it waits for the result. If network
      * call failed, it tries to call again.
      *
      * @returns a [GBFeatureResult] object
@@ -239,6 +240,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
 
         val gbFeatureResult = feature(id)
         return when(val gbResultValue = gbFeatureResult.gbValue) {
+            is GBNull -> null
             is GBBoolean -> gbResultValue.value as? V
             is GBString -> gbResultValue.value as? V
             is GBNumber -> gbResultValue.value as? V
