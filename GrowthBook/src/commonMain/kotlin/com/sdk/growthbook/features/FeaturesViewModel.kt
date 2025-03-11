@@ -11,7 +11,6 @@ import com.sdk.growthbook.sandbox.CachingImpl
 import com.sdk.growthbook.sandbox.getData
 import com.sdk.growthbook.sandbox.putData
 import com.sdk.growthbook.serializable_model.SerializableFeaturesDataModel
-import com.sdk.growthbook.serializable_model.SerializableGBFeature
 import com.sdk.growthbook.serializable_model.gbDeserialize
 import com.sdk.growthbook.utils.getSavedGroupFromEncryptedSavedGroup
 import kotlinx.coroutines.flow.Flow
@@ -35,6 +34,7 @@ internal class FeaturesViewModel(
     private val delegate: FeaturesFlowDelegate,
     private val dataSource: FeaturesDataSource,
     private val encryptionKey: String? = null,
+    private val cachingEnabled: Boolean,
 ) {
 
     /**
@@ -141,7 +141,9 @@ internal class FeaturesViewModel(
 
         try {
             if (dataModel != null) {
-                putDataToCache(dataModel)
+                if (cachingEnabled) {
+                    putDataToCache(dataModel)
+                }
 
                 delegate.featuresAPIModelSuccessfully(dataModel)
                 if (!features.isNullOrEmpty()) {

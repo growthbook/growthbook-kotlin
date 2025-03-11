@@ -83,6 +83,7 @@ class GBSDKBuilder(
     trackingCallback: GBTrackingCallback,
     remoteEval: Boolean = false,
     enableLogging: Boolean = false,
+    private val cachingEnabled: Boolean = true,
 ) : SDKBuilder(
     apiKey, hostURL,
     attributes, trackingCallback, encryptionKey, networkDispatcher, remoteEval, enableLogging
@@ -158,6 +159,7 @@ class GBSDKBuilder(
             gbContext,
             refreshHandler,
             networkDispatcher,
+            cachingEnabled = cachingEnabled,
         )
     }
 }
