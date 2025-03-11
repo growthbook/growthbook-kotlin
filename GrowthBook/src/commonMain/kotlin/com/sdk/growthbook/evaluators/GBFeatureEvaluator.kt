@@ -1,20 +1,18 @@
 package com.sdk.growthbook.evaluators
 
+import com.sdk.growthbook.model.GBJson
+import com.sdk.growthbook.model.GBValue
+import com.sdk.growthbook.model.GBNumber
+import com.sdk.growthbook.model.GBBoolean
+import com.sdk.growthbook.model.GBFeature
+import com.sdk.growthbook.model.GBExperiment
+import com.sdk.growthbook.model.GBFeatureSource
+import com.sdk.growthbook.model.GBFeatureResult
+import com.sdk.growthbook.model.FeatureEvalContext
+import com.sdk.growthbook.model.GBExperimentResult
+import com.sdk.growthbook.utils.GBUtils
 import com.sdk.growthbook.utils.Constants
 import com.sdk.growthbook.utils.GBTrackData
-import com.sdk.growthbook.utils.GBUtils
-import com.sdk.growthbook.utils.toJsonElement
-import com.sdk.growthbook.model.FeatureEvalContext
-import com.sdk.growthbook.model.GBBoolean
-import com.sdk.growthbook.model.GBExperiment
-import com.sdk.growthbook.model.GBExperimentResult
-import com.sdk.growthbook.model.GBFeature
-import com.sdk.growthbook.model.GBFeatureResult
-import com.sdk.growthbook.model.GBFeatureSource
-import com.sdk.growthbook.model.GBNumber
-import com.sdk.growthbook.model.GBValue
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
 
 /**
  * Feature Evaluator Class
@@ -103,13 +101,16 @@ internal class GBFeatureEvaluator(
                             }
 
                             val evalObj = parentResult.gbValue?.let { value ->
-                                mapOf("value" to value.gbSerialize())
+                                mapOf("value" to value)
                             } ?: emptyMap()
 
+                            val conditionObj = parentCondition
+                                .condition.let(GBValue::from) as? GBJson
+                                ?: GBJson(emptyMap())
                             val evalCondition = GBConditionEvaluator().evalCondition(
                                 attributes = evalObj,
-                                conditionObj = parentCondition.condition,
-                                savedGroups = evaluationContext.savedGroups?.toJsonElement()?.jsonObject
+                                conditionObj = conditionObj,
+                                savedGroups = evaluationContext.savedGroups,
                             )
 
                             if (!evalCondition) {
@@ -162,15 +163,9 @@ internal class GBFeatureEvaluator(
                                 attributes = getAttributes(
                                     attributeOverrides = attributeOverrides,
                                     attributes = evaluationContext.userContext.attributes,
-                                )
-                                    .mapValues { it.value.gbSerialize() }
-                                ,
-                                conditionObj = rule.condition,
-                                savedGroups = JsonObject(
-                                    evaluationContext.savedGroups
-                                        ?.mapValues { it.value.gbSerialize() }
-                                        ?: emptyMap()
-                                )
+                                ),
+                                conditionObj = rule.condition.let(GBValue::from) as? GBJson ?: GBJson(emptyMap()),
+                                savedGroups = evaluationContext.savedGroups,
                             )
                         ) {
                             /**
