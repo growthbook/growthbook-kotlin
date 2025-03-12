@@ -5,6 +5,7 @@ import com.sdk.growthbook.model.GBValue
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonElement
+import com.sdk.growthbook.kotlinx.serialization.from
 
 /**
  * The result of running an Experiment given a specific Context

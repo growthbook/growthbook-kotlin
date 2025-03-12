@@ -12,6 +12,7 @@ import com.sdk.growthbook.model.toGbNumber
 import org.intellij.lang.annotations.Language
 import org.junit.Test
 import kotlin.test.assertEquals
+import com.sdk.growthbook.kotlinx.serialization.gbSerialize
 
 internal class VerifySDKReturnFeatureValues {
 

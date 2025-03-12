@@ -1,5 +1,8 @@
 package com.sdk.growthbook
 
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.json.JsonObject
 import com.sdk.growthbook.evaluators.EvaluationContext
 import com.sdk.growthbook.network.NetworkDispatcher
 import com.sdk.growthbook.utils.Crypto
@@ -28,14 +31,7 @@ import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBExperimentResult
-import kotlinx.coroutines.delay
-import com.sdk.growthbook.model.GBJson
-import com.sdk.growthbook.model.GBNumber
-import com.sdk.growthbook.model.GBString
-import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.kotlinx.serialization.from
-import kotlinx.coroutines.flow.Flow
-import kotlinx.serialization.json.JsonObject
 
 typealias GBTrackingCallback = (GBExperiment, GBExperimentResult) -> Unit
 typealias GBFeatureUsageCallback = (featureKey: String, gbFeatureResult: GBFeatureResult) -> Unit

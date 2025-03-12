@@ -15,6 +15,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.JsonPrimitive
+import com.sdk.growthbook.model.GBNull
 import com.sdk.growthbook.model.GBJson
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBArray
@@ -24,6 +25,7 @@ import com.sdk.growthbook.model.GBBoolean
 
 fun GBValue.gbSerialize(): JsonElement =
     when(this) {
+        is GBNull -> JsonNull
         is GBBoolean -> JsonPrimitive(this.value)
         is GBString -> JsonPrimitive(this.value)
         is GBNumber -> JsonPrimitive(this.value)
@@ -40,6 +42,7 @@ fun GBValue.Companion.from(jsonElement: JsonElement): GBValue =
     when(jsonElement) {
         is JsonPrimitive -> {
             when {
+                jsonElement is JsonNull -> GBNull
                 jsonElement.isString -> GBString(jsonElement.content)
                 jsonElement.intOrNull != null -> GBNumber(jsonElement.int)
                 jsonElement.longOrNull != null -> GBNumber(jsonElement.long)

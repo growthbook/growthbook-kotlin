@@ -64,7 +64,7 @@ kotlin {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
                 implementation(
-                    "org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion"
+                    "org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinxSerializationVersion"
                 )
                 implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
             }
