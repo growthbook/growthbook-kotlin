@@ -63,7 +63,7 @@ abstract class SDKBuilder(
      * This method is open to be overridden by subclasses
      */
     abstract suspend fun initialize(): GrowthBookSDK
-    abstract fun initializeWithoutCall(): GrowthBookSDK
+    abstract fun initializeWithoutWaitForCall(): GrowthBookSDK
 }
 
 /**
@@ -158,7 +158,7 @@ class GBSDKBuilder(
      * Initialize the Kotlin SDK
      * This init method takes less time than suspend version
      */
-    override fun initializeWithoutCall(): GrowthBookSDK {
+    override fun initializeWithoutWaitForCall(): GrowthBookSDK {
         val gbContext = createGbContext()
 
         if (enableLogging && !cachingEnabled) {
@@ -200,7 +200,7 @@ class GBSDKBuilder(
         private val onResult: (GrowthBookSDK) -> Unit
     ) {
         var growthBookSDK: GrowthBookSDK? = null
-        private val handleWaitForCallCallback: () -> Unit = {
+        private var handleWaitForCallCallback: (() -> Unit)? = {
             growthBookSDK?.let(onResult)
         }
 
@@ -214,7 +214,11 @@ class GBSDKBuilder(
                     )
                 }
 
-                handleWaitForCallCallback.invoke()
+                // it can be called only one time
+                // a continuation represents a single suspension point
+                handleWaitForCallCallback?.invoke()
+                handleWaitForCallCallback = null
+                growthBookSDK = null
             }
             growthBookSDK = GrowthBookSDK(
                 gbContext,

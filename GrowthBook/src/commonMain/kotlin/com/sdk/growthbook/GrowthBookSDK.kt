@@ -17,12 +17,18 @@ import com.sdk.growthbook.features.FeaturesDataModel
 import com.sdk.growthbook.features.FeaturesDataSource
 import com.sdk.growthbook.features.FeaturesFlowDelegate
 import com.sdk.growthbook.features.FeaturesViewModel
+import com.sdk.growthbook.model.GBJson
+import com.sdk.growthbook.model.GBNull
 import com.sdk.growthbook.model.GBArray
-import com.sdk.growthbook.model.GBBoolean
+import com.sdk.growthbook.model.GBValue
+import com.sdk.growthbook.model.GBNumber
+import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBContext
+import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.model.GBExperiment
-import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeatureResult
+import com.sdk.growthbook.model.GBExperimentResult
+import kotlinx.coroutines.delay
 import com.sdk.growthbook.model.GBJson
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBString
@@ -51,11 +57,8 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     private var assigned: MutableMap<String, Pair<GBExperiment, GBExperimentResult>> =
         mutableMapOf()
     private var subscriptions: MutableList<GBExperimentRunCallback> = mutableListOf()
-
-    //@ThreadLocal
-    internal companion object {
-        internal lateinit var gbContext: GBContext
-    }
+    private var remoteSourceFeaturesFetchResult: FeaturesFetchResult =
+        FeaturesFetchResult.NoResultYet
 
     internal constructor(
         context: GBContext,
@@ -130,6 +133,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
         gbContext.features = features
         if (isRemote) {
+            remoteSourceFeaturesFetchResult = FeaturesFetchResult.Success
             this.refreshHandler?.invoke(true, null)
         }
     }
@@ -159,6 +163,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     override fun featuresFetchFailed(error: GBError, isRemote: Boolean) {
 
         if (isRemote) {
+            remoteSourceFeaturesFetchResult = FeaturesFetchResult.Failed
             this.refreshHandler?.invoke(false, error)
         }
     }
@@ -173,6 +178,32 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         gbContext.savedGroups = savedGroups.mapValues { GBValue.from(it.value) }
         if (isRemote) {
             this.refreshHandler?.invoke(true, null)
+        }
+    }
+
+    /**
+     * The wrapper for the feature() method.
+     * This method accesses a feature only if
+     * features were successfully fetched from remote source.
+     * If a call is in progress, it waits for the result. If network
+     * call failed, it tries to call again.
+     *
+     * @returns a [GBFeatureResult] object
+     */
+    suspend fun suspendFeature(id: String): GBFeatureResult {
+        return when(remoteSourceFeaturesFetchResult) {
+            FeaturesFetchResult.Success -> {
+                feature(id)
+            }
+            FeaturesFetchResult.NoResultYet -> {
+                delay(TIME_FOR_CALL_WAIT_MILLIS)
+                suspendFeature(id)
+            }
+            FeaturesFetchResult.Failed -> {
+                featuresViewModel.fetchFeatures()
+                delay(TIME_FOR_CALL_WAIT_MILLIS)
+                suspendFeature(id)
+            }
         }
     }
 
@@ -213,6 +244,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
 
         val gbFeatureResult = feature(id)
         return when(val gbResultValue = gbFeatureResult.gbValue) {
+            is GBNull -> null
             is GBBoolean -> gbResultValue.value as? V
             is GBString -> gbResultValue.value as? V
             is GBNumber -> gbResultValue.value as? V
@@ -354,4 +386,15 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
             )
         )
 
+    //@ThreadLocal
+    internal companion object {
+        internal lateinit var gbContext: GBContext
+
+        // After this period of time a call status is checked again
+        private const val TIME_FOR_CALL_WAIT_MILLIS = 1000L
+    }
+
+    private enum class FeaturesFetchResult {
+        NoResultYet, Success, Failed
+    }
 }
