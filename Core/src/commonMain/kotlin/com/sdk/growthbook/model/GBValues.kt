@@ -24,13 +24,5 @@ sealed class GBValue {
             else -> false
         }
 
-    companion object {
-        internal fun from(anyObj: Any): GBValue =
-            when(anyObj) {
-                is Boolean -> GBBoolean(anyObj)
-                is String -> GBString(anyObj)
-                is Number -> GBNumber(anyObj)
-                else -> Unknown
-            }
-    }
+    companion object
 }
