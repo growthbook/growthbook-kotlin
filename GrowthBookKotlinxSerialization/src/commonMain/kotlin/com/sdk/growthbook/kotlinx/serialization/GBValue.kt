@@ -32,11 +32,13 @@ fun GBValue.gbSerialize(): JsonElement =
         is GBArray -> JsonArray(
             this.map { it.gbSerialize() }
         )
-        is GBJson -> JsonObject(
-            this.mapValues { it.value.gbSerialize() }
-        )
+        is GBJson -> this.gbSerialize()
         is GBValue.Unknown -> JsonNull
     }
+
+fun GBJson.gbSerialize() = JsonObject(
+    this.mapValues { it.value.gbSerialize() }
+)
 
 fun GBValue.Companion.from(jsonElement: JsonElement): GBValue =
     when(jsonElement) {
