@@ -12,6 +12,7 @@ import com.sdk.growthbook.utils.OptionalProperty
 import com.sdk.growthbook.utils.RangeSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
+import com.sdk.growthbook.kotlinx.serialization.gbSerialize
 
 /**
  * A Feature object consists of possible values plus rules for how to assign values to users.

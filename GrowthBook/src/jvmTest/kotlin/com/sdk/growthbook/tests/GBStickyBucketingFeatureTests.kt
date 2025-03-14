@@ -16,6 +16,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Before
 import org.junit.Test
 import kotlin.test.assertTrue
+import com.sdk.growthbook.kotlinx.serialization.from
 
 class GBStickyBucketingFeatureTests {
     private lateinit var evalConditions: JsonArray

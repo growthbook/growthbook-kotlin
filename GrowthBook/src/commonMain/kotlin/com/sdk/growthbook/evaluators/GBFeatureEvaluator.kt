@@ -13,6 +13,7 @@ import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.utils.GBUtils
 import com.sdk.growthbook.utils.Constants
 import com.sdk.growthbook.utils.GBTrackData
+import com.sdk.growthbook.kotlinx.serialization.from
 
 /**
  * Feature Evaluator Class
@@ -21,7 +22,7 @@ import com.sdk.growthbook.utils.GBTrackData
  */
 internal class GBFeatureEvaluator(
     private val evaluationContext: EvaluationContext,
-    private val forcedFeature: Map<String, Any> = emptyMap()
+    private val forcedFeature: Map<String, GBValue> = emptyMap()
 ) {
     /**
      * Takes Context and Feature Key
@@ -47,7 +48,7 @@ internal class GBFeatureEvaluator(
                 }
                 return prepareResult(
                     featureKey = featureKey,
-                    gbValue = forcedFeature[featureKey]?.let(GBValue::from),
+                    gbValue = forcedFeature[featureKey],
                     source = GBFeatureSource.override,
                 )
             }

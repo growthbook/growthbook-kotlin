@@ -12,6 +12,7 @@ import com.sdk.growthbook.utils.RangeSerializer
 import com.sdk.growthbook.utils.OptionalProperty
 import com.sdk.growthbook.utils.GBParentConditionInterface
 import com.sdk.growthbook.utils.OptionalPropertySerializer
+import com.sdk.growthbook.kotlinx.serialization.from
 
 /**
  * Rule object consists of various definitions to apply to calculate feature value
