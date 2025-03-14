@@ -9,9 +9,17 @@ import com.sdk.growthbook.model.GBBoolean
 // import com.sdk.growthbook.model.GBFeatureSource
 import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.toGbNumber
+import com.sdk.growthbook.utils.GBError
+import io.mockk.mockk
+import io.mockk.every
+import io.mockk.coVerify
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runTest
 import org.intellij.lang.annotations.Language
 import org.junit.Test
 import kotlin.test.assertEquals
+import com.sdk.growthbook.features.FeaturesViewModel
 import com.sdk.growthbook.kotlinx.serialization.gbSerialize
 
 internal class VerifySDKReturnFeatureValues {
@@ -148,6 +156,34 @@ internal class VerifySDKReturnFeatureValues {
         assertEquals("wrongIdDefaultValue", wrongKeyAttributeValue)
         val wrongKeyFeature = sdkInstance.feature("test_feature")
         assertEquals("experiment", wrongKeyFeature.source.name)
+    }
+
+    @Test
+    fun `if features fetch fails, suspendFeature() method calls fetchFeature() again`() {
+        val gbSdk = buildSDK(json = "{}", attributes = emptyMap()) // buildSDK() calls refreshCache(),
+        // refreshCache() calls fetchFeature()
+        // fetchFeature() triggers featuresFetchFailed()
+
+        val mockedFeaturesViewModel: FeaturesViewModel = mockk {
+            every { fetchFeatures() } returns Unit
+        }
+        gbSdk.featuresViewModel = mockedFeaturesViewModel
+
+        runTest {
+            val job = launch {
+                gbSdk.suspendFeature("some-feature-id")
+            }
+
+            // it is not mandatory here but just to emphasize that
+            // if call failed, then suspendFeature() method calls fetchFeatures()
+            gbSdk.featuresFetchFailed(GBError(null), true)
+
+            delay(100) // cancel only after 100 millis of waiting
+            job.cancel()
+            // or gbSdk.featuresFetchedSuccessfully(emptyMap(), true)
+
+            coVerify { mockedFeaturesViewModel.fetchFeatures() }
+        }
     }
 
 /*

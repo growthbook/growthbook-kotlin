@@ -44,10 +44,10 @@ typealias GBExperimentRunCallback = (GBExperiment, GBExperimentResult) -> Unit
  */
 class GrowthBookSDK() : FeaturesFlowDelegate {
 
-    /* visible for test */ var forcedFeatures: Map<String, GBValue> = emptyMap()
+    internal var forcedFeatures: Map<String, GBValue> = emptyMap()
+    internal lateinit var featuresViewModel: FeaturesViewModel
     private var refreshHandler: GBCacheRefreshHandler? = null
     private lateinit var networkDispatcher: NetworkDispatcher
-    private lateinit var featuresViewModel: FeaturesViewModel
     private var attributeOverrides: Map<String, GBValue> = emptyMap()
     private var savedGroups: Map<String, GBValue>? = emptyMap()
     private var assigned: MutableMap<String, Pair<GBExperiment, GBExperimentResult>> =
