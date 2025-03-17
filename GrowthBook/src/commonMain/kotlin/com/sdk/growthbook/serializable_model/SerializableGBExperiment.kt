@@ -11,6 +11,7 @@ import com.sdk.growthbook.utils.GBBucketRange
 import com.sdk.growthbook.utils.RangeSerializer
 import com.sdk.growthbook.utils.GBVariationMeta
 import com.sdk.growthbook.utils.GBParentConditionInterface
+import com.sdk.growthbook.kotlinx.serialization.from
 
 /*
     Defines a single experiment

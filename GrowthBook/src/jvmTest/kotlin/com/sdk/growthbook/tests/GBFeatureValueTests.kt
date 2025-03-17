@@ -16,6 +16,8 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import com.sdk.growthbook.kotlinx.serialization.from
+import com.sdk.growthbook.kotlinx.serialization.gbSerialize
 
 class GBFeatureValueTests {
 

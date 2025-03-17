@@ -1,5 +1,6 @@
 package com.sdk.growthbook.tests
 
+import kotlin.test.*
 import com.sdk.growthbook.utils.GBCondition
 import com.sdk.growthbook.evaluators.GBAttributeType
 import com.sdk.growthbook.evaluators.GBConditionEvaluator
@@ -14,7 +15,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import org.intellij.lang.annotations.Language
-import kotlin.test.*
+import com.sdk.growthbook.kotlinx.serialization.from
 
 class GBConditionTests {
 

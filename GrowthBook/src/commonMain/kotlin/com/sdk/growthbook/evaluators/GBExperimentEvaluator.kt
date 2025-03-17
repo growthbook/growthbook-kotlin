@@ -7,6 +7,7 @@ import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBFeatureSource
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.utils.GBUtils
+import com.sdk.growthbook.kotlinx.serialization.from
 
 /**
  * Experiment Evaluator Class

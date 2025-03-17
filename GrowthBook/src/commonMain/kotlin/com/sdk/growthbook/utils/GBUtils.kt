@@ -19,6 +19,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlin.math.pow
 import kotlin.math.roundToInt
+import com.sdk.growthbook.kotlinx.serialization.gbSerialize
 
 /**
  * Fowler-Noll-Vo hash - 32 bit

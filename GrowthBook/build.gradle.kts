@@ -9,13 +9,13 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "4.0.0-alpha"
+version = "5.0.0-alpha"
 
 kotlin {
 
     val ktorVersion = "2.1.2"
-    val serializationVersion = "1.3.3"
     val kryptoVersion = "2.7.0"
+    val kotlinxSerializationVersion = libs.versions.kotlinxSerialization.get()
 
     androidTarget {
         publishLibraryVariants("release")
@@ -52,10 +52,11 @@ kotlin {
                 implementation("com.ionspin.kotlin:bignum:0.3.3")
                 implementation("com.soywiz.korlibs.krypto:krypto:$kryptoVersion")
 
-                api(project(":Core"))
-                api(
-                    "org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion"
+                implementation(
+                    "org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinxSerializationVersion"
                 )
+                api(project(":Core"))
+                implementation(project(":GrowthBookKotlinxSerialization"))
             }
         }
         val commonTest by getting {
@@ -63,7 +64,7 @@ kotlin {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
                 implementation(
-                    "org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion"
+                    "org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinxSerializationVersion"
                 )
                 implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
             }
