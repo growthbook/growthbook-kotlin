@@ -28,6 +28,7 @@ import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBExperimentResult
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonObject
 
@@ -42,27 +43,26 @@ typealias GBExperimentRunCallback = (GBExperiment, GBExperimentResult) -> Unit
  */
 class GrowthBookSDK() : FeaturesFlowDelegate {
 
-    /* visible for test */ var forcedFeatures: Map<String, GBValue> = emptyMap()
+    internal var forcedFeatures: Map<String, GBValue> = emptyMap()
+    internal lateinit var featuresViewModel: FeaturesViewModel
     private var refreshHandler: GBCacheRefreshHandler? = null
     private lateinit var networkDispatcher: NetworkDispatcher
-    private lateinit var featuresViewModel: FeaturesViewModel
     private var attributeOverrides: Map<String, GBValue> = emptyMap()
     private var savedGroups: Map<String, GBValue>? = emptyMap()
     private var assigned: MutableMap<String, Pair<GBExperiment, GBExperimentResult>> =
         mutableMapOf()
     private var subscriptions: MutableList<GBExperimentRunCallback> = mutableListOf()
+    private var remoteSourceFeaturesFetchResult: FeaturesFetchResult =
+        FeaturesFetchResult.NoResultYet
 
-    //@ThreadLocal
-    internal companion object {
-        internal lateinit var gbContext: GBContext
-    }
 
     internal constructor(
         context: GBContext,
         refreshHandler: GBCacheRefreshHandler?,
         networkDispatcher: NetworkDispatcher,
         features: GBFeatures? = null,
-        savedGroups: Map<String, GBValue>? = null
+        savedGroups: Map<String, GBValue>? = null,
+        cachingEnabled: Boolean,
     ) : this() {
         gbContext = context
         this.refreshHandler = refreshHandler
@@ -80,6 +80,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
                     enableLogging = context.enableLogging,
                 ),
                 encryptionKey = gbContext.encryptionKey,
+                cachingEnabled = cachingEnabled,
             )
         if (features != null) {
             gbContext.features = features
@@ -128,6 +129,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
         gbContext.features = features
         if (isRemote) {
+            remoteSourceFeaturesFetchResult = FeaturesFetchResult.Success
             this.refreshHandler?.invoke(true, null)
         }
     }
@@ -157,6 +159,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     override fun featuresFetchFailed(error: GBError, isRemote: Boolean) {
 
         if (isRemote) {
+            remoteSourceFeaturesFetchResult = FeaturesFetchResult.Failed
             this.refreshHandler?.invoke(false, error)
         }
     }
@@ -171,6 +174,32 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         gbContext.savedGroups = savedGroups.mapValues { GBValue.from(it.value) }
         if (isRemote) {
             this.refreshHandler?.invoke(true, null)
+        }
+    }
+
+    /**
+     * The wrapper for the feature() method.
+     * This method accesses a feature only if
+     * features were successfully fetched from remote source.
+     * If a call is in progress, it waits for the result. If network
+     * call failed, it tries to call again.
+     *
+     * @returns a [GBFeatureResult] object
+     */
+    suspend fun suspendFeature(id: String): GBFeatureResult {
+        return when(remoteSourceFeaturesFetchResult) {
+            FeaturesFetchResult.Success -> {
+                feature(id)
+            }
+            FeaturesFetchResult.NoResultYet -> {
+                delay(TIME_FOR_CALL_WAIT_MILLIS)
+                suspendFeature(id)
+            }
+            FeaturesFetchResult.Failed -> {
+                featuresViewModel.fetchFeatures()
+                delay(TIME_FOR_CALL_WAIT_MILLIS)
+                suspendFeature(id)
+            }
         }
     }
 
@@ -353,4 +382,15 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
             )
         )
 
+    //@ThreadLocal
+    internal companion object {
+        internal lateinit var gbContext: GBContext
+
+        // After this period of time a call status is checked again
+        private const val TIME_FOR_CALL_WAIT_MILLIS = 1000L
+    }
+
+    private enum class FeaturesFetchResult {
+        NoResultYet, Success, Failed
+    }
 }

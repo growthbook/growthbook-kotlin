@@ -146,7 +146,7 @@ class GBFeatureValueTests {
             actualNumberOfOnFeatureUsageCalls++
         }
 
-        val sdk: GrowthBookSDK = builder.initialize()
+        val sdk: GrowthBookSDK = builder.initializeWithoutWaitForCall()
 
         for (item in evalConditions) {
             if (item is JsonArray) {
