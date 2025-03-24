@@ -339,6 +339,10 @@ class GBStickyBucketServiceImp(
 in order to get rid of null on the first access. It is expected that user of
 the SDK calls `initialize()` from coroutine. For those who doesn't use coroutines,
 they can use `initializeWithoutWaitForCall()` method
+- **v5.0.0-alpha** 2025-03-24
+    - GB values were moved to :Core module because they are used in :GrowthBookKotlinxSerialization
+module;
+    - forcedFeature field of GBFeatureEvaluator is a map of GB values
 
 
 ## License
