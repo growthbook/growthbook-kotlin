@@ -4,6 +4,7 @@ import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.model.GBValue
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import com.sdk.growthbook.kotlinx.serialization.from
 
 @Serializable
 data class SerializableGBFeature(

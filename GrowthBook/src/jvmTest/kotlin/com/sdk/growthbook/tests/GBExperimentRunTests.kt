@@ -17,6 +17,8 @@ import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.toGbNumber
 import com.sdk.growthbook.serializable_model.SerializableGBExperiment
+import com.sdk.growthbook.kotlinx.serialization.from
+import com.sdk.growthbook.kotlinx.serialization.gbSerialize
 
 class GBExperimentRunTests {
 

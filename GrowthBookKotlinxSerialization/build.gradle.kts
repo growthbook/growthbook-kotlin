@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "1.1.0"
+version = "1.0.0"
 
 kotlin {
     androidTarget {
@@ -42,7 +42,11 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+                val kotlinxSerializationVersion = libs.versions.kotlinxSerialization.get()
+                api(
+                    "org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinxSerializationVersion"
+                )
+                implementation(project(":Core"))
             }
         }
     }
@@ -50,7 +54,7 @@ kotlin {
 
 android {
     compileSdk = 34
-    namespace = "com.sdk.growthbook.core"
+    namespace = "com.sdk.growthbook.kotlinx.serialization"
     defaultConfig {
         minSdk = 21
     }
