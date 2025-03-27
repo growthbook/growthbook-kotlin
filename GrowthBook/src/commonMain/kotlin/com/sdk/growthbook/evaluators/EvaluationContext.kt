@@ -9,7 +9,7 @@ import com.sdk.growthbook.stickybucket.GBStickyBucketService
 
 internal data class EvaluationContext(
     val enabled: Boolean,
-    val features: GBFeatures,
+    var features: GBFeatures,
     val userContext: UserContext,
     val loggingEnabled: Boolean,
     val savedGroups: Map<String, GBValue>?,

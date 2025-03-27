@@ -129,6 +129,7 @@ class GrowthBookSDK(
      */
     override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
         gbContext.features = features
+        evaluationContext.features = features
         if (isRemote) {
             remoteSourceFeaturesFetchResult = FeaturesFetchResult.Success
             this.refreshHandler?.invoke(true, null)
@@ -305,6 +306,7 @@ class GrowthBookSDK(
      */
     fun setForcedVariations(forcedVariations: Map<String, Number>) {
         gbContext.forcedVariations = forcedVariations
+        evaluationContext.forcedVariations = forcedVariations
         refreshForRemoteEval()
     }
 
