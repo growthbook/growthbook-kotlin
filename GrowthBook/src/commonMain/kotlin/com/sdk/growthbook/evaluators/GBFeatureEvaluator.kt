@@ -205,11 +205,11 @@ internal class GBFeatureEvaluator(
                          */
                         if (rule.tracks != null) {
                             rule.tracks.forEach { track: GBTrackData ->
-                                if (!GBExperimentHelper().isTracked(
-                                        experiment = track.experiment,
-                                        result = track.result
-                                    )
-                                ) {
+                                val isTrackedFlag = evaluationContext.experimentHelper.isTracked(
+                                    experiment = track.experiment,
+                                    result = track.result
+                                )
+                                if (!isTrackedFlag) {
                                     evaluationContext.trackingCallback(track.experiment, track.result)
                                 }
                             }
