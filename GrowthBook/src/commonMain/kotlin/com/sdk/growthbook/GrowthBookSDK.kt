@@ -42,12 +42,19 @@ typealias GBExperimentRunCallback = (GBExperiment, GBExperimentResult) -> Unit
  * that takes a Context object in the constructor.
  * It exposes two main methods: feature and run.
  */
-class GrowthBookSDK() : FeaturesFlowDelegate {
+class GrowthBookSDK(
+    context: GBContext,
+    refreshHandler: GBCacheRefreshHandler?,
+    networkDispatcher: NetworkDispatcher,
+    features: GBFeatures? = null,
+    savedGroups: Map<String, GBValue>? = null,
+    cachingEnabled: Boolean,
+) : FeaturesFlowDelegate {
 
     internal var forcedFeatures: Map<String, GBValue> = emptyMap()
-    internal lateinit var featuresViewModel: FeaturesViewModel
+    internal var featuresViewModel: FeaturesViewModel
     private var refreshHandler: GBCacheRefreshHandler? = null
-    private lateinit var networkDispatcher: NetworkDispatcher
+    private var networkDispatcher: NetworkDispatcher
     private var attributeOverrides: Map<String, GBValue> = emptyMap()
     private var savedGroups: Map<String, GBValue>? = emptyMap()
     private var assigned: MutableMap<String, Pair<GBExperiment, GBExperimentResult>> =
@@ -55,15 +62,9 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     private var subscriptions: MutableList<GBExperimentRunCallback> = mutableListOf()
     private var remoteSourceFeaturesFetchResult: FeaturesFetchResult =
         FeaturesFetchResult.NoResultYet
+    private val evaluationContext: EvaluationContext = createEvaluationContext(context)
 
-    internal constructor(
-        context: GBContext,
-        refreshHandler: GBCacheRefreshHandler?,
-        networkDispatcher: NetworkDispatcher,
-        features: GBFeatures? = null,
-        savedGroups: Map<String, GBValue>? = null,
-        cachingEnabled: Boolean,
-    ) : this() {
+    init {
         gbContext = context
         this.refreshHandler = refreshHandler
         this.networkDispatcher = networkDispatcher
@@ -210,7 +211,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
      */
     fun feature(id: String): GBFeatureResult {
         val evaluator = GBFeatureEvaluator(
-            createEvaluationContext(), this.forcedFeatures,
+            evaluationContext, this.forcedFeatures,
         )
         return evaluator.evaluateFeature(
             featureKey = id,
@@ -263,9 +264,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
      * The run method takes an Experiment object and returns an ExperimentResult
      */
     fun run(experiment: GBExperiment): GBExperimentResult {
-        val evaluator = GBExperimentEvaluator(
-            createEvaluationContext()
-        )
+        val evaluator = GBExperimentEvaluator(evaluationContext)
         val result = evaluator.evaluateExperiment(
             experiment = experiment,
             attributeOverrides = attributeOverrides
@@ -365,22 +364,9 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         }
     }
 
-    private fun createEvaluationContext() =
-        EvaluationContext(
-            enabled = gbContext.enabled,
-            features = gbContext.features,
-            loggingEnabled = gbContext.enableLogging,
-            savedGroups = gbContext.savedGroups,
-            forcedVariations = gbContext.forcedVariations,
-            trackingCallback = gbContext.trackingCallback,
-            stickyBucketService = gbContext.stickyBucketService,
-            onFeatureUsage = gbContext.onFeatureUsage,
-            userContext = UserContext(
-                qaMode = gbContext.qaMode,
-                attributes = gbContext.attributes,
-                stickyBucketAssignmentDocs = gbContext.stickyBucketAssignmentDocs,
-            )
-        )
+    private enum class FeaturesFetchResult {
+        NoResultYet, Success, Failed
+    }
 
     //@ThreadLocal
     internal companion object {
@@ -388,9 +374,22 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
 
         // After this period of time a call status is checked again
         private const val TIME_FOR_CALL_WAIT_MILLIS = 1000L
-    }
 
-    private enum class FeaturesFetchResult {
-        NoResultYet, Success, Failed
+        private fun createEvaluationContext(gbContext: GBContext) =
+            EvaluationContext(
+                enabled = gbContext.enabled,
+                features = gbContext.features,
+                loggingEnabled = gbContext.enableLogging,
+                savedGroups = gbContext.savedGroups,
+                forcedVariations = gbContext.forcedVariations,
+                trackingCallback = gbContext.trackingCallback,
+                stickyBucketService = gbContext.stickyBucketService,
+                onFeatureUsage = gbContext.onFeatureUsage,
+                userContext = UserContext(
+                    qaMode = gbContext.qaMode,
+                    attributes = gbContext.attributes,
+                    stickyBucketAssignmentDocs = gbContext.stickyBucketAssignmentDocs,
+                )
+            )
     }
 }
