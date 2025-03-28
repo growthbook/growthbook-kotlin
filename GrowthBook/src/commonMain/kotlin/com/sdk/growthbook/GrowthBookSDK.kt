@@ -59,12 +59,10 @@ class GrowthBookSDK(
     private var attributeOverrides: Map<String, GBValue> = emptyMap()
     private var remoteSourceFeaturesFetchResult: FeaturesFetchResult =
         FeaturesFetchResult.NoResultYet
+    private val gbExperimentHelper: GBExperimentHelper = GBExperimentHelper()
+    private var subscriptions: MutableList<GBExperimentRunCallback> = mutableListOf()
     private var assigned: MutableMap<String, Pair<GBExperiment, GBExperimentResult>> =
         mutableMapOf()
-    private var subscriptions: MutableList<GBExperimentRunCallback> = mutableListOf()
-    private var remoteSourceFeaturesFetchResult: FeaturesFetchResult =
-        FeaturesFetchResult.NoResultYet
-    private val gbExperimentHelper: GBExperimentHelper = GBExperimentHelper()
 
     init {
         gbContext = context
