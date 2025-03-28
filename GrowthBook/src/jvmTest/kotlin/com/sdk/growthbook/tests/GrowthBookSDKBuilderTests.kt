@@ -254,13 +254,15 @@ class GrowthBookSDKBuilderTests {
             remoteEval = true
         ).setForcedVariations(expectedForcedVariation)
             .initializeWithoutWaitForCall()
-        sdkInstance.forcedFeatures = mapOf("featureForce" to GBNumber(112))
+        sdkInstance.setForcedFeatures(
+            mapOf("featureForce" to GBNumber(112))
+        )
 
         val actualForcedVariation = sdkInstance.getGBContext().forcedVariations
 
         assertTrue { actualForcedVariation.isNotEmpty() }
         assertEquals(actualForcedVariation, expectedForcedVariation)
-        assertTrue { sdkInstance.forcedFeatures.isNotEmpty() }
+        assertTrue { sdkInstance.getForcedFeatures().isNotEmpty() }
     }
 
     @Test
