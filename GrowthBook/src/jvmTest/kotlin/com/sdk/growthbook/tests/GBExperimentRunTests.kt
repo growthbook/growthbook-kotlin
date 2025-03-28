@@ -12,6 +12,7 @@ import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.serializable_model.gbDeserialize
 import com.sdk.growthbook.evaluators.GBExperimentEvaluator
 import com.sdk.growthbook.evaluators.EvaluationContext
+import com.sdk.growthbook.evaluators.GBExperimentHelper
 import com.sdk.growthbook.evaluators.UserContext
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBValue
@@ -72,10 +73,11 @@ class GBExperimentRunTests {
                     features = gbContext.features,
                     loggingEnabled = true,
                     savedGroups = gbContext.savedGroups,
+                    gbExperimentHelper = GBExperimentHelper(),
+                    onFeatureUsage = gbContext.onFeatureUsage,
                     forcedVariations = gbContext.forcedVariations,
                     trackingCallback = gbContext.trackingCallback,
                     stickyBucketService = gbContext.stickyBucketService,
-                    onFeatureUsage = gbContext.onFeatureUsage,
                     userContext = UserContext(
                         qaMode = gbContext.qaMode,
                         attributes = gbContext.attributes,
@@ -134,11 +136,12 @@ class GBExperimentRunTests {
                 .mapValues { GBValue.from(it.value) }
 
             val testScopeEvalContext = EvaluationContext(
-                enabled = testContext.enabled,
-                features = testContext.features.mapValues { it.value.gbDeserialize() },
-                loggingEnabled = true,
                 savedGroups = null,
+                loggingEnabled = true,
+                enabled = testContext.enabled,
+                gbExperimentHelper = GBExperimentHelper(),
                 forcedVariations = testContext.forcedVariations ?: emptyMap(),
+                features = testContext.features.mapValues { it.value.gbDeserialize() },
                 trackingCallback = { _, _ ->
                     countTrackingCallback += 1
                 },
