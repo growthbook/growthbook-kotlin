@@ -51,23 +51,21 @@ class GrowthBookSDK(
     cachingEnabled: Boolean,
 ) : FeaturesFlowDelegate {
 
-    internal var forcedFeatures: Map<String, GBValue> = emptyMap()
     internal var featuresViewModel: FeaturesViewModel
     private var refreshHandler: GBCacheRefreshHandler? = null
-    private var networkDispatcher: NetworkDispatcher
-    private var attributeOverrides: Map<String, GBValue> = emptyMap()
     private var savedGroups: Map<String, GBValue>? = emptyMap()
+    private var forcedFeatures: Map<String, GBValue> = emptyMap()
+    private var attributeOverrides: Map<String, GBValue> = emptyMap()
+    private var remoteSourceFeaturesFetchResult: FeaturesFetchResult =
+        FeaturesFetchResult.NoResultYet
     private var assigned: MutableMap<String, Pair<GBExperiment, GBExperimentResult>> =
         mutableMapOf()
     private var subscriptions: MutableList<GBExperimentRunCallback> = mutableListOf()
-    private var remoteSourceFeaturesFetchResult: FeaturesFetchResult =
-        FeaturesFetchResult.NoResultYet
     private val evaluationContext: EvaluationContext = createEvaluationContext(context)
 
     init {
         gbContext = context
         this.refreshHandler = refreshHandler
-        this.networkDispatcher = networkDispatcher
 
         /**
          * JAVA Consumers preset Features
@@ -298,6 +296,11 @@ class GrowthBookSDK(
 
     fun getAttributeOverrides(): Map<String, Any> {
         return attributeOverrides
+    }
+
+    fun getForcedFeatures(): Map<String, GBValue> = forcedFeatures
+    fun setForcedFeatures(forcedFeatures: Map<String, GBValue>) {
+        this.forcedFeatures = forcedFeatures
     }
 
     /**
