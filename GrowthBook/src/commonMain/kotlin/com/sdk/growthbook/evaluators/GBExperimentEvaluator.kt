@@ -389,7 +389,7 @@ internal class GBExperimentEvaluator(
          * 18. Fire context.trackingClosure if set and the combination of hashAttribute,
          * hashValue, experiment.key, and variationId has not been tracked before
          */
-        if (!evaluationContext.experimentHelper.isTracked(experiment, result)) {
+        if (!evaluationContext.gbExperimentHelper.isTracked(experiment, result)) {
             evaluationContext.trackingCallback(experiment, result)
         }
 

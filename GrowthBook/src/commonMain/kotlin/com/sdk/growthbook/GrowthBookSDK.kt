@@ -13,8 +13,9 @@ import com.sdk.growthbook.utils.GBRemoteEvalParams
 import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBuckets
 import com.sdk.growthbook.utils.Resource
 import com.sdk.growthbook.utils.getFeaturesFromEncryptedFeatures
-import com.sdk.growthbook.evaluators.GBExperimentEvaluator
+import com.sdk.growthbook.evaluators.GBExperimentHelper
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
+import com.sdk.growthbook.evaluators.GBExperimentEvaluator
 import com.sdk.growthbook.evaluators.UserContext
 import com.sdk.growthbook.features.FeaturesDataModel
 import com.sdk.growthbook.features.FeaturesDataSource
@@ -62,7 +63,7 @@ class GrowthBookSDK(
     private var subscriptions: MutableList<GBExperimentRunCallback> = mutableListOf()
     private var remoteSourceFeaturesFetchResult: FeaturesFetchResult =
         FeaturesFetchResult.NoResultYet
-    private val evaluationContext: EvaluationContext = createEvaluationContext(context)
+    private val gbExperimentHelper: GBExperimentHelper = GBExperimentHelper()
 
     init {
         gbContext = context
@@ -129,7 +130,6 @@ class GrowthBookSDK(
      */
     override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
         gbContext.features = features
-        evaluationContext.features = features
         if (isRemote) {
             remoteSourceFeaturesFetchResult = FeaturesFetchResult.Success
             this.refreshHandler?.invoke(true, null)
@@ -212,7 +212,7 @@ class GrowthBookSDK(
      */
     fun feature(id: String): GBFeatureResult {
         val evaluator = GBFeatureEvaluator(
-            evaluationContext, this.forcedFeatures,
+            createEvaluationContext(), this.forcedFeatures,
         )
         return evaluator.evaluateFeature(
             featureKey = id,
@@ -265,7 +265,9 @@ class GrowthBookSDK(
      * The run method takes an Experiment object and returns an ExperimentResult
      */
     fun run(experiment: GBExperiment): GBExperimentResult {
-        val evaluator = GBExperimentEvaluator(evaluationContext)
+        val evaluator = GBExperimentEvaluator(
+            createEvaluationContext()
+        )
         val result = evaluator.evaluateExperiment(
             experiment = experiment,
             attributeOverrides = attributeOverrides
@@ -306,7 +308,6 @@ class GrowthBookSDK(
      */
     fun setForcedVariations(forcedVariations: Map<String, Number>) {
         gbContext.forcedVariations = forcedVariations
-        evaluationContext.forcedVariations = forcedVariations
         refreshForRemoteEval()
     }
 
@@ -370,6 +371,9 @@ class GrowthBookSDK(
         NoResultYet, Success, Failed
     }
 
+    private fun createEvaluationContext() =
+        createEvaluationContext(gbContext, gbExperimentHelper)
+
     //@ThreadLocal
     internal companion object {
         internal lateinit var gbContext: GBContext
@@ -377,16 +381,20 @@ class GrowthBookSDK(
         // After this period of time a call status is checked again
         private const val TIME_FOR_CALL_WAIT_MILLIS = 1000L
 
-        private fun createEvaluationContext(gbContext: GBContext) =
+        private fun createEvaluationContext(
+            gbContext: GBContext,
+            gbExperimentHelper: GBExperimentHelper,
+        ) =
             EvaluationContext(
                 enabled = gbContext.enabled,
                 features = gbContext.features,
-                loggingEnabled = gbContext.enableLogging,
                 savedGroups = gbContext.savedGroups,
+                gbExperimentHelper = gbExperimentHelper,
+                loggingEnabled = gbContext.enableLogging,
+                onFeatureUsage = gbContext.onFeatureUsage,
                 forcedVariations = gbContext.forcedVariations,
                 trackingCallback = gbContext.trackingCallback,
                 stickyBucketService = gbContext.stickyBucketService,
-                onFeatureUsage = gbContext.onFeatureUsage,
                 userContext = UserContext(
                     qaMode = gbContext.qaMode,
                     attributes = gbContext.attributes,

@@ -15,11 +15,10 @@ internal data class EvaluationContext(
     val savedGroups: Map<String, GBValue>?,
     var forcedVariations: Map<String, Any>,
     val trackingCallback: GBTrackingCallback,
+    val gbExperimentHelper: GBExperimentHelper,
     val stickyBucketService: GBStickyBucketService?,
     val onFeatureUsage: ((String, GBFeatureResult) -> Unit)?,
-) {
-    internal val experimentHelper: GBExperimentHelper = GBExperimentHelper()
-}
+)
 
 internal data class UserContext(
     val qaMode: Boolean,
