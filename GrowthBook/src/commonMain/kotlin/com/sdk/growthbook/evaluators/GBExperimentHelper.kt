@@ -12,9 +12,11 @@ internal class GBExperimentHelper {
 
         //Make sure a tracking callback is only fired once per unique experiment
         val key = (result?.hashAttribute ?: "") +
-        (result?.hashValue ?: "") +
-        (experimentKey + result?.variationId)
-        if (trackedExperiments.contains(key)) { return true }
+            (result?.hashValue ?: "") +
+            (experimentKey + result?.variationId)
+        if (trackedExperiments.contains(key)) {
+            return true
+        }
         trackedExperiments.add(key)
         return false
     }
