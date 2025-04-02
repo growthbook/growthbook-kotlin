@@ -17,9 +17,8 @@ internal data class EvaluationContext(
     val trackingCallback: GBTrackingCallback,
     val stickyBucketService: GBStickyBucketService?,
     val onFeatureUsage: ((String, GBFeatureResult) -> Unit)?,
-) {
-    internal val experimentHelper: GBExperimentHelper = GBExperimentHelper()
-}
+    internal val experimentHelper: GBExperimentHelper,
+)
 
 internal data class UserContext(
     val qaMode: Boolean,

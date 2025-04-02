@@ -12,6 +12,7 @@ import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.serializable_model.gbDeserialize
 import com.sdk.growthbook.evaluators.GBExperimentEvaluator
 import com.sdk.growthbook.evaluators.EvaluationContext
+import com.sdk.growthbook.evaluators.GBExperimentHelper
 import com.sdk.growthbook.evaluators.UserContext
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBValue
@@ -70,6 +71,7 @@ class GBExperimentRunTests {
                     features = gbContext.features,
                     loggingEnabled = true,
                     savedGroups = gbContext.savedGroups,
+                    experimentHelper = GBExperimentHelper(),
                     forcedVariations = gbContext.forcedVariations,
                     trackingCallback = gbContext.trackingCallback,
                     stickyBucketService = gbContext.stickyBucketService,
@@ -136,6 +138,7 @@ class GBExperimentRunTests {
                 features = testContext.features.mapValues { it.value.gbDeserialize() },
                 loggingEnabled = true,
                 savedGroups = null,
+                experimentHelper = GBExperimentHelper(),
                 forcedVariations = testContext.forcedVariations ?: emptyMap(),
                 trackingCallback = { _, _ ->
                     countTrackingCallback += 1
