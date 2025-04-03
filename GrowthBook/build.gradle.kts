@@ -12,11 +12,6 @@ group = "io.growthbook.sdk"
 version = "5.0.0-alpha-2"
 
 kotlin {
-
-    val ktorVersion = "2.1.2"
-    val kryptoVersion = "2.7.0"
-    val kotlinxSerializationVersion = libs.versions.kotlinxSerialization.get()
-
     androidTarget {
         publishLibraryVariants("release")
     }
@@ -44,13 +39,16 @@ kotlin {
     iosArm64()
     iosSimulatorArm64()
 
+    //noinspection UseTomlInstead
     sourceSets {
         val commonMain by getting {
             dependencies {
+                api(project(":Core"))
+
                 implementation("org.jetbrains.kotlin:kotlin-stdlib-common")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.0")
-                implementation("com.ionspin.kotlin:bignum:0.3.3")
-                implementation("com.soywiz.korlibs.krypto:krypto:$kryptoVersion")
+                implementation(libs.kotlinx.coroutines.core)
+                implementation("com.ionspin.kotlin:bignum:0.3.3") // used in hash calculation
+                implementation("com.soywiz.korlibs.krypto:krypto:2.7.0") // encryption/decryption
 
                 implementation(
                     "org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinxSerializationVersion"

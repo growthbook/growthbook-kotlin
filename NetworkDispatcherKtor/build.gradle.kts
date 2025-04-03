@@ -4,7 +4,6 @@ import org.jetbrains.kotlin.gradle.targets.js.yarn.yarn
 plugins {
     kotlin("multiplatform")
     id("com.android.library")
-    kotlin("plugin.serialization")
     id("org.jetbrains.dokka") version "1.9.10"
 }
 

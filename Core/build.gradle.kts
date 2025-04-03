@@ -4,7 +4,6 @@ import org.jetbrains.kotlin.gradle.targets.js.yarn.yarn
 plugins {
     kotlin("multiplatform")
     id("com.android.library")
-    kotlin("plugin.serialization")
     id("org.jetbrains.dokka") version "1.8.10"
 }
 
@@ -42,7 +41,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+                implementation(libs.kotlinx.coroutines.core)
             }
         }
     }

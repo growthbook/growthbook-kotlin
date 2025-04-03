@@ -4,7 +4,6 @@ import org.jetbrains.kotlin.gradle.targets.js.yarn.yarn
 plugins {
     kotlin("multiplatform")
     id("com.android.library")
-    kotlin("plugin.serialization")
     id("org.jetbrains.dokka") version "1.8.10"
 }
 
@@ -42,11 +41,8 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                val kotlinxSerializationVersion = libs.versions.kotlinxSerialization.get()
-                api(
-                    "org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinxSerializationVersion"
-                )
                 implementation(project(":Core"))
+                api(libs.kotlinx.serialization.json)
             }
         }
     }
@@ -59,12 +55,8 @@ android {
         minSdk = 21
     }
     buildTypes {
-        release {
-            isMinifyEnabled = false
-        }
-        debug {
-            isMinifyEnabled = false
-        }
+        release {}
+        debug {}
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
