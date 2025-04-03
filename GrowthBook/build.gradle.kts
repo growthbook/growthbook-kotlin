@@ -50,48 +50,27 @@ kotlin {
                 implementation("com.ionspin.kotlin:bignum:0.3.3") // used in hash calculation
                 implementation("com.soywiz.korlibs.krypto:krypto:2.7.0") // encryption/decryption
 
-                implementation(
-                    "org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinxSerializationVersion"
-                )
-                api(project(":Core"))
+                implementation(libs.kotlinx.serialization.json)
                 implementation(project(":GrowthBookKotlinxSerialization"))
             }
         }
-        val commonTest by getting {
-            dependencies {
-                implementation(kotlin("test-common"))
-                implementation(kotlin("test-annotations-common"))
-                implementation(
-                    "org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinxSerializationVersion"
-                )
-                implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
-            }
-        }
+        // val commonTest by getting {}
         val androidMain by getting {
             dependencies {
-                implementation("androidx.startup:startup-runtime:1.1.1")
-                implementation("com.soywiz.korlibs.krypto:krypto-android:$kryptoVersion")
+                implementation("androidx.startup:startup-runtime:1.2.0")
             }
         }
         val androidUnitTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
                 implementation("junit:junit:4.13.2")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test")
-                implementation("io.ktor:ktor-client-mock:$ktorVersion")
             }
         }
 
-        val jvmMain by getting {
-            dependencies {
-                implementation("io.ktor:ktor-client-java:$ktorVersion")
-                implementation("com.soywiz.korlibs.krypto:krypto-jvm:$kryptoVersion")
-            }
-        }
+        val jvmMain by getting {}
         val jvmTest by getting {
             dependencies {
                 implementation ("org.jetbrains.kotlin:kotlin-test-junit")
-                implementation("com.soywiz.korlibs.krypto:krypto-jvm:$kryptoVersion")
 
                 // https://mvnrepository.com/artifact/org.jetbrains.kotlinx/kotlinx-coroutines-test
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
@@ -99,9 +78,7 @@ kotlin {
                 implementation("io.mockk:mockk:1.13.16")
             }
         }
-
     }
-
 }
 
 android {
