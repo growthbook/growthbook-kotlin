@@ -8,27 +8,23 @@ group = "io.growthbook.sdk"
 version = "1.0.2"
 
 kotlin {
-    android {
+    androidTarget {
         publishLibraryVariants("release")
     }
 
-    jvm {
-        compilations.all {
-            kotlinOptions.jvmTarget = "1.8"
-        }
-    }
+    jvm()
 
+    //noinspection UseTomlInstead
     sourceSets {
-        val okhttpVersion = "4.9.2"
+        val okhttpVersion = "4.12.0"
 
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+                implementation(project(":Core"))
+                implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.kotlinx.serialization.json)
                 api("com.squareup.okhttp3:okhttp:$okhttpVersion")
                 implementation("com.squareup.okhttp3:okhttp-sse:$okhttpVersion")
-
-                implementation(project(":Core"))
-                implementation("io.ktor:ktor-serialization-kotlinx-json:2.1.2")
             }
         }
         val androidMain by getting {
@@ -39,7 +35,6 @@ kotlin {
         val androidUnitTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
-                // implementation("com.squareup.okhttp3:mockwebserver:$okhttpVersion")
             }
         }
     }
@@ -52,12 +47,8 @@ android {
         minSdk = 21
     }
     buildTypes {
-        release {
-            isMinifyEnabled = false
-        }
-        debug {
-            isMinifyEnabled = false
-        }
+        debug {}
+        release {}
     }
 }
 

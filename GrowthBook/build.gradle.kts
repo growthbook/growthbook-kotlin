@@ -29,12 +29,7 @@ kotlin {
         }
     }
 
-    jvm {
-        compilations.all {
-            kotlinOptions.jvmTarget = "1.8"
-        }
-    }
-
+    jvm()
     iosX64()
     iosArm64()
     iosSimulatorArm64()
@@ -87,24 +82,10 @@ android {
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
     defaultConfig {
         minSdk = 21
-
-        consumerProguardFiles("consumer-rules.pro")
     }
     buildTypes {
-        release {
-            isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-        }
-        debug {
-            isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-        }
+        debug {}
+        release {}
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8

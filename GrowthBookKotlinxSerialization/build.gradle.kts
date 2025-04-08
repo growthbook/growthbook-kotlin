@@ -28,12 +28,7 @@ kotlin {
         }
     }
 
-    jvm {
-        compilations.all {
-            kotlinOptions.jvmTarget = "1.8"
-        }
-    }
-
+    jvm()
     iosX64()
     iosArm64()
     iosSimulatorArm64()
