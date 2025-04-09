@@ -33,7 +33,7 @@ kotlin {
     iosArm64()
     iosSimulatorArm64()
 
-    val ktorVersion = "3.0.3"
+    val ktorVersion = "3.1.2"
     //noinspection UseTomlInstead
     sourceSets {
         val commonMain by getting {
@@ -146,11 +146,4 @@ publishing {
             }
         }
     }
-}
-
-/**
- * Signing JAR using GPG Keys
- */
-signing {
-    sign(publishing.publications)
 }

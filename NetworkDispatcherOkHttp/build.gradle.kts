@@ -125,10 +125,3 @@ publishing {
         }
     }
 }
-
-/**
- * Signing JAR using GPG Keys
- */
-signing {
-    sign(publishing.publications)
-}

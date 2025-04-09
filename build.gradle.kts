@@ -6,9 +6,9 @@ buildscript {
     }
     //noinspection UseTomlInstead
     dependencies {
-        classpath("com.android.tools.build:gradle:7.4.2")
+        classpath("com.android.tools.build:gradle:8.0.2")
 
-        val kotlinPluginsVersion = "2.0.0"
+        val kotlinPluginsVersion = "2.1.20"
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinPluginsVersion")
         //noinspection GradleDependency
         classpath ("org.jetbrains.kotlin:kotlin-serialization:$kotlinPluginsVersion")
@@ -37,5 +37,12 @@ subprojects {
             System.getenv("GPG_PRIVATE_KEY"),
             System.getenv("GPG_PRIVATE_PASSWORD")
         )
+        sign(publishing.publications)
     }
+
+    tasks
+        .withType<AbstractPublishToMaven>()
+        .configureEach {
+            mustRunAfter(tasks.withType<Sign>())
+        }
 }
