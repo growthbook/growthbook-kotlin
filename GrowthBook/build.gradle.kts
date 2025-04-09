@@ -12,14 +12,9 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "2.0.0"
+version = "5.0.0-alpha-3"
 
 kotlin {
-
-    val ktorVersion = "3.0.3"
-    val serializationVersion = "1.6.1"
-    val cryptographyVersion = "0.4.0"
-
     androidTarget {
         publishLibraryVariants("release")
     }
@@ -37,86 +32,66 @@ kotlin {
         }
     }
 
-    jvm {
-        compilations.all {
-            kotlinOptions.jvmTarget = "1.8"
-        }
-    }
-
-    wasmJs {
-        nodejs()
-    }
-
+    jvm()
     iosX64()
     iosArm64()
     iosSimulatorArm64()
 
+    //noinspection UseTomlInstead
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlin:kotlin-stdlib-common")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
-                implementation("com.ionspin.kotlin:bignum:0.3.9")
-                implementation("dev.whyoleg.cryptography:cryptography-core:$cryptographyVersion")
-
                 api(project(":Core"))
-                api(
-                    "org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion"
-                )
+
+                implementation("org.jetbrains.kotlin:kotlin-stdlib-common")
+                implementation(libs.kotlinx.coroutines.core)
+                implementation("com.ionspin.kotlin:bignum:0.3.9") // used in hash calculation
+                implementation("dev.whyoleg.cryptography:cryptography-core:0.4.0") // encryption/decryption
+
+                implementation(libs.kotlinx.serialization.json)
+                implementation(project(":GrowthBookKotlinxSerialization"))
             }
         }
-        val commonTest by getting {
-            dependencies {
-                implementation(kotlin("test-common"))
-                implementation(kotlin("test-annotations-common"))
-                implementation(
-                    "org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion"
-                )
-                implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
-            }
-        }
+        // val commonTest by getting {}
         val androidMain by getting {
             dependencies {
-                implementation("androidx.startup:startup-runtime:1.1.1")
-                implementation("dev.whyoleg.cryptography:cryptography-provider-jdk:$cryptographyVersion")
+                implementation("androidx.startup:startup-runtime:1.2.0")
+                implementation("dev.whyoleg.cryptography:cryptography-provider-jdk:0.4.0")
             }
         }
         val androidUnitTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
                 implementation("junit:junit:4.13.2")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test")
-                implementation("io.ktor:ktor-client-mock:$ktorVersion")
             }
         }
 
         val jvmMain by getting {
             dependencies {
-                implementation("io.ktor:ktor-client-java:$ktorVersion")
-                implementation("dev.whyoleg.cryptography:cryptography-provider-jdk:$cryptographyVersion")
+                implementation("dev.whyoleg.cryptography:cryptography-provider-jdk:0.4.0")
             }
         }
         val jvmTest by getting {
             dependencies {
                 implementation ("org.jetbrains.kotlin:kotlin-test-junit")
-                implementation("dev.whyoleg.cryptography:cryptography-provider-jdk:$cryptographyVersion")
 
                 // https://mvnrepository.com/artifact/org.jetbrains.kotlinx/kotlinx-coroutines-test
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+
+                implementation("io.mockk:mockk:1.13.16")
             }
         }
         val jsMain by getting {
             dependencies {
-                implementation("dev.whyoleg.cryptography:cryptography-provider-webcrypto:$cryptographyVersion")
+                implementation("dev.whyoleg.cryptography:cryptography-provider-webcrypto:0.4.0")
             }
         }
         val wasmJsMain by getting {
             dependencies {
-                implementation("dev.whyoleg.cryptography:cryptography-provider-webcrypto:$cryptographyVersion")
+                implementation("dev.whyoleg.cryptography:cryptography-provider-webcrypto:0.4.0")
             }
         }
     }
-
 }
 
 android {
@@ -125,24 +100,10 @@ android {
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
     defaultConfig {
         minSdk = 21
-
-        consumerProguardFiles("consumer-rules.pro")
     }
     buildTypes {
-        release {
-            isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-        }
-        debug {
-            isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-        }
+        debug {}
+        release {}
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
@@ -222,11 +183,4 @@ publishing {
             }
         }
     }
-}
-
-/**
- * Signing JAR using GPG Keys
- */
-signing {
-    sign(publishing.publications)
 }

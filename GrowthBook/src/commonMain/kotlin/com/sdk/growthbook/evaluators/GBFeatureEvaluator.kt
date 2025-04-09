@@ -1,19 +1,19 @@
 package com.sdk.growthbook.evaluators
 
+import com.sdk.growthbook.model.GBJson
+import com.sdk.growthbook.model.GBValue
+import com.sdk.growthbook.model.GBNumber
+import com.sdk.growthbook.model.GBBoolean
+import com.sdk.growthbook.model.GBFeature
+import com.sdk.growthbook.model.GBExperiment
+import com.sdk.growthbook.model.GBFeatureSource
+import com.sdk.growthbook.model.GBFeatureResult
+import com.sdk.growthbook.model.FeatureEvalContext
+import com.sdk.growthbook.model.GBExperimentResult
+import com.sdk.growthbook.utils.GBUtils
 import com.sdk.growthbook.utils.Constants
 import com.sdk.growthbook.utils.GBTrackData
-import com.sdk.growthbook.utils.GBUtils
-import com.sdk.growthbook.utils.toJsonElement
-import com.sdk.growthbook.model.FeatureEvalContext
-import com.sdk.growthbook.model.GBBoolean
-import com.sdk.growthbook.model.GBExperiment
-import com.sdk.growthbook.model.GBExperimentResult
-import com.sdk.growthbook.model.GBFeature
-import com.sdk.growthbook.model.GBFeatureResult
-import com.sdk.growthbook.model.GBFeatureSource
-import com.sdk.growthbook.model.GBNumber
-import com.sdk.growthbook.model.GBValue
-import kotlinx.serialization.json.jsonObject
+import com.sdk.growthbook.kotlinx.serialization.from
 
 /**
  * Feature Evaluator Class
@@ -22,7 +22,7 @@ import kotlinx.serialization.json.jsonObject
  */
 internal class GBFeatureEvaluator(
     private val evaluationContext: EvaluationContext,
-    private val forcedFeature: Map<String, Any> = emptyMap()
+    private val forcedFeature: Map<String, GBValue> = emptyMap()
 ) {
     /**
      * Takes Context and Feature Key
@@ -30,7 +30,7 @@ internal class GBFeatureEvaluator(
      */
     fun evaluateFeature(
         featureKey: String,
-        attributeOverrides: Map<String, Any>,
+        attributeOverrides: Map<String, GBValue>,
         evalContext: FeatureEvalContext = FeatureEvalContext(
             id = featureKey,
             evaluatedFeatures = mutableSetOf()
@@ -48,7 +48,7 @@ internal class GBFeatureEvaluator(
                 }
                 return prepareResult(
                     featureKey = featureKey,
-                    gbValue = forcedFeature[featureKey]?.let(GBValue::from),
+                    gbValue = forcedFeature[featureKey],
                     source = GBFeatureSource.override,
                 )
             }
@@ -102,13 +102,16 @@ internal class GBFeatureEvaluator(
                             }
 
                             val evalObj = parentResult.gbValue?.let { value ->
-                                mapOf("value" to value.gbSerialize())
+                                mapOf("value" to value)
                             } ?: emptyMap()
 
+                            val conditionObj = parentCondition
+                                .condition.let(GBValue::from) as? GBJson
+                                ?: GBJson(emptyMap())
                             val evalCondition = GBConditionEvaluator().evalCondition(
                                 attributes = evalObj,
-                                conditionObj = parentCondition.condition,
-                                savedGroups = evaluationContext.savedGroups?.toJsonElement()?.jsonObject
+                                conditionObj = conditionObj,
+                                savedGroups = evaluationContext.savedGroups,
                             )
 
                             if (!evalCondition) {
@@ -161,11 +164,9 @@ internal class GBFeatureEvaluator(
                                 attributes = getAttributes(
                                     attributeOverrides = attributeOverrides,
                                     attributes = evaluationContext.userContext.attributes,
-                                )
-                                    .mapValues { GBValue.from(it.value).gbSerialize() }
-                                ,
-                                conditionObj = rule.condition,
-                                savedGroups = evaluationContext.savedGroups?.toJsonElement()?.jsonObject
+                                ),
+                                conditionObj = rule.condition.let(GBValue::from) as? GBJson ?: GBJson(emptyMap()),
+                                savedGroups = evaluationContext.savedGroups,
                             )
                         ) {
                             /**
@@ -204,11 +205,13 @@ internal class GBFeatureEvaluator(
                          */
                         if (rule.tracks != null) {
                             rule.tracks.forEach { track: GBTrackData ->
-                                if (!GBExperimentHelper().isTracked(
+                                val isTrackedFlag = evaluationContext
+                                    .gbExperimentHelper
+                                    .isTracked(
                                         experiment = track.experiment,
                                         result = track.result
                                     )
-                                ) {
+                                if (!isTrackedFlag) {
                                     evaluationContext.trackingCallback(track.experiment, track.result)
                                 }
                             }
@@ -275,7 +278,7 @@ internal class GBFeatureEvaluator(
                             if (result.inExperiment && (result.passthrough != true)) {
                                 return prepareResult(
                                     featureKey = featureKey,
-                                    gbValue = GBValue.from(result.value),
+                                    gbValue = result.value,
                                     source = GBFeatureSource.experiment,
                                     experiment = exp,
                                     experimentResult = result
@@ -347,8 +350,8 @@ internal class GBFeatureEvaluator(
      * The method that merge together attributes of Context and override attribute
      */
     private fun getAttributes(
-        attributes: Map<String, Any>, attributeOverrides: Map<String, Any>,
-    ): Map<String, Any> {
+        attributes: Map<String, GBValue>, attributeOverrides: Map<String, GBValue>,
+    ): Map<String, GBValue> {
         attributes.toMutableMap().putAll(attributeOverrides)
         return attributes
     }

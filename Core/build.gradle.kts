@@ -7,12 +7,11 @@ import org.jetbrains.kotlin.gradle.targets.js.yarn.yarn
 plugins {
     kotlin("multiplatform")
     id("com.android.library")
-    kotlin("plugin.serialization")
-    id("org.jetbrains.dokka") version "1.8.10"
+    id("org.jetbrains.dokka") version "1.9.10"
 }
 
 group = "io.growthbook.sdk"
-version = "1.0.3"
+version = "1.1.0"
 
 kotlin {
     androidTarget {
@@ -32,16 +31,10 @@ kotlin {
         }
     }
 
-    jvm {
-        compilations.all {
-            kotlinOptions.jvmTarget = "1.8"
-        }
-    }
-
+    jvm()
     wasmJs {
         nodejs()
     }
-
     iosX64()
     iosArm64()
     iosSimulatorArm64()
@@ -49,7 +42,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
+                implementation(libs.kotlinx.coroutines.core)
             }
         }
     }
@@ -62,12 +55,8 @@ android {
         minSdk = 21
     }
     buildTypes {
-        release {
-            isMinifyEnabled = false
-        }
-        debug {
-            isMinifyEnabled = false
-        }
+        release {}
+        debug {}
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
@@ -147,11 +136,4 @@ publishing {
             }
         }
     }
-}
-
-/**
- * Signing JAR using GPG Keys
- */
-signing {
-    sign(publishing.publications)
 }

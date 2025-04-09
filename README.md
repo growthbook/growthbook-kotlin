@@ -25,13 +25,13 @@ repositories {
 
 dependencies {
     // Add GrowthBook module:
-    implementation 'io.growthbook.sdk:GrowthBook:<version>' // 1.1.60 latest version when this file was edited
+    implementation 'io.growthbook.sdk:GrowthBook:<version>' // 3.1.0 latest version when this file was edited
 
     // Add Network Dispatcher you prefer:
     // 1) NetworkDispatcherKtor artifact contains the Network Dispatcher based on Ktor artifact
-    implementation 'io.growthbook.sdk:NetworkDispatcherKtor:1.0.2'
+    implementation 'io.growthbook.sdk:NetworkDispatcherKtor:1.0.4'
     // 2) NetworkDispatcherOkHttp artifact contains the Network Dispatcher based on OkHttp artifact
-    implementation 'io.growthbook.sdk:NetworkDispatcherOkHttp:1.0.0'
+    implementation 'io.growthbook.sdk:NetworkDispatcherOkHttp:1.0.2'
 }
 ```
 If you are not sure which dispatcher to choose we recommend to use network dispatcher based on Ktor.
@@ -330,6 +330,20 @@ class GBStickyBucketServiceImp(
 - **v2.0.0-alpha** 2025-01-10
     - the `value` field was renamed to `gbValue`, the type of this field was changed to `GBValue`;
     - `inline fun <reified V>feature(id: String): V?` was added (useful when you need only feature value and you know the type of this feature)
+- **v3.0.0-alpha** 2025-01-27
+    - user attributes type was changed (map of GB values);
+    - attributesOverride is map of GB values;
+    - forced features is map of GB values
+- **v4.0.0-alpha** 2025-03-03
+    - `initialize()` method was changed from non-suspend to suspend method
+in order to get rid of null on the first access. It is expected that user of
+the SDK calls `initialize()` from coroutine. For those who doesn't use coroutines,
+they can use `initializeWithoutWaitForCall()` method
+- **v5.0.0-alpha** 2025-03-24
+    - GB values were moved to :Core module because they are used in :GrowthBookKotlinxSerialization
+module;
+    - forcedFeature field of GBFeatureEvaluator is a map of GB values
+
 
 ## License
 

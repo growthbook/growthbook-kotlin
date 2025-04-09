@@ -1,21 +1,23 @@
-package com.sdk.growthbook.model
+package com.sdk.growthbook.serializable_model
 
+import com.sdk.growthbook.model.GBExperiment
+import com.sdk.growthbook.model.GBValue
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import com.sdk.growthbook.utils.GBFilter
 import com.sdk.growthbook.utils.GBCondition
 import com.sdk.growthbook.utils.GBBucketRange
-import com.sdk.growthbook.utils.GBVariationMeta
 import com.sdk.growthbook.utils.RangeSerializer
+import com.sdk.growthbook.utils.GBVariationMeta
 import com.sdk.growthbook.utils.GBParentConditionInterface
-import com.sdk.growthbook.kotlinx.serialization.gbSerialize
-import com.sdk.growthbook.serializable_model.SerializableGBExperiment
-import com.sdk.growthbook.serializable_model.SerializableGBExperimentResult
+import com.sdk.growthbook.kotlinx.serialization.from
 
 /*
     Defines a single experiment
  */
-data class GBExperiment(
+@Serializable
+data class SerializableGBExperiment(
 
     /**
      * The globally unique tracking key for the experiment
@@ -25,7 +27,7 @@ data class GBExperiment(
     /**
      * The different variations to choose between
      */
-    val variations: List<GBValue> = emptyList(),
+    val variations: List<JsonElement> = ArrayList(),
 
     /**
      * A tuple that contains the namespace identifier, plus a range of coverage for the experiment
@@ -128,112 +130,29 @@ data class GBExperiment(
      * Any users with a sticky bucket version less than this will be excluded from the experiment
      */
     val minBucketVersion: Int? = null
-) {
-    internal fun gbSerialize() =
-        SerializableGBExperiment(
-            key = key,
-            meta = meta,
-            seed = seed,
-            name = name,
-            force = force,
-            phase = phase,
-            active = active,
-            ranges = ranges,
-            filters = filters,
-            weights = weights,
-            coverage = coverage,
-            condition = condition,
-            namespace = namespace,
-            hashVersion = hashVersion,
-            bucketVersion = bucketVersion,
-            hashAttribute = hashAttribute,
-            minBucketVersion = minBucketVersion,
-            parentConditions = parentConditions,
-            fallBackAttribute = fallBackAttribute,
-            disableStickyBucketing = disableStickyBucketing,
-            variations = variations.map { it.gbSerialize() },
-        )
-}
+)
 
-/**
- * The result of running an Experiment given a specific Context
- */
-data class GBExperimentResult(
-
-    /**
-     * Whether or not the user is part of the experiment
-     */
-    val inExperiment: Boolean = false,
-
-    /**
-     * The array index of the assigned variation
-     */
-    val variationId: Int = 0,
-
-    /**
-     * The array value of the assigned variation
-     */
-    val value: GBValue,
-
-    /**
-     * The user attribute used to assign a variation
-     */
-    val hashAttribute: String? = null,
-
-    /**
-     * The value of that attribute
-     */
-    val hashValue: String? = null,
-
-    //new properties v0.4.0
-    /**
-     * The unique key for the assigned variation
-     */
-    val key: String = "",
-
-    /**
-     * The human-readable name of the assigned variation
-     */
-    var name: String? = null,
-
-    /**
-     * The hash value used to assign a variation (float from 0 to 1)
-     */
-    var bucket: Float? = null,
-
-    /**
-     * Used for holdout groups
-     */
-    var passthrough: Boolean? = null,
-
-    /**
-     * If a hash was used to assign a variation
-     */
-    val hashUsed: Boolean? = null,
-
-    /**
-     * The id of the feature (if any) that the experiment came from
-     */
-    val featureId: String? = null,
-
-    /**
-     * If sticky bucketing was used to assign a variation
-     */
-    val stickyBucketUsed: Boolean? = null
-) {
-    internal fun gbSerialize() =
-        SerializableGBExperimentResult(
-            key = key,
-            name = name,
-            bucket = bucket,
-            hashUsed = hashUsed,
-            hashValue = hashValue,
-            featureId = featureId,
-            passthrough = passthrough,
-            variationId = variationId,
-            value = value.gbSerialize(),
-            inExperiment = inExperiment,
-            hashAttribute = hashAttribute,
-            stickyBucketUsed = stickyBucketUsed,
-        )
-}
+internal fun SerializableGBExperiment.gbDeserialize() =
+    GBExperiment(
+        key = key,
+        seed = seed,
+        meta = meta,
+        name = name,
+        force = force,
+        phase = phase,
+        active = active,
+        ranges = ranges,
+        weights = weights,
+        filters = filters,
+        coverage = coverage,
+        namespace = namespace,
+        condition = condition,
+        hashVersion = hashVersion,
+        bucketVersion = bucketVersion,
+        hashAttribute = hashAttribute,
+        minBucketVersion = minBucketVersion,
+        parentConditions = parentConditions,
+        fallBackAttribute = fallBackAttribute,
+        disableStickyBucketing = disableStickyBucketing,
+        variations = variations.map { GBValue.from(it) },
+    )

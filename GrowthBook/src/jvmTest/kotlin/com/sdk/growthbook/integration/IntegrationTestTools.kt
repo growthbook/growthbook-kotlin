@@ -3,12 +3,13 @@ package com.sdk.growthbook.integration
 import com.sdk.growthbook.GBSDKBuilder
 import com.sdk.growthbook.GBTrackingCallback
 import com.sdk.growthbook.GrowthBookSDK
+import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.tests.MockNetworkClient
 import com.sdk.growthbook.network.NetworkDispatcher
 
 internal fun buildSDK(
     json: String,
-    attributes: Map<String, Any> = emptyMap(),
+    attributes: Map<String, GBValue> = emptyMap(),
     networkDispatcher: NetworkDispatcher = MockNetworkClient(
         json, null
     ),
@@ -22,5 +23,5 @@ internal fun buildSDK(
         encryptionKey = "",
         trackingCallback = trackingCallback,
         networkDispatcher = networkDispatcher,
-    ).initialize()
+    ).initializeWithoutWaitForCall()
 }

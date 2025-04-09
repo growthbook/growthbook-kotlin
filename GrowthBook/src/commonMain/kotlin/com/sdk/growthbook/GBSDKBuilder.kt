@@ -1,5 +1,8 @@
 package com.sdk.growthbook
 
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
+import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.network.NetworkDispatcher
 import com.sdk.growthbook.sandbox.CachingImpl
@@ -21,7 +24,7 @@ import com.sdk.growthbook.utils.GBCacheRefreshHandler
 abstract class SDKBuilder(
     val apiKey: String,
     val hostURL: String,
-    val attributes: Map<String, Any>,
+    val attributes: Map<String, GBValue>,
     val trackingCallback: GBTrackingCallback,
     val encryptionKey: String?,
     val networkDispatcher: NetworkDispatcher,
@@ -59,7 +62,8 @@ abstract class SDKBuilder(
     /**
      * This method is open to be overridden by subclasses
      */
-    abstract fun initialize(): GrowthBookSDK
+    abstract suspend fun initialize(): GrowthBookSDK
+    abstract fun initializeWithoutWaitForCall(): GrowthBookSDK
 }
 
 /**
@@ -77,11 +81,12 @@ class GBSDKBuilder(
     apiKey: String,
     hostURL: String,
     networkDispatcher: NetworkDispatcher,
-    attributes: Map<String, Any>,
+    attributes: Map<String, GBValue>,
     encryptionKey: String? = null,
     trackingCallback: GBTrackingCallback,
     remoteEval: Boolean = false,
     enableLogging: Boolean = false,
+    private val cachingEnabled: Boolean = true,
 ) : SDKBuilder(
     apiKey, hostURL,
     attributes, trackingCallback, encryptionKey, networkDispatcher, remoteEval, enableLogging
@@ -136,9 +141,46 @@ class GBSDKBuilder(
     /**
      * Initialize the Kotlin SDK
      */
-    override fun initialize(): GrowthBookSDK {
+    override suspend fun initialize(): GrowthBookSDK {
+        val gbContext = createGbContext()
 
-        val gbContext = GBContext(
+        return suspendCoroutine { continuationObject ->
+            WaitForCallCaseHelper(
+                gbContext = gbContext,
+                onResult = {
+                    continuationObject.resume(it)
+                }
+            )
+        }
+    }
+
+    /**
+     * Initialize the Kotlin SDK
+     * This init method takes less time than suspend version
+     */
+    override fun initializeWithoutWaitForCall(): GrowthBookSDK {
+        val gbContext = createGbContext()
+
+        if (enableLogging && !cachingEnabled) {
+            println(
+                """
+                    GrowthBook warning: calling #initializeWithoutCall with caching
+                    disabled will cause feature values nulls. We recommend to enable
+                    caching or calling suspend method #initialize
+                """.trimIndent()
+            )
+        }
+
+        return GrowthBookSDK(
+            gbContext,
+            refreshHandler,
+            networkDispatcher,
+            cachingEnabled = cachingEnabled,
+        )
+    }
+
+    private fun createGbContext() =
+        GBContext(
             apiKey = apiKey,
             enabled = enabled,
             attributes = attributes,
@@ -153,10 +195,37 @@ class GBSDKBuilder(
             stickyBucketService = stickyBucketService,
         )
 
-        return GrowthBookSDK(
-            gbContext,
-            refreshHandler,
-            networkDispatcher,
-        )
+    private inner class WaitForCallCaseHelper(
+        gbContext: GBContext,
+        private val onResult: (GrowthBookSDK) -> Unit
+    ) {
+        var growthBookSDK: GrowthBookSDK? = null
+        private var handleWaitForCallCallback: (() -> Unit)? = {
+            growthBookSDK?.let(onResult)
+        }
+
+        init {
+            val internalRefreshHandler: GBCacheRefreshHandler = { arg1, arg2 ->
+                refreshHandler?.invoke(arg1, arg2)
+
+                if (arg2 != null && enableLogging) {
+                    println(
+                        "GrowthBook error: " + arg2.errorMessage
+                    )
+                }
+
+                // it can be called only one time
+                // a continuation represents a single suspension point
+                handleWaitForCallCallback?.invoke()
+                handleWaitForCallCallback = null
+                growthBookSDK = null
+            }
+            growthBookSDK = GrowthBookSDK(
+                gbContext,
+                internalRefreshHandler,
+                networkDispatcher,
+                cachingEnabled = cachingEnabled,
+            )
+        }
     }
 }

@@ -1,5 +1,8 @@
 package com.sdk.growthbook
 
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.json.JsonObject
 import com.sdk.growthbook.evaluators.EvaluationContext
 import com.sdk.growthbook.network.NetworkDispatcher
 import com.sdk.growthbook.utils.Crypto
@@ -10,25 +13,26 @@ import com.sdk.growthbook.utils.GBRemoteEvalParams
 import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBuckets
 import com.sdk.growthbook.utils.Resource
 import com.sdk.growthbook.utils.getFeaturesFromEncryptedFeatures
-import com.sdk.growthbook.evaluators.GBExperimentEvaluator
+import com.sdk.growthbook.evaluators.GBExperimentHelper
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
+import com.sdk.growthbook.evaluators.GBExperimentEvaluator
 import com.sdk.growthbook.evaluators.UserContext
 import com.sdk.growthbook.features.FeaturesDataModel
 import com.sdk.growthbook.features.FeaturesDataSource
 import com.sdk.growthbook.features.FeaturesFlowDelegate
 import com.sdk.growthbook.features.FeaturesViewModel
-import com.sdk.growthbook.model.GBBoolean
-import com.sdk.growthbook.model.GBContext
-import com.sdk.growthbook.model.GBExperiment
-import com.sdk.growthbook.model.GBExperimentResult
-import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBJson
+import com.sdk.growthbook.model.GBNull
+import com.sdk.growthbook.model.GBArray
+import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBString
-import com.sdk.growthbook.model.GBValue
-import com.sdk.growthbook.utils.toHashMap
-import kotlinx.coroutines.flow.Flow
-import kotlinx.serialization.json.JsonObject
+import com.sdk.growthbook.model.GBContext
+import com.sdk.growthbook.model.GBBoolean
+import com.sdk.growthbook.model.GBExperiment
+import com.sdk.growthbook.model.GBFeatureResult
+import com.sdk.growthbook.model.GBExperimentResult
+import com.sdk.growthbook.kotlinx.serialization.from
 
 typealias GBTrackingCallback = (GBExperiment, GBExperimentResult) -> Unit
 typealias GBFeatureUsageCallback = (featureKey: String, gbFeatureResult: GBFeatureResult) -> Unit
@@ -39,33 +43,30 @@ typealias GBExperimentRunCallback = (GBExperiment, GBExperimentResult) -> Unit
  * that takes a Context object in the constructor.
  * It exposes two main methods: feature and run.
  */
-class GrowthBookSDK() : FeaturesFlowDelegate {
+class GrowthBookSDK(
+    context: GBContext,
+    refreshHandler: GBCacheRefreshHandler?,
+    networkDispatcher: NetworkDispatcher,
+    features: GBFeatures? = null,
+    savedGroups: Map<String, GBValue>? = null,
+    cachingEnabled: Boolean,
+) : FeaturesFlowDelegate {
 
+    internal var featuresViewModel: FeaturesViewModel
     private var refreshHandler: GBCacheRefreshHandler? = null
-    private lateinit var networkDispatcher: NetworkDispatcher
-    private lateinit var featuresViewModel: FeaturesViewModel
-    private var attributeOverrides: Map<String, Any> = emptyMap()
-    private var forcedFeatures: Map<String, Any> = emptyMap()
-    private var savedGroups: Map<String, Any>? = emptyMap()
+    private var savedGroups: Map<String, GBValue>? = emptyMap()
+    private var forcedFeatures: Map<String, GBValue> = emptyMap()
+    private var attributeOverrides: Map<String, GBValue> = emptyMap()
+    private var remoteSourceFeaturesFetchResult: FeaturesFetchResult =
+        FeaturesFetchResult.NoResultYet
+    private val gbExperimentHelper: GBExperimentHelper = GBExperimentHelper()
+    private var subscriptions: MutableList<GBExperimentRunCallback> = mutableListOf()
     private var assigned: MutableMap<String, Pair<GBExperiment, GBExperimentResult>> =
         mutableMapOf()
-    private var subscriptions: MutableList<GBExperimentRunCallback> = mutableListOf()
 
-    //@ThreadLocal
-    internal companion object {
-        internal lateinit var gbContext: GBContext
-    }
-
-    internal constructor(
-        context: GBContext,
-        refreshHandler: GBCacheRefreshHandler?,
-        networkDispatcher: NetworkDispatcher,
-        features: GBFeatures? = null,
-        savedGroups: Map<String, Any>? = null
-    ) : this() {
+    init {
         gbContext = context
         this.refreshHandler = refreshHandler
-        this.networkDispatcher = networkDispatcher
 
         /**
          * JAVA Consumers preset Features
@@ -79,6 +80,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
                     enableLogging = context.enableLogging,
                 ),
                 encryptionKey = gbContext.encryptionKey,
+                cachingEnabled = cachingEnabled,
             )
         if (features != null) {
             gbContext.features = features
@@ -127,6 +129,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
         gbContext.features = features
         if (isRemote) {
+            remoteSourceFeaturesFetchResult = FeaturesFetchResult.Success
             this.refreshHandler?.invoke(true, null)
         }
     }
@@ -156,6 +159,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     override fun featuresFetchFailed(error: GBError, isRemote: Boolean) {
 
         if (isRemote) {
+            remoteSourceFeaturesFetchResult = FeaturesFetchResult.Failed
             this.refreshHandler?.invoke(false, error)
         }
     }
@@ -167,9 +171,35 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     }
 
     override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) {
-        gbContext.savedGroups = savedGroups.toHashMap()
+        gbContext.savedGroups = savedGroups.mapValues { GBValue.from(it.value) }
         if (isRemote) {
             this.refreshHandler?.invoke(true, null)
+        }
+    }
+
+    /**
+     * The wrapper for the feature() method.
+     * This method accesses a feature only if
+     * features were successfully fetched from remote source.
+     * If a call is in progress, it waits for the result. If network
+     * call failed, it tries to call again.
+     *
+     * @returns a [GBFeatureResult] object
+     */
+    suspend fun suspendFeature(id: String): GBFeatureResult {
+        return when(remoteSourceFeaturesFetchResult) {
+            FeaturesFetchResult.Success -> {
+                feature(id)
+            }
+            FeaturesFetchResult.NoResultYet -> {
+                delay(TIME_FOR_CALL_WAIT_MILLIS)
+                suspendFeature(id)
+            }
+            FeaturesFetchResult.Failed -> {
+                featuresViewModel.fetchFeatures()
+                delay(TIME_FOR_CALL_WAIT_MILLIS)
+                suspendFeature(id)
+            }
         }
     }
 
@@ -210,11 +240,13 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
 
         val gbFeatureResult = feature(id)
         return when(val gbResultValue = gbFeatureResult.gbValue) {
+            is GBNull -> null
             is GBBoolean -> gbResultValue.value as? V
             is GBString -> gbResultValue.value as? V
             is GBNumber -> gbResultValue.value as? V
             is GBJson -> gbResultValue as? V
             is GBValue.Unknown -> null
+            is GBArray -> null
             null -> null
         }
     }
@@ -244,24 +276,10 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
     }
 
     /**
-     * The setForcedFeatures method setup the Map of user's (forced) features
-     */
-    fun setForcedFeatures(forcedFeatures: Map<String, Any>) {
-        this.forcedFeatures = forcedFeatures
-    }
-
-    /**
-     * The getForcedFeatures method for mapping model object for request's body type
-     */
-    fun getForcedFeatures(): List<List<Any>> {
-        return this.forcedFeatures.map { listOf(it.key, it.value) }
-    }
-
-    /**
      * The setAttributes method replaces the Map of user attributes
      * that are used to assign variations
      */
-    fun setAttributes(attributes: Map<String, Any>) {
+    fun setAttributes(attributes: Map<String, GBValue>) {
         gbContext.attributes = attributes
         refreshStickyBucketService()
     }
@@ -270,7 +288,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
      * The setAttributeOverrides method replaces the Map of user overrides attribute
      * that are used for Sticky Bucketing
      */
-    fun setAttributeOverrides(overrides: Map<String, Any>) {
+    fun setAttributeOverrides(overrides: Map<String, GBValue>) {
         attributeOverrides = overrides
         if (gbContext.stickyBucketService != null) {
             refreshStickyBucketService()
@@ -282,11 +300,16 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         return attributeOverrides
     }
 
+    fun getForcedFeatures(): Map<String, GBValue> = forcedFeatures
+    fun setForcedFeatures(forcedFeatures: Map<String, GBValue>) {
+        this.forcedFeatures = forcedFeatures
+    }
+
     /**
      * The setForcedVariations method setup the Map of user's (forced) variations
      * to assign a specific variation (used for QA)
      */
-    fun setForcedVariations(forcedVariations: Map<String, Any>) {
+    fun setForcedVariations(forcedVariations: Map<String, Number>) {
         gbContext.forcedVariations = forcedVariations
         refreshForRemoteEval()
     }
@@ -321,8 +344,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         }
         val payload = GBRemoteEvalParams(
             gbContext.attributes,
-            this.getForcedFeatures(),
-            gbContext.forcedVariations
+            this.forcedFeatures, gbContext.forcedVariations
         )
         featuresViewModel.fetchFeatures(gbContext.remoteEval, payload)
     }
@@ -348,21 +370,39 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         }
     }
 
-    private fun createEvaluationContext() =
-        EvaluationContext(
-            enabled = gbContext.enabled,
-            features = gbContext.features,
-            loggingEnabled = gbContext.enableLogging,
-            savedGroups = gbContext.savedGroups,
-            forcedVariations = gbContext.forcedVariations,
-            trackingCallback = gbContext.trackingCallback,
-            stickyBucketService = gbContext.stickyBucketService,
-            onFeatureUsage = gbContext.onFeatureUsage,
-            userContext = UserContext(
-                qaMode = gbContext.qaMode,
-                attributes = gbContext.attributes,
-                stickyBucketAssignmentDocs = gbContext.stickyBucketAssignmentDocs,
-            )
-        )
+    private enum class FeaturesFetchResult {
+        NoResultYet, Success, Failed
+    }
 
+    private fun createEvaluationContext() =
+        createEvaluationContext(gbContext, gbExperimentHelper)
+
+    //@ThreadLocal
+    internal companion object {
+        internal lateinit var gbContext: GBContext
+
+        // After this period of time a call status is checked again
+        private const val TIME_FOR_CALL_WAIT_MILLIS = 1000L
+
+        private fun createEvaluationContext(
+            gbContext: GBContext,
+            gbExperimentHelper: GBExperimentHelper,
+        ) =
+            EvaluationContext(
+                enabled = gbContext.enabled,
+                features = gbContext.features,
+                savedGroups = gbContext.savedGroups,
+                gbExperimentHelper = gbExperimentHelper,
+                loggingEnabled = gbContext.enableLogging,
+                onFeatureUsage = gbContext.onFeatureUsage,
+                forcedVariations = gbContext.forcedVariations,
+                trackingCallback = gbContext.trackingCallback,
+                stickyBucketService = gbContext.stickyBucketService,
+                userContext = UserContext(
+                    qaMode = gbContext.qaMode,
+                    attributes = gbContext.attributes,
+                    stickyBucketAssignmentDocs = gbContext.stickyBucketAssignmentDocs,
+                )
+            )
+    }
 }

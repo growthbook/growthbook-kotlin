@@ -7,7 +7,6 @@ import org.jetbrains.kotlin.gradle.targets.js.yarn.yarn
 plugins {
     kotlin("multiplatform")
     id("com.android.library")
-    kotlin("plugin.serialization")
     id("org.jetbrains.dokka") version "1.9.10"
 }
 
@@ -32,31 +31,23 @@ kotlin {
         }
     }
 
-    jvm {
-        compilations.all {
-            kotlinOptions.jvmTarget = "1.8"
-        }
-    }
-
+    jvm()
     wasmJs {
         nodejs()
     }
-
     iosX64()
     iosArm64()
     iosSimulatorArm64()
 
-    val ktorVersion = "3.0.3"
+    val ktorVersion = "3.1.2"
+    //noinspection UseTomlInstead
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
-
+                implementation(project(":Core"))
                 api("io.ktor:ktor-client-core:$ktorVersion")
                 implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
-
-                implementation(project(":Core"))
             }
         }
         val androidMain by getting {
@@ -80,12 +71,8 @@ android {
         minSdk = 21
     }
     buildTypes {
-        release {
-            isMinifyEnabled = false
-        }
-        debug {
-            isMinifyEnabled = false
-        }
+        debug {}
+        release {}
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
@@ -165,11 +152,4 @@ publishing {
             }
         }
     }
-}
-
-/**
- * Signing JAR using GPG Keys
- */
-signing {
-    sign(publishing.publications)
 }

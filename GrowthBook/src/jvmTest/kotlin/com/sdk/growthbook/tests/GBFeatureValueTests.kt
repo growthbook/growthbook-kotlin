@@ -2,19 +2,22 @@ package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.GBSDKBuilder
 import com.sdk.growthbook.GrowthBookSDK
-import com.sdk.growthbook.utils.toHashMap
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
 import com.sdk.growthbook.model.GBContext
+import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.serializable_model.gbDeserialize
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import com.sdk.growthbook.kotlinx.serialization.from
+import com.sdk.growthbook.kotlinx.serialization.gbSerialize
 
 class GBFeatureValueTests {
 
@@ -37,7 +40,9 @@ class GBFeatureValueTests {
                         item[1]
                     )
 
-                val attributes = testData.attributes.jsonObject.toHashMap()
+                val attributes = testData
+                    .attributes.jsonObject
+                    .mapValues { GBValue.from(it.value) }
 
                 val gbContext = GBContext(
                     apiKey = "", hostURL = "",
@@ -51,11 +56,16 @@ class GBFeatureValueTests {
                         .mapValues { it.value.gbDeserialize() }
                 }
                 if (testData.forcedVariations != null) {
-                    gbContext.forcedVariations = testData.forcedVariations.toHashMap()
+                    gbContext.forcedVariations = testData.forcedVariations
+                        .mapValues {
+                            it.value.jsonPrimitive.intOrNull ?: 0
+                        }
                 }
 
                 if (testData.savedGroups != null) {
-                    gbContext.savedGroups = testData.savedGroups.jsonObject
+                    gbContext.savedGroups = testData
+                        .savedGroups.jsonObject
+                        .mapValues { GBValue.from(it.value) }
                 }
 
                 val evaluator = GBFeatureEvaluator(
@@ -138,7 +148,7 @@ class GBFeatureValueTests {
             actualNumberOfOnFeatureUsageCalls++
         }
 
-        val sdk: GrowthBookSDK = builder.initialize()
+        val sdk: GrowthBookSDK = builder.initializeWithoutWaitForCall()
 
         for (item in evalConditions) {
             if (item is JsonArray) {
@@ -163,7 +173,9 @@ class GBFeatureValueTests {
                         item[1]
                     )
 
-                val attributes = testData.attributes.jsonObject.toHashMap()
+                val attributes = testData
+                    .attributes.jsonObject
+                    .mapValues { GBValue.from(it.value) }
 
                 val testScopeEvalContext = GBTestHelper.createTestScopeEvaluationContext(
                     attributes = attributes,

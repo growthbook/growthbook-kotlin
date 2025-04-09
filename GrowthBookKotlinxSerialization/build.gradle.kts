@@ -1,3 +1,6 @@
+import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackOutput
+import org.jetbrains.kotlin.gradle.targets.js.yarn.yarn
+
 plugins {
     kotlin("multiplatform")
     id("com.android.library")
@@ -5,36 +8,36 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "1.0.2"
+version = "1.0.0"
 
 kotlin {
     androidTarget {
         publishLibraryVariants("release")
     }
 
+    js {
+        yarn.lockFileDirectory = file("kotlin-js-store")
+        browser {
+            commonWebpackConfig {
+                output = KotlinWebpackOutput(
+                    library = project.name,
+                    libraryTarget = KotlinWebpackOutput.Target.UMD,
+                    globalObject = KotlinWebpackOutput.Target.WINDOW
+                )
+            }
+        }
+    }
+
     jvm()
+    iosX64()
+    iosArm64()
+    iosSimulatorArm64()
 
-    //noinspection UseTomlInstead
     sourceSets {
-        val okhttpVersion = "4.12.0"
-
         val commonMain by getting {
             dependencies {
                 implementation(project(":Core"))
-                implementation(libs.kotlinx.coroutines.core)
-                implementation(libs.kotlinx.serialization.json)
-                api("com.squareup.okhttp3:okhttp:$okhttpVersion")
-                implementation("com.squareup.okhttp3:okhttp-sse:$okhttpVersion")
-            }
-        }
-        val androidMain by getting {
-            dependencies {
-                implementation("com.squareup.okhttp3:okhttp:$okhttpVersion")
-            }
-        }
-        val androidUnitTest by getting {
-            dependencies {
-                implementation(kotlin("test-junit"))
+                api(libs.kotlinx.serialization.json)
             }
         }
     }
@@ -42,13 +45,17 @@ kotlin {
 
 android {
     compileSdk = 34
-    namespace = "com.sdk.growthbook.okhttp_network_dispatcher"
+    namespace = "com.sdk.growthbook.kotlinx.serialization"
     defaultConfig {
         minSdk = 21
     }
     buildTypes {
-        debug {}
         release {}
+        debug {}
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
     }
 }
 
@@ -99,7 +106,7 @@ publishing {
             artifact(javadocJar)
             pom {
                 name.set("kotlin")
-                description.set("OkHttp network dispatcher for GrowthBook")
+                description.set("Core module of GrowthBook Kotlin SDK")
                 licenses {
                     license {
                         name.set("MIT")

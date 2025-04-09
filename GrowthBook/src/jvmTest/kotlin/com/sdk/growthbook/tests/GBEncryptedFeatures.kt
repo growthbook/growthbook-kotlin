@@ -1,6 +1,7 @@
 package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.GBSDKBuilder
+import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.utils.DefaultCrypto
 import com.sdk.growthbook.utils.encryptToFeaturesDataModel
 import kotlinx.serialization.json.JsonArray
@@ -50,7 +51,7 @@ class GBEncryptedFeatures {
 
     private val testApiKey = "4r23r324f23"
     private val testHostURL = "https://host.com"
-    private val testAttributes: HashMap<String, Any> = HashMap()
+    private val testAttributes: HashMap<String, GBValue> = HashMap()
 
     @Test
     fun testEncrypt() {
@@ -63,7 +64,7 @@ class GBEncryptedFeatures {
             encryptionKey = "",
             trackingCallback = { _, _ -> },
             networkDispatcher = MockNetworkClient(null, null),
-            ).initialize()
+            ).initializeWithoutWaitForCall()
 
         val keyString = "Ns04T5n9+59rl2x3SlNHtQ=="
         val encryptedFeatures =

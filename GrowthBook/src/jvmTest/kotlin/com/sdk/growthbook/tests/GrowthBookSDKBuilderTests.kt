@@ -2,14 +2,17 @@ package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.GBSDKBuilder
 import com.sdk.growthbook.GrowthBookSDK
+import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.utils.GBCacheRefreshHandler
 import com.sdk.growthbook.utils.GBError
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeatureSource
+import com.sdk.growthbook.model.GBNumber
+import com.sdk.growthbook.model.GBValue
+import com.sdk.growthbook.model.toGbBoolean
 import com.sdk.growthbook.stickybucket.GBStickyBucketServiceImp
-import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -21,7 +24,7 @@ class GrowthBookSDKBuilderTests {
     val testApiKey = "4r23r324f23"
     val testHostURL = "https://host.com"
     val testKeyString = "3tfeoyW0wlo47bDnbWDkxg=="
-    val testAttributes: HashMap<String, Any> = HashMap()
+    val testAttributes: HashMap<String, GBValue> = HashMap()
 
     @BeforeTest
     fun setUp() {
@@ -38,7 +41,7 @@ class GrowthBookSDKBuilderTests {
             trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
             networkDispatcher = MockNetworkClient(null, null),
             remoteEval = false
-        ).initialize()
+        ).initializeWithoutWaitForCall()
 
         assertEquals(sdkInstance.getGBContext().apiKey, testApiKey)
         assertTrue(sdkInstance.getGBContext().enabled)
@@ -61,7 +64,7 @@ class GrowthBookSDKBuilderTests {
             networkDispatcher = MockNetworkClient(null, null),
             remoteEval = false
         ).setRefreshHandler { isRefreshed, gbError ->
-        }.setEnabled(false).setForcedVariations(variations).setQAMode(true).initialize()
+        }.setEnabled(false).setForcedVariations(variations).setQAMode(true).initializeWithoutWaitForCall()
 
         assertTrue(sdkInstance.getGBContext().apiKey == testApiKey)
         assertFalse(sdkInstance.getGBContext().enabled)
@@ -87,7 +90,7 @@ class GrowthBookSDKBuilderTests {
         ).setRefreshHandler { isRefreshed, gbError ->
 
         }
-            .setEnabled(false).setForcedVariations(variations).setQAMode(true).initialize()
+            .setEnabled(false).setForcedVariations(variations).setQAMode(true).initializeWithoutWaitForCall()
 
         assertTrue(sdkInstance.getGBContext().apiKey == testApiKey)
         assertFalse(sdkInstance.getGBContext().enabled)
@@ -111,7 +114,7 @@ class GrowthBookSDKBuilderTests {
             remoteEval = false
         ).setRefreshHandler { _, gbError ->
             isRefreshed = true
-        }.initialize()
+        }.initializeWithoutWaitForCall()
 
         assertTrue(isRefreshed)
 
@@ -139,7 +142,7 @@ class GrowthBookSDKBuilderTests {
             remoteEval = false
         ).setRefreshHandler { _, gbError ->
             isRefreshed = true
-        }.initialize()
+        }.initializeWithoutWaitForCall()
 
         assertTrue(isRefreshed)
 
@@ -159,7 +162,7 @@ class GrowthBookSDKBuilderTests {
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = false
         ).setRefreshHandler { isRefreshed, gbError ->
-        }.initialize()
+        }.initializeWithoutWaitForCall()
 
         val featureValue = sdkInstance.feature("fwrfewrfe")
         assertEquals(featureValue.source, GBFeatureSource.unknownFeature)
@@ -195,7 +198,7 @@ class GrowthBookSDKBuilderTests {
             remoteEval = false
         ).setPrefixForStickyBucketCachedDirectory(
             prefix = "test_prefix"
-        ).initialize()
+        ).initializeWithoutWaitForCall()
 
         assertTrue { sdkInstance.getGBContext().stickyBucketService != null }
         assertTrue { sdkInstance.getGBContext().stickyBucketService is GBStickyBucketServiceImp }
@@ -212,7 +215,7 @@ class GrowthBookSDKBuilderTests {
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = false
         ).setStickyBucketService()
-            .initialize()
+            .initializeWithoutWaitForCall()
 
         assertTrue { sdkInstance.getGBContext().stickyBucketService != null }
         assertTrue { sdkInstance.getGBContext().stickyBucketService is GBStickyBucketServiceImp }
@@ -230,7 +233,7 @@ class GrowthBookSDKBuilderTests {
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = false
         ).setForcedVariations(expectedForcedVariation)
-            .initialize()
+            .initializeWithoutWaitForCall()
 
         val actualForcedVariation = sdkInstance.getGBContext().forcedVariations
 
@@ -250,8 +253,10 @@ class GrowthBookSDKBuilderTests {
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = true
         ).setForcedVariations(expectedForcedVariation)
-            .initialize()
-        sdkInstance.setForcedFeatures(mapOf("featureForce" to JsonPrimitive(112)))
+            .initializeWithoutWaitForCall()
+        sdkInstance.setForcedFeatures(
+            mapOf("featureForce" to GBNumber(112))
+        )
 
         val actualForcedVariation = sdkInstance.getGBContext().forcedVariations
 
@@ -262,7 +267,7 @@ class GrowthBookSDKBuilderTests {
 
     @Test
     fun test_setAttributesOverrides_Ok() {
-        val expectedAttributes = mapOf("user" to false)
+        val expectedAttributes = mapOf("user" to false.toGbBoolean())
         val sdkInstance = GBSDKBuilder(
             testApiKey,
             testHostURL,
@@ -272,7 +277,7 @@ class GrowthBookSDKBuilderTests {
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = false
         )
-            .initialize()
+            .initializeWithoutWaitForCall()
 
         sdkInstance.setAttributeOverrides(expectedAttributes)
 
@@ -284,7 +289,7 @@ class GrowthBookSDKBuilderTests {
 
     @Test
     fun test_setAttributesOverridesWithStickyBucketing_Ok() {
-        val expectedAttributes = mapOf("user" to false)
+        val expectedAttributes = mapOf("user" to GBBoolean(false))
         val sdkInstance = GBSDKBuilder(
             testApiKey,
             testHostURL,
@@ -294,7 +299,7 @@ class GrowthBookSDKBuilderTests {
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = true
         ).setStickyBucketService(GBStickyBucketServiceImp())
-            .initialize()
+            .initializeWithoutWaitForCall()
 
         sdkInstance.setAttributeOverrides(expectedAttributes)
 
@@ -307,7 +312,7 @@ class GrowthBookSDKBuilderTests {
 
     private fun buildSDK(
         json: String,
-        attributes: Map<String, Any> = mapOf(),
+        attributes: Map<String, GBValue> = mapOf(),
         encryptionKey: String?
     ): GrowthBookSDK {
         return GBSDKBuilder(
@@ -318,7 +323,7 @@ class GrowthBookSDKBuilderTests {
             trackingCallback = { _, _ -> },
             networkDispatcher = MockNetworkClient(json, null),
             remoteEval = false
-        ).initialize()
+        ).initializeWithoutWaitForCall()
     }
 
 //    @Test

@@ -1,12 +1,13 @@
 package com.sdk.growthbook.evaluators
 
 import kotlinx.serialization.json.jsonObject
+import com.sdk.growthbook.model.GBJson
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBFeatureSource
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.utils.GBUtils
-import com.sdk.growthbook.utils.toJsonElement
+import com.sdk.growthbook.kotlinx.serialization.from
 
 /**
  * Experiment Evaluator Class
@@ -21,7 +22,7 @@ internal class GBExperimentEvaluator(
      */
     fun evaluateExperiment(
         experiment: GBExperiment,
-        attributeOverrides: Map<String, Any>,
+        attributeOverrides: Map<String, GBValue>,
         featureId: String? = null
     ): GBExperimentResult {
 
@@ -172,9 +173,11 @@ internal class GBExperimentEvaluator(
              */
             if (experiment.condition != null) {
                 val attr = evaluationContext.userContext.attributes
-                    .mapValues { GBValue.from(it.value).gbSerialize() }
+                val conditionObj: GBJson = experiment.condition!!.let(GBValue::from) as? GBJson
+                    ?: GBJson(emptyMap())
                 val evaluationResult = GBConditionEvaluator().evalCondition(
-                    attr, experiment.condition!!, evaluationContext.savedGroups?.toJsonElement()?.jsonObject
+                    attr, conditionObj,
+                    evaluationContext.savedGroups,
                 )
                 if (!evaluationResult) {
                     return getExperimentResult(
@@ -195,7 +198,8 @@ internal class GBExperimentEvaluator(
                     val parentResult = GBFeatureEvaluator(evaluationContext)
                         .evaluateFeature(
                             featureKey = parentCondition.id,
-                            attributeOverrides = parentCondition.condition.jsonObject.toMap()
+                            attributeOverrides = parentCondition.condition
+                                .jsonObject.mapValues { GBValue.from(it.value) }
                         )
                     if (parentResult.source == GBFeatureSource.cyclicPrerequisite) {
                         return getExperimentResult(
@@ -207,13 +211,15 @@ internal class GBExperimentEvaluator(
                         )
                     }
                     val evalObj = parentResult.gbValue?.let {
-                        mapOf("value" to it.gbSerialize())
+                        mapOf("value" to it)
                     } ?: emptyMap()
 
+                    val conditionObj: GBJson = parentCondition.condition.let(GBValue::from) as? GBJson
+                        ?: GBJson(emptyMap())
                     val evalCondition = GBConditionEvaluator().evalCondition(
                         attributes = evalObj,
-                        conditionObj = parentCondition.condition,
-                        evaluationContext.savedGroups?.toJsonElement()?.jsonObject
+                        conditionObj = conditionObj,
+                        savedGroups = evaluationContext.savedGroups,
                     )
 
                     /**
@@ -383,7 +389,7 @@ internal class GBExperimentEvaluator(
          * 18. Fire context.trackingClosure if set and the combination of hashAttribute,
          * hashValue, experiment.key, and variationId has not been tracked before
          */
-        if (!evaluationContext.experimentHelper.isTracked(experiment, result)) {
+        if (!evaluationContext.gbExperimentHelper.isTracked(experiment, result)) {
             evaluationContext.trackingCallback(experiment, result)
         }
 
@@ -403,7 +409,7 @@ internal class GBExperimentEvaluator(
         featureId: String? = null,
         bucket: Float? = null,
         stickyBucketUsed: Boolean? = null,
-        attributeOverrides: Map<String, Any>
+        attributeOverrides: Map<String, GBValue>
 
     ): GBExperimentResult {
         var inExperiment = true
@@ -437,9 +443,9 @@ internal class GBExperimentEvaluator(
         return GBExperimentResult(
             inExperiment = inExperiment,
             variationId = targetVariationIndex,
-            value = if (experiment.variations.size > targetVariationIndex)
+            value = if (targetVariationIndex < experiment.variations.size)
                 experiment.variations[targetVariationIndex]
-            else mapOf(null to null).toJsonElement(),
+            else GBValue.Unknown,
             hashAttribute = hashAttribute,
             hashValue = hashValue,
             key = meta?.key ?: "$targetVariationIndex",

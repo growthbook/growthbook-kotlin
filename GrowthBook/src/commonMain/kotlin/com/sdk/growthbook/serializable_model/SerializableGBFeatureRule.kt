@@ -1,18 +1,18 @@
 package com.sdk.growthbook.serializable_model
 
-import com.sdk.growthbook.model.GBFeatureRule
-import com.sdk.growthbook.model.GBValue
-import com.sdk.growthbook.utils.GBBucketRange
-import com.sdk.growthbook.utils.GBFilter
-import com.sdk.growthbook.utils.GBParentConditionInterface
-import com.sdk.growthbook.utils.GBTrackData
-import com.sdk.growthbook.utils.GBVariationMeta
-import com.sdk.growthbook.utils.OptionalProperty
-import com.sdk.growthbook.utils.OptionalPropertySerializer
-import com.sdk.growthbook.utils.RangeSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import com.sdk.growthbook.model.GBValue
+import com.sdk.growthbook.model.GBFeatureRule
+import com.sdk.growthbook.utils.GBFilter
+import com.sdk.growthbook.utils.GBBucketRange
+import com.sdk.growthbook.utils.GBVariationMeta
+import com.sdk.growthbook.utils.RangeSerializer
+import com.sdk.growthbook.utils.OptionalProperty
+import com.sdk.growthbook.utils.GBParentConditionInterface
+import com.sdk.growthbook.utils.OptionalPropertySerializer
+import com.sdk.growthbook.kotlinx.serialization.from
 
 /**
  * Rule object consists of various definitions to apply to calculate feature value
@@ -139,15 +139,35 @@ data class SerializableGBFeatureRule(
     /**
      * Array of tracking calls to fire
      */
-    val tracks: ArrayList<GBTrackData>? = null
+    val tracks: ArrayList<SerializableGBTrackData>? = null
 )
 
 internal fun SerializableGBFeatureRule.gbDeserialize() =
     GBFeatureRule(
         id = id,
-        condition = condition,
-        parentConditions = parentConditions,
+        key = key,
+        meta = meta,
+        seed = seed,
+        name = name,
+        range = range,
+        phase = phase,
+        ranges = ranges,
+        tracks = tracks?.let {
+            ArrayList(
+                tracks.map { it.gbDeserialize() }
+            )
+        },
+        filters = filters,
+        weights = weights,
         coverage = coverage,
+        namespace = namespace,
+        condition = condition,
+        hashVersion = hashVersion,
+        bucketVersion = bucketVersion,
+        hashAttribute = hashAttribute,
+        parentConditions = parentConditions,
+        minBucketVersion = minBucketVersion,
+        fallbackAttribute = fallbackAttribute,
         force = when(force) {
             is OptionalProperty.Present -> {
                 if (force.value == null) null
@@ -157,23 +177,6 @@ internal fun SerializableGBFeatureRule.gbDeserialize() =
                 null
             }
         },
-
-        variations = variations,
-        key = key,
-        weights = weights,
-        namespace = namespace,
-        hashAttribute = hashAttribute,
-        hashVersion = hashVersion,
-        range = range,
-        ranges = ranges,
-        meta = meta,
-        filters = filters,
-        seed = seed,
-        name = name,
-        phase = phase,
-        fallbackAttribute = fallbackAttribute,
         disableStickyBucketing = disableStickyBucketing,
-        bucketVersion = bucketVersion,
-        minBucketVersion = minBucketVersion,
-        tracks = tracks,
+        variations = variations?.map { GBValue.from(it) },
     )
