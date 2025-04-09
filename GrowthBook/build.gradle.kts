@@ -33,6 +33,9 @@ kotlin {
     }
 
     jvm()
+    wasmJs {
+        nodejs()
+    }
     iosX64()
     iosArm64()
     iosSimulatorArm64()
@@ -46,7 +49,7 @@ kotlin {
                 implementation("org.jetbrains.kotlin:kotlin-stdlib-common")
                 implementation(libs.kotlinx.coroutines.core)
                 implementation("com.ionspin.kotlin:bignum:0.3.9") // used in hash calculation
-                implementation("dev.whyoleg.cryptography:cryptography-core:0.4.0") // encryption/decryption
+                implementation(libs.cryptography.core) // encryption/decryption
 
                 implementation(libs.kotlinx.serialization.json)
                 implementation(project(":GrowthBookKotlinxSerialization"))
@@ -56,7 +59,7 @@ kotlin {
         val androidMain by getting {
             dependencies {
                 implementation("androidx.startup:startup-runtime:1.2.0")
-                implementation("dev.whyoleg.cryptography:cryptography-provider-jdk:0.4.0")
+                implementation(libs.cryptography.provider.jdk)
             }
         }
         val androidUnitTest by getting {
@@ -68,7 +71,7 @@ kotlin {
 
         val jvmMain by getting {
             dependencies {
-                implementation("dev.whyoleg.cryptography:cryptography-provider-jdk:0.4.0")
+                implementation(libs.cryptography.provider.jdk)
             }
         }
         val jvmTest by getting {
@@ -83,12 +86,12 @@ kotlin {
         }
         val jsMain by getting {
             dependencies {
-                implementation("dev.whyoleg.cryptography:cryptography-provider-webcrypto:0.4.0")
+                implementation(libs.cryptography.provider.webcrypto)
             }
         }
         val wasmJsMain by getting {
             dependencies {
-                implementation("dev.whyoleg.cryptography:cryptography-provider-webcrypto:0.4.0")
+                implementation(libs.cryptography.provider.webcrypto)
             }
         }
     }
