@@ -1,3 +1,6 @@
+@file:OptIn(ExperimentalWasmDsl::class)
+
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackOutput
 import org.jetbrains.kotlin.gradle.targets.js.yarn.yarn
 
@@ -29,6 +32,9 @@ kotlin {
     }
 
     jvm()
+    wasmJs {
+        nodejs()
+    }
     iosX64()
     iosArm64()
     iosSimulatorArm64()
