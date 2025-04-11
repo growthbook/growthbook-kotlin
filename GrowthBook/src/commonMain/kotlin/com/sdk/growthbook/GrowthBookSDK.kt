@@ -10,8 +10,9 @@ import com.sdk.growthbook.utils.GBRemoteEvalParams
 import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBuckets
 import com.sdk.growthbook.utils.Resource
 import com.sdk.growthbook.utils.getFeaturesFromEncryptedFeatures
-import com.sdk.growthbook.evaluators.GBExperimentEvaluator
+import com.sdk.growthbook.evaluators.GBExperimentHelper
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
+import com.sdk.growthbook.evaluators.GBExperimentEvaluator
 import com.sdk.growthbook.evaluators.UserContext
 import com.sdk.growthbook.features.FeaturesDataModel
 import com.sdk.growthbook.features.FeaturesDataSource
@@ -45,6 +46,8 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
 
     internal var forcedFeatures: Map<String, GBValue> = emptyMap()
     internal lateinit var featuresViewModel: FeaturesViewModel
+
+    private val experimentHelper = GBExperimentHelper()
     private var refreshHandler: GBCacheRefreshHandler? = null
     private lateinit var networkDispatcher: NetworkDispatcher
     private var attributeOverrides: Map<String, GBValue> = emptyMap()
@@ -369,6 +372,7 @@ class GrowthBookSDK() : FeaturesFlowDelegate {
         EvaluationContext(
             enabled = gbContext.enabled,
             features = gbContext.features,
+            experimentHelper = experimentHelper,
             loggingEnabled = gbContext.enableLogging,
             savedGroups = gbContext.savedGroups,
             forcedVariations = gbContext.forcedVariations,
