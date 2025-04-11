@@ -1,10 +1,13 @@
+@file:OptIn(ExperimentalWasmDsl::class)
+
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackOutput
 import org.jetbrains.kotlin.gradle.targets.js.yarn.yarn
 
 plugins {
     kotlin("multiplatform")
     id("com.android.library")
-    id("org.jetbrains.dokka") version "1.8.10"
+    id("org.jetbrains.dokka") version "1.9.10"
 }
 
 group = "io.growthbook.sdk"
@@ -28,12 +31,10 @@ kotlin {
         }
     }
 
-    jvm {
-        compilations.all {
-            kotlinOptions.jvmTarget = "1.8"
-        }
+    jvm()
+    wasmJs {
+        nodejs()
     }
-
     iosX64()
     iosArm64()
     iosSimulatorArm64()
@@ -54,12 +55,8 @@ android {
         minSdk = 21
     }
     buildTypes {
-        release {
-            isMinifyEnabled = false
-        }
-        debug {
-            isMinifyEnabled = false
-        }
+        release {}
+        debug {}
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
@@ -139,11 +136,4 @@ publishing {
             }
         }
     }
-}
-
-/**
- * Signing JAR using GPG Keys
- */
-signing {
-    sign(publishing.publications)
 }

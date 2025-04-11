@@ -1,3 +1,6 @@
+@file:OptIn(ExperimentalWasmDsl::class)
+
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackOutput
 import org.jetbrains.kotlin.gradle.targets.js.yarn.yarn
 
@@ -11,7 +14,7 @@ group = "io.growthbook.sdk"
 version = "1.0.4"
 
 kotlin {
-    android {
+    androidTarget {
         publishLibraryVariants("release")
     }
 
@@ -28,27 +31,23 @@ kotlin {
         }
     }
 
-    jvm {
-        compilations.all {
-            kotlinOptions.jvmTarget = "1.8"
-        }
+    jvm()
+    wasmJs {
+        nodejs()
     }
-
     iosX64()
     iosArm64()
     iosSimulatorArm64()
 
-    val ktorVersion = "2.1.2"
+    val ktorVersion = "3.1.2"
+    //noinspection UseTomlInstead
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
-
+                implementation(project(":Core"))
                 api("io.ktor:ktor-client-core:$ktorVersion")
                 implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
-
-                implementation(project(":Core"))
             }
         }
         val androidMain by getting {
@@ -72,12 +71,8 @@ android {
         minSdk = 21
     }
     buildTypes {
-        release {
-            isMinifyEnabled = false
-        }
-        debug {
-            isMinifyEnabled = false
-        }
+        debug {}
+        release {}
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
@@ -157,11 +152,4 @@ publishing {
             }
         }
     }
-}
-
-/**
- * Signing JAR using GPG Keys
- */
-signing {
-    sign(publishing.publications)
 }
