@@ -1,7 +1,5 @@
 package com.sdk.growthbook
 
-import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.network.NetworkDispatcher
@@ -62,8 +60,7 @@ abstract class SDKBuilder(
     /**
      * This method is open to be overridden by subclasses
      */
-    abstract suspend fun initialize(): GrowthBookSDK
-    abstract fun initializeWithoutWaitForCall(): GrowthBookSDK
+    abstract fun initialize(): GrowthBookSDK
 }
 
 /**
@@ -139,26 +136,22 @@ class GBSDKBuilder(
     }
 
     /**
-     * Initialize the Kotlin SDK
+     * Initialize the Kotlin SDK and provide it when ready
      */
-    override suspend fun initialize(): GrowthBookSDK {
+    fun initialize(onResult: (GrowthBookSDK) -> Unit) {
         val gbContext = createGbContext()
 
-        return suspendCoroutine { continuationObject ->
-            WaitForCallCaseHelper(
-                gbContext = gbContext,
-                onResult = {
-                    continuationObject.resume(it)
-                }
-            )
-        }
+        WaitForCallCaseHelper(
+            gbContext = gbContext,
+            onResult = onResult,
+        )
     }
 
     /**
      * Initialize the Kotlin SDK
-     * This init method takes less time than suspend version
+     * This init method takes less time than method above
      */
-    override fun initializeWithoutWaitForCall(): GrowthBookSDK {
+    override fun initialize(): GrowthBookSDK {
         val gbContext = createGbContext()
 
         if (enableLogging && !cachingEnabled) {
