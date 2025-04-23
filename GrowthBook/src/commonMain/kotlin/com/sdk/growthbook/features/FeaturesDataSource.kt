@@ -1,6 +1,6 @@
 package com.sdk.growthbook.features
 
-import com.sdk.growthbook.GrowthBookSDK
+import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.network.NetworkDispatcher
 import com.sdk.growthbook.serializable_model.SerializableFeaturesDataModel
 import com.sdk.growthbook.serializable_model.gbDeserialize
@@ -17,7 +17,7 @@ import kotlinx.serialization.json.Json
  */
 internal class FeaturesDataSource(
     private val dispatcher: NetworkDispatcher,
-    private val enableLogging: Boolean = true,
+    private val gbContext: GBContext,
 ) {
 
     private val jsonParser: Json
@@ -30,8 +30,8 @@ internal class FeaturesDataSource(
         featureRefreshStrategy: FeatureRefreshStrategy =
             FeatureRefreshStrategy.STALE_WHILE_REVALIDATE
     ) = FeatureURLBuilder().buildUrl(
-        GrowthBookSDK.gbContext.hostURL,
-        GrowthBookSDK.gbContext.apiKey,
+        gbContext.hostURL,
+        gbContext.apiKey,
         featureRefreshStrategy
     )
 
@@ -96,7 +96,7 @@ internal class FeaturesDataSource(
             payload["forcedVariations"] = params.forcedVariations
         }
 
-        if (enableLogging) {
+        if (gbContext.enableLogging) {
             println(payload)
         }
 

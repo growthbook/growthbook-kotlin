@@ -1,6 +1,5 @@
 package com.sdk.growthbook.tests
 
-import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.utils.GBError
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.utils.GBRemoteEvalParams
@@ -11,7 +10,6 @@ import com.sdk.growthbook.features.FeaturesViewModel
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBNumber
 import kotlinx.serialization.json.JsonObject
-import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -21,18 +19,15 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     private var isError: Boolean = false
     private var hasFeatures: Boolean = false
 
-    @BeforeTest
-    fun setUp() {
-        GrowthBookSDK.gbContext = GBContext(
-            "Key", hostURL = "https://example.com",
-            enabled = true, attributes = HashMap(), forcedVariations = HashMap(),
-            qaMode = false, trackingCallback = { _, _ ->
+    private val gbContext = GBContext(
+        "Key", hostURL = "https://example.com",
+        enabled = true, attributes = HashMap(), forcedVariations = HashMap(),
+        qaMode = false, trackingCallback = { _, _ ->
 
-            },
-            encryptionKey = null,
-            remoteEval = false,
-        )
-    }
+        },
+        encryptionKey = null,
+        remoteEval = false,
+    )
 
     @Test
     fun testSuccess() {
@@ -40,7 +35,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         isError = true
         val viewModel = FeaturesViewModel(
             this,
-            FeaturesDataSource(MockNetworkClient(MockResponse.successResponse, null)),
+            FeaturesDataSource(MockNetworkClient(MockResponse.successResponse, null), gbContext),
             "3tfeoyW0wlo47bDnbWDkxg==", false,
         )
 
@@ -60,7 +55,8 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             FeaturesDataSource(
                 MockNetworkClient(
                     MockResponse.successResponseEncryptedFeatures, null
-                )
+                ),
+                gbContext
             ), "3tfeoyW0wlo47bDnbWDkxg==", false,
         )
 
@@ -81,7 +77,8 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             dataSource = FeaturesDataSource(
                 MockNetworkClient(
                     null, Throwable("UNKNOWN", null)
-                )
+                ),
+                gbContext
             ),
             cachingEnabled = false,
         )
@@ -103,7 +100,8 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             dataSource = FeaturesDataSource(
                 MockNetworkClient(
                     MockResponse.ERROR_RESPONSE, null
-                )
+                ),
+                gbContext
             ),
             encryptionKey = "",
             cachingEnabled = false,
@@ -127,7 +125,8 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 dispatcher = MockNetworkClient(
                     successResponse = MockResponse.successResponse,
                     error = null
-                )
+                ),
+                gbContext
             ),
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = false,
@@ -159,7 +158,8 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 dispatcher = MockNetworkClient(
                     successResponse = null,
                     error = Error()
-                )
+                ),
+                gbContext
             ),
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = false,

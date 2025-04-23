@@ -44,16 +44,14 @@ typealias GBExperimentRunCallback = (GBExperiment, GBExperimentResult) -> Unit
  * It exposes two main methods: feature and run.
  */
 class GrowthBookSDK(
-    context: GBContext,
-    refreshHandler: GBCacheRefreshHandler?,
+    private val gbContext: GBContext,
+    private val refreshHandler: GBCacheRefreshHandler?,
     networkDispatcher: NetworkDispatcher,
     features: GBFeatures? = null,
     savedGroups: Map<String, GBValue>? = null,
     cachingEnabled: Boolean,
 ) : FeaturesFlowDelegate {
 
-    internal var featuresViewModel: FeaturesViewModel
-    private var refreshHandler: GBCacheRefreshHandler? = null
     private var savedGroups: Map<String, GBValue>? = emptyMap()
     private var forcedFeatures: Map<String, GBValue> = emptyMap()
     private var attributeOverrides: Map<String, GBValue> = emptyMap()
@@ -64,24 +62,21 @@ class GrowthBookSDK(
     private var assigned: MutableMap<String, Pair<GBExperiment, GBExperimentResult>> =
         mutableMapOf()
 
-    init {
-        gbContext = context
-        this.refreshHandler = refreshHandler
+    /**
+     * JAVA Consumers preset Features
+     * SDK will not call API to fetch Features List
+     */
+    internal var featuresViewModel: FeaturesViewModel = FeaturesViewModel(
+        delegate = this,
+        dataSource = FeaturesDataSource(
+            dispatcher = networkDispatcher,
+            gbContext = gbContext,
+        ),
+        encryptionKey = gbContext.encryptionKey,
+        cachingEnabled = cachingEnabled,
+    )
 
-        /**
-         * JAVA Consumers preset Features
-         * SDK will not call API to fetch Features List
-         */
-        this.featuresViewModel =
-            FeaturesViewModel(
-                delegate = this,
-                dataSource = FeaturesDataSource(
-                    dispatcher = networkDispatcher,
-                    enableLogging = context.enableLogging,
-                ),
-                encryptionKey = gbContext.encryptionKey,
-                cachingEnabled = cachingEnabled,
-            )
+    init {
         if (features != null) {
             gbContext.features = features
         } else {
@@ -379,7 +374,6 @@ class GrowthBookSDK(
 
     //@ThreadLocal
     internal companion object {
-        internal lateinit var gbContext: GBContext
 
         // After this period of time a call status is checked again
         private const val TIME_FOR_CALL_WAIT_MILLIS = 1000L
