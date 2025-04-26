@@ -64,7 +64,7 @@ class GBEncryptedFeatures {
             encryptionKey = "",
             trackingCallback = { _, _ -> },
             networkDispatcher = MockNetworkClient(null, null),
-            ).initializeWithoutWaitForCall()
+            ).initialize()
 
         val keyString = "Ns04T5n9+59rl2x3SlNHtQ=="
         val encryptedFeatures =

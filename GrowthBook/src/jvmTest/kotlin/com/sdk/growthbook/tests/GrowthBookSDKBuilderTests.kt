@@ -41,7 +41,7 @@ class GrowthBookSDKBuilderTests {
             trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
             networkDispatcher = MockNetworkClient(null, null),
             remoteEval = false
-        ).initializeWithoutWaitForCall()
+        ).initialize()
 
         assertEquals(sdkInstance.getGBContext().apiKey, testApiKey)
         assertTrue(sdkInstance.getGBContext().enabled)
@@ -64,7 +64,7 @@ class GrowthBookSDKBuilderTests {
             networkDispatcher = MockNetworkClient(null, null),
             remoteEval = false
         ).setRefreshHandler { isRefreshed, gbError ->
-        }.setEnabled(false).setForcedVariations(variations).setQAMode(true).initializeWithoutWaitForCall()
+        }.setEnabled(false).setForcedVariations(variations).setQAMode(true).initialize()
 
         assertTrue(sdkInstance.getGBContext().apiKey == testApiKey)
         assertFalse(sdkInstance.getGBContext().enabled)
@@ -90,7 +90,7 @@ class GrowthBookSDKBuilderTests {
         ).setRefreshHandler { isRefreshed, gbError ->
 
         }
-            .setEnabled(false).setForcedVariations(variations).setQAMode(true).initializeWithoutWaitForCall()
+            .setEnabled(false).setForcedVariations(variations).setQAMode(true).initialize()
 
         assertTrue(sdkInstance.getGBContext().apiKey == testApiKey)
         assertFalse(sdkInstance.getGBContext().enabled)
@@ -114,7 +114,7 @@ class GrowthBookSDKBuilderTests {
             remoteEval = false
         ).setRefreshHandler { _, gbError ->
             isRefreshed = true
-        }.initializeWithoutWaitForCall()
+        }.initialize()
 
         assertTrue(isRefreshed)
 
@@ -142,7 +142,7 @@ class GrowthBookSDKBuilderTests {
             remoteEval = false
         ).setRefreshHandler { _, gbError ->
             isRefreshed = true
-        }.initializeWithoutWaitForCall()
+        }.initialize()
 
         assertTrue(isRefreshed)
 
@@ -162,7 +162,7 @@ class GrowthBookSDKBuilderTests {
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = false
         ).setRefreshHandler { isRefreshed, gbError ->
-        }.initializeWithoutWaitForCall()
+        }.initialize()
 
         val featureValue = sdkInstance.feature("fwrfewrfe")
         assertEquals(featureValue.source, GBFeatureSource.unknownFeature)
@@ -198,7 +198,7 @@ class GrowthBookSDKBuilderTests {
             remoteEval = false
         ).setPrefixForStickyBucketCachedDirectory(
             prefix = "test_prefix"
-        ).initializeWithoutWaitForCall()
+        ).initialize()
 
         assertTrue { sdkInstance.getGBContext().stickyBucketService != null }
         assertTrue { sdkInstance.getGBContext().stickyBucketService is GBStickyBucketServiceImp }
@@ -215,7 +215,7 @@ class GrowthBookSDKBuilderTests {
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = false
         ).setStickyBucketService()
-            .initializeWithoutWaitForCall()
+            .initialize()
 
         assertTrue { sdkInstance.getGBContext().stickyBucketService != null }
         assertTrue { sdkInstance.getGBContext().stickyBucketService is GBStickyBucketServiceImp }
@@ -233,7 +233,7 @@ class GrowthBookSDKBuilderTests {
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = false
         ).setForcedVariations(expectedForcedVariation)
-            .initializeWithoutWaitForCall()
+            .initialize()
 
         val actualForcedVariation = sdkInstance.getGBContext().forcedVariations
 
@@ -253,7 +253,7 @@ class GrowthBookSDKBuilderTests {
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = true
         ).setForcedVariations(expectedForcedVariation)
-            .initializeWithoutWaitForCall()
+            .initialize()
         sdkInstance.setForcedFeatures(
             mapOf("featureForce" to GBNumber(112))
         )
@@ -277,7 +277,7 @@ class GrowthBookSDKBuilderTests {
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = false
         )
-            .initializeWithoutWaitForCall()
+            .initialize()
 
         sdkInstance.setAttributeOverrides(expectedAttributes)
 
@@ -299,7 +299,7 @@ class GrowthBookSDKBuilderTests {
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = true
         ).setStickyBucketService(GBStickyBucketServiceImp())
-            .initializeWithoutWaitForCall()
+            .initialize()
 
         sdkInstance.setAttributeOverrides(expectedAttributes)
 
@@ -323,7 +323,7 @@ class GrowthBookSDKBuilderTests {
             trackingCallback = { _, _ -> },
             networkDispatcher = MockNetworkClient(json, null),
             remoteEval = false
-        ).initializeWithoutWaitForCall()
+        ).initialize()
     }
 
 //    @Test
