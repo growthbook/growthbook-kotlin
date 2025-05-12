@@ -47,7 +47,6 @@ class GBStickyBucketingFeatureTests {
 
                 val gbContext = GBContext(
                     apiKey = "",
-                    hostURL = "",
                     enabled = true,
                     attributes = attributes,
                     forcedVariations = emptyMap(),
