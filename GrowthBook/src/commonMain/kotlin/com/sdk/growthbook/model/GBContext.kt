@@ -20,11 +20,6 @@ data class GBContext(
     val apiKey: String,
 
     /**
-     * Host URL for GrowthBook
-     */
-    val hostURL: String,
-
-    /**
      * Switch to globally disable all experiments. Default true.
      */
     val enabled: Boolean,

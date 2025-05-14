@@ -53,7 +53,6 @@ class GBExperimentRunTests {
 
                 val gbContext = GBContext(
                     apiKey = "",
-                    hostURL = "",
                     enabled = testContext.enabled,
                     attributes = attributes,
                     forcedVariations = testContext.forcedVariations ?: HashMap(),

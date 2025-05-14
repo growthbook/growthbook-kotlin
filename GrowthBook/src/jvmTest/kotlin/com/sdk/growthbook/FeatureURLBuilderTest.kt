@@ -1,5 +1,6 @@
 package com.sdk.growthbook
 
+import com.sdk.growthbook.model.GBOptions
 import com.sdk.growthbook.features.FeatureURLBuilder
 import com.sdk.growthbook.utils.FeatureRefreshStrategy
 import kotlin.test.Test
@@ -9,24 +10,38 @@ class FeatureURLBuilderTest {
 
     @Test
     fun verifyCreateUrl() {
-        val actual = FeatureURLBuilder().buildUrl("https://some.domain", "api_key")
+        val actual = createTestUrlBuilder(TEST_API_HOST)
+            .buildUrl("api_key")
 
-        assertEquals("https://some.domain/api/features/api_key", actual)
+        assertEquals("$TEST_API_HOST/api/features/api_key", actual)
     }
 
     @Test
     fun verifyCreateUrlWithDash() {
-        val actual = FeatureURLBuilder()
-            .buildUrl("https://some.domain/", "api_key_2")
+        val actual = createTestUrlBuilder("$TEST_API_HOST/")
+            .buildUrl("api_key_2")
 
-        assertEquals("https://some.domain/api/features/api_key_2", actual)
+        assertEquals("$TEST_API_HOST/api/features/api_key_2", actual)
     }
 
     @Test
     fun verifyCreateSseUrl() {
-        val actual = FeatureURLBuilder()
-            .buildUrl("https://some.domain/", "api_key", FeatureRefreshStrategy.SERVER_SENT_EVENTS)
+        val urlBuilder = FeatureURLBuilder(
+            GBOptions(TEST_API_HOST, TEST_API_HOST)
+        )
+        val actual = urlBuilder.buildUrl(
+            "api_key", FeatureRefreshStrategy.SERVER_SENT_EVENTS
+        )
 
-        assertEquals("https://some.domain/sub/api_key", actual)
+        assertEquals("$TEST_API_HOST/sub/api_key", actual)
+    }
+
+    private fun createTestUrlBuilder(apiHost: String) =
+        FeatureURLBuilder(
+            GBOptions(apiHost, null)
+        )
+
+    companion object {
+        private const val TEST_API_HOST = "https://some.domain"
     }
 }

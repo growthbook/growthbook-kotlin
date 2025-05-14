@@ -2,6 +2,7 @@ package com.sdk.growthbook
 
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBContext
+import com.sdk.growthbook.model.GBOptions
 import com.sdk.growthbook.network.NetworkDispatcher
 import com.sdk.growthbook.sandbox.CachingImpl
 import com.sdk.growthbook.stickybucket.GBStickyBucketService
@@ -11,7 +12,8 @@ import com.sdk.growthbook.utils.GBCacheRefreshHandler
 /**
  * SDKBuilder - Root Class for SDK Initializers for GrowthBook SDK
  * APIKey - API Key
- * HostURL - Server URL
+ * ApiHost - domain for features fetch
+ * StreamingHost - domain for server sent events
  * UserAttributes - User Attributes
  * Tracking Callback - Track Events for Experiments
  * EncryptionKey - Encryption key if you intend to use data encryption
@@ -21,7 +23,8 @@ import com.sdk.growthbook.utils.GBCacheRefreshHandler
  */
 abstract class SDKBuilder(
     val apiKey: String,
-    val hostURL: String,
+    val apiHost: String,
+    val streamingHost: String? = null,
     val attributes: Map<String, GBValue>,
     val trackingCallback: GBTrackingCallback,
     val encryptionKey: String?,
@@ -66,7 +69,8 @@ abstract class SDKBuilder(
 /**
  * SDKBuilder - Initializer for GrowthBook SDK for Apps
  * APIKey - API Key
- * HostURL - Server URL
+ * ApiHost - domain for features fetch
+ * StreamingHost - domain for server sent events
  * UserAttributes - User Attributes
  * Tracking Callback - Track Events for Experiments
  * EncryptionKey - Encryption key if you intend to use data encryption
@@ -76,7 +80,8 @@ abstract class SDKBuilder(
  */
 class GBSDKBuilder(
     apiKey: String,
-    hostURL: String,
+    apiHost: String,
+    streamingHost: String? = null,
     networkDispatcher: NetworkDispatcher,
     attributes: Map<String, GBValue>,
     encryptionKey: String? = null,
@@ -85,7 +90,7 @@ class GBSDKBuilder(
     enableLogging: Boolean = false,
     private val cachingEnabled: Boolean = true,
 ) : SDKBuilder(
-    apiKey, hostURL,
+    apiKey, apiHost, streamingHost,
     attributes, trackingCallback, encryptionKey, networkDispatcher, remoteEval, enableLogging
 ) {
 
@@ -164,8 +169,11 @@ class GBSDKBuilder(
             )
         }
 
+        val gbOptions = GBOptions(apiHost, streamingHost)
+
         return GrowthBookSDK(
             gbContext,
+            gbOptions,
             refreshHandler,
             networkDispatcher,
             cachingEnabled = cachingEnabled,
@@ -177,7 +185,6 @@ class GBSDKBuilder(
             apiKey = apiKey,
             enabled = enabled,
             attributes = attributes,
-            hostURL = hostURL,
             qaMode = qaMode,
             forcedVariations = forcedVariations,
             trackingCallback = trackingCallback,
@@ -213,8 +220,10 @@ class GBSDKBuilder(
                 handleWaitForCallCallback = null
                 growthBookSDK = null
             }
+            val gbOptions = GBOptions(apiHost, streamingHost)
             growthBookSDK = GrowthBookSDK(
                 gbContext,
+                gbOptions,
                 internalRefreshHandler,
                 networkDispatcher,
                 cachingEnabled = cachingEnabled,
