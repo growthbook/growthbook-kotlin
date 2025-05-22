@@ -327,19 +327,19 @@ class GBStickyBucketServiceImp(
 ## Changelog
 - **v1.1.63** 2024-11-26
     - The type of `value` field of `GBFeatureResult` class was changed to `kotlinx.serialization.json.JsonElement`
-- **v2.0.0-alpha** 2025-01-10
+- **v2.0.0** 2025-01-10
     - the `value` field was renamed to `gbValue`, the type of this field was changed to `GBValue`;
     - `inline fun <reified V>feature(id: String): V?` was added (useful when you need only feature value and you know the type of this feature)
-- **v3.0.0-alpha** 2025-01-27
+- **v3.0.0** 2025-01-27
     - user attributes type was changed (map of GB values);
     - attributesOverride is map of GB values;
     - forced features is map of GB values
-- **v4.0.0-alpha** 2025-03-03
+- **v4.0.0** 2025-03-03
     - `initialize()` method was changed from non-suspend to suspend method
 in order to get rid of null on the first access. It is expected that user of
 the SDK calls `initialize()` from coroutine. For those who doesn't use coroutines,
 they can use `initializeWithoutWaitForCall()` method
-- **v5.0.0-alpha** 2025-03-24
+- **v5.0.0** 2025-05-22
     - GB values were moved to :Core module because they are used in :GrowthBookKotlinxSerialization
 module;
     - forcedFeature field of GBFeatureEvaluator is a map of GB values

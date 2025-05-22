@@ -1,7 +1,7 @@
 package com.sdk.growthbook.evaluators
 
 import kotlinx.serialization.json.jsonObject
-import com.sdk.growthbook.utils.GB
+import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.GBJson
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBExperiment
