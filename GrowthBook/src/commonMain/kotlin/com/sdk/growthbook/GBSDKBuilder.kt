@@ -1,5 +1,6 @@
 package com.sdk.growthbook
 
+import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.network.NetworkDispatcher
@@ -155,11 +156,11 @@ class GBSDKBuilder(
         val gbContext = createGbContext()
 
         if (enableLogging && !cachingEnabled) {
-            println(
+            GB.warning(
                 """
-                    GrowthBook warning: calling #initializeWithoutCall with caching
+                    calling #initialize with caching
                     disabled will cause feature values nulls. We recommend to enable
-                    caching or calling suspend method #initialize
+                    caching or calling method #initialize with callback
                 """.trimIndent()
             )
         }
