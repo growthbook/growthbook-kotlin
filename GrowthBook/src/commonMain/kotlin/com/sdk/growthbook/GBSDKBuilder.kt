@@ -51,7 +51,8 @@ abstract class SDKBuilder(
     }
 
     /**
-     * Set Enabled - Default Disabled - If Enabled - then experiments will be disabled
+     * If enabled - then experiments will be run,
+     * otherwise default values will be returned
      */
     fun setEnabled(isEnabled: Boolean): SDKBuilder {
         this.enabled = isEnabled
