@@ -3,7 +3,6 @@ package com.sdk.growthbook.model
 data object GBNull: GBValue()
 data class GBBoolean(val value: Boolean): GBValue()
 data class GBString(val value: String): GBValue()
-data class GBNumber(val value: Number): GBValue()
 class GBArray(
     value: List<GBValue>
 ): GBValue(), List<GBValue> by value
@@ -25,4 +24,17 @@ sealed class GBValue {
         }
 
     companion object
+}
+
+data class GBNumber(val value: Number): GBValue() {
+    override fun equals(other: Any?): Boolean {
+        if (other is GBNumber) {
+            return JsNumber(value) == JsNumber(other.value)
+        }
+        return super.equals(other)
+    }
+
+    override fun hashCode(): Int {
+        return value.hashCode()
+    }
 }

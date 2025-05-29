@@ -1,21 +1,23 @@
 package com.sdk.growthbook.tests
 
 import kotlin.test.*
-import com.sdk.growthbook.utils.GBCondition
-import com.sdk.growthbook.evaluators.GBAttributeType
-import com.sdk.growthbook.evaluators.GBConditionEvaluator
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import org.intellij.lang.annotations.Language
 import com.sdk.growthbook.model.GBJson
 import com.sdk.growthbook.model.GBNull
+import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.toGbBoolean
 import com.sdk.growthbook.model.toGbString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
-import org.intellij.lang.annotations.Language
+import com.sdk.growthbook.utils.GBCondition
 import com.sdk.growthbook.kotlinx.serialization.from
+import com.sdk.growthbook.evaluators.GBAttributeType
+import com.sdk.growthbook.evaluators.GBConditionEvaluator
 
 class GBConditionTests {
 
@@ -206,4 +208,37 @@ class GBConditionTests {
             )
         )
     }
+
+    @Test
+    fun `be careful when the user of the library passes long attribute`() {
+        val evaluator = GBConditionEvaluator()
+
+        val conditionValue = GBValue.from(
+            // response from Backend written in Typescript
+            JsonPrimitive(576),
+        )
+
+        val appUser = AppUser(
+            age = 18,
+
+            // Kotlin language has Long type,
+            // but Typescript language doesn't have it
+            id = 576L,
+
+            name = "some_name",
+        )
+        val attributeValue = GBNumber(appUser.id)
+
+        assertTrue(
+            evaluator.evalConditionValue(
+                conditionValue, attributeValue, null
+            )
+        )
+    }
+
+    private data class AppUser(
+        val id: Long,
+        val age: Int,
+        val name: String,
+    )
 }
