@@ -3,7 +3,33 @@ package com.sdk.growthbook.model
 data object GBNull: GBValue()
 data class GBBoolean(val value: Boolean): GBValue()
 data class GBString(val value: String): GBValue()
-data class GBNumber(val value: Number): GBValue()
+
+class GBNumber(val value: Number): GBValue() {
+
+    override fun equals(other: Any?): Boolean {
+        if (other !is GBNumber) {
+            return false
+        }
+        if (isIntegerValue() && other.isIntegerValue() && value.toLong() == other.value.toLong()) {
+            return true
+        }
+        if (
+            !isIntegerValue() && !other.isIntegerValue() &&
+            value.toDouble() == other.value.toDouble()
+        ) {
+            return true
+        }
+        return false
+    }
+
+    override fun hashCode(): Int =
+        if (isIntegerValue()) value.toLong().hashCode() else value.toDouble().hashCode()
+
+    private fun isIntegerValue(): Boolean =
+        value is Byte || value is Short || value is Int || value is Long
+
+}
+
 class GBArray(
     value: List<GBValue>
 ): GBValue(), List<GBValue> by value
