@@ -210,11 +210,11 @@ class GBConditionTests {
     }
 
     @Test
-    fun `be careful when the user of the library passes long attribute`() {
+    fun `Be careful when the user of the library passes the type that is absent in JSON`() {
         val evaluator = GBConditionEvaluator()
 
         val conditionValue = GBValue.from(
-            // response from Backend written in Typescript
+            // response from Backend (JSON format)
             JsonPrimitive(576),
         )
 
@@ -222,7 +222,7 @@ class GBConditionTests {
             age = 18,
 
             // Kotlin language has Long type,
-            // but Typescript language doesn't have it
+            // but JSON format doesn't have it (has a number)
             id = 576L,
 
             name = "some_name",

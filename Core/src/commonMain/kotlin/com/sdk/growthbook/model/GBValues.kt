@@ -1,5 +1,7 @@
 package com.sdk.growthbook.model
 
+import com.sdk.growthbook.utils.isIntegerValue
+
 data object GBNull: GBValue()
 data class GBBoolean(val value: Boolean): GBValue()
 data class GBString(val value: String): GBValue()
@@ -27,9 +29,20 @@ sealed class GBValue {
 }
 
 data class GBNumber(val value: Number): GBValue() {
+
     override fun equals(other: Any?): Boolean {
         if (other is GBNumber) {
-            return JsNumber(value) == JsNumber(other.value)
+            val areTypesTheSame: Boolean = (value::class.simpleName == other.value::class.simpleName)
+
+            return if (areTypesTheSame) {
+                value == other.value
+            } else {
+                if (value.isIntegerValue() && other.value.isIntegerValue()) {
+                    value.toLong() == other.value.toLong()
+                } else {
+                    value.toDouble() == other.value.toDouble()
+                }
+            }
         }
         return super.equals(other)
     }
