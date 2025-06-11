@@ -12,9 +12,11 @@ import com.sdk.growthbook.model.toGbBoolean
 import com.sdk.growthbook.model.toGbString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import org.intellij.lang.annotations.Language
+import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.kotlinx.serialization.from
 
 class GBConditionTests {
@@ -206,4 +208,37 @@ class GBConditionTests {
             )
         )
     }
+
+    @Test
+    fun `Be careful when the user of the library passes the type that is absent in JSON`() {
+        val evaluator = GBConditionEvaluator()
+
+        val conditionValue = GBValue.from(
+            // response from Backend (JSON format)
+            JsonPrimitive(576),
+        )
+
+        val appUser = AppUser(
+            age = 18,
+
+            // Kotlin language has Long type,
+            // but JSON format doesn't have it (has a number)
+            id = 576L,
+
+            name = "some_name",
+        )
+        val attributeValue = GBNumber(appUser.id)
+
+        assertTrue(
+            evaluator.evalConditionValue(
+                conditionValue, attributeValue, null
+            )
+        )
+    }
+
+    private data class AppUser(
+        val id: Long,
+        val age: Int,
+        val name: String,
+    )
 }
