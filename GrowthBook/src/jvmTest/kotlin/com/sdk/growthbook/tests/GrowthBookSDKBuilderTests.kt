@@ -45,7 +45,6 @@ class GrowthBookSDKBuilderTests {
 
         assertEquals(sdkInstance.getGBContext().apiKey, testApiKey)
         assertTrue(sdkInstance.getGBContext().enabled)
-        assertTrue(sdkInstance.getGBContext().hostURL == testHostURL)
         assertFalse(sdkInstance.getGBContext().qaMode)
         assertTrue(sdkInstance.getGBContext().attributes == testAttributes)
     }
@@ -68,7 +67,6 @@ class GrowthBookSDKBuilderTests {
 
         assertTrue(sdkInstance.getGBContext().apiKey == testApiKey)
         assertFalse(sdkInstance.getGBContext().enabled)
-        assertTrue(sdkInstance.getGBContext().hostURL == testHostURL)
         assertTrue(sdkInstance.getGBContext().qaMode)
         assertTrue(sdkInstance.getGBContext().attributes == testAttributes)
         assertTrue(sdkInstance.getGBContext().forcedVariations == variations)
@@ -94,7 +92,6 @@ class GrowthBookSDKBuilderTests {
 
         assertTrue(sdkInstance.getGBContext().apiKey == testApiKey)
         assertFalse(sdkInstance.getGBContext().enabled)
-        assertTrue(sdkInstance.getGBContext().hostURL == testHostURL)
         assertTrue(sdkInstance.getGBContext().qaMode)
         assertTrue(sdkInstance.getGBContext().attributes == testAttributes)
     }
