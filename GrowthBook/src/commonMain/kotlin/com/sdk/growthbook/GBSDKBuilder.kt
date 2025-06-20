@@ -1,5 +1,6 @@
 package com.sdk.growthbook
 
+import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBOptions
@@ -53,7 +54,11 @@ abstract class SDKBuilder(
     }
 
     /**
-     * Set Enabled - Default Disabled - If Enabled - then experiments will be disabled
+     * If enabled - then experiments will be run,
+     * otherwise default values will be returned.
+     * Experiments are enabled by default.
+     * If you want to disable experiments,
+     * you can pass false here.
      */
     fun setEnabled(isEnabled: Boolean): SDKBuilder {
         this.enabled = isEnabled
@@ -160,11 +165,11 @@ class GBSDKBuilder(
         val gbContext = createGbContext()
 
         if (enableLogging && !cachingEnabled) {
-            println(
+            GB.warning(
                 """
-                    GrowthBook warning: calling #initializeWithoutCall with caching
+                    calling #initialize with caching
                     disabled will cause feature values nulls. We recommend to enable
-                    caching or calling suspend method #initialize
+                    caching or calling method #initialize with callback
                 """.trimIndent()
             )
         }

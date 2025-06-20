@@ -1,6 +1,7 @@
 package com.sdk.growthbook.evaluators
 
 import kotlinx.serialization.json.jsonObject
+import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.GBJson
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBExperiment
@@ -48,6 +49,9 @@ internal class GBExperimentEvaluator(
          */
         val forcedVariation = evaluationContext.forcedVariations[experiment.key]
         if (forcedVariation != null) {
+            if (evaluationContext.loggingEnabled) {
+                GB.log("return forcedVariation $forcedVariation")
+            }
             return getExperimentResult(
                 featureId = featureId,
                 experiment = experiment,

@@ -26,7 +26,7 @@ import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.setBody
 import io.ktor.http.HttpStatusCode
 import io.ktor.utils.io.core.use
-import io.ktor.utils.io.errors.IOException
+import kotlinx.io.IOException
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -65,27 +65,25 @@ class GBNetworkDispatcherKtor(
         onError: (Throwable) -> Unit
     ): Job =
         CoroutineScope(PlatformDependentIODispatcher).launch {
-            client.use {
+            try {
+                val result = prepareGetRequest(request).execute()
                 try {
-                    val result = prepareGetRequest(request).execute()
-                    try {
-                        if (result.status == HttpStatusCode.OK) {
-                            onSuccess(result.body())
-                        } else {
-                            onError(Exception("Response status in not ok: Response is: ${result.body<String>()}"))
-                        }
-                    } catch (exception: Exception) {
-                        onError(exception)
+                    if (result.status == HttpStatusCode.OK) {
+                        onSuccess(result.body())
+                    } else {
+                        onError(Exception("Response status in not ok: Response is: ${result.body<String>()}"))
                     }
-                } catch (clientRequestException: ClientRequestException) {
-                    onError(clientRequestException)
-                } catch (serverResponseException: ServerResponseException) {
-                    onError(serverResponseException)
-                } catch (ioException: IOException) {
-                    onError(ioException)
-                } catch (exception: Exception) { // for the case if something was missed
+                } catch (exception: Exception) {
                     onError(exception)
                 }
+            } catch (clientRequestException: ClientRequestException) {
+                onError(clientRequestException)
+            } catch (serverResponseException: ServerResponseException) {
+                onError(serverResponseException)
+            } catch (ioException: IOException) {
+                onError(ioException)
+            } catch (exception: Exception) { // for the case if something was missed
+                onError(exception)
             }
         }
 
