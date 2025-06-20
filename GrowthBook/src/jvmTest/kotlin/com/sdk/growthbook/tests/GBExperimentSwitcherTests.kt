@@ -3,6 +3,7 @@ package com.sdk.growthbook.tests
 import kotlin.test.Test
 import kotlin.random.Random
 import com.sdk.growthbook.GrowthBookSDK
+import com.sdk.growthbook.model.GBOptions
 import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBFeature
@@ -45,10 +46,14 @@ class GBExperimentSwitcherTests {
                 forcedVariations = emptyMap(),
                 encryptionKey = null,
                 qaMode = false,
-                hostURL = "https://test-host.com",
                 trackingCallback = { _, _ -> },
 
-                ),
+                )
+            ,
+            gbOptions = GBOptions(
+                apiHost = "https://test-host.com",
+                streamingHost = null,
+            ),
             features = mapOf(
                 featureKey to GBFeature(
                     defaultValue = GBBoolean(false),
