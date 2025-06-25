@@ -342,7 +342,10 @@ they can use `initializeWithoutWaitForCall()` method
 - **v5.0.0** 2025-05-22
     - GB values were moved to :Core module because they are used in :GrowthBookKotlinxSerialization
 module;
-    - forcedFeature field of GBFeatureEvaluator is a map of GB values
+    - forcedFeature field of GBFeatureEvaluator is a map of GB values.
+- **v6.0.0-alpha** 2025-05-22
+    - hostURL property was renamed to apiHost in order to follow the same way as Typescript SDK follows,
+streamingHost property was added to  to differentiate streaming host url from API host
 
 
 ## License

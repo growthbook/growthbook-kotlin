@@ -45,7 +45,7 @@ class GBFeatureValueTests {
                     .mapValues { GBValue.from(it.value) }
 
                 val gbContext = GBContext(
-                    apiKey = "", hostURL = "",
+                    apiKey = "",
                     enabled = true, attributes = attributes, forcedVariations = HashMap(),
                     qaMode = false, trackingCallback = { _, _ ->
 
@@ -135,7 +135,7 @@ class GBFeatureValueTests {
 
         val builder = GBSDKBuilder(
             apiKey = "",
-            hostURL = "",
+            apiHost = "",
             networkDispatcher = MockNetworkClient(
                 successResponse = null,
                 error = null,

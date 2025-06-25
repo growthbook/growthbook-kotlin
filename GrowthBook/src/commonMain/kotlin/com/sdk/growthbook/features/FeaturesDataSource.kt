@@ -1,6 +1,7 @@
 package com.sdk.growthbook.features
 
 import com.sdk.growthbook.model.GBContext
+import com.sdk.growthbook.model.GBOptions
 import com.sdk.growthbook.network.NetworkDispatcher
 import com.sdk.growthbook.serializable_model.SerializableFeaturesDataModel
 import com.sdk.growthbook.serializable_model.gbDeserialize
@@ -18,6 +19,7 @@ import kotlinx.serialization.json.Json
 internal class FeaturesDataSource(
     private val dispatcher: NetworkDispatcher,
     private val gbContext: GBContext,
+    private val gbOptions: GBOptions,
 ) {
 
     private val jsonParser: Json
@@ -29,8 +31,7 @@ internal class FeaturesDataSource(
     private fun getEndpoint(
         featureRefreshStrategy: FeatureRefreshStrategy =
             FeatureRefreshStrategy.STALE_WHILE_REVALIDATE
-    ) = FeatureURLBuilder().buildUrl(
-        gbContext.hostURL,
+    ) = FeatureURLBuilder(gbOptions).buildUrl(
         gbContext.apiKey,
         featureRefreshStrategy
     )

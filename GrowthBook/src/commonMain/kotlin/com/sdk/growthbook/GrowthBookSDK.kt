@@ -27,6 +27,7 @@ import com.sdk.growthbook.model.GBArray
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBString
+import com.sdk.growthbook.model.GBOptions
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.model.GBExperiment
@@ -45,6 +46,7 @@ typealias GBExperimentRunCallback = (GBExperiment, GBExperimentResult) -> Unit
  */
 class GrowthBookSDK(
     private val gbContext: GBContext,
+    gbOptions: GBOptions,
     private val refreshHandler: GBCacheRefreshHandler?,
     networkDispatcher: NetworkDispatcher,
     features: GBFeatures? = null,
@@ -69,8 +71,7 @@ class GrowthBookSDK(
     internal var featuresViewModel: FeaturesViewModel = FeaturesViewModel(
         delegate = this,
         dataSource = FeaturesDataSource(
-            dispatcher = networkDispatcher,
-            gbContext = gbContext,
+            networkDispatcher, gbContext, gbOptions,
         ),
         encryptionKey = gbContext.encryptionKey,
         cachingEnabled = cachingEnabled,
