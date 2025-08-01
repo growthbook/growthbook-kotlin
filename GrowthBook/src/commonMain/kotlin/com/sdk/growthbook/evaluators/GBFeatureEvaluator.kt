@@ -119,7 +119,7 @@ internal class GBFeatureEvaluator(
                                 /**
                                  * blocking prerequisite eval failed: feature evaluation fails
                                  */
-                                if (parentCondition.gate != false) {
+                                if (parentCondition.gate == true) {
                                     if (evaluationContext.loggingEnabled) {
                                         println("Feature blocked by prerequisite")
                                     }
