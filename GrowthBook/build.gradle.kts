@@ -9,9 +9,10 @@ plugins {
     id("com.android.library")
     kotlin("plugin.serialization")
     id("org.jetbrains.dokka") version "1.9.10"
+
 }
 
-group = "io.growthbook.sdk"
+group = "io.github.growthbook"
 version = "6.0.1"
 
 kotlin {
@@ -145,9 +146,11 @@ val sonatypePassword: String? = System.getenv("GB_SONATYPE_PASSWORD")
 publishing {
     repositories {
         maven {
-            name = "kotlin"
+            name = "central"
+            // Use OSSRH but GitHub Actions should have compatible credentials
+            // or we need to update the GitHub repository secrets
             val releasesRepoUrl = uri("https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/")
-            val snapshotsRepoUrl = uri("https://s01.oss.sonatype.org/content/repositories/snapshots/")
+            val snapshotsRepoUrl = uri("https://s01.oss.sonatype.org/content/repositories/snapshots/")  
             url = if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl
             credentials {
                 username = sonatypeUsername
@@ -179,8 +182,8 @@ publishing {
                 }
                 developers {
                     developer {
-                        name.set("Nicholas Pearson")
-                        email.set("nicholaspearson918@gmail.com")
+                        name.set("GrowthBook")
+                        email.set("hello@growthbook.io")
                     }
                 }
             }
