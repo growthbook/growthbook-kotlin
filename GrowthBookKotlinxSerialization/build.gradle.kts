@@ -7,7 +7,7 @@ plugins {
     id("org.jetbrains.dokka") version "1.9.10"
 }
 
-group = "io.github.growthbook"
+group = "io.growthbook.sdk"
 version = "1.0.0"
 
 kotlin {

@@ -12,7 +12,7 @@ plugins {
 
 }
 
-group = "io.github.growthbook"
+group = "io.growthbook.sdk"
 version = "6.0.1"
 
 kotlin {

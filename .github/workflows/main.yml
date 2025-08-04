@@ -45,9 +45,23 @@ jobs:
         body: ${{ github.event.head_commit.message }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    - name: Publish to maven central
+    - name: Build signed artifacts for Maven Central
       run: |
-        GPG_PRIVATE_KEY="${{secrets.GPG_PRIVATE_KEY}}" GPG_PRIVATE_PASSWORD="${{secrets.GPG_PRIVATE_PASSWORD}}" GB_SONATYPE_USERNAME='${{secrets.GB_SONATYPE_USERNAME}}' GB_SONATYPE_PASSWORD='${{secrets.GB_SONATYPE_PASSWORD}}' ./gradlew -Pversion=$LIB_VERSION :GrowthBook:publish
+        GPG_PRIVATE_KEY="${{secrets.GPG_PRIVATE_KEY}}" GPG_PRIVATE_PASSWORD="${{secrets.GPG_PRIVATE_PASSWORD}}" ./gradlew -Pversion=$LIB_VERSION :GrowthBook:publishToMavenLocal
+    - name: Create Maven Central deployment bundle
+      run: |
+        echo "📦 Creating deployment bundle for Manual Upload to Central Portal..."
+        cd ~/.m2/repository/io/github/growthbook
+        find . -name "*6.0.1*" -type f | head -10
+        zip -r /tmp/growthbook-6.0.1-central-bundle.zip . -i "*6.0.1*"
+        ls -la /tmp/growthbook-6.0.1-central-bundle.zip
+        echo "✅ Bundle created for manual upload"
+    - name: Upload Maven Central bundle
+      uses: actions/upload-artifact@v3
+      with:
+        name: growthbook-6.0.1-maven-central-bundle
+        path: /tmp/growthbook-6.0.1-central-bundle.zip
+        retention-days: 7
     - name: Upload binary
       uses: actions/upload-release-asset@v1
       env:
