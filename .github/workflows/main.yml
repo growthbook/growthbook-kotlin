@@ -93,19 +93,31 @@ jobs:
         echo "🏗️ Creating proper bundle structure for Central Portal..."
         mkdir -p /tmp/central-bundle
         
-        # Copy all artifacts with proper structure: groupId/artifactId/version/files
-        find . -name "*6.0.1*" -type f | while read file; do
-          # Extract relative path and create proper structure
-          rel_path=${file#./}
-          target_path="/tmp/central-bundle/io/github/growthbook/$rel_path"
-          mkdir -p "$(dirname "$target_path")"
-          cp "$file" "$target_path"
-          echo "📁 Added: $rel_path"
+        # Central Portal expects artifacts grouped by coordinates, not nested folders
+        # Copy all version 6.0.1 files directly, maintaining their artifact structure
+        find . -path "*/6.0.1/*" -name "*6.0.1*" -type f | while read file; do
+          # Get the artifact directory (e.g., GrowthBook, GrowthBook-android, etc.)
+          artifact_dir=$(echo "$file" | sed 's|.*/\([^/]*\)/6\.0\.1/.*|\1|')
+          filename=$(basename "$file")
+          
+          # Create structure: artifactId/version/filename
+          target_dir="/tmp/central-bundle/$artifact_dir/6.0.1"
+          mkdir -p "$target_dir"
+          cp "$file" "$target_dir/$filename"
+          echo "📁 Added: $artifact_dir/6.0.1/$filename"
         done
         
         cd /tmp/central-bundle
-        echo "📦 Bundle structure:"
-        find . -type f | head -20
+        echo "📦 Bundle structure (Central Portal format):"
+        find . -type f | sort | head -30
+        
+        # Verify each artifact directory has a .pom file
+        echo ""
+        echo "🔍 Verifying .pom files exist for each artifact:"
+        find . -name "*.pom" | while read pom; do
+          echo "✅ Found POM: $pom"
+        done
+        
         zip -r /tmp/growthbook-6.0.1-central-bundle.zip . || echo "Created empty bundle"
         
         # Verify the bundle was created and show details
