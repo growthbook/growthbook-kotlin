@@ -52,12 +52,18 @@ jobs:
       run: |
         echo "📦 Creating deployment bundle for Manual Upload to Central Portal..."
         cd ~/.m2/repository/io/github/growthbook
-        find . -name "*6.0.1*" -type f | head -10
+        echo "🔍 All 6.0.1 artifacts that will be included:"
+        find . -name "*6.0.1*" -type f | sort
+        echo ""
+        echo "📊 Artifact count by type:"
+        find . -name "*6.0.1*" -type f | grep -E '\.(jar|aar|pom|asc|md5|sha1|klib|module)$' | sed 's/.*\.//' | sort | uniq -c
+        echo ""
         zip -r /tmp/growthbook-6.0.1-central-bundle.zip . -i "*6.0.1*"
         ls -la /tmp/growthbook-6.0.1-central-bundle.zip
-        echo "✅ Bundle created for manual upload"
+        echo ""
+        echo "✅ Bundle created with $(find . -name "*6.0.1*" -type f | wc -l) files"
     - name: Upload Maven Central bundle
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: growthbook-6.0.1-maven-central-bundle
         path: /tmp/growthbook-6.0.1-central-bundle.zip
