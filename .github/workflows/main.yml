@@ -38,6 +38,16 @@ jobs:
     - name: Build signed artifacts for Maven Central
       run: |
         GPG_PRIVATE_KEY="${{secrets.GPG_PRIVATE_KEY}}" GPG_PRIVATE_PASSWORD="${{secrets.GPG_PRIVATE_PASSWORD}}" ./gradlew -Pversion=$LIB_VERSION :GrowthBook:publishToMavenLocal
+        
+        # Generate missing checksums for Central Portal
+        echo "🔧 Generating MD5 and SHA1 checksums for all artifacts..."
+        find ~/.m2/repository/io/github/growthbook -name "*.jar" -o -name "*.pom" -o -name "*.aar" -o -name "*.klib" -o -name "*.module" -o -name "*.json" | while read file; do
+          if [ -f "$file" ]; then
+            md5sum "$file" | cut -d' ' -f1 > "$file.md5"
+            sha1sum "$file" | cut -d' ' -f1 > "$file.sha1"
+            echo "✅ Generated checksums for $(basename "$file")"
+          fi
+        done
     - name: Create Maven Central deployment bundle
       run: |
         echo "📦 Creating deployment bundle for Manual Upload to Central Portal..."
@@ -78,7 +88,25 @@ jobs:
         echo "🔍 All 6.0.1 artifacts that will be included:"
         find . -name "*6.0.1*" -type f | sort || echo "No 6.0.1 files in current location"
         echo ""
-        zip -r /tmp/growthbook-6.0.1-central-bundle.zip . -i "*6.0.1*" || echo "Created empty bundle"
+        
+        # Create proper Central Portal bundle structure
+        echo "🏗️ Creating proper bundle structure for Central Portal..."
+        mkdir -p /tmp/central-bundle
+        
+        # Copy all artifacts with proper structure: groupId/artifactId/version/files
+        find . -name "*6.0.1*" -type f | while read file; do
+          # Extract relative path and create proper structure
+          rel_path=${file#./}
+          target_path="/tmp/central-bundle/io/github/growthbook/$rel_path"
+          mkdir -p "$(dirname "$target_path")"
+          cp "$file" "$target_path"
+          echo "📁 Added: $rel_path"
+        done
+        
+        cd /tmp/central-bundle
+        echo "📦 Bundle structure:"
+        find . -type f | head -20
+        zip -r /tmp/growthbook-6.0.1-central-bundle.zip . || echo "Created empty bundle"
         
         # Verify the bundle was created and show details
         if [ -f /tmp/growthbook-6.0.1-central-bundle.zip ]; then
@@ -86,9 +114,12 @@ jobs:
           ls -la /tmp/growthbook-6.0.1-central-bundle.zip
           echo ""
           echo "📦 Bundle contents preview:"
-          unzip -l /tmp/growthbook-6.0.1-central-bundle.zip | head -20
+          unzip -l /tmp/growthbook-6.0.1-central-bundle.zip | head -30
           echo ""
-          echo "✅ Bundle created with $(find . -name "*6.0.1*" -type f | wc -l) files"
+          echo "✅ Bundle created with $(unzip -l /tmp/growthbook-6.0.1-central-bundle.zip | grep -c "6.0.1") files"
+          echo ""
+          echo "🔍 Checking for required file types in bundle:"
+          unzip -l /tmp/growthbook-6.0.1-central-bundle.zip | grep -E '\.(jar|pom|aar|klib|module|asc|md5|sha1)$' | wc -l | xargs echo "Total artifact files:"
         else
           echo "❌ Bundle creation failed!"
           # Create a minimal bundle so the upload doesn't fail
