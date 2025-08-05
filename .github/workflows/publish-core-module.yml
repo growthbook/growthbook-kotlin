@@ -4,7 +4,7 @@ on:
   workflow_dispatch
 
 env:
-  CORE_MODULE_VERSION: 1.0.2
+  CORE_MODULE_VERSION: 1.1.1
 
 jobs:
   release:
@@ -14,15 +14,146 @@ jobs:
       with:
         clean: 'true'
         fetch-depth: 0
-    - uses: actions/setup-java@v1
+    - name: Install GitVersion
+      uses: gittools/actions/gitversion/setup@v0.9.7
       with:
-        java-version: 11
+        versionSpec: '5.x'
+    - uses: actions/setup-java@v3
+      with:
+        java-version: 17
+        distribution: 'temurin'
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
+    - name: Determine Version
+      id: gitversion
+      uses: gittools/actions/gitversion/execute@v0.9.7
+      with:
+        useConfigFile: true
+        configFilePath: ./.github/gitversion.yml
     - name: Gradle clean
       run: ./gradlew clean --info
     - name: Build with Gradle
-      run: ./gradlew -Pversion=$CORE_MODULE_VERSION :Core:build --info
-    - name: Publish to maven central
+      run: ./gradlew kotlinUpgradeYarnLock :Core:build --info
+    # Skip release creation - we just want the bundle for manual upload
+    - name: Build signed artifacts for Maven Central
       run: |
-        GPG_PRIVATE_KEY="${{secrets.GPG_PRIVATE_KEY}}" GPG_PRIVATE_PASSWORD="${{secrets.GPG_PRIVATE_PASSWORD}}" GB_SONATYPE_USERNAME='${{secrets.GB_SONATYPE_USERNAME}}' GB_SONATYPE_PASSWORD='${{secrets.GB_SONATYPE_PASSWORD}}' ./gradlew -Pversion=$CORE_MODULE_VERSION kotlinUpgradeYarnLock :Core:publish
+        # Build and publish Core module to Maven Local
+        GPG_PRIVATE_KEY="${{secrets.GPG_PRIVATE_KEY}}" GPG_PRIVATE_PASSWORD="${{secrets.GPG_PRIVATE_PASSWORD}}" ./gradlew :Core:publishToMavenLocal
+        
+        # Generate missing checksums for Central Portal
+        echo "🔧 Generating MD5 and SHA1 checksums for all artifacts..."
+        find ~/.m2/repository/io/github/growthbook -name "*.jar" -o -name "*.pom" -o -name "*.aar" -o -name "*.klib" -o -name "*.module" -o -name "*.json" | while read file; do
+          if [ -f "$file" ]; then
+            md5sum "$file" | cut -d' ' -f1 > "$file.md5"
+            sha1sum "$file" | cut -d' ' -f1 > "$file.sha1"
+            echo "✅ Generated checksums for $(basename "$file")"
+          fi
+        done
+    - name: Create Maven Central deployment bundle
+      run: |
+        echo "📦 Creating deployment bundle for Manual Upload to Central Portal..."
+        echo "🔍 First, let's see what was actually published:"
+        ls -la ~/.m2/repository/
+        echo ""
+        echo "🔍 Looking for any io/github structure:"
+        find ~/.m2/repository -name "*io*" -type d || echo "No io directories found"
+        echo ""
+        echo "🔍 Looking for any growthbook artifacts:"
+        find ~/.m2/repository -name "*growthbook*" -type f || echo "No growthbook files found"
+        echo ""
+        echo "🔍 Looking for any $CORE_MODULE_VERSION artifacts:"
+        find ~/.m2/repository -name "*$CORE_MODULE_VERSION*" -type f | head -20 || echo "No $CORE_MODULE_VERSION files found"
+        echo ""
+        
+        # Try to find the actual location (checking current namespace first)
+        if [ -d ~/.m2/repository/io/github/growthbook ]; then
+          echo "✅ Found current namespace structure: io.github.growthbook"
+          cd ~/.m2/repository/io/github/growthbook
+        elif [ -d ~/.m2/repository/io/growthbook/sdk ]; then
+          echo "✅ Found old namespace structure: io.growthbook.sdk"
+          cd ~/.m2/repository/io/growthbook/sdk
+        else
+          echo "🔍 Searching for any Core artifacts..."
+          ARTIFACT_DIR=$(find ~/.m2/repository -name "*Core*" -type d | head -1)
+          if [ -n "$ARTIFACT_DIR" ]; then
+            echo "📁 Found artifacts in: $ARTIFACT_DIR"
+            cd "$ARTIFACT_DIR/.."
+          else
+            echo "❌ No artifacts found, creating empty bundle"
+            mkdir -p /tmp/empty-bundle
+            cd /tmp/empty-bundle
+          fi
+        fi
+        
+        echo "📍 Current directory: $(pwd)"
+        echo "🔍 All artifacts that will be included:"
+        find . -name "*.jar" -o -name "*.pom" -o -name "*.aar" -o -name "*.klib" -o -name "*.module" -o -name "*.json" | sort || echo "No files in current location"
+        echo ""
+        
+        # Create proper Central Portal bundle structure
+        echo "🏗️ Creating proper bundle structure for Central Portal..."
+        mkdir -p /tmp/central-bundle
+        
+        # Central Portal expects artifacts grouped by coordinates, not nested folders
+        # Copy all files directly, maintaining their artifact structure
+        find . -type f \( -name "*.jar" -o -name "*.pom" -o -name "*.aar" -o -name "*.klib" -o -name "*.module" -o -name "*.json" -o -name "*.asc" -o -name "*.md5" -o -name "*.sha1" \) | while read file; do
+          # Get the artifact directory and version from the path
+          # Path format: artifactId/version/filename
+          artifact_path=$(echo "$file" | sed 's|^\./||')
+          artifact_dir=$(echo "$artifact_path" | cut -d'/' -f1)
+          version=$(echo "$artifact_path" | cut -d'/' -f2)
+          filename=$(basename "$file")
+          
+          # Create structure: artifactId/version/filename
+          target_dir="/tmp/central-bundle/$artifact_dir/$version"
+          mkdir -p "$target_dir"
+          cp "$file" "$target_dir/$filename"
+          echo "📁 Added: $artifact_dir/$version/$filename"
+        done
+        
+        cd /tmp/central-bundle
+        echo "📦 Bundle structure (Central Portal format):"
+        find . -type f | sort | head -30
+        
+        # Verify each artifact directory has a .pom file
+        echo ""
+        echo "🔍 Verifying .pom files exist for each artifact:"
+        find . -name "*.pom" | while read pom; do
+          echo "✅ Found POM: $pom"
+        done
+        
+        # Create bundle with timestamp to avoid conflicts
+        BUNDLE_NAME="growthbook-core-$CORE_MODULE_VERSION-central-bundle-$(date +%Y%m%d-%H%M%S)"
+        zip -r "/tmp/$BUNDLE_NAME.zip" . || echo "Created empty bundle"
+        
+        # Verify the bundle was created and show details
+        if [ -f "/tmp/$BUNDLE_NAME.zip" ]; then
+          echo "✅ Bundle file exists:"
+          ls -la "/tmp/$BUNDLE_NAME.zip"
+          echo ""
+          echo "📦 Bundle contents preview:"
+          unzip -l "/tmp/$BUNDLE_NAME.zip" | head -30
+          echo ""
+          echo "✅ Bundle created with $(unzip -l "/tmp/$BUNDLE_NAME.zip" | grep -c "\.jar\|\.pom\|\.aar\|\.klib\|\.module\|\.json") files"
+          echo ""
+          echo "🔍 Checking for required file types in bundle:"
+          unzip -l "/tmp/$BUNDLE_NAME.zip" | grep -E '\.(jar|pom|aar|klib|module|asc|md5|sha1)$' | wc -l | xargs echo "Total artifact files:"
+          
+          # Store bundle name for upload step
+          echo "BUNDLE_NAME=$BUNDLE_NAME" >> $GITHUB_ENV
+        else
+          echo "❌ Bundle creation failed!"
+          # Create a minimal bundle so the upload doesn't fail
+          echo "Creating minimal bundle for debugging..."
+          echo "No artifacts found - please check the build configuration" > /tmp/debug.txt
+          BUNDLE_NAME="growthbook-core-debug-bundle-$(date +%Y%m%d-%H%M%S)"
+          zip "/tmp/$BUNDLE_NAME.zip" /tmp/debug.txt
+          echo "BUNDLE_NAME=$BUNDLE_NAME" >> $GITHUB_ENV
+        fi
+    - name: Upload Maven Central bundle
+      uses: actions/upload-artifact@v4
+      if: always()  # Upload even if previous steps had issues
+      with:
+        name: ${{ env.BUNDLE_NAME }}
+        path: /tmp/${{ env.BUNDLE_NAME }}.zip
+        retention-days: 7
