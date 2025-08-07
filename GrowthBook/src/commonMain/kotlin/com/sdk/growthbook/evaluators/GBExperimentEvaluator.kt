@@ -9,6 +9,7 @@ import com.sdk.growthbook.model.GBFeatureSource
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.utils.GBUtils
 import com.sdk.growthbook.kotlinx.serialization.from
+import com.sdk.growthbook.utils.StickyBucketServiceHelper
 
 /**
  * Experiment Evaluator Class
@@ -382,10 +383,16 @@ internal class GBExperimentEvaluator(
                     (stickyBucketAssignmentDocs ?: emptyMap()).toMutableMap().apply {
                         this[key] = doc
                     }
-                /**
-                 * save doc
-                 */
-                evaluationContext.stickyBucketService.saveAssignments(doc = doc)
+                with(
+                    StickyBucketServiceHelper(
+                        evaluationContext.stickyBucketService
+                    )
+                ) {
+                    /**
+                     * save doc
+                     */
+                    saveAssignments(doc)
+                }
             }
         }
 

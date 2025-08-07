@@ -15,7 +15,7 @@ internal class GBStickyBucketServiceImp(
     /**
      * Method for get assignment document from cache by attribute name and attribute value
      */
-    override fun getAssignments(
+    override suspend fun getAssignments(
         attributeName: String,
         attributeValue: String
     ): GBStickyAssignmentsDocument? {
@@ -37,7 +37,7 @@ internal class GBStickyBucketServiceImp(
     /**
      * Method for saving assignments document to cache
      */
-    override fun saveAssignments(doc: GBStickyAssignmentsDocument) {
+    override suspend fun saveAssignments(doc: GBStickyAssignmentsDocument) {
         val key = "${doc.attributeName}||${doc.attributeValue}"
 
         localStorage?.let { localStorage ->
@@ -54,7 +54,7 @@ internal class GBStickyBucketServiceImp(
     /**
      * Method for getting sticky bucket assignments from attributes of context
      */
-    override fun getAllAssignments(
+    override suspend fun getAllAssignments(
         attributes: Map<String, String>
     ): Map<String, GBStickyAssignmentsDocument> {
         val docs =
