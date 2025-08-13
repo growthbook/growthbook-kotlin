@@ -9,6 +9,3 @@ import kotlinx.coroutines.CoroutineDispatcher
  */
 actual val PlatformDependentIODispatcher: CoroutineDispatcher =
     Dispatchers.IO
-
-actual fun <T> platformDependentRunBlocking(block: suspend () -> T): T? =
-    runBlocking { block.invoke() }

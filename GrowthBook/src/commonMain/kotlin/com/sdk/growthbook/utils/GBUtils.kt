@@ -348,10 +348,15 @@ internal class GBUtils {
                 attributeOverrides = attributeOverrides
             )
 
-            context.stickyBucketAssignmentDocs = with(
+            with(
                 StickyBucketServiceHelper(stickyBucketService)
             ) {
-                getAllAssignments(attributes)
+                getAllAssignments(
+                    attributes = attributes,
+                    onResult = {
+                        context.stickyBucketAssignmentDocs = it
+                    }
+                )
             }
         }
 

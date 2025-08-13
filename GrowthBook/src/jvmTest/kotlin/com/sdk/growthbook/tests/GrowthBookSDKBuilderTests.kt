@@ -18,6 +18,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlinx.coroutines.test.TestScope
 
 class GrowthBookSDKBuilderTests {
 
@@ -194,7 +195,7 @@ class GrowthBookSDKBuilderTests {
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = false
         ).setPrefixForStickyBucketCachedDirectory(
-            prefix = "test_prefix"
+            coroutineScope = TestScope(), prefix = "test_prefix",
         ).initialize()
 
         assertTrue { sdkInstance.getGBContext().stickyBucketService != null }
@@ -211,7 +212,7 @@ class GrowthBookSDKBuilderTests {
             trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = false
-        ).setStickyBucketService()
+        ).setStickyBucketService(TestScope())
             .initialize()
 
         assertTrue { sdkInstance.getGBContext().stickyBucketService != null }
@@ -295,7 +296,7 @@ class GrowthBookSDKBuilderTests {
             trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = true
-        ).setStickyBucketService(GBStickyBucketServiceImp())
+        ).setStickyBucketService(GBStickyBucketServiceImp(TestScope()))
             .initialize()
 
         sdkInstance.setAttributeOverrides(expectedAttributes)

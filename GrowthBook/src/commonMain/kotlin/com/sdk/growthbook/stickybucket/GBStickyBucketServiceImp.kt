@@ -1,5 +1,6 @@
 package com.sdk.growthbook.stickybucket
 
+import kotlinx.coroutines.CoroutineScope
 import com.sdk.growthbook.utils.GBStickyAssignmentsDocument
 import com.sdk.growthbook.sandbox.CachingLayer
 import kotlinx.serialization.encodeToString
@@ -8,6 +9,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.decodeFromJsonElement
 
 internal class GBStickyBucketServiceImp(
+    override val coroutineScope: CoroutineScope,
     private val prefix: String = "gbStickyBuckets__",
     private val localStorage: CachingLayer? = null
 ) : GBStickyBucketService {

@@ -1,11 +1,18 @@
 package com.sdk.growthbook.stickybucket
 
+import kotlinx.coroutines.CoroutineScope
 import com.sdk.growthbook.utils.GBStickyAssignmentsDocument
 
 /**
  * Responsible for reading and writing documents which describe sticky bucket assignments.
  */
 interface GBStickyBucketService {
+
+    /**
+     * Provide coroutine scope for #getAssignments(), #saveAssignments(),
+     * getAllAssignments() methods
+     */
+    val coroutineScope: CoroutineScope
 
     /**
      * Method for get assignment document for cache by attribute name and attribute value
