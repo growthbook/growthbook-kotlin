@@ -10,7 +10,7 @@ interface GBStickyBucketService {
 
     /**
      * Provide coroutine scope for #getAssignments(), #saveAssignments(),
-     * getAllAssignments() methods
+     * getAllAssignments() methods. It can be scope based on IO dispatcher for example.
      */
     val coroutineScope: CoroutineScope
 
