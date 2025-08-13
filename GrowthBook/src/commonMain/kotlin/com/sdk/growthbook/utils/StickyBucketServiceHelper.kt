@@ -25,9 +25,9 @@ internal class StickyBucketServiceHelper(private val stickyBucketService: GBStic
     }
 
     private fun launchJob(block: suspend CoroutineScope.() -> Unit) {
-        val job = stickyBucketService.coroutineScope.launch {
-            block.invoke(this)
-        }
+        val job = stickyBucketService.coroutineScope.launch(
+            block = block,
+        )
         jobs.add(job)
     }
 }
