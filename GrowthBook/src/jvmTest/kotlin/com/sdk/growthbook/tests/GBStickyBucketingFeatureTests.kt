@@ -1,5 +1,6 @@
 package com.sdk.growthbook.tests
 
+import kotlinx.coroutines.test.TestScope
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBValue
@@ -25,7 +26,7 @@ class GBStickyBucketingFeatureTests {
     @Before
     fun setUp() {
         evalConditions = GBTestHelper.getStickyBucketingData()
-        service = GBStickyBucketServiceImp()
+        service = GBStickyBucketServiceImp(TestScope())
     }
 
     @Test

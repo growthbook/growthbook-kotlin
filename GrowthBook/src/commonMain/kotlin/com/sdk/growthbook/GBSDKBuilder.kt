@@ -1,5 +1,6 @@
 package com.sdk.growthbook
 
+import kotlinx.coroutines.CoroutineScope
 import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBContext
@@ -111,13 +112,20 @@ class GBSDKBuilder(
         return this
     }
 
+    fun setStickyBucketService(coroutineScope: CoroutineScope): GBSDKBuilder {
+        return setStickyBucketService(
+            GBStickyBucketServiceImp(
+                coroutineScope = coroutineScope,
+                localStorage = CachingImpl.getLayer(),
+            )
+        )
+    }
+
     /**
      * Method for enable sticky bucket service
      */
     fun setStickyBucketService(
-        stickyBucketService: GBStickyBucketService = GBStickyBucketServiceImp(
-            localStorage = CachingImpl.getLayer()
-        )
+        stickyBucketService: GBStickyBucketService
     ): GBSDKBuilder {
         this.stickyBucketService = stickyBucketService
         return this
@@ -130,9 +138,12 @@ class GBSDKBuilder(
      * Example name of file be like `gbStickyBuckets__test||testAttribute.txt`
      */
     fun setPrefixForStickyBucketCachedDirectory(
+        coroutineScope: CoroutineScope,
         prefix: String = "gbStickyBuckets__"
     ): GBSDKBuilder {
-        this.stickyBucketService = GBStickyBucketServiceImp(prefix, CachingImpl.getLayer())
+        this.stickyBucketService = GBStickyBucketServiceImp(
+            coroutineScope, prefix, CachingImpl.getLayer()
+        )
         return this
     }
 
