@@ -273,10 +273,11 @@ The attributeName/attributeValue combo is the primary key.
 Here's an example implementation using a theoretical db object:
 ```kotlin
 class GBStickyBucketServiceImp(
+    override val coroutineScope: CoroutineScope,
     private val prefix: String = "gbStickyBuckets__",
     private val localStorage: CachingLayer? = null
 ) : GBStickyBucketService {
-    override fun getAssignments(
+    override suspend fun getAssignments(
         attributeName: String,
         attributeValue: String
     ): GBStickyAssignmentsDocument? {
@@ -295,7 +296,7 @@ class GBStickyBucketServiceImp(
         return null
     }
 
-    override fun saveAssignments(doc: GBStickyAssignmentsDocument) {
+    override suspend fun saveAssignments(doc: GBStickyAssignmentsDocument) {
         val key = "${doc.attributeName}||${doc.attributeValue}"
 
         localStorage?.let { localStorage ->
@@ -309,7 +310,7 @@ class GBStickyBucketServiceImp(
         }
     }
 
-    override fun getAllAssignments(attributes: Map<String, String>): Map<String, GBStickyAssignmentsDocument> {
+    override suspend fun getAllAssignments(attributes: Map<String, String>): Map<String, GBStickyAssignmentsDocument> {
         val docs = mutableMapOf<String, GBStickyAssignmentsDocument>()
 
         attributes.forEach { (key, value) ->
@@ -343,9 +344,11 @@ they can use `initializeWithoutWaitForCall()` method
     - GB values were moved to :Core module because they are used in :GrowthBookKotlinxSerialization
 module;
     - forcedFeature field of GBFeatureEvaluator is a map of GB values.
-- **v6.0.0-alpha** 2025-05-22
+- **v6.0.0** 2025-05-22
     - hostURL property was renamed to apiHost in order to follow the same way as Typescript SDK follows,
-streamingHost property was added to  to differentiate streaming host url from API host
+streamingHost property was added to  to differentiate streaming host url from API host.
+- **v6.1.0** 2025-08-15
+    - `GBStickyBucketService` methods were changed to suspend, `coroutineScope` was added
 
 
 ## License
