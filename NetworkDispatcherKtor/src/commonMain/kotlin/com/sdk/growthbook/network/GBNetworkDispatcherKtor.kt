@@ -1,32 +1,33 @@
 package com.sdk.growthbook.network
 
-import com.sdk.growthbook.utils.Resource
-import kotlinx.coroutines.Job
-import io.ktor.client.HttpClient
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.serialization.kotlinx.json.json
-import kotlinx.serialization.json.Json
-import kotlinx.coroutines.CoroutineScope
 import com.sdk.growthbook.PlatformDependentIODispatcher
-import kotlinx.coroutines.launch
-import io.ktor.client.request.post
-import io.ktor.client.request.prepareGet
+import com.sdk.growthbook.utils.Resource
+import com.sdk.growthbook.utils.readSse
+import io.ktor.client.HttpClient
 import io.ktor.client.call.body
-import io.ktor.client.statement.HttpStatement
-import io.ktor.client.request.headers
 import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.ServerResponseException
-import kotlinx.coroutines.flow.callbackFlow
-import io.ktor.utils.io.ByteReadChannel
-import com.sdk.growthbook.utils.readSse
-import kotlinx.coroutines.channels.awaitClose
-import io.ktor.http.ContentType
-import io.ktor.http.contentType
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.request.headers
+import io.ktor.client.request.post
+import io.ktor.client.request.prepareGet
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpStatement
+import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
+import io.ktor.serialization.kotlinx.json.json
+import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.core.use
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
 import kotlinx.io.IOException
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -108,23 +109,44 @@ class GBNetworkDispatcherKtor(
     override fun consumeSSEConnection(
         url: String
     ) = callbackFlow {
-        CoroutineScope(PlatformDependentIODispatcher).launch {
-            try {
-                prepareGetRequest(url).execute { response ->
-                    val channel: ByteReadChannel = response.body()
-                    channel.readSse(
-                        onSseEvent = { sseEvent ->
-                            trySend(sseEvent)
-                        },
-                    )
+        val scope = this
+
+        fun startSseConnection() {
+            scope.launch(PlatformDependentIODispatcher) {
+                try {
+                    prepareGetRequest(url).execute { response ->
+                        val channel: ByteReadChannel = response.body()
+                        channel.readSse(
+                            onSseEvent = { sseEvent ->
+                                trySend(sseEvent)
+                            }
+                        )
+                    }
+                    // if server closed connection — try reconnect
+                    if (enableLogging) {
+                        println("GrowthBook SSE (Ktor): connection closed, reconnecting...")
+                    }
+                    delay(1000)
+                    startSseConnection()
+                } catch (ex: Exception) {
+                    if (enableLogging) {
+                        println("GrowthBook SSE (Ktor): error = ${ex.message}, reconnecting...")
+                        ex.printStackTrace()
+                    }
+                    trySend(Resource.Error(ex))
+                    delay(1000)
+                    startSseConnection()
                 }
-            } catch (ex: Exception) {
-                trySend(Resource.Error(ex))
-            } finally {
-                close()
             }
         }
-        awaitClose()
+
+        startSseConnection()
+
+        awaitClose {
+            if (enableLogging) {
+                println("GrowthBook SSE (Ktor): flow closed, stop reconnecting")
+            }
+        }
     }
 
     /**
