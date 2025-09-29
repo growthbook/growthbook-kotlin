@@ -369,9 +369,7 @@ internal class GBUtils {
             attributeOverrides: Map<String, GBValue>
         ): Map<String, String> {
             val attributes = mutableMapOf<String, String>()
-            context.stickyBucketIdentifierAttributes = context.stickyBucketIdentifierAttributes
-                ?.takeIf { true }
-                ?: deriveStickyBucketIdentifierAttributes(context, data)
+            context.stickyBucketIdentifierAttributes = deriveStickyBucketIdentifierAttributes(context, data)
 
             context.stickyBucketIdentifierAttributes?.forEach { attr ->
                 val hashValue =
