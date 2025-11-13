@@ -8,9 +8,9 @@ This `kotlin-1x` branch has been successfully downported from Kotlin 2.1.20 to *
 
 ### ✓ What's Working
 
-- **JVM Target**: ✅ Compiles successfully  
-- **Android Target**: ✅ Compiles successfully (API 21+)
-- **iOS Targets**: ℹ️ Code ready, compilation requires Xcode setup
+- **JVM Target**: ✅ Compiles successfully (tested)
+- **Android Target**: ✅ Compiles successfully (tested, API 21+)
+- **iOS Targets**: ⚠️ Code ready, requires Xcode (will fail in CI without Xcode)
 - **JS Target**: ℹ️ Code ready, not tested yet
 
 ## Version Information
@@ -72,13 +72,16 @@ dependencies {
 ## Building the Project
 
 ```bash
-# Build JVM and Android targets
-./gradlew :GrowthBook:compileKotlinJvm :GrowthBook:compileDebugKotlinAndroid
+# Build JVM and Android targets (recommended for CI)
+./gradlew :Core:compileKotlinJvm :Core:compileDebugKotlinAndroid \
+          :GrowthBook:compileKotlinJvm :GrowthBook:compileDebugKotlinAndroid \
+          :NetworkDispatcherKtor:compileKotlinJvm :NetworkDispatcherKtor:compileDebugKotlinAndroid \
+          :NetworkDispatcherOkHttp:compileKotlinJvm :NetworkDispatcherOkHttp:compileDebugKotlinAndroid
 
-# Publish to Maven Local for testing
-./gradlew publishToMavenLocal
+# Publish to Maven Local for testing (skips iOS if no Xcode)
+./gradlew publishToMavenLocal -x compileKotlinIosArm64 -x compileKotlinIosX64 -x compileKotlinIosSimulatorArm64
 
-# Full build (may fail on iOS without Xcode)
+# Full build (requires Xcode for iOS targets)
 ./gradlew build
 ```
 
