@@ -26,7 +26,6 @@ import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.setBody
 import io.ktor.http.HttpStatusCode
 import io.ktor.utils.io.core.use
-import kotlinx.io.IOException
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -80,8 +79,6 @@ class GBNetworkDispatcherKtor(
                 onError(clientRequestException)
             } catch (serverResponseException: ServerResponseException) {
                 onError(serverResponseException)
-            } catch (ioException: IOException) {
-                onError(ioException)
             } catch (exception: Exception) { // for the case if something was missed
                 onError(exception)
             }
