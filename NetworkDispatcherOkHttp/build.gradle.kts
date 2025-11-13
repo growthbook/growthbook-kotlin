@@ -5,14 +5,25 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "1.0.2"
+version = "1.0.2-k1x"
 
 kotlin {
     androidTarget {
         publishLibraryVariants("release")
+        compilations.all {
+            kotlinOptions {
+                jvmTarget = "1.8"
+            }
+        }
     }
 
-    jvm()
+    jvm {
+        compilations.all {
+            kotlinOptions {
+                jvmTarget = "1.8"
+            }
+        }
+    }
 
     //noinspection UseTomlInstead
     sourceSets {

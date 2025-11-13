@@ -316,7 +316,7 @@ object RangeSerializer {
  * Wrapper for deserialized model with optional field
  */
 sealed class OptionalProperty<out T> {
-    data object NotPresent : OptionalProperty<Nothing>()
+    object NotPresent : OptionalProperty<Nothing>()
     data class Present<T>(val value: T) : OptionalProperty<T>()
 }
 

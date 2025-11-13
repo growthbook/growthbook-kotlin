@@ -1,6 +1,3 @@
-@file:OptIn(ExperimentalWasmDsl::class)
-
-import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackOutput
 import org.jetbrains.kotlin.gradle.targets.js.yarn.yarn
 
@@ -11,11 +8,16 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "1.1.1"
+version = "1.1.1-k1x"
 
 kotlin {
     androidTarget {
         publishLibraryVariants("release")
+        compilations.all {
+            kotlinOptions {
+                jvmTarget = "1.8"
+            }
+        }
     }
 
     js {
@@ -31,9 +33,12 @@ kotlin {
         }
     }
 
-    jvm()
-    wasmJs {
-        nodejs()
+    jvm {
+        compilations.all {
+            kotlinOptions {
+                jvmTarget = "1.8"
+            }
+        }
     }
     iosX64()
     iosArm64()

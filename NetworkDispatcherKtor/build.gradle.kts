@@ -1,6 +1,3 @@
-@file:OptIn(ExperimentalWasmDsl::class)
-
-import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackOutput
 import org.jetbrains.kotlin.gradle.targets.js.yarn.yarn
 
@@ -11,11 +8,16 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "1.0.6"
+version = "1.0.6-k1x"
 
 kotlin {
     androidTarget {
         publishLibraryVariants("release")
+        compilations.all {
+            kotlinOptions {
+                jvmTarget = "1.8"
+            }
+        }
     }
 
     js {
@@ -31,15 +33,18 @@ kotlin {
         }
     }
 
-    jvm()
-    wasmJs {
-        nodejs()
+    jvm {
+        compilations.all {
+            kotlinOptions {
+                jvmTarget = "1.8"
+            }
+        }
     }
     iosX64()
     iosArm64()
     iosSimulatorArm64()
 
-    val ktorVersion = "3.1.2"
+    val ktorVersion = "2.3.12"
     //noinspection UseTomlInstead
     sourceSets {
         val commonMain by getting {

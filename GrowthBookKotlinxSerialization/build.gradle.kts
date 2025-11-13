@@ -8,11 +8,16 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "1.0.0"
+version = "1.0.0-k1x"
 
 kotlin {
     androidTarget {
         publishLibraryVariants("release")
+        compilations.all {
+            kotlinOptions {
+                jvmTarget = "1.8"
+            }
+        }
     }
 
     js {
@@ -28,9 +33,12 @@ kotlin {
         }
     }
 
-    jvm()
-    wasmJs {
-        nodejs()
+    jvm {
+        compilations.all {
+            kotlinOptions {
+                jvmTarget = "1.8"
+            }
+        }
     }
     iosX64()
     iosArm64()

@@ -6,9 +6,9 @@ buildscript {
     }
     //noinspection UseTomlInstead
     dependencies {
-        classpath("com.android.tools.build:gradle:8.0.2")
+        classpath("com.android.tools.build:gradle:7.4.2")
 
-        val kotlinPluginsVersion = "2.1.20"
+        val kotlinPluginsVersion = "1.9.24"
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinPluginsVersion")
         //noinspection GradleDependency
         classpath ("org.jetbrains.kotlin:kotlin-serialization:$kotlinPluginsVersion")

@@ -9,8 +9,6 @@ import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 
 interface Crypto {
     fun decrypt(
@@ -45,10 +43,8 @@ class DefaultCrypto : Crypto {
     }
 }
 
-@OptIn(ExperimentalEncodingApi::class)
-fun decodeBase64(base64: String): ByteArray {
-    return Base64.decode(base64)
-}
+// Platform-specific Base64 decoding
+internal expect fun decodeBase64(base64: String): ByteArray
 
 fun encryptToFeaturesDataModel(string: String): GBFeatures? {
     val jsonParser = Json { prettyPrint = true; isLenient = true; ignoreUnknownKeys = true }

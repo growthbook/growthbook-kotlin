@@ -1,6 +1,3 @@
-@file:OptIn(ExperimentalWasmDsl::class)
-
-import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackOutput
 import org.jetbrains.kotlin.gradle.targets.js.yarn.yarn
 
@@ -12,11 +9,16 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "6.1.1"
+version = "6.1.1-k1x"
 
 kotlin {
     androidTarget {
         publishLibraryVariants("release")
+        compilations.all {
+            kotlinOptions {
+                jvmTarget = "1.8"
+            }
+        }
     }
 
     js {
@@ -32,9 +34,12 @@ kotlin {
         }
     }
 
-    jvm()
-    wasmJs {
-        nodejs()
+    jvm {
+        compilations.all {
+            kotlinOptions {
+                jvmTarget = "1.8"
+            }
+        }
     }
     iosX64()
     iosArm64()
@@ -89,11 +94,14 @@ kotlin {
                 implementation(libs.cryptography.provider.webcrypto)
             }
         }
-        val wasmJsMain by getting {
-            dependencies {
-                implementation(libs.cryptography.provider.webcrypto)
-            }
-        }
+    }
+}
+
+// Force kotlinx-serialization version to 1.6.0 for Kotlin 1.9.24 compatibility
+configurations.all {
+    resolutionStrategy {
+        force("org.jetbrains.kotlinx:kotlinx-serialization-core:1.6.0")
+        force("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
     }
 }
 
