@@ -27,6 +27,9 @@ import okhttp3.sse.EventSource
 import okhttp3.sse.EventSources
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.math.min
+import kotlin.math.pow
 
 /**
  * Default Ktor Implementation for Network Dispatcher
@@ -39,7 +42,11 @@ class GBNetworkDispatcherOkHttp(
     private val client: OkHttpClient = OkHttpClient(),
 
     private var enableLogging: Boolean = false,
-) : NetworkDispatcher {
+    private val maxRetries: Int = 10,
+    private val initialRetryDelayMs: Long = 1000L,
+    private val maxRetryDelayMs: Long = 30_000L,
+
+    ) : NetworkDispatcher {
 
     /**
      * Function that execute API Call to fetch features
@@ -120,6 +127,7 @@ class GBNetworkDispatcherOkHttp(
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(0, TimeUnit.SECONDS)
             .writeTimeout(0, TimeUnit.SECONDS)
+            .pingInterval(30, TimeUnit.SECONDS)
             .build()
 
         val request = Request.Builder()
@@ -131,6 +139,13 @@ class GBNetworkDispatcherOkHttp(
 
         return callbackFlow {
             var eventSource: EventSource? = null
+            val retryCount = AtomicInteger(0)
+
+            fun getBackoffDelay(): Long {
+                val attempt = retryCount.get()
+                val exponentialDelay = initialRetryDelayMs * (2.0.pow(attempt.toDouble())).toLong()
+                return min(exponentialDelay, maxRetryDelayMs)
+            }
 
             fun startEventSource() {
                 if (enableLogging) println("GrowthBook SSE: starting EventSource…")
@@ -141,23 +156,35 @@ class GBNetworkDispatcherOkHttp(
                         GBEventSourceListener(
                             handler = object : GBEventSourceHandler {
                                 override fun onClose(eventSource: EventSource?) {
-                                    if (enableLogging) println("GrowthBook SSE: closed, scheduling reconnect")
-                                    eventSource?.cancel()
-                                    // try to reconnect again
-                                    launch {
-                                        delay(1000)
-                                        startEventSource()
+                                    if (retryCount.get() < maxRetries) {
+                                        val delayMs = getBackoffDelay()
+                                        if (enableLogging) {
+                                            println("GrowthBook SSE (OkHttp): closed, retry ${retryCount.get() + 1}/$maxRetries in ${delayMs}ms")
+                                        }
+                                        retryCount.incrementAndGet()
+                                        launch {
+                                            delay(delayMs)
+                                            startEventSource()
+                                        }
+                                    } else {
+                                        if (enableLogging) {
+                                            println("GrowthBook SSE (OkHttp): max retries ($maxRetries) reached, stopping reconnection")
+                                        }
+                                        close()
                                     }
                                 }
 
                                 override fun onFeaturesResponse(featuresJsonResponse: String?) {
                                     featuresJsonResponse?.let {
+                                        retryCount.set(0)
+
                                         if (enableLogging) {
                                             println("GrowthBook SSE: Features response received, length=${it.length}")
                                         }
                                         trySend(Resource.Success(it))
                                     }
                                 }
+
                             },
                             enableLogging = enableLogging
                         )
