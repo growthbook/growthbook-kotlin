@@ -1,6 +1,3 @@
-import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackOutput
-import org.jetbrains.kotlin.gradle.targets.js.yarn.yarn
-
 plugins {
     kotlin("multiplatform")
     id("com.android.library")
@@ -16,19 +13,6 @@ kotlin {
         compilations.all {
             kotlinOptions {
                 jvmTarget = "1.8"
-            }
-        }
-    }
-
-    js {
-        yarn.lockFileDirectory = file("kotlin-js-store")
-        browser {
-            commonWebpackConfig {
-                output = KotlinWebpackOutput(
-                    library = project.name,
-                    libraryTarget = KotlinWebpackOutput.Target.UMD,
-                    globalObject = KotlinWebpackOutput.Target.WINDOW
-                )
             }
         }
     }

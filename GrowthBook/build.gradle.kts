@@ -1,6 +1,3 @@
-import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackOutput
-import org.jetbrains.kotlin.gradle.targets.js.yarn.yarn
-
 plugins {
     kotlin("multiplatform")
     id("com.android.library")
@@ -17,19 +14,6 @@ kotlin {
         compilations.all {
             kotlinOptions {
                 jvmTarget = "1.8"
-            }
-        }
-    }
-
-    js {
-        yarn.lockFileDirectory = file("kotlin-js-store")
-        browser {
-            commonWebpackConfig {
-                output = KotlinWebpackOutput(
-                    library = project.name,
-                    libraryTarget = KotlinWebpackOutput.Target.UMD,
-                    globalObject = KotlinWebpackOutput.Target.WINDOW
-                )
             }
         }
     }
@@ -87,11 +71,6 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
 
                 implementation("io.mockk:mockk:1.13.16")
-            }
-        }
-        val jsMain by getting {
-            dependencies {
-                implementation(libs.cryptography.provider.webcrypto)
             }
         }
     }
