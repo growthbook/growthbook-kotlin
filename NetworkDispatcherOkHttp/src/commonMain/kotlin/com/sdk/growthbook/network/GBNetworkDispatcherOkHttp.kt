@@ -6,8 +6,8 @@ import com.sdk.growthbook.utils.GBEventSourceListener
 import com.sdk.growthbook.utils.Resource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
@@ -27,6 +27,9 @@ import okhttp3.sse.EventSource
 import okhttp3.sse.EventSources
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.math.min
+import kotlin.math.pow
 
 /**
  * Default Ktor Implementation for Network Dispatcher
@@ -39,7 +42,11 @@ class GBNetworkDispatcherOkHttp(
     private val client: OkHttpClient = OkHttpClient(),
 
     private var enableLogging: Boolean = false,
-) : NetworkDispatcher {
+    private val maxRetries: Int = 10,
+    private val initialRetryDelayMs: Long = 1000L,
+    private val maxRetryDelayMs: Long = 30_000L,
+
+    ) : NetworkDispatcher {
 
     /**
      * Function that execute API Call to fetch features
@@ -60,7 +67,7 @@ class GBNetworkDispatcherOkHttp(
 
                 override fun onResponse(call: Call, response: Response) {
                     response.use { resp ->
-                        if (!resp.isSuccessful || resp.code !in 200 .. 299) {
+                        if (!resp.isSuccessful || resp.code !in 200..299) {
                             onError(IOException("Unexpected code $resp"))
                             return
                         }
@@ -83,7 +90,8 @@ class GBNetworkDispatcherOkHttp(
     ) {
         CoroutineScope(PlatformDependentIODispatcher).launch {
             val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
-            val requestBody: RequestBody = bodyParams.toJsonElement().toString().toRequestBody(mediaType)
+            val requestBody: RequestBody =
+                bodyParams.toJsonElement().toString().toRequestBody(mediaType)
 
             val postRequest = Request.Builder()
                 .url(url)
@@ -99,7 +107,7 @@ class GBNetworkDispatcherOkHttp(
 
                 override fun onResponse(call: Call, response: Response) {
                     response.use { resp ->
-                        if (!resp.isSuccessful || resp.code !in 200 .. 299) {
+                        if (!resp.isSuccessful || resp.code !in 200..299) {
                             // throw IOException("Unexpected code $response")
                             onError(IOException("Unexpected code $resp"))
                             return
@@ -116,38 +124,79 @@ class GBNetworkDispatcherOkHttp(
     override fun consumeSSEConnection(url: String): Flow<Resource<String>> {
         val sseHttpClient = OkHttpClient.Builder()
             .retryOnConnectionFailure(true)
-            .connectTimeout(0, TimeUnit.SECONDS)
+            .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(0, TimeUnit.SECONDS)
             .writeTimeout(0, TimeUnit.SECONDS)
+            .pingInterval(30, TimeUnit.SECONDS)
             .build()
 
         val request = Request.Builder()
             .url(url)
-            .header("Accept", "application/json; q=0.5")
-            .addHeader("Accept", "text/event-stream")
+            .header("Accept", "text/event-stream")
+            .header("Cache-Control", "no-cache")
+            .header("Connection", "keep-alive")
             .build()
 
         return callbackFlow {
-            EventSources
-                .createFactory(sseHttpClient)
-                .newEventSource(
-                    request = request,
-                    listener = GBEventSourceListener(handler = object : GBEventSourceHandler {
-                        override fun onClose(eventSource: EventSource?) {
-                            eventSource?.cancel()
-                            cancel()
-                        }
+            var eventSource: EventSource? = null
+            val retryCount = AtomicInteger(0)
 
-                        override fun onFeaturesResponse(featuresJsonResponse: String?) {
-                            featuresJsonResponse?.let {
-                                trySend(Resource.Success(it))
-                            }
-                        }
-                    },
-                        enableLogging = enableLogging,
+            fun getBackoffDelay(): Long {
+                val attempt = retryCount.get()
+                val exponentialDelay = initialRetryDelayMs * (2.0.pow(attempt.toDouble())).toLong()
+                return min(exponentialDelay, maxRetryDelayMs)
+            }
+
+            fun startEventSource() {
+                if (enableLogging) println("GrowthBook SSE: starting EventSource…")
+                eventSource = EventSources
+                    .createFactory(sseHttpClient)
+                    .newEventSource(
+                        request,
+                        GBEventSourceListener(
+                            handler = object : GBEventSourceHandler {
+                                override fun onClose(eventSource: EventSource?) {
+                                    if (retryCount.get() < maxRetries) {
+                                        val delayMs = getBackoffDelay()
+                                        if (enableLogging) {
+                                            println("GrowthBook SSE (OkHttp): closed, retry ${retryCount.get() + 1}/$maxRetries in ${delayMs}ms")
+                                        }
+                                        retryCount.incrementAndGet()
+                                        launch {
+                                            delay(delayMs)
+                                            startEventSource()
+                                        }
+                                    } else {
+                                        if (enableLogging) {
+                                            println("GrowthBook SSE (OkHttp): max retries ($maxRetries) reached, stopping reconnection")
+                                        }
+                                        close()
+                                    }
+                                }
+
+                                override fun onFeaturesResponse(featuresJsonResponse: String?) {
+                                    featuresJsonResponse?.let {
+                                        retryCount.set(0)
+
+                                        if (enableLogging) {
+                                            println("GrowthBook SSE: Features response received, length=${it.length}")
+                                        }
+                                        trySend(Resource.Success(it))
+                                    }
+                                }
+
+                            },
+                            enableLogging = enableLogging
+                        )
                     )
-                )
-            awaitClose()
+            }
+
+            startEventSource()
+
+            awaitClose {
+                if (enableLogging) println("GrowthBook SSE: Flow closed, cancelling EventSource")
+                eventSource?.cancel()
+            }
         }
     }
 
@@ -155,6 +204,7 @@ class GBNetworkDispatcherOkHttp(
         enableLogging = enabled
     }
 }
+
 internal fun Map<*, *>.toJsonElement(): JsonElement {
     val map: MutableMap<String, JsonElement> = mutableMapOf()
     this.forEach {

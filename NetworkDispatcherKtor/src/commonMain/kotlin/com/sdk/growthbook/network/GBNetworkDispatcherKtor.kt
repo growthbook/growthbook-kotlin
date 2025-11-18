@@ -1,36 +1,44 @@
 package com.sdk.growthbook.network
 
-import com.sdk.growthbook.utils.Resource
-import kotlinx.coroutines.Job
-import io.ktor.client.HttpClient
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.serialization.kotlinx.json.json
-import kotlinx.serialization.json.Json
-import kotlinx.coroutines.CoroutineScope
 import com.sdk.growthbook.PlatformDependentIODispatcher
-import kotlinx.coroutines.launch
+import com.sdk.growthbook.utils.Resource
+import com.sdk.growthbook.utils.readSse
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.plugins.ClientRequestException
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.HttpTimeoutConfig.Companion.INFINITE_TIMEOUT_MS
+import io.ktor.client.plugins.ServerResponseException
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.request.headers
 import io.ktor.client.request.post
 import io.ktor.client.request.prepareGet
-import io.ktor.client.call.body
-import io.ktor.client.statement.HttpStatement
-import io.ktor.client.request.headers
-import io.ktor.client.plugins.ClientRequestException
-import io.ktor.client.plugins.ServerResponseException
-import kotlinx.coroutines.flow.callbackFlow
-import io.ktor.utils.io.ByteReadChannel
-import com.sdk.growthbook.utils.readSse
-import kotlinx.coroutines.channels.awaitClose
-import io.ktor.http.ContentType
-import io.ktor.http.contentType
-import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpStatement
+import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
+import io.ktor.serialization.kotlinx.json.json
+import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.core.use
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
 import kotlinx.io.IOException
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.concurrent.atomics.incrementAndFetch
+import kotlin.math.min
+import kotlin.math.pow
 
 internal fun createDefaultHttpClient(): HttpClient =
     HttpClient {
@@ -40,6 +48,12 @@ internal fun createDefaultHttpClient(): HttpClient =
                 isLenient = true
                 ignoreUnknownKeys = true
             })
+        }
+        install(HttpTimeout) {
+            socketTimeoutMillis = INFINITE_TIMEOUT_MS
+            requestTimeoutMillis = INFINITE_TIMEOUT_MS
+            connectTimeoutMillis = 30_000
+
         }
     }
 
@@ -54,7 +68,11 @@ class GBNetworkDispatcherKtor(
     private val client: HttpClient = createDefaultHttpClient(),
 
     private var enableLogging: Boolean = false,
-) : NetworkDispatcher {
+    private val maxRetries: Int = 10,
+    private val initialRetryDelayMs: Long = 1000L,
+    private val maxRetryDelayMs: Long = 30_000L
+
+    ) : NetworkDispatcher {
 
     /**
      * Function that execute API Call to fetch features
@@ -105,26 +123,74 @@ class GBNetworkDispatcherKtor(
     /**
      * Method that produce SSE connection
      */
+    @OptIn(ExperimentalAtomicApi::class)
     override fun consumeSSEConnection(
         url: String
     ) = callbackFlow {
-        CoroutineScope(PlatformDependentIODispatcher).launch {
-            try {
-                prepareGetRequest(url).execute { response ->
-                    val channel: ByteReadChannel = response.body()
-                    channel.readSse(
-                        onSseEvent = { sseEvent ->
-                            trySend(sseEvent)
-                        },
-                    )
+        val scope = this
+        val retryCount = AtomicInt(0)
+
+        fun getBackoffDelay(): Long {
+            val attempt = retryCount.load()
+            val exponentialDelay = initialRetryDelayMs * (2.0.pow(attempt.toDouble())).toLong()
+            return min(exponentialDelay, maxRetryDelayMs)
+        }
+
+        fun startSseConnection() {
+            scope.launch(PlatformDependentIODispatcher) {
+                try {
+                    prepareGetRequest(url).execute { response ->
+                        val channel: ByteReadChannel = response.body()
+                        channel.readSse(
+                            onSseEvent = { sseEvent ->
+                                retryCount.store(0)
+                                trySend(sseEvent)
+                            }
+                        )
+                    }
+                    if (retryCount.load() < maxRetries) {
+                        val delayMs = getBackoffDelay()
+                        if (enableLogging) {
+                            println("GrowthBook SSE (Ktor): connection closed, retry ${retryCount.load() + 1}/$maxRetries in ${delayMs}ms")
+                        }
+                        retryCount.incrementAndFetch()
+                        delay(delayMs)
+                        startSseConnection()
+                    } else {
+                        if (enableLogging) {
+                            println("GrowthBook SSE (Ktor): max retries ($maxRetries) reached, stopping reconnection")
+                        }
+                        close()
+                    }
+                } catch (ex: Exception) {
+                    if (retryCount.load() < maxRetries) {
+                        val delayMs = getBackoffDelay()
+                        if (enableLogging) {
+                            println("GrowthBook SSE (Ktor): error = ${ex.message}, retry ${retryCount.load() + 1}/$maxRetries in ${delayMs}ms")
+                            ex.printStackTrace()
+                        }
+                        trySend(Resource.Error(ex))
+                        retryCount.incrementAndFetch()
+                        delay(delayMs)
+                        startSseConnection()
+                    } else {
+                        if (enableLogging) {
+                            println("GrowthBook SSE (Ktor): max retries ($maxRetries) reached after error, stopping reconnection")
+                        }
+                        trySend(Resource.Error(Exception("Max SSE reconnection retries exceeded", ex)))
+                        close()
+                    }
                 }
-            } catch (ex: Exception) {
-                trySend(Resource.Error(ex))
-            } finally {
-                close()
             }
         }
-        awaitClose()
+
+        startSseConnection()
+
+        awaitClose {
+            if (enableLogging) {
+                println("GrowthBook SSE (Ktor): flow closed, stop reconnecting")
+            }
+        }
     }
 
     /**
