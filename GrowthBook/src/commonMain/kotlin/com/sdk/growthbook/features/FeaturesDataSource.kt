@@ -9,6 +9,7 @@ import com.sdk.growthbook.utils.FeatureRefreshStrategy
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.utils.GBRemoteEvalParams
 import com.sdk.growthbook.utils.Resource
+import com.sdk.growthbook.utils.SSEConnectionController
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.transform
 import kotlinx.serialization.json.Json
@@ -20,6 +21,7 @@ internal class FeaturesDataSource(
     private val dispatcher: NetworkDispatcher,
     private val gbContext: GBContext,
     private val gbOptions: GBOptions,
+    val sseController: SSEConnectionController = SSEConnectionController()
 ) {
 
     private val jsonParser: Json
@@ -61,7 +63,7 @@ internal class FeaturesDataSource(
     fun autoRefresh(
         success: (FeaturesDataModel) -> Unit, failure: (Throwable?) -> Unit
     ): Flow<Resource<GBFeatures?>> = dispatcher.consumeSSEConnection(
-        url = getEndpoint(FeatureRefreshStrategy.SERVER_SENT_EVENTS),
+        url = getEndpoint(FeatureRefreshStrategy.SERVER_SENT_EVENTS),sseController = sseController
     ).transform { resource ->
         if (resource is Resource.Success) {
             val serializableFeaturesDataModel = jsonParser.decodeFromString(

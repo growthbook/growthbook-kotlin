@@ -12,6 +12,7 @@ import com.sdk.growthbook.sandbox.getData
 import com.sdk.growthbook.sandbox.putData
 import com.sdk.growthbook.serializable_model.SerializableFeaturesDataModel
 import com.sdk.growthbook.serializable_model.gbDeserialize
+import com.sdk.growthbook.utils.SSEConnectionController
 import com.sdk.growthbook.utils.getSavedGroupFromEncryptedSavedGroup
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonObject
@@ -41,6 +42,12 @@ internal class FeaturesViewModel(
      * Caching Manager
      */
     private val manager = CachingImpl
+
+    /**
+     * SSEConnectionController for managing the lifecycle state
+     */
+    val sseController: SSEConnectionController
+        get() = dataSource.sseController
 
     /**
      * Fetch Features
