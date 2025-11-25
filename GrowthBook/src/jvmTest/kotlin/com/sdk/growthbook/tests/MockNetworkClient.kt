@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import com.sdk.growthbook.utils.Resource
 import com.sdk.growthbook.network.NetworkDispatcher
+import com.sdk.growthbook.utils.SSEConnectionController
 
 open class MockNetworkClient(
     private val successResponse: String?,
@@ -30,7 +31,7 @@ open class MockNetworkClient(
         return Job()
     }
 
-    override fun consumeSSEConnection(url: String): Flow<Resource<String>> {
+    override fun consumeSSEConnection(url: String, sseConnectionController: SSEConnectionController?): Flow<Resource<String>> {
         return emptyFlow()
     }
 
