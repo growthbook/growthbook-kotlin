@@ -1,6 +1,7 @@
 package com.sdk.growthbook.network
 
 import com.sdk.growthbook.utils.Resource
+import com.sdk.growthbook.utils.SSEConnectionController
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 
@@ -16,7 +17,8 @@ interface NetworkDispatcher {
     ): Job
 
     fun consumeSSEConnection(
-        url: String
+        url: String,
+        sseController: SSEConnectionController? = null
     ): Flow<Resource<String>>
 
     fun consumePOSTRequest(
