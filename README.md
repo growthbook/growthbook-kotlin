@@ -25,11 +25,11 @@ repositories {
 
 dependencies {
     // Add GrowthBook module:
-    implementation 'io.growthbook.sdk:GrowthBook:<version>' // 3.1.0 latest version when this file was edited
+    implementation 'io.growthbook.sdk:GrowthBook:<version>' // 6.1.1 latest version when this file was edited
 
     // Add Network Dispatcher you prefer:
     // 1) NetworkDispatcherKtor artifact contains the Network Dispatcher based on Ktor artifact
-    implementation 'io.growthbook.sdk:NetworkDispatcherKtor:1.0.4'
+    implementation 'io.growthbook.sdk:NetworkDispatcherKtor:1.0.6'
     // 2) NetworkDispatcherOkHttp artifact contains the Network Dispatcher based on OkHttp artifact
     implementation 'io.growthbook.sdk:NetworkDispatcherOkHttp:1.0.2'
 }
@@ -348,7 +348,9 @@ module;
     - hostURL property was renamed to apiHost in order to follow the same way as Typescript SDK follows,
 streamingHost property was added to  to differentiate streaming host url from API host.
 - **v6.1.0** 2025-08-15
-    - `GBStickyBucketService` methods were changed to suspend, `coroutineScope` was added
+    - `GBStickyBucketService` methods were changed to suspend, `coroutineScope` was added.
+- **v6.1.1** 2025-10-20
+    - bug fix
 
 
 ## License
