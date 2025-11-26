@@ -488,7 +488,8 @@ internal class GBUtils {
             )
 
             if (minExperimentBucketVersion > 0) {
-                for (version in 0..minExperimentBucketVersion) {
+                // users with any blocked bucket version (0 to minExperimentBucketVersion - 1) are excluded from the test
+                for (version in 0..minExperimentBucketVersion - 1) {
                     val blockedKey = getStickyBucketExperimentKey(experimentKey, version)
                     if (blockedKey in assignments) {
                         return Pair(-1, true)
