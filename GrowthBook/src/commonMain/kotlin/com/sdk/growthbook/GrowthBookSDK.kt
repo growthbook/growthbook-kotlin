@@ -128,16 +128,6 @@ class GrowthBookSDK(
         return featuresViewModel.autoRefreshFeatures()
     }
 
-    /** Temporarily pauses SSE updates without closing the connection. */
-    fun pauseAutoRefreshFeatures() {
-        featuresViewModel.sseController.pause()
-    }
-
-    /** Resumes SSE updates after pause. */
-    fun resumeAutoRefreshFeatures() {
-        featuresViewModel.sseController.resume()
-    }
-
     /** Fully stops the SSE connection. */
     fun stopAutoRefreshFeatures() {
         featuresViewModel.sseController.stop()

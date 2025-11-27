@@ -30,9 +30,6 @@ enum class SSEConnectionState {
     /** SSE connection is active and events are being streamed. */
     ACTIVE,
 
-    /** The connection is temporarily paused; no events will be processed. */
-    PAUSED,
-
     /**
      * The SSE connection is permanently stopped.
      * Once stopped, the connection cannot be resumed and must be restarted manually.
@@ -43,17 +40,16 @@ enum class SSEConnectionState {
 /**
  * Controller responsible for managing the lifecycle state of the SSE connection.
  *
- * The SDK uses this controller to pause, resume, or completely stop event streaming.
+ * The SDK uses this controller to start and stop event streaming.
  * Consumers (app-side code) can observe changes through [connectionState] and update
  * the UI or internal logic accordingly.
  *
  * State transitions:
- * - `pause()` → switches to [SSEConnectionState.PAUSED]
  * - `resume()` → switches back to [SSEConnectionState.ACTIVE]
  * - `stop()` → switches to [SSEConnectionState.STOPPED] (terminal state)
  */
 class SSEConnectionController {
-    private val _connectionState = MutableStateFlow(SSEConnectionState.ACTIVE)
+    private val _connectionState = MutableStateFlow(SSEConnectionState.STOPPED)
 
     /**
      * A hot observable stream representing the current connection state.
@@ -61,19 +57,18 @@ class SSEConnectionController {
      */
     val connectionState: StateFlow<SSEConnectionState> = _connectionState.asStateFlow()
 
-    /** Pauses SSE updates without closing the underlying connection. */
-    fun pause() {
-        _connectionState.value = SSEConnectionState.PAUSED
-    }
-
-    /** Resumes the SSE stream after a pause. */
-    fun resume() {
-        _connectionState.value = SSEConnectionState.ACTIVE
+    /**
+     * Starts the SSE connection. If already active, does nothing.
+     */
+    fun start() {
+        if (_connectionState.value != SSEConnectionState.ACTIVE) {
+            _connectionState.value = SSEConnectionState.ACTIVE
+        }
     }
 
     /**
      * Permanently stops the SSE connection.
-     * This is a terminal state — to reconnect, a new SSE instance must be created.
+     * This is a terminal state; to reconnect, the connection must be started again.
      */
     fun stop() {
         _connectionState.value = SSEConnectionState.STOPPED
@@ -81,9 +76,6 @@ class SSEConnectionController {
 
     /** Returns true if the connection is currently active. */
     fun isActive(): Boolean = _connectionState.value == SSEConnectionState.ACTIVE
-
-    /** Returns true if the connection is currently paused. */
-    fun isPaused(): Boolean = _connectionState.value == SSEConnectionState.PAUSED
 
     /** Returns true if the connection is permanently stopped. */
     fun isStopped(): Boolean = _connectionState.value == SSEConnectionState.STOPPED

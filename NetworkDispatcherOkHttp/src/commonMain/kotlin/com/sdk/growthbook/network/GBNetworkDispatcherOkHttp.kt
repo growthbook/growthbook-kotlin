@@ -172,11 +172,6 @@ class GBNetworkDispatcherOkHttp(
 
             fun startEventSource() {
                 when {
-                    controller.isPaused() -> {
-                        if (enableLogging) println("GrowthBook SSE (OkHttp): PAUSED, not starting")
-                        return
-                    }
-
                     controller.isStopped() -> {
                         if (enableLogging) println("GrowthBook SSE (OkHttp): STOPPED, closing")
                         close()
@@ -193,21 +188,18 @@ class GBNetworkDispatcherOkHttp(
                         GBEventSourceListener(
                             handler = object : GBEventSourceHandler {
                                 override fun onClose(eventSource: EventSource?) {
-                                    if (controller.isPaused() || controller.isStopped()) {
+                                    if (controller.isStopped()) {
                                         if (enableLogging) {
-                                            println(
-                                                "GrowthBook SSE (OkHttp): " +
-                                                    "Connection closed, paused/stopped. No retry."
-                                            )
+                                            println("GrowthBook SSE (OkHttp): Connection closed, STOPPED. No retry.")
                                         }
                                         return
                                     }
 
                                     if (retryManager.isMaxRetriesReached()) {
                                         if (enableLogging) {
-                                            println("GrowthBook SSE (OkHttp): Max retries reached, PAUSING connection.")
+                                            println("GrowthBook SSE (OkHttp): Max retries reached, STOPPING connection.")
                                         }
-                                        controller.pause()
+                                        controller.stop()
                                         trySend(
                                             Resource.Error(
                                                 Exception("Max SSE reconnection retries exceeded")
@@ -242,58 +234,11 @@ class GBNetworkDispatcherOkHttp(
 
                                 override fun onFailure(
                                     eventSource: EventSource?,
-                                    error: Throwable?,
-                                    errorType: SSEErrorType
-                                ) {
+                                    error: Throwable?) {
                                     if (enableLogging) {
-                                        println("GrowthBook SSE (OkHttp): Failure - $errorType: ${error?.message}")
+                                        println("GrowthBook SSE (OkHttp): onFailure ${error?.message}")
                                     }
-
-                                    when (errorType) {
-                                        SSEErrorType.NETWORK_UNAVAILABLE -> {
-                                            if (controller.isPaused() || controller.isStopped()) {
-                                                if (enableLogging) {
-                                                    println(
-                                                        "GrowthBook SSE (OkHttp): " +
-                                                            "Network error while paused/stopped, not retrying"
-                                                    )
-                                                }
-                                                return
-                                            }
-
-                                            if (retryManager.shouldRetry()) {
-                                                val delayMs = retryManager.getBackoffDelay()
-                                                if (enableLogging) {
-                                                    println(
-                                                        "GrowthBook SSE (OkHttp): Network error, " +
-                                                            "retry ${retryManager.getCurrentRetry() + 1}/$maxRetries " +
-                                                            "in ${delayMs}ms"
-                                                    )
-                                                }
-                                                retryManager.incrementRetry()
-                                                launch {
-                                                    delay(delayMs)
-                                                    startEventSource()
-                                                }
-                                            } else {
-                                                if (enableLogging) {
-                                                    println(
-                                                        "GrowthBook SSE (OkHttp):" +
-                                                            " Max retries reached, PAUSING connection."
-                                                    )
-                                                }
-                                                controller.pause()
-                                                trySend(
-                                                    Resource.Error(
-                                                        error as? Exception
-                                                            ?: Exception("Network unavailable")
-                                                    )
-                                                )
-                                            }
-                                        }
-
-                                        else -> onClose(eventSource)
-                                    }
+                                    onClose(eventSource)
                                 }
                             },
                             enableLogging = enableLogging
@@ -301,18 +246,10 @@ class GBNetworkDispatcherOkHttp(
                     )
             }
 
-            // Listen to controller state changes
-            var isFirstEmission = true
             launch {
                 controller.connectionState.collect { state ->
                     if (enableLogging) {
                         println("GrowthBook SSE (OkHttp): State changed to $state")
-                    }
-
-                    // Skip first emission to avoid double start
-                    if (isFirstEmission && state == SSEConnectionState.ACTIVE) {
-                        isFirstEmission = false
-                        return@collect
                     }
 
                     when (state) {
@@ -322,10 +259,6 @@ class GBNetworkDispatcherOkHttp(
                             startEventSource()
                         }
 
-                        SSEConnectionState.PAUSED -> {
-                            eventSource?.cancel()
-                        }
-
                         SSEConnectionState.STOPPED -> {
                             eventSource?.cancel()
                             close()
@@ -333,8 +266,6 @@ class GBNetworkDispatcherOkHttp(
                     }
                 }
             }
-
-            startEventSource()
 
             awaitClose {
                 if (enableLogging) println("GrowthBook SSE (OkHttp): Flow closed")

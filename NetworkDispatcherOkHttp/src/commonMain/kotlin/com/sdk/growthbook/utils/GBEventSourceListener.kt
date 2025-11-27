@@ -1,14 +1,8 @@
 package com.sdk.growthbook.utils
 
-import kotlinx.coroutines.channels.ClosedSendChannelException
 import okhttp3.Response
-import okhttp3.internal.http2.StreamResetException
 import okhttp3.sse.EventSource
 import okhttp3.sse.EventSourceListener
-import java.io.IOException
-import java.net.SocketException
-import java.net.SocketTimeoutException
-import java.net.UnknownHostException
 
 /**
  * Listener for SSE events from OkHttp EventSource
@@ -69,31 +63,6 @@ class GBEventSourceListener(
             println("GrowthBook SSE (OkHttp): Failure message: ${t?.message}")
             t?.printStackTrace()
         }
-
-        val errorType = classifyError(t)
-        handler.onFailure(eventSource, t, errorType)
-    }
-
-    /**
-     * Classifies the error type based on the throwable
-     */
-    private fun classifyError(throwable: Throwable?): SSEErrorType {
-        return when (throwable) {
-            is UnknownHostException -> SSEErrorType.NETWORK_UNAVAILABLE
-            is SocketTimeoutException -> SSEErrorType.TIMEOUT
-            is SocketException -> SSEErrorType.SOCKET_CLOSED
-            is ClosedSendChannelException -> SSEErrorType.CONNECTION_CLOSED
-            is StreamResetException -> SSEErrorType.UNKNOWN
-            is IOException -> {
-                when {
-                    throwable.message?.contains("Unable to resolve host") == true ->
-                        SSEErrorType.NETWORK_UNAVAILABLE
-
-                    else -> SSEErrorType.SERVER_ERROR
-                }
-            }
-
-            else -> SSEErrorType.UNKNOWN
-        }
+        handler.onFailure(eventSource, t)
     }
 }

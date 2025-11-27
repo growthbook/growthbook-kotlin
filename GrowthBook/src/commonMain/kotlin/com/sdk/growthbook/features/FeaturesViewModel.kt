@@ -129,6 +129,7 @@ internal class FeaturesViewModel(
      * Supportive method for automatically refresh features
      */
     fun autoRefreshFeatures(): Flow<Resource<GBFeatures?>> {
+        sseController.start()
         return dataSource.autoRefresh(success = { dataModel ->
             prepareFeaturesDataForRemoteEval(dataModel = dataModel)
         }, failure = { error ->

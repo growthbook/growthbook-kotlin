@@ -19,5 +19,5 @@ interface GBEventSourceHandler {
     /**
      * Invoke when error occur
      */
-    fun onFailure(eventSource: EventSource?, error: Throwable?, errorType: SSEErrorType)
+    fun onFailure(eventSource: EventSource?, error: Throwable?)
 }

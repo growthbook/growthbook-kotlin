@@ -153,15 +153,45 @@ class GBNetworkDispatcherKtor(
         fun startSseConnection() {
             // Check state before starting
             when {
-                controller.isPaused() -> {
-                    if (enableLogging) println("GrowthBook SSE (Ktor): PAUSED, not starting")
-                    return
-                }
-
                 controller.isStopped() -> {
                     if (enableLogging) println("GrowthBook SSE (Ktor): STOPPED, closing")
                     close()
                     return
+                }
+            }
+
+            fun handleConnectionEnd(error: Exception? = null) {
+                if (controller.isStopped()) {
+                    if (enableLogging) {
+                        println("GrowthBook SSE (Ktor): Connection end while STOPPED, not retrying.")
+                    }
+                    return
+                }
+
+                if (retryManager.isMaxRetriesReached()) {
+                    if (enableLogging) {
+                        println("GrowthBook SSE (Ktor): Max retries reached, STOPPING connection.")
+                    }
+                    controller.stop()
+                    trySend(
+                        Resource.Error(
+                            Exception("Max SSE reconnection retries exceeded", error)
+                        )
+                    )
+                } else {
+                    val delayMs = retryManager.getBackoffDelay()
+                    if (enableLogging) {
+                        val msg = if (error != null) "error = ${error.message}" else "connection closed"
+                        println(
+                            "GrowthBook SSE (Ktor): $msg," +
+                                " retry ${retryManager.getCurrentRetry() + 1}/$maxRetries in ${delayMs}ms"
+                        )
+                    }
+                    retryManager.incrementRetry()
+                    launch {
+                        delay(delayMs)
+                        startSseConnection()
+                    }
                 }
             }
 
@@ -183,88 +213,19 @@ class GBNetworkDispatcherKtor(
                         )
                     }
 
-                    // Connection closed normally
-                    if (controller.isPaused() || controller.isStopped()) {
-                        if (enableLogging) {
-                            println("GrowthBook SSE (Ktor): Connection closed, paused/stopped. No retry.")
-                        }
-                        return@launch
-                    }
-
-                    if (retryManager.isMaxRetriesReached()) {
-                        if (enableLogging) {
-                            println("GrowthBook SSE (Ktor): Max retries reached, PAUSING connection.")
-                        }
-                        controller.pause()
-                        trySend(
-                            Resource.Error(
-                                Exception("Max SSE reconnection retries exceeded")
-                            )
-                        )
-                    } else {
-                        val delayMs = retryManager.getBackoffDelay()
-                        if (enableLogging) {
-                            println(
-                                "GrowthBook SSE (Ktor): connection closed," +
-                                    " retry ${retryManager.getCurrentRetry() + 1}/$maxRetries in ${delayMs}ms"
-                            )
-                        }
-                        retryManager.incrementRetry()
-                        delay(delayMs)
-                        startSseConnection()
-                    }
+                    handleConnectionEnd();
                 } catch (ex: Exception) {
-                    if (controller.isPaused() || controller.isStopped()) {
-                        if (enableLogging) {
-                            println("GrowthBook SSE (Ktor): Error while paused/stopped, not retrying")
-                        }
-                        return@launch
-                    }
-
-                    if (retryManager.shouldRetry()) {
-                        val delayMs = retryManager.getBackoffDelay()
-                        if (enableLogging) {
-                            println(
-                                "GrowthBook SSE (Ktor): error = ${ex.message}, " +
-                                    "retry ${retryManager.getCurrentRetry() + 1}/$maxRetries " +
-                                    "in ${delayMs}ms"
-                            )
-                            ex.printStackTrace()
-                        }
-                        trySend(Resource.Error(ex))
-                        retryManager.incrementRetry()
-                        delay(delayMs)
-                        startSseConnection()
-                    } else {
-                        if (enableLogging) {
-                            println(
-                                "GrowthBook SSE (Ktor): max retries ($maxRetries) reached after error, " +
-                                    "PAUSING connection"
-                            )
-                        }
-                        controller.pause()
-                        trySend(
-                            Resource.Error(
-                                Exception("Max SSE reconnection retries exceeded", ex)
-                            )
-                        )
-                    }
+                    if (enableLogging) ex.printStackTrace()
+                    handleConnectionEnd(ex)
                 }
             }
         }
 
         // Listen to controller state changes
-        var isFirstEmission = true
         launch {
             controller.connectionState.collect { state ->
                 if (enableLogging) {
                     println("GrowthBook SSE (Ktor): State changed to $state")
-                }
-
-                // Skip first emission to avoid double start
-                if (isFirstEmission && state == SSEConnectionState.ACTIVE) {
-                    isFirstEmission = false
-                    return@collect
                 }
 
                 when (state) {
@@ -274,10 +235,6 @@ class GBNetworkDispatcherKtor(
                         startSseConnection()
                     }
 
-                    SSEConnectionState.PAUSED -> {
-                        connectionJob?.cancel()
-                    }
-
                     SSEConnectionState.STOPPED -> {
                         connectionJob?.cancel()
                         close()
@@ -285,8 +242,6 @@ class GBNetworkDispatcherKtor(
                 }
             }
         }
-
-        startSseConnection()
 
         awaitClose {
             if (enableLogging) {
