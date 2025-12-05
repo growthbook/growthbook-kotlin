@@ -41,6 +41,9 @@ import java.util.concurrent.TimeUnit
  *
  * This dispatcher is optimized for long-lived SSE connections and
  * includes built-in retry logic with exponential backoff.
+ *
+ * Also implements ETag-based HTTP caching with an LRU cache to reduce
+ * bandwidth and improve performance for feature fetching.
  */
 class GBNetworkDispatcherOkHttp(
 
@@ -56,6 +59,12 @@ class GBNetworkDispatcherOkHttp(
 
     ) : NetworkDispatcher {
 
+    // Regex to match the desired URL pattern: "/api/features/<clientKey>"
+    private val featuresPathPattern = Regex(".*/api/features/[^/]+")
+    
+    // Thread-safe LRU cache with max 100 entries to prevent unbounded growth
+    private val eTagCache = LruETagCache(maxSize = 100)
+
     /**
      * Function that execute API Call to fetch features
      */
@@ -67,6 +76,16 @@ class GBNetworkDispatcherOkHttp(
         CoroutineScope(PlatformDependentIODispatcher).launch {
             val getRequest = Request.Builder()
                 .url(request)
+                .addHeader("Cache-Control", "max-age=3600")
+                .apply {
+                    // Only add If-None-Match header if URL matches featuresPathPattern
+                    if (featuresPathPattern.matches(request)) {
+                        // Add If-None-Match header if ETag is present
+                        eTagCache.get(request)?.let {
+                            header("If-None-Match", it)
+                        }
+                    }
+                }
                 .build()
             client.newCall(getRequest).enqueue(object : Callback {
                 override fun onFailure(call: Call, e: IOException) {
@@ -79,6 +98,12 @@ class GBNetworkDispatcherOkHttp(
                             onError(IOException("Unexpected code $resp"))
                             return
                         }
+                        
+                        // Store the ETag only if the URL matches featuresPathPattern
+                        if (featuresPathPattern.matches(request)) {
+                            eTagCache.put(request, resp.headers["ETag"])
+                        }
+                        
                         resp.body?.string()?.let { body ->
                             onSuccess(body)
                         } ?: onError(Exception("Response body is null: ${resp.body}"))

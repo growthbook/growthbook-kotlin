@@ -83,6 +83,12 @@ class GBNetworkDispatcherKtor(
     private val maxRetryDelayMs: Long = 30_000L
 ) : NetworkDispatcher {
 
+    // Regex to match the desired URL pattern: "/api/features/<clientKey>"
+    private val featuresPathPattern = Regex(".*/api/features/[^/]+")
+    
+    // Thread-safe LRU cache with max 100 entries to prevent unbounded growth
+    private val eTagCache = LruETagCache(maxSize = 100)
+
     /**
      * Function that execute API Call to fetch features
      */
@@ -95,6 +101,11 @@ class GBNetworkDispatcherKtor(
             try {
                 val result = prepareGetRequest(request).execute()
                 try {
+                    // Store the ETag only if the URL matches featuresPathPattern
+                    if (featuresPathPattern.matches(request)) {
+                        eTagCache.put(request, result.headers["ETag"])
+                    }
+                    
                     if (result.status == HttpStatusCode.OK) {
                         onSuccess(result.body())
                     } else {
@@ -130,6 +141,15 @@ class GBNetworkDispatcherKtor(
         client.prepareGet(url) {
             headers {
                 headers.forEach { (key, value) -> append(key, value) }
+                
+                // Only add cache headers if URL matches featuresPathPattern
+                if (featuresPathPattern.matches(url)) {
+                    // Add If-None-Match header if ETag is present
+                    eTagCache.get(url)?.let {
+                        append("If-None-Match", it)
+                    }
+                    append("Cache-Control", "max-age=3600")
+                }
             }
             queryParams.forEach { (key, value) -> addOrReplaceParameter(key, value) }
         }
