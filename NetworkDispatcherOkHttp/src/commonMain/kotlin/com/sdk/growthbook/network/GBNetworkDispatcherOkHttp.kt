@@ -24,18 +24,23 @@ import com.sdk.growthbook.utils.GBEventSourceListener
 import kotlinx.coroutines.cancel
 
 /**
- * Default Ktor Implementation for Network Dispatcher
+ * Default OkHttp Implementation for Network Dispatcher
  */
 class GBNetworkDispatcherOkHttp(
 
     /**
-     * Ktor http client instance for sending request
+     * OkHttp client instance for sending request
      */
     private val client: OkHttpClient = OkHttpClient()
 
 ) : NetworkDispatcher {
+    // Regex to match the desired URL pattern: "/api/features/<clientKey>"
+    private val featuresPathPattern = Regex(".*/api/features/[^/]+")
+    
+    // Thread-safe LRU cache with max 100 entries to prevent unbounded growth
+    private val eTagCache = LruETagCache(maxSize = 100)
 
-    private var eTag: String? = null
+
     /**
      * Function that execute API Call to fetch features
      */
@@ -49,9 +54,12 @@ class GBNetworkDispatcherOkHttp(
                 .url(request)
                 .addHeader("Cache-Control", "max-age=3600")
                 .apply {
-                    // Add If-None-Match header if ETag exists
-                    eTag?.let {
-                        header("If-None-Match", it)
+                    // Only add If-None-Match header if URL matches featuresPathPattern
+                    if (featuresPathPattern.matches(request)) {
+                        // Add If-None-Match header if ETag is present
+                        eTagCache.get(request)?.let {
+                            header("If-None-Match", it)
+                        }
                     }
                 }
                 .build()
@@ -63,8 +71,10 @@ class GBNetworkDispatcherOkHttp(
                 override fun onResponse(call: Call, response: Response) {
                     response.use {
                         if (response.isSuccessful) {
-                            // Store the ETag
-                            eTag = response.header("ETag")
+                            // Store the ETag only if the URL matches featuresPathPattern
+                            if (featuresPathPattern.matches(request)) {
+                                eTagCache.put(request, response.headers["ETag"])
+                            }
                             response.body?.string()?.let {
                                 onSuccess(it)
                             }
@@ -105,7 +115,6 @@ class GBNetworkDispatcherOkHttp(
                 override fun onResponse(call: Call, response: Response) {
                     response.use {
                         if (!response.isSuccessful) {
-                            // throw IOException("Unexpected code $response")
                             onError(IOException("Unexpected code $response"))
                         }
                         onSuccess(response.body?.string() ?: "")
@@ -115,23 +124,12 @@ class GBNetworkDispatcherOkHttp(
         }
     }
 
-    // Interceptor to capture the ETag from the response headers
-    val eTagInterceptor = object : okhttp3.Interceptor {
-        override fun intercept(chain: okhttp3.Interceptor.Chain): Response {
-            val response = chain.proceed(chain.request())
-            // Capture ETag header from the response
-            eTag = response.header("ETag")
-            return response
-        }
-    }
-
     override fun consumeSSEConnection(url: String): Flow<Resource<String>> {
         val sseHttpClient = OkHttpClient.Builder()
             .retryOnConnectionFailure(true)
             .connectTimeout(0, TimeUnit.SECONDS)
             .readTimeout(0, TimeUnit.SECONDS)
             .writeTimeout(0, TimeUnit.SECONDS)
-            .addInterceptor(eTagInterceptor) // Add the interceptor here
             .build()
 
         val request = Request.Builder()
@@ -139,12 +137,6 @@ class GBNetworkDispatcherOkHttp(
             .header("Accept", "application/json; q=0.5")
             .addHeader("Accept", "text/event-stream")
             .addHeader("Cache-Control", "max-age=3600")
-            .apply {
-                // Add If-None-Match header if ETag exists
-                eTag?.let {
-                    header("If-None-Match", it)
-                }
-            }
             .build()
 
         return callbackFlow {

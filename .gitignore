@@ -10,4 +10,5 @@
 .cxx
 local.properties
 *.zip
-xcframework/*
+xcframework/*.kotlin/
+.kotlin/
