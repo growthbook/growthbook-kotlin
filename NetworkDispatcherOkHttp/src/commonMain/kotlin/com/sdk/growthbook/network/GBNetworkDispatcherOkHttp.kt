@@ -24,19 +24,21 @@ import com.sdk.growthbook.utils.GBEventSourceListener
 import kotlinx.coroutines.cancel
 
 /**
- * Default Ktor Implementation for Network Dispatcher
+ * Default OkHttp Implementation for Network Dispatcher
  */
 class GBNetworkDispatcherOkHttp(
 
     /**
-     * Ktor http client instance for sending request
+     * OkHttp client instance for sending request
      */
     private val client: OkHttpClient = OkHttpClient()
 
 ) : NetworkDispatcher {
     // Regex to match the desired URL pattern: "/api/features/<clientKey>"
     private val featuresPathPattern = Regex(".*/api/features/[^/]+")
-    private val eTagMap = mutableMapOf<String, String?>() // Store ETag per URI
+    
+    // Thread-safe LRU cache with max 100 entries to prevent unbounded growth
+    private val eTagCache = LruETagCache(maxSize = 100)
 
 
     /**
@@ -55,7 +57,7 @@ class GBNetworkDispatcherOkHttp(
                     // Only add If-None-Match header if URL matches featuresPathPattern
                     if (featuresPathPattern.matches(request)) {
                         // Add If-None-Match header if ETag is present
-                        eTagMap[request]?.let {
+                        eTagCache.get(request)?.let {
                             header("If-None-Match", it)
                         }
                     }
@@ -71,7 +73,7 @@ class GBNetworkDispatcherOkHttp(
                         if (response.isSuccessful) {
                             // Store the ETag only if the URL matches featuresPathPattern
                             if (featuresPathPattern.matches(request)) {
-                                eTagMap[request] = response.headers["ETag"]
+                                eTagCache.put(request, response.headers["ETag"])
                             }
                             response.body?.string()?.let {
                                 onSuccess(it)

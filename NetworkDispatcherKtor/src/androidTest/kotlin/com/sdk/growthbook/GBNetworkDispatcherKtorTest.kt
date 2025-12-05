@@ -47,13 +47,14 @@ class GBNetworkDispatcherKtorTest {
             onSuccess = { _ ->
                 wasOnSuccessCalled = true
 
-                // Access the private eTagMap using reflection
-                val eTagMapField = GBNetworkDispatcherKtor::class.java
-                    .getDeclaredField("eTagMap")
+                // Access the private eTagCache using reflection
+                val eTagCacheField = GBNetworkDispatcherKtor::class.java
+                    .getDeclaredField("eTagCache")
                     .apply { isAccessible = true }
 
-                val eTagMap = eTagMapField.get(classUnderTest) as Map<*, *>
-                eTagValue = eTagMap[FEATURES_ENDPOINT]?.toString()
+                val eTagCache = eTagCacheField.get(classUnderTest)
+                val getMethod = eTagCache::class.java.getDeclaredMethod("get", String::class.java)
+                eTagValue = getMethod.invoke(eTagCache, FEATURES_ENDPOINT) as? String
             },
             onError = {},
         )

@@ -35,13 +35,14 @@ class GBNetworkDispatcherOkHttpTest {
     }
 
     private fun getETagVal(url: String): String? {
-        // Access the private eTagMap using reflection
-        val eTagMapField = GBNetworkDispatcherOkHttp::class.java
-            .getDeclaredField("eTagMap")
+        // Access the private eTagCache using reflection
+        val eTagCacheField = GBNetworkDispatcherOkHttp::class.java
+            .getDeclaredField("eTagCache")
             .apply { isAccessible = true }
 
-        val eTagMap = eTagMapField.get(networkDispatcher) as Map<*, *>
-        return eTagMap[url]?.toString()
+        val eTagCache = eTagCacheField.get(networkDispatcher)
+        val getMethod = eTagCache::class.java.getDeclaredMethod("get", String::class.java)
+        return getMethod.invoke(eTagCache, url) as? String
     }
 
     @Test

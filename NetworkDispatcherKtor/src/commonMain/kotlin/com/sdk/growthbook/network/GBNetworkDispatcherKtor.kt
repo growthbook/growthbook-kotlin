@@ -54,7 +54,9 @@ class GBNetworkDispatcherKtor(
 
     // Regex to match the desired URL pattern: "/api/features/<clientKey>"
     private val featuresPathPattern = Regex(".*/api/features/[^/]+")
-    private val eTagMap = mutableMapOf<String, String?>() // Store ETag per URI
+    
+    // Thread-safe LRU cache with max 100 entries to prevent unbounded growth
+    private val eTagCache = LruETagCache(maxSize = 100)
 
     /**
      * Function that execute API Call to fetch features
@@ -70,7 +72,7 @@ class GBNetworkDispatcherKtor(
                 try {
                     // Store the ETag only if the URL matches featuresPathPattern
                     if (featuresPathPattern.matches(url)) {
-                        eTagMap[url] = result.headers["ETag"]
+                        eTagCache.put(url, result.headers["ETag"])
                     }
                     onSuccess(result.body())
                 } catch (exception: Exception) {
@@ -107,7 +109,7 @@ class GBNetworkDispatcherKtor(
                 // Only add If-None-Match header if URL matches featuresPathPattern
                 if (featuresPathPattern.matches(url)) {
                     // Add If-None-Match header if ETag is present
-                    eTagMap[url]?.let {
+                    eTagCache.get(url)?.let {
                         append("If-None-Match", it)
                     }
                 }
