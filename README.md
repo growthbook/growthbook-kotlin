@@ -135,10 +135,15 @@ If you are accessing features the first time there will be no features right aft
   fun setEncryptedFeatures(encryptedString: String, encryptionKey: String, subtleCrypto: Crypto?){
   ```
 
-- receive Features automatically when updated SSE
+- start receiving Features automatically when updated SSE
 
   ```kotlin
-  fun autoRefreshFeatures(): Flow<Resource<GBFeatures?>>{}
+  fun startAutoRefreshFeatures(): Flow<Resource<GBFeatures?>>{}
+  ```
+- stop receiving Features automatically during SSE connection
+
+  ```kotlin
+  fun stopAutoRefreshFeatures(): Flow<Resource<GBFeatures?>>{}
   ```
 
 - Delegate that set to Context successfully fetched features
@@ -351,7 +356,8 @@ streamingHost property was added to  to differentiate streaming host url from AP
     - `GBStickyBucketService` methods were changed to suspend, `coroutineScope` was added.
 - **v6.1.1** 2025-10-20
     - bug fix
-
+- **v6.1.2** 2025-12-05
+    - Add `startAutoRefreshFeatures()` and `stopAutoRefreshFeatures()` for better handling SSE connection
 
 ## License
 
