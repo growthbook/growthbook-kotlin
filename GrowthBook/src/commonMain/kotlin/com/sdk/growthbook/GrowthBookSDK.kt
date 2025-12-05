@@ -71,7 +71,7 @@ class GrowthBookSDK(
     internal var featuresViewModel: FeaturesViewModel = FeaturesViewModel(
         delegate = this,
         dataSource = FeaturesDataSource(
-            networkDispatcher, gbContext, gbOptions,
+            networkDispatcher, gbContext, gbOptions
         ),
         encryptionKey = gbContext.encryptionKey,
         cachingEnabled = cachingEnabled,
@@ -106,10 +106,31 @@ class GrowthBookSDK(
     }
 
     /**
-     * receive Features automatically when updated SSE
+     * Legacy method for enabling automatic SSE-based feature refresh.
+     *
+     * @deprecated Use [startAutoRefreshFeatures] instead.
      */
+    @Deprecated(
+        message = "Use startAutoRefreshFeatures() instead.",
+        replaceWith = ReplaceWith("startAutoRefreshFeatures()"),
+    )
     fun autoRefreshFeatures(): Flow<Resource<GBFeatures?>> {
         return featuresViewModel.autoRefreshFeatures()
+    }
+
+    /**
+     * Starts automatic SSE-based Features updates.
+     *
+     * This method establishes a persistent SSE connection and emits updates
+     * whenever features change on the server.
+     */
+    fun startAutoRefreshFeatures(): Flow<Resource<GBFeatures?>> {
+        return featuresViewModel.autoRefreshFeatures()
+    }
+
+    /** Fully stops the SSE connection. */
+    fun stopAutoRefreshFeatures() {
+        featuresViewModel.sseController.stop()
     }
 
     /**

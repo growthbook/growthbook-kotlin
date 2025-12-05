@@ -10,6 +10,7 @@ import kotlinx.coroutines.test.TestScope
 import org.intellij.lang.annotations.Language
 import com.sdk.growthbook.utils.Resource
 import com.sdk.growthbook.tests.MockNetworkClient
+import com.sdk.growthbook.utils.SSEConnectionController
 
 class IntegrationTests {
 
@@ -113,9 +114,9 @@ class IntegrationTests {
         var wasMethodCalled = false
 
         val networkDispatcher = object: MockNetworkClient("", null) {
-            override fun consumeSSEConnection(url: String): Flow<Resource<String>> {
+            override fun consumeSSEConnection(url: String, sseConnectionController: SSEConnectionController?): Flow<Resource<String>> {
                 wasMethodCalled = true
-                return super.consumeSSEConnection(url)
+                return super.consumeSSEConnection(url, sseConnectionController)
             }
         }
 

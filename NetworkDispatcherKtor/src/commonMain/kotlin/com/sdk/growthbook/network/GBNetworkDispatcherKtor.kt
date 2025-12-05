@@ -2,6 +2,9 @@ package com.sdk.growthbook.network
 
 import com.sdk.growthbook.PlatformDependentIODispatcher
 import com.sdk.growthbook.utils.Resource
+import com.sdk.growthbook.utils.SSEConnectionController
+import com.sdk.growthbook.utils.SSEConnectionState
+import com.sdk.growthbook.utils.SSERetryManager
 import com.sdk.growthbook.utils.readSse
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -10,6 +13,7 @@ import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.HttpTimeoutConfig.Companion.INFINITE_TIMEOUT_MS
 import io.ktor.client.plugins.ServerResponseException
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.sse.SSE
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.headers
 import io.ktor.client.request.post
@@ -34,12 +38,13 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlin.concurrent.atomics.AtomicInt
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
-import kotlin.concurrent.atomics.incrementAndFetch
-import kotlin.math.min
-import kotlin.math.pow
 
+/**
+ * Creates default Ktor HTTP client configured for:
+ * - SSE consumption
+ * - unlimited request/socket timeout for streaming connections
+ * - JSON parsing with lenient mode & unknown key ignore
+ */
 internal fun createDefaultHttpClient(): HttpClient =
     HttpClient {
         install(ContentNegotiation) {
@@ -49,16 +54,21 @@ internal fun createDefaultHttpClient(): HttpClient =
                 ignoreUnknownKeys = true
             })
         }
+
+        install(SSE)
+
         install(HttpTimeout) {
             socketTimeoutMillis = INFINITE_TIMEOUT_MS
             requestTimeoutMillis = INFINITE_TIMEOUT_MS
             connectTimeoutMillis = 30_000
-
         }
     }
 
 /**
- * Network Dispatcher based on Ktor
+ * Network dispatcher implementation using Ktor to perform:
+ * - GET requests
+ * - POST requests
+ * - SSE long-lived streaming connections with reconnection support
  */
 class GBNetworkDispatcherKtor(
 
@@ -71,8 +81,7 @@ class GBNetworkDispatcherKtor(
     private val maxRetries: Int = 10,
     private val initialRetryDelayMs: Long = 1000L,
     private val maxRetryDelayMs: Long = 30_000L
-
-    ) : NetworkDispatcher {
+) : NetworkDispatcher {
 
     /**
      * Function that execute API Call to fetch features
@@ -89,7 +98,12 @@ class GBNetworkDispatcherKtor(
                     if (result.status == HttpStatusCode.OK) {
                         onSuccess(result.body())
                     } else {
-                        onError(Exception("Response status in not ok: Response is: ${result.body<String>()}"))
+                        onError(
+                            Exception(
+                                "Response status in not ok: " +
+                                    "Response is: ${result.body<String>()}"
+                            )
+                        )
                     }
                 } catch (exception: Exception) {
                     onError(exception)
@@ -121,75 +135,119 @@ class GBNetworkDispatcherKtor(
         }
 
     /**
-     * Method that produce SSE connection
+     * Opens SSE connection and handles reconnection logic with exponential backoff.
+     *
+     * Emits:
+     *  - Resource.Success(String) — when event received
+     *  - Resource.Error(Throwable) — on errors or max retries
      */
-    @OptIn(ExperimentalAtomicApi::class)
     override fun consumeSSEConnection(
-        url: String
+        url: String,
+        sseController: SSEConnectionController?
     ) = callbackFlow {
         val scope = this
-        val retryCount = AtomicInt(0)
-
-        fun getBackoffDelay(): Long {
-            val attempt = retryCount.load()
-            val exponentialDelay = initialRetryDelayMs * (2.0.pow(attempt.toDouble())).toLong()
-            return min(exponentialDelay, maxRetryDelayMs)
-        }
+        val retryManager = SSERetryManager(maxRetries, initialRetryDelayMs, maxRetryDelayMs)
+        val controller = sseController ?: SSEConnectionController()
+        var connectionJob: Job? = null
 
         fun startSseConnection() {
-            scope.launch(PlatformDependentIODispatcher) {
+            // Check state before starting
+            when {
+                controller.isStopped() -> {
+                    if (enableLogging) println("GrowthBook SSE (Ktor): STOPPED, closing")
+                    close()
+                    return
+                }
+            }
+
+            fun handleConnectionEnd(error: Exception? = null) {
+                if (controller.isStopped()) {
+                    if (enableLogging) {
+                        println("GrowthBook SSE (Ktor): Connection end while STOPPED, not retrying.")
+                    }
+                    return
+                }
+
+                if (retryManager.isMaxRetriesReached()) {
+                    if (enableLogging) {
+                        println("GrowthBook SSE (Ktor): Max retries reached, STOPPING connection.")
+                    }
+                    controller.stop()
+                    trySend(
+                        Resource.Error(
+                            Exception("Max SSE reconnection retries exceeded", error)
+                        )
+                    )
+                } else {
+                    val delayMs = retryManager.getBackoffDelay()
+                    if (enableLogging) {
+                        val msg = if (error != null) "error = ${error.message}" else "connection closed"
+                        println(
+                            "GrowthBook SSE (Ktor): $msg," +
+                                " retry ${retryManager.getCurrentRetry() + 1}/$maxRetries in ${delayMs}ms"
+                        )
+                    }
+                    retryManager.incrementRetry()
+                    launch {
+                        delay(delayMs)
+                        startSseConnection()
+                    }
+                }
+            }
+
+            if (enableLogging) println("GrowthBook SSE (Ktor): Starting SSE connection...")
+
+            connectionJob?.cancel()
+            connectionJob = scope.launch(PlatformDependentIODispatcher) {
                 try {
                     prepareGetRequest(url).execute { response ->
                         val channel: ByteReadChannel = response.body()
                         channel.readSse(
                             onSseEvent = { sseEvent ->
-                                retryCount.store(0)
+                                retryManager.reset()
+                                if (enableLogging) {
+                                    println("GrowthBook SSE (Ktor): Features received")
+                                }
                                 trySend(sseEvent)
                             }
                         )
                     }
-                    if (retryCount.load() < maxRetries) {
-                        val delayMs = getBackoffDelay()
-                        if (enableLogging) {
-                            println("GrowthBook SSE (Ktor): connection closed, retry ${retryCount.load() + 1}/$maxRetries in ${delayMs}ms")
-                        }
-                        retryCount.incrementAndFetch()
-                        delay(delayMs)
-                        startSseConnection()
-                    } else {
-                        if (enableLogging) {
-                            println("GrowthBook SSE (Ktor): max retries ($maxRetries) reached, stopping reconnection")
-                        }
-                        close()
-                    }
+
+                    handleConnectionEnd();
                 } catch (ex: Exception) {
-                    if (retryCount.load() < maxRetries) {
-                        val delayMs = getBackoffDelay()
-                        if (enableLogging) {
-                            println("GrowthBook SSE (Ktor): error = ${ex.message}, retry ${retryCount.load() + 1}/$maxRetries in ${delayMs}ms")
-                            ex.printStackTrace()
-                        }
-                        trySend(Resource.Error(ex))
-                        retryCount.incrementAndFetch()
-                        delay(delayMs)
+                    if (enableLogging) ex.printStackTrace()
+                    handleConnectionEnd(ex)
+                }
+            }
+        }
+
+        // Listen to controller state changes
+        launch {
+            controller.connectionState.collect { state ->
+                if (enableLogging) {
+                    println("GrowthBook SSE (Ktor): State changed to $state")
+                }
+
+                when (state) {
+                    SSEConnectionState.ACTIVE -> {
+                        retryManager.reset()
+                        connectionJob?.cancel()
                         startSseConnection()
-                    } else {
-                        if (enableLogging) {
-                            println("GrowthBook SSE (Ktor): max retries ($maxRetries) reached after error, stopping reconnection")
-                        }
-                        trySend(Resource.Error(Exception("Max SSE reconnection retries exceeded", ex)))
+                    }
+
+                    SSEConnectionState.STOPPED -> {
+                        connectionJob?.cancel()
                         close()
                     }
                 }
             }
         }
 
-        startSseConnection()
-
         awaitClose {
             if (enableLogging) {
                 println("GrowthBook SSE (Ktor): flow closed, stop reconnecting")
             }
+            connectionJob?.cancel()
         }
     }
 
