@@ -6,7 +6,7 @@ buildscript {
     }
     //noinspection UseTomlInstead
     dependencies {
-        classpath("com.android.tools.build:gradle:8.0.2")
+        classpath("com.android.tools.build:gradle:8.13.2")
 
         val kotlinPluginsVersion = "2.1.20"
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinPluginsVersion")
@@ -24,7 +24,7 @@ allprojects {
 }
 
 plugins {
-    id("org.jetbrains.kotlinx.kover") version "0.5.0"
+    id("org.jetbrains.kotlinx.kover") version "0.9.4"
     id("signing")
     id("maven-publish")
 }
