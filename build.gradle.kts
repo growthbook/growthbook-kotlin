@@ -24,14 +24,35 @@ allprojects {
 }
 
 plugins {
-    id("org.jetbrains.kotlinx.kover") version "0.9.4"
     id("signing")
     id("maven-publish")
+    id("org.jetbrains.kotlinx.kover") version "0.9.4"
+}
+
+kover {
+    reports {
+        total {
+            xml {
+                onCheck = true
+            }
+            html {
+                onCheck = true
+            }
+            verify {
+                rule {
+                    bound {
+                        minValue = 70
+                    }
+                }
+            }
+        }
+    }
 }
 
 subprojects {
     plugins.apply("signing")
     plugins.apply("maven-publish")
+    plugins.apply("org.jetbrains.kotlinx.kover")
     signing {
         useInMemoryPgpKeys(
             System.getenv("GPG_PRIVATE_KEY"),
@@ -45,4 +66,10 @@ subprojects {
         .configureEach {
             mustRunAfter(tasks.withType<Sign>())
         }
+}
+
+dependencies {
+    subprojects.forEach {
+        kover(it)
+    }
 }
