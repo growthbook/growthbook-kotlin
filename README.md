@@ -25,13 +25,13 @@ repositories {
 
 dependencies {
     // Add GrowthBook module:
-    implementation 'io.growthbook.sdk:GrowthBook:<version>' // 6.1.1 latest version when this file was edited
+    implementation 'io.growthbook.sdk:GrowthBook:<version>' // 6.1.2 latest version when this file was edited
 
     // Add Network Dispatcher you prefer:
     // 1) NetworkDispatcherKtor artifact contains the Network Dispatcher based on Ktor artifact
-    implementation 'io.growthbook.sdk:NetworkDispatcherKtor:1.0.6'
+    implementation 'io.growthbook.sdk:NetworkDispatcherKtor:1.0.8'
     // 2) NetworkDispatcherOkHttp artifact contains the Network Dispatcher based on OkHttp artifact
-    implementation 'io.growthbook.sdk:NetworkDispatcherOkHttp:1.0.2'
+    implementation 'io.growthbook.sdk:NetworkDispatcherOkHttp:1.0.4'
 }
 ```
 If you are not sure which dispatcher to choose we recommend to use network dispatcher based on Ktor.
@@ -182,12 +182,28 @@ If you are accessing features the first time there will be no features right aft
   ```kotlin
   fun setAttributes(attributes: Map<String, Any>) {}
   ```
+- **NEW:** The setAttributesSync method is a synchronous version that waits for sticky bucket assignments to load before returning. Use this for login, logout, and user switching to prevent race conditions.
+  ```kotlin
+    suspend fun setAttributesSync(attributes: Map) {}
+  ```
+  Example usage:
+    ```kotlin
+   lifecycleScope.launch {
+      sdk.setAttributesSync(loginAttributes)
+      // Sticky buckets are guaranteed to be loaded here
+      val result = sdk.feature("my-experiment")
+  }
+  ```
 
 - The setAttributeOverrides method replaces the Map of user overrides attribute that are used for Sticky Bucketing
 
   ```kotlin
   fun setAttributeOverrides(overrides: Map<String, Any>) {}
   ```
+- **NEW:** The setAttributeOverridesSync method is a synchronous version that waits for sticky bucket assignments to load
+    ```kotlin
+  suspend fun setAttributeOverridesSync(overrides: Map) {}
+    ```
 
 - The setForcedVariations method setup the Map of user's (forced) variations to assign a specific variation (used for
   QA)
@@ -358,6 +374,13 @@ streamingHost property was added to  to differentiate streaming host url from AP
     - bug fix
 - **v6.1.2** 2025-12-05
     - Add `startAutoRefreshFeatures()` and `stopAutoRefreshFeatures()` for better handling SSE connection
+- **v6.1.3** 2026-1-1
+    - **IMPORTANT:** Add synchronous methods to prevent sticky bucket race conditions
+    - Add `setAttributesSync()` - waits for sticky buckets to load before returning
+    - Add `setAttributeOverridesSync()` - synchronous version of attribute overrides
+    - Add `refreshStickyBucketsSync()` utility function
+    - Remove `StickyBucketServiceHelper` internal class (no longer needed)
+    - **Migration:** Use sync methods for login/logout/user switching to prevent race conditions where experiments were evaluated before sticky buckets loaded
 
 ## License
 
