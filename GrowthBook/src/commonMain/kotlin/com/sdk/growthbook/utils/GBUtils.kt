@@ -356,7 +356,8 @@ internal class GBUtils {
         }
 
         /**
-         * Synchronous version of refreshStickyBuckets that waits for completion.
+         * Synchronous method that get cached assignments
+         * and set it to Context's Sticky Bucket Assignments documents that waits for completion.
          * Use this when you need guarantees that sticky buckets are loaded.
          */
         suspend fun refreshStickyBucketsSync(
