@@ -16,6 +16,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import com.sdk.growthbook.kotlinx.serialization.gbSerialize
+import kotlinx.coroutines.launch
 
 /**
  * Fowler-Noll-Vo hash - 32 bit
@@ -348,16 +349,31 @@ internal class GBUtils {
                 attributeOverrides = attributeOverrides
             )
 
-            with(
-                StickyBucketServiceHelper(stickyBucketService)
-            ) {
-                getAllAssignments(
-                    attributes = attributes,
-                    onResult = {
-                        context.stickyBucketAssignmentDocs = it
-                    }
-                )
+            stickyBucketService.coroutineScope.launch {
+                val assignments = stickyBucketService.getAllAssignments(attributes)
+                context.stickyBucketAssignmentDocs = assignments
             }
+        }
+
+        /**
+         * Synchronous version of refreshStickyBuckets that waits for completion.
+         * Use this when you need guarantees that sticky buckets are loaded.
+         */
+        suspend fun refreshStickyBucketsSync(
+            context: GBContext,
+            data: FeaturesDataModel?,
+            attributeOverrides: Map<String, GBValue>
+        ) {
+            val stickyBucketService = context.stickyBucketService ?: return
+
+            val attributes = getStickyBucketAttributes(
+                context = context,
+                data = data,
+                attributeOverrides = attributeOverrides
+            )
+
+            // Directly call and wait for completion
+            context.stickyBucketAssignmentDocs = stickyBucketService.getAllAssignments(attributes)
         }
 
         /**
@@ -369,7 +385,8 @@ internal class GBUtils {
             attributeOverrides: Map<String, GBValue>
         ): Map<String, String> {
             val attributes = mutableMapOf<String, String>()
-            context.stickyBucketIdentifierAttributes = deriveStickyBucketIdentifierAttributes(context, data)
+            context.stickyBucketIdentifierAttributes =
+                deriveStickyBucketIdentifierAttributes(context, data)
 
             context.stickyBucketIdentifierAttributes?.forEach { attr ->
                 val hashValue =
@@ -446,7 +463,8 @@ internal class GBUtils {
             val tempKey = "$expFallBackAttribute" +
                 "||" + attributeOverrides[expFallBackAttribute].toHashValue()
             val leftOperand = stickyBucketAssignmentDocs[tempKey]?.attributeValue
-            val rightOperand = attributeOverrides[expFallBackAttribute]?.gbSerialize()?.jsonPrimitive?.content
+            val rightOperand =
+                attributeOverrides[expFallBackAttribute]?.gbSerialize()?.jsonPrimitive?.content
 
             if (leftOperand != rightOperand) {
                 userContext.stickyBucketAssignmentDocs = emptyMap()
@@ -584,7 +602,7 @@ internal class GBUtils {
         }
 
         private fun GBValue?.toHashValue(): String =
-            when(this) {
+            when (this) {
                 is GBString -> this.value // without quotes
                 else -> this?.gbSerialize().toString()
             }
