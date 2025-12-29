@@ -10,7 +10,6 @@ import com.sdk.growthbook.utils.GBCacheRefreshHandler
 import com.sdk.growthbook.utils.GBError
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.utils.GBRemoteEvalParams
-import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBuckets
 import com.sdk.growthbook.utils.Resource
 import com.sdk.growthbook.utils.getFeaturesFromEncryptedFeatures
 import com.sdk.growthbook.evaluators.GBExperimentHelper
@@ -34,6 +33,8 @@ import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.kotlinx.serialization.from
+import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBucketsSync
+import kotlinx.coroutines.launch
 
 typealias GBTrackingCallback = (GBExperiment, GBExperimentResult) -> Unit
 typealias GBFeatureUsageCallback = (featureKey: String, gbFeatureResult: GBFeatureResult) -> Unit
@@ -302,6 +303,36 @@ class GrowthBookSDK(
     }
 
     /**
+     * Synchronous version of setAttributes that waits for sticky buckets to load.
+     *
+     * Use this method when switching users, during login/logout, or any scenario
+     * where you need to ensure sticky bucket assignments are loaded before
+     * evaluating experiments.
+     *
+     * Example:
+     * ```kotlin
+     * lifecycleScope.launch {
+     *     sdk.setAttributesSync(loginAttributes)
+     *     // Sticky buckets guaranteed to be loaded here
+     *     val result = sdk.feature("my-experiment")
+     * }
+     * ```
+     *
+     * @param attributes The user attributes map
+     */
+    suspend fun setAttributesSync(attributes: Map<String, GBValue>) {
+        gbContext.attributes = attributes
+
+        if (gbContext.stickyBucketService != null) {
+            refreshStickyBucketsSync(
+                context = gbContext,
+                data = null,
+                attributeOverrides = attributeOverrides
+            )
+        }
+    }
+
+    /**
      * The setAttributeOverrides method replaces the Map of user overrides attribute
      * that are used for Sticky Bucketing
      */
@@ -310,6 +341,25 @@ class GrowthBookSDK(
         if (gbContext.stickyBucketService != null) {
             refreshStickyBucketService()
         }
+        refreshForRemoteEval()
+    }
+
+    /**
+     * Synchronous version of setAttributeOverrides that waits for sticky buckets to load.
+     *
+     * @param overrides The attribute overrides map
+     */
+    suspend fun setAttributeOverridesSync(overrides: Map<String, GBValue>) {
+        attributeOverrides = overrides
+
+        if (gbContext.stickyBucketService != null) {
+            refreshStickyBucketsSync(
+                context = gbContext,
+                data = null,
+                attributeOverrides = attributeOverrides
+            )
+        }
+
         refreshForRemoteEval()
     }
 
@@ -343,8 +393,8 @@ class GrowthBookSDK(
      * Method for update latest attributes
      */
     private fun refreshStickyBucketService(dataModel: FeaturesDataModel? = null) {
-        if (gbContext.stickyBucketService != null) {
-            refreshStickyBuckets(
+        gbContext.stickyBucketService?.coroutineScope?.launch {
+            refreshStickyBucketsSync(
                 context = gbContext,
                 data = dataModel,
                 attributeOverrides = attributeOverrides
