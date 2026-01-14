@@ -4,6 +4,7 @@ import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.GBTrackingCallback
+import com.sdk.growthbook.model.StackContext
 import com.sdk.growthbook.model.StickyBucketAssignmentDocsType
 import com.sdk.growthbook.stickybucket.GBStickyBucketService
 
@@ -18,6 +19,7 @@ internal data class EvaluationContext(
     val gbExperimentHelper: GBExperimentHelper,
     val stickyBucketService: GBStickyBucketService?,
     val onFeatureUsage: ((String, GBFeatureResult) -> Unit)?,
+    val stackContext: StackContext
 )
 
 internal data class UserContext(

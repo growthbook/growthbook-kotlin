@@ -90,7 +90,7 @@ data class GBContext(
 /**
  * Model consist already evaluated features
  */
-data class FeatureEvalContext(
+data class StackContext(
 
     /**
      * Unique feature identifier
@@ -101,5 +101,5 @@ data class FeatureEvalContext(
      * Collection of unique feature identifier that used for handle recursion
      * in evaluate feature method
      */
-    val evaluatedFeatures: MutableSet<String>
+    var evaluatedFeatures: MutableSet<String>
 )
