@@ -239,6 +239,7 @@ enum class GBFeatureSource {
  * Result for Feature
  */
 data class GBFeatureResult(
+    val ruleId: String? = "",
 
     /**
      * The assigned value of the feature
