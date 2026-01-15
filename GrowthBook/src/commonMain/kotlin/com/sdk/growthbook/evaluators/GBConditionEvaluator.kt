@@ -81,7 +81,11 @@ internal class GBConditionEvaluator {
      * - attributes is the user's attributes
      * - condition to be evaluated
      */
-    fun evalCondition(attributes: Map<String, GBValue>, conditionObj: GBJson, savedGroups: Map<String, GBValue>?): Boolean {
+    fun evalCondition(
+        attributes: Map<String, GBValue>,
+        conditionObj: GBJson,
+        savedGroups: Map<String, GBValue>?
+    ): Boolean {
         for ((key, value) in conditionObj) {
             when (key) {
                 "\$or" -> {
@@ -142,7 +146,11 @@ internal class GBConditionEvaluator {
     /**
      * Evaluate OR conditions against given attributes
      */
-    private fun evalOr(attributes: Map<String, GBValue>, conditionObjs: GBArray, savedGroups: Map<String, GBValue>?): Boolean {
+    private fun evalOr(
+        attributes: Map<String, GBValue>,
+        conditionObjs: GBArray,
+        savedGroups: Map<String, GBValue>?
+    ): Boolean {
         // If conditionObjs is empty, return true
         if (conditionObjs.isEmpty()) {
             return true
@@ -165,7 +173,11 @@ internal class GBConditionEvaluator {
     /**
      * Evaluate AND conditions against given attributes
      */
-    private fun evalAnd(attributes: Map<String, GBValue>, conditionObjs: GBArray, savedGroups: Map<String, GBValue>?): Boolean {
+    private fun evalAnd(
+        attributes: Map<String, GBValue>,
+        conditionObjs: GBArray,
+        savedGroups: Map<String, GBValue>?
+    ): Boolean {
 
         // Loop through the conditionObjects
         for (item in conditionObjs) {
@@ -322,7 +334,11 @@ internal class GBConditionEvaluator {
      * This checks if attributeValue is an array,
      * and if so at least one of the array items must match the condition
      */
-    private fun elemMatch(attributeValue: GBValue, condition: GBValue, savedGroups: Map<String, GBValue>?): Boolean {
+    private fun elemMatch(
+        attributeValue: GBValue,
+        condition: GBValue,
+        savedGroups: Map<String, GBValue>?
+    ): Boolean {
 
         if (attributeValue is GBArray) {
             // Loop through items in attributeValue
@@ -341,7 +357,12 @@ internal class GBConditionEvaluator {
                     }
                 }
                 // Else if evalCondition(item, condition), break out of loop and return true
-                else if (evalCondition(attributes, condition as? GBJson ?: GBJson(emptyMap()), savedGroups)) {
+                else if (evalCondition(
+                        attributes,
+                        condition as? GBJson ?: GBJson(emptyMap()),
+                        savedGroups
+                    )
+                ) {
                     return true
                 }
             }
@@ -438,14 +459,20 @@ internal class GBConditionEvaluator {
                 }
                 // Evaluate SIE operator - whether condition size is same as that of attribute
                 "\$size" -> {
-                    return evalConditionValue(conditionValue, GBNumber(attributeValue.size), savedGroups)
+                    return evalConditionValue(
+                        conditionValue,
+                        GBNumber(attributeValue.size),
+                        savedGroups
+                    )
                 }
             }
         } else if (attributeValue?.isPrimitiveValue() == true) {
             val targetPrimitiveValue = conditionValue as? GBString
             val sourcePrimitiveValue = attributeValue as? GBString
-            val paddedVersionTarget = GBUtils.paddedVersionString(targetPrimitiveValue?.value.orEmpty())
-            val paddedVersionSource = GBUtils.paddedVersionString(sourcePrimitiveValue?.value ?: "0")
+            val paddedVersionTarget =
+                GBUtils.paddedVersionString(targetPrimitiveValue?.value.orEmpty())
+            val paddedVersionSource =
+                GBUtils.paddedVersionString(sourcePrimitiveValue?.value ?: "0")
 
             fun template(
                 stringComparator: (String, String) -> Boolean,
@@ -458,6 +485,7 @@ internal class GBConditionEvaluator {
             when (operator) {
                 // Evaluate EQ operator - whether condition equals to attribute
                 "\$eq" -> {
+                    if (sourcePrimitiveValue == null || getType(attributeValue) == GBAttributeType.GbNull) return false
                     return sourcePrimitiveValue == targetPrimitiveValue
                 }
                 // Evaluate NE operator - whether condition doesn't equal to attribute
@@ -537,11 +565,14 @@ internal class GBConditionEvaluator {
                 // than or equal the second version
                 "\$vlte" -> return paddedVersionSource <= paddedVersionTarget
                 "\$inGroup" -> {
-                    val gbArray = savedGroups?.get(conditionValue.asKey()) as? GBArray ?: GBArray(emptyList())
+                    val gbArray =
+                        savedGroups?.get(conditionValue.asKey()) as? GBArray ?: GBArray(emptyList())
                     return isIn(attributeValue, gbArray)
                 }
+
                 "\$notInGroup" -> {
-                    val gbArray = savedGroups?.get(conditionValue.asKey()) as? GBArray ?: GBArray(emptyList())
+                    val gbArray =
+                        savedGroups?.get(conditionValue.asKey()) as? GBArray ?: GBArray(emptyList())
                     return !isIn(attributeValue, gbArray)
                 }
             }
@@ -551,7 +582,7 @@ internal class GBConditionEvaluator {
     }
 
     private fun GBValue.asKey(): String =
-        when(this) {
+        when (this) {
             is GBString -> this.value // without quotes
             else -> this.toString()
         }
@@ -597,7 +628,7 @@ internal class GBConditionEvaluator {
     }
 
     private fun GBValue.tryRetrieveDouble(): Double =
-        when(this) {
+        when (this) {
             is GBNumber -> this.value.toDouble()
             is GBString -> this.value.toDoubleOrNull() ?: 0.0
             else -> 0.0
