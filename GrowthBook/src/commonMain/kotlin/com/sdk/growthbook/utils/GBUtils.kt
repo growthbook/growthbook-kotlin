@@ -369,7 +369,8 @@ internal class GBUtils {
             attributeOverrides: Map<String, GBValue>
         ): Map<String, String> {
             val attributes = mutableMapOf<String, String>()
-            context.stickyBucketIdentifierAttributes = deriveStickyBucketIdentifierAttributes(context, data)
+            context.stickyBucketIdentifierAttributes =
+                deriveStickyBucketIdentifierAttributes(context, data)
 
             context.stickyBucketIdentifierAttributes?.forEach { attr ->
                 val hashValue =
@@ -409,7 +410,7 @@ internal class GBUtils {
 
         /**
          * Method to get actual Sticky Bucket assignments.
-         * Also this method handle if assignments belong to user
+         * Also this method handles if assignments belong to user
          */
         private fun getStickyBucketAssignments(
             userContext: UserContext,
@@ -419,10 +420,34 @@ internal class GBUtils {
             attributeOverrides: Map<String, GBValue>
         ): Map<String, String> {
 
+            val stickyDocs = userContext.stickyBucketAssignmentDocs
+                ?: return emptyMap()
+
+            fun generateKey(attribute: String, value: String): String = "$attribute||$value"
+
+            if (expFallBackAttribute != null) {
+                val fallbackAttrValue = userContext.attributes[expFallBackAttribute]?.toHashValue()
+
+                if (fallbackAttrValue != null) {
+                    val key = generateKey(expFallBackAttribute, fallbackAttrValue)
+                    val storedValue = stickyDocs[key]?.attributeValue
+
+                    if (storedValue != fallbackAttrValue) {
+                        userContext.stickyBucketAssignmentDocs = emptyMap()
+                        return emptyMap()
+                    }
+                }
+            }
+
+            if (userContext.stickyBucketAssignmentDocs.isNullOrEmpty()) {
+                return emptyMap()
+            }
+
             val mergedAssignments = mutableMapOf<String, String>()
 
-            val stickyBucketAssignmentDocs =
-                userContext.stickyBucketAssignmentDocs ?: return mergedAssignments
+            stickyDocs.values.forEach { doc ->
+                mergedAssignments.putAll(doc.assignments)
+            }
 
             val (hashAttribute, hashValue) = getHashAttribute(
                 attr = expHashAttribute,
@@ -431,8 +456,6 @@ internal class GBUtils {
                 attributeOverrides = attributeOverrides
             )
 
-            val hashKey = "$hashAttribute||$hashValue"
-
             val (fallbackAttribute, fallbackValue) = getHashAttribute(
                 attr = null,
                 fallback = expFallBackAttribute,
@@ -440,26 +463,16 @@ internal class GBUtils {
                 attributeOverrides = attributeOverrides
             )
 
-            val fallbackKey = if (fallbackValue.isEmpty()) null
-            else "$fallbackAttribute||$fallbackValue"
-
-            val tempKey = "$expFallBackAttribute" +
-                "||" + attributeOverrides[expFallBackAttribute].toHashValue()
-            val leftOperand = stickyBucketAssignmentDocs[tempKey]?.attributeValue
-            val rightOperand = attributeOverrides[expFallBackAttribute]?.gbSerialize()?.jsonPrimitive?.content
-
-            if (leftOperand != rightOperand) {
-                userContext.stickyBucketAssignmentDocs = emptyMap()
-            }
-
-            fallbackKey?.let { fallback ->
-                stickyBucketAssignmentDocs[fallback]?.let { fallbackAssignments ->
-                    mergedAssignments.putAll(fallbackAssignments.assignments)
+            if (fallbackValue.isNotEmpty()) {
+                val fallbackKey = generateKey(fallbackAttribute, fallbackValue)
+                stickyDocs[fallbackKey]?.let { doc ->
+                    mergedAssignments.putAll(doc.assignments)
                 }
             }
 
-            stickyBucketAssignmentDocs[hashKey]?.let { hashAssignments ->
-                mergedAssignments.putAll(hashAssignments.assignments)
+            val hashKey = generateKey(hashAttribute, hashValue)
+            stickyDocs[hashKey]?.let { doc ->
+                mergedAssignments.putAll(doc.assignments)
             }
 
             return mergedAssignments
@@ -489,7 +502,7 @@ internal class GBUtils {
 
             if (minExperimentBucketVersion > 0) {
                 // users with any blocked bucket version (0 to minExperimentBucketVersion - 1) are excluded from the test
-                for (version in 0..minExperimentBucketVersion - 1) {
+                for (version in 0 until minExperimentBucketVersion) {
                     val blockedKey = getStickyBucketExperimentKey(experimentKey, version)
                     if (blockedKey in assignments) {
                         return Pair(-1, true)
@@ -584,7 +597,7 @@ internal class GBUtils {
         }
 
         private fun GBValue?.toHashValue(): String =
-            when(this) {
+            when (this) {
                 is GBString -> this.value // without quotes
                 else -> this?.gbSerialize().toString()
             }
