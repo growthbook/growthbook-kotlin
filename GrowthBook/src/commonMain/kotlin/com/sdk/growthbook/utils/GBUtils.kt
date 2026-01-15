@@ -420,34 +420,9 @@ internal class GBUtils {
             attributeOverrides: Map<String, GBValue>
         ): Map<String, String> {
 
-            val stickyDocs = userContext.stickyBucketAssignmentDocs
-                ?: return emptyMap()
-
-            fun generateKey(attribute: String, value: String): String = "$attribute||$value"
-
-            if (expFallBackAttribute != null) {
-                val fallbackAttrValue = userContext.attributes[expFallBackAttribute]?.toHashValue()
-
-                if (fallbackAttrValue != null) {
-                    val key = generateKey(expFallBackAttribute, fallbackAttrValue)
-                    val storedValue = stickyDocs[key]?.attributeValue
-
-                    if (storedValue != fallbackAttrValue) {
-                        userContext.stickyBucketAssignmentDocs = emptyMap()
-                        return emptyMap()
-                    }
-                }
-            }
-
-            if (userContext.stickyBucketAssignmentDocs.isNullOrEmpty()) {
-                return emptyMap()
-            }
-
             val mergedAssignments = mutableMapOf<String, String>()
-
-            stickyDocs.values.forEach { doc ->
-                mergedAssignments.putAll(doc.assignments)
-            }
+            val stickyBucketAssignmentDocs =
+                userContext.stickyBucketAssignmentDocs ?: return mergedAssignments
 
             val (hashAttribute, hashValue) = getHashAttribute(
                 attr = expHashAttribute,
@@ -456,6 +431,8 @@ internal class GBUtils {
                 attributeOverrides = attributeOverrides
             )
 
+            val hashKey = "$hashAttribute||$hashValue"
+
             val (fallbackAttribute, fallbackValue) = getHashAttribute(
                 attr = null,
                 fallback = expFallBackAttribute,
@@ -463,16 +440,40 @@ internal class GBUtils {
                 attributeOverrides = attributeOverrides
             )
 
-            if (fallbackValue.isNotEmpty()) {
-                val fallbackKey = generateKey(fallbackAttribute, fallbackValue)
-                stickyDocs[fallbackKey]?.let { doc ->
-                    mergedAssignments.putAll(doc.assignments)
+            val fallbackKey = if (fallbackValue.isEmpty()) null
+            else "$fallbackAttribute||$fallbackValue"
+
+            val userFallbackAttribute = userContext.attributes[expFallBackAttribute]
+            if (userFallbackAttribute != null) {
+                val leftOperand =
+                    if (stickyBucketAssignmentDocs[expFallBackAttribute + "||" + userFallbackAttribute.toHashValue()] == null
+                    ) {
+                        null
+                    } else {
+                        stickyBucketAssignmentDocs[expFallBackAttribute + "||" + userFallbackAttribute.toHashValue()]?.attributeValue
+                    }
+
+                if (leftOperand != userFallbackAttribute.toHashValue()) {
+                    userContext.stickyBucketAssignmentDocs = emptyMap()
                 }
             }
 
-            val hashKey = generateKey(hashAttribute, hashValue)
-            stickyDocs[hashKey]?.let { doc ->
-                mergedAssignments.putAll(doc.assignments)
+            if (userContext.stickyBucketAssignmentDocs != null) {
+                userContext.stickyBucketAssignmentDocs!!.values.forEach { docs ->
+                    mergedAssignments.putAll(
+                        docs.assignments
+                    )
+                }
+            }
+
+            fallbackKey?.let { fallback ->
+                stickyBucketAssignmentDocs[fallback]?.let { fallbackAssignments ->
+                    mergedAssignments.putAll(fallbackAssignments.assignments)
+                }
+            }
+
+            stickyBucketAssignmentDocs[hashKey]?.let { hashAssignments ->
+                mergedAssignments.putAll(hashAssignments.assignments)
             }
 
             return mergedAssignments
