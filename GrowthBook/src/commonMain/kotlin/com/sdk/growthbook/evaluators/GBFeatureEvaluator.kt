@@ -1,19 +1,18 @@
 package com.sdk.growthbook.evaluators
 
-import com.sdk.growthbook.model.GBJson
-import com.sdk.growthbook.model.GBValue
-import com.sdk.growthbook.model.GBNumber
+import com.sdk.growthbook.kotlinx.serialization.from
 import com.sdk.growthbook.model.GBBoolean
-import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.model.GBExperiment
-import com.sdk.growthbook.model.GBFeatureSource
-import com.sdk.growthbook.model.GBFeatureResult
-import com.sdk.growthbook.model.FeatureEvalContext
 import com.sdk.growthbook.model.GBExperimentResult
-import com.sdk.growthbook.utils.GBUtils
+import com.sdk.growthbook.model.GBFeature
+import com.sdk.growthbook.model.GBFeatureResult
+import com.sdk.growthbook.model.GBFeatureSource
+import com.sdk.growthbook.model.GBJson
+import com.sdk.growthbook.model.GBNumber
+import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.utils.Constants
 import com.sdk.growthbook.utils.GBTrackData
-import com.sdk.growthbook.kotlinx.serialization.from
+import com.sdk.growthbook.utils.GBUtils
 
 /**
  * Feature Evaluator Class
@@ -31,13 +30,27 @@ internal class GBFeatureEvaluator(
     fun evaluateFeature(
         featureKey: String,
         attributeOverrides: Map<String, GBValue>,
-        evalContext: FeatureEvalContext = FeatureEvalContext(
-            id = featureKey,
-            evaluatedFeatures = mutableSetOf()
-        ),
     ): GBFeatureResult {
-        
+
         try {
+
+            /**
+             * block that handle recursion
+             */
+            if (evaluationContext.stackContext.evaluatedFeatures.contains(featureKey)) {
+                if (evaluationContext.loggingEnabled) {
+                    println("evaluateFeature: circular dependency detected:")
+                }
+
+                val featureResultWhenCircularDependencyDetected = prepareResult(
+                    featureKey = featureKey,
+                    gbValue = null,
+                    source = GBFeatureSource.cyclicPrerequisite
+                )
+
+                return featureResultWhenCircularDependencyDetected
+            }
+            evaluationContext.stackContext.evaluatedFeatures.add(featureKey)
 
             /**
              * Global override
@@ -53,24 +66,6 @@ internal class GBFeatureEvaluator(
                 )
             }
 
-
-            /**
-             * block that handle recursion
-             */
-            if (evaluationContext.loggingEnabled) {
-                println("evaluateFeature: circular dependency detected:")
-            }
-            if (evalContext.evaluatedFeatures.contains(featureKey)) {
-                val featureResultWhenCircularDependencyDetected = prepareResult(
-                    featureKey = featureKey,
-                    gbValue = null,
-                    source = GBFeatureSource.cyclicPrerequisite
-                )
-
-                return featureResultWhenCircularDependencyDetected
-            }
-            evalContext.evaluatedFeatures.add(featureKey)
-
             val targetFeature: GBFeature = evaluationContext.features.getValue(featureKey)
 
             /**
@@ -78,6 +73,8 @@ internal class GBFeatureEvaluator(
              */
             val rules = targetFeature.rules
             if (!rules.isNullOrEmpty()) {
+                val evaluatedFeatures =
+                    evaluationContext.stackContext.evaluatedFeatures.toMutableSet()
 
                 ruleLoop@ for (rule in rules) {
 
@@ -86,18 +83,21 @@ internal class GBFeatureEvaluator(
                      */
                     if (rule.parentConditions != null) {
                         for (parentCondition in rule.parentConditions) {
+                            evaluationContext.stackContext.evaluatedFeatures =
+                                evaluatedFeatures.toMutableSet()
+
                             val parentResult = evaluateFeature(
                                 featureKey = parentCondition.id,
                                 attributeOverrides = attributeOverrides,
-                                evalContext = evalContext
                             )
                             /**
                              * break out for cyclic prerequisites
                              */
                             if (parentResult.source == GBFeatureSource.cyclicPrerequisite) {
                                 return prepareResult(
-                                    featureKey, null,
-                                    GBFeatureSource.cyclicPrerequisite,
+                                    ruleId = rule.id,
+                                    featureKey = featureKey, gbValue = null,
+                                    source = GBFeatureSource.cyclicPrerequisite,
                                 )
                             }
 
@@ -123,8 +123,13 @@ internal class GBFeatureEvaluator(
                                     if (evaluationContext.loggingEnabled) {
                                         println("Feature blocked by prerequisite")
                                     }
-                                    
-                                    return prepareResult(featureKey, null, GBFeatureSource.prerequisite)
+
+                                    return prepareResult(
+                                        ruleId = rule.id,
+                                        featureKey = featureKey,
+                                        gbValue = null,
+                                        source = GBFeatureSource.prerequisite
+                                    )
                                 }
                                 /**
                                  * non-blocking prerequisite eval failed: break out
@@ -165,7 +170,8 @@ internal class GBFeatureEvaluator(
                                     attributeOverrides = attributeOverrides,
                                     attributes = evaluationContext.userContext.attributes,
                                 ),
-                                conditionObj = rule.condition.let(GBValue::from) as? GBJson ?: GBJson(emptyMap()),
+                                conditionObj = rule.condition.let(GBValue::from) as? GBJson
+                                    ?: GBJson(emptyMap()),
                                 savedGroups = evaluationContext.savedGroups,
                             )
                         ) {
@@ -212,7 +218,10 @@ internal class GBFeatureEvaluator(
                                         result = track.result
                                     )
                                 if (!isTrackedFlag) {
-                                    evaluationContext.trackingCallback(track.experiment, track.result)
+                                    evaluationContext.trackingCallback(
+                                        track.experiment,
+                                        track.result
+                                    )
                                 }
                             }
                         }
@@ -220,7 +229,8 @@ internal class GBFeatureEvaluator(
                         if (rule.range == null) {
                             if (rule.coverage != null) {
                                 val key = rule.hashAttribute ?: Constants.ID_ATTRIBUTE_KEY
-                                val attributeValue = evaluationContext.userContext.attributes[key]?.toString()
+                                val attributeValue =
+                                    evaluationContext.userContext.attributes[key]?.toString()
                                 if (attributeValue.isNullOrEmpty()) {
                                     continue@ruleLoop
                                 }
@@ -235,7 +245,12 @@ internal class GBFeatureEvaluator(
                             }
                         }
 
-                        return prepareResult(featureKey, rule.force, GBFeatureSource.force)
+                        return prepareResult(
+                            ruleId = rule.id,
+                            featureKey = featureKey,
+                            gbValue = rule.force,
+                            source = GBFeatureSource.force
+                        )
                     } else {
 
                         val variation = rule.variations
@@ -277,6 +292,7 @@ internal class GBFeatureEvaluator(
                                 )
                             if (result.inExperiment && (result.passthrough != true)) {
                                 return prepareResult(
+                                    ruleId = rule.id,
                                     featureKey = featureKey,
                                     gbValue = result.value,
                                     source = GBFeatureSource.experiment,
@@ -318,6 +334,7 @@ internal class GBFeatureEvaluator(
      * on and off, which are just the value cast to booleans.
      */
     private fun prepareResult(
+        ruleId: String? = "",
         featureKey: String,
         gbValue: GBValue?,
         source: GBFeatureSource,
@@ -331,6 +348,7 @@ internal class GBFeatureEvaluator(
 
         //val castResult = gbValue as? V
         val gbFeatureResult = GBFeatureResult(
+            ruleId = ruleId,
             gbValue = gbValue,
             on = !isFalse,
             off = isFalse,

@@ -43,7 +43,7 @@ data class GBFeatureRule(
     /**
      * Unique feature rule id
      */
-    val id: String? = null,
+    val id: String? = "",
     /**
      * Optional targeting condition
      */
@@ -239,6 +239,7 @@ enum class GBFeatureSource {
  * Result for Feature
  */
 data class GBFeatureResult(
+    val ruleId: String? = "",
 
     /**
      * The assigned value of the feature

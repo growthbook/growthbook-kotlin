@@ -6,6 +6,7 @@ import com.sdk.growthbook.evaluators.GBExperimentHelper
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBFeatureResult
+import com.sdk.growthbook.model.StackContext
 import com.sdk.growthbook.model.StickyBucketAssignmentDocsType
 import com.sdk.growthbook.serializable_model.SerializableGBExperiment
 import com.sdk.growthbook.serializable_model.SerializableGBFeature
@@ -110,7 +111,9 @@ class GBTestHelper {
                     qaMode = false,
                     attributes = attributes,
                     stickyBucketAssignmentDocs = stickyBucketAssignmentDocs,
-                )
+                ),
+                stackContext = StackContext(null, mutableSetOf())
+
             )
     }
 }
@@ -137,6 +140,7 @@ class GBFeaturesTest(
 
 @Serializable
 class GBFeatureResultTest(
+    val ruleId: String = "",
     val value: JsonPrimitive,
     val on: Boolean,
     val off: Boolean,
@@ -156,7 +160,7 @@ data class GBExperimentResultTest(
     // The user attribute used to assign a variation
     val hashAttribute: String? = null,
     // The value of that attribute
-    val hashValue: String? = null,
+    val hashValue: JsonElement? = null,
     //new properties v0.4.0
     // The unique key for the assigned variation
     val key: String = "",

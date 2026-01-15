@@ -135,7 +135,7 @@ internal class GBExperimentEvaluator(
                 if (GBUtils.isFilteredOut(
                         filters = experiment.filters,
                         attributeOverrides = evaluationContext.userContext.attributes,
-                        evaluationContext= evaluationContext,
+                        evaluationContext = evaluationContext,
                     )
                 ) {
                     if (evaluationContext.loggingEnabled) {
@@ -199,7 +199,13 @@ internal class GBExperimentEvaluator(
              * 10. Exclude if prerequisites are not met
              */
             if (experiment.parentConditions != null) {
+                val evaluatedFeatures =
+                    evaluationContext.stackContext.evaluatedFeatures.toMutableSet()
+
                 for (parentCondition in experiment.parentConditions) {
+                    evaluationContext.stackContext.evaluatedFeatures =
+                        evaluatedFeatures.toMutableSet()
+
                     val parentResult = GBFeatureEvaluator(evaluationContext)
                         .evaluateFeature(
                             featureKey = parentCondition.id,
@@ -219,8 +225,9 @@ internal class GBExperimentEvaluator(
                         mapOf("value" to it)
                     } ?: emptyMap()
 
-                    val conditionObj: GBJson = parentCondition.condition.let(GBValue::from) as? GBJson
-                        ?: GBJson(emptyMap())
+                    val conditionObj: GBJson =
+                        parentCondition.condition.let(GBValue::from) as? GBJson
+                            ?: GBJson(emptyMap())
                     val evalCondition = GBConditionEvaluator().evalCondition(
                         attributes = evalObj,
                         conditionObj = conditionObj,
@@ -351,7 +358,7 @@ internal class GBExperimentEvaluator(
             bucket = hash,
             attributeOverrides = attributeOverrides
         )
-        
+
         if (evaluationContext.loggingEnabled) {
             println("ExperimentResult: $result")
         }
@@ -360,7 +367,8 @@ internal class GBExperimentEvaluator(
          * 17. Persist sticky bucket
          */
         if (evaluationContext.stickyBucketService != null && experiment.disableStickyBucketing != true) {
-            val stickyBucketAssignmentDocs = evaluationContext.userContext.stickyBucketAssignmentDocs
+            val stickyBucketAssignmentDocs =
+                evaluationContext.userContext.stickyBucketAssignmentDocs
 
             val (key, doc, changed) =
                 GBUtils.generateStickyBucketAssignmentDoc(

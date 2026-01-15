@@ -22,7 +22,7 @@ data class SerializableGBFeatureRule(
     /**
      * Unique feature rule id
      */
-    val id: String? = null,
+    val id: String? = "",
     /**
      * Optional targeting condition
      */
