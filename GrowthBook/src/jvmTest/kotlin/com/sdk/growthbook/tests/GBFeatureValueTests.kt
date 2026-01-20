@@ -91,6 +91,7 @@ class GBFeatureValueTests {
                 val status = item[0].toString() +
                     "\nExpected Result - " +
                     "\nValue - " + expectedResult.value.content +
+                    "\nRule Id - " + expectedResult.ruleId +
                     "\nOn - " + expectedResult.on.toString() +
                     "\nOff - " + expectedResult.off.toString() +
                     "\nSource - " + expectedResult.source +
@@ -98,6 +99,7 @@ class GBFeatureValueTests {
                     "\nExperiment Result - " + expectedResult.experimentResult?.variationId +
                     "\nActual result - " +
                     "\nValue - " + resultJsonPrimitive?.content.toString() +
+                    "\nRule Id - " + result.ruleId +
                     "\nOn - " + result.on.toString() +
                     "\nOff - " + result.off.toString() +
                     "\nSource - " + result.source +
@@ -110,7 +112,8 @@ class GBFeatureValueTests {
                     result.off.toString() == expectedResult.off.toString() &&
                     result.source.toString() == expectedResult.source &&
                     result.experiment?.key == expectedResult.experiment?.key &&
-                    result.experimentResult?.variationId == expectedResult.experimentResult?.variationId
+                    result.experimentResult?.variationId == expectedResult.experimentResult?.variationId &&
+                    result.ruleId == expectedResult.ruleId
                 ) {
                     passedScenarios.add(status)
                 } else {

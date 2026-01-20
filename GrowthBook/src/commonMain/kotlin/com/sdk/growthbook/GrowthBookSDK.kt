@@ -34,6 +34,7 @@ import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.kotlinx.serialization.from
+import com.sdk.growthbook.model.StackContext
 
 typealias GBTrackingCallback = (GBExperiment, GBExperimentResult) -> Unit
 typealias GBFeatureUsageCallback = (featureKey: String, gbFeatureResult: GBFeatureResult) -> Unit
@@ -418,7 +419,8 @@ class GrowthBookSDK(
                     qaMode = gbContext.qaMode,
                     attributes = gbContext.attributes,
                     stickyBucketAssignmentDocs = gbContext.stickyBucketAssignmentDocs,
-                )
+                ),
+                stackContext = StackContext(null, mutableSetOf())
             )
     }
 }
