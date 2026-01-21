@@ -33,6 +33,7 @@ import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.kotlinx.serialization.from
+import com.sdk.growthbook.model.StackContext
 import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBucketsSync
 import kotlinx.coroutines.launch
 
@@ -468,7 +469,8 @@ class GrowthBookSDK(
                     qaMode = gbContext.qaMode,
                     attributes = gbContext.attributes,
                     stickyBucketAssignmentDocs = gbContext.stickyBucketAssignmentDocs,
-                )
+                ),
+                stackContext = StackContext(null, mutableSetOf())
             )
     }
 }

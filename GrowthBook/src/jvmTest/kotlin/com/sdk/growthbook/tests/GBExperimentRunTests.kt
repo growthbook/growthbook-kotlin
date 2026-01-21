@@ -20,6 +20,7 @@ import com.sdk.growthbook.model.toGbNumber
 import com.sdk.growthbook.serializable_model.SerializableGBExperiment
 import com.sdk.growthbook.kotlinx.serialization.from
 import com.sdk.growthbook.kotlinx.serialization.gbSerialize
+import com.sdk.growthbook.model.StackContext
 
 class GBExperimentRunTests {
 
@@ -81,7 +82,8 @@ class GBExperimentRunTests {
                         qaMode = gbContext.qaMode,
                         attributes = gbContext.attributes,
                         stickyBucketAssignmentDocs = gbContext.stickyBucketAssignmentDocs,
-                    )
+                    ),
+                    stackContext = StackContext(null, mutableSetOf())
                 )
 
                 val evaluator = GBExperimentEvaluator(testScopeEvaluationContext)
@@ -112,7 +114,7 @@ class GBExperimentRunTests {
         print("\n")
         print(failedScenarios)
 
-        assertTrue(failedScenarios.size == 0)
+        assertEquals(failedScenarios.size, 0)
     }
 
     @Test
@@ -150,7 +152,9 @@ class GBExperimentRunTests {
                     attributes = attributes,
                     qaMode = testContext.qaMode,
                     stickyBucketAssignmentDocs = null,
-                )
+                ),
+                stackContext = StackContext(null, mutableSetOf())
+
             )
 
             val gbExperiment = serializableGbExperiment.gbDeserialize()
@@ -166,7 +170,7 @@ class GBExperimentRunTests {
             ) // second time for test count of callbacks
 
             println("Count of calls TrackingCallback - $countTrackingCallback")
-            assertTrue(countTrackingCallback == 1)
+            assertEquals(countTrackingCallback, 1)
         }
     }
 
@@ -184,7 +188,7 @@ class GBExperimentRunTests {
 
         val result1 = gb.run(experiment)
         assertTrue(result1.inExperiment)
-        assertTrue(result1.hashUsed == true)
+        assertEquals(result1.hashUsed, true)
         assertEquals(result1.value, GBNumber(1))
 
         gb.setForcedVariations(
@@ -193,7 +197,7 @@ class GBExperimentRunTests {
 
         val result2 = gb.run(experiment)
         assertTrue(result2.inExperiment)
-        assertTrue(result2.hashUsed == false)
+        assertEquals(result2.hashUsed, false)
         assertEquals(result2.value, GBNumber(0))
     }
 }
