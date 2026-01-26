@@ -380,6 +380,8 @@ streamingHost property was added to  to differentiate streaming host url from AP
     - Add `setAttributeOverridesSync()` - synchronous version of attribute overrides
     - Add `refreshStickyBucketsSync()` utility function
     - Remove `StickyBucketServiceHelper` internal class (no longer needed)
+    - Update lib up to 0.7.1 changelog
+    - Add ETag caching to NetworkDispatchers
     - **Migration:** Use sync methods for login/logout/user switching to prevent race conditions where experiments were evaluated before sticky buckets loaded
 
 ## License

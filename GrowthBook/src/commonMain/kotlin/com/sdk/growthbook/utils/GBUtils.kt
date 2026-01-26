@@ -350,8 +350,14 @@ internal class GBUtils {
             )
 
             stickyBucketService.coroutineScope.launch {
-                val assignments = stickyBucketService.getAllAssignments(attributes)
-                context.stickyBucketAssignmentDocs = assignments
+                try {
+                    val assignments = stickyBucketService.getAllAssignments(attributes)
+                    context.stickyBucketAssignmentDocs = assignments
+                } catch (e : Exception) {
+                    println("GrowthBook: Failed to refresh sticky bucket assignments: ${e.message}")
+                    e.printStackTrace()
+                }
+
             }
         }
 
