@@ -77,6 +77,7 @@ class GBNetworkDispatcherOkHttp(
             val getRequest = Request.Builder()
                 .url(request)
                 .addHeader("Cache-Control", "max-age=3600")
+                .addHeader("Accept-Encoding", "gzip, deflate, br")
                 .apply {
                     // Only add If-None-Match header if URL matches featuresPathPattern
                     if (featuresPathPattern.matches(request)) {
