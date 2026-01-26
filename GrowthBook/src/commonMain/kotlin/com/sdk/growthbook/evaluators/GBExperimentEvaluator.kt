@@ -9,7 +9,7 @@ import com.sdk.growthbook.model.GBFeatureSource
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.utils.GBUtils
 import com.sdk.growthbook.kotlinx.serialization.from
-import com.sdk.growthbook.utils.StickyBucketServiceHelper
+import kotlinx.coroutines.launch
 
 /**
  * Experiment Evaluator Class
@@ -391,15 +391,10 @@ internal class GBExperimentEvaluator(
                     (stickyBucketAssignmentDocs ?: emptyMap()).toMutableMap().apply {
                         this[key] = doc
                     }
-                with(
-                    StickyBucketServiceHelper(
-                        evaluationContext.stickyBucketService
-                    )
-                ) {
-                    /**
-                     * save doc
-                     */
-                    saveAssignments(doc)
+                
+                // Save async to storage (fire and forget)
+                evaluationContext.stickyBucketService.coroutineScope.launch {
+                    evaluationContext.stickyBucketService.saveAssignments(doc)
                 }
             }
         }

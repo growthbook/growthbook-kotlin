@@ -16,6 +16,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import com.sdk.growthbook.kotlinx.serialization.gbSerialize
+import kotlinx.coroutines.launch
 
 /**
  * Fowler-Noll-Vo hash - 32 bit
@@ -348,16 +349,38 @@ internal class GBUtils {
                 attributeOverrides = attributeOverrides
             )
 
-            with(
-                StickyBucketServiceHelper(stickyBucketService)
-            ) {
-                getAllAssignments(
-                    attributes = attributes,
-                    onResult = {
-                        context.stickyBucketAssignmentDocs = it
-                    }
-                )
+            stickyBucketService.coroutineScope.launch {
+                try {
+                    val assignments = stickyBucketService.getAllAssignments(attributes)
+                    context.stickyBucketAssignmentDocs = assignments
+                } catch (e : Exception) {
+                    println("GrowthBook: Failed to refresh sticky bucket assignments: ${e.message}")
+                    e.printStackTrace()
+                }
+
             }
+        }
+
+        /**
+         * Synchronous method that get cached assignments
+         * and set it to Context's Sticky Bucket Assignments documents that waits for completion.
+         * Use this when you need guarantees that sticky buckets are loaded.
+         */
+        suspend fun refreshStickyBucketsSync(
+            context: GBContext,
+            data: FeaturesDataModel?,
+            attributeOverrides: Map<String, GBValue>
+        ) {
+            val stickyBucketService = context.stickyBucketService ?: return
+
+            val attributes = getStickyBucketAttributes(
+                context = context,
+                data = data,
+                attributeOverrides = attributeOverrides
+            )
+
+            // Directly call and wait for completion
+            context.stickyBucketAssignmentDocs = stickyBucketService.getAllAssignments(attributes)
         }
 
         /**
