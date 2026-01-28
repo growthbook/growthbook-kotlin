@@ -270,7 +270,11 @@ internal class GBConditionEvaluator {
     /**
      * Evaluates Condition Value against given condition & attributes
      */
-    fun evalConditionValue(conditionValue: GBValue, attributeValue: GBValue?, savedGroups: Map<String, GBValue>?): Boolean {
+    fun evalConditionValue(
+        conditionValue: GBValue,
+        attributeValue: GBValue?,
+        savedGroups: Map<String, GBValue>?
+    ): Boolean {
 
         // If conditionValue is a string, number, boolean, return true
         // if it's "equal" to attributeValue and false if not.
@@ -301,7 +305,13 @@ internal class GBConditionEvaluator {
             if (isOperatorObject(conditionValue)) {
                 for (key in conditionValue.keys) {
                     // If evalOperatorCondition(key, attributeValue, value) is false, return false
-                    if (!evalOperatorCondition(key, attributeValue, conditionValue[key]!!, savedGroups)) {
+                    if (!evalOperatorCondition(
+                            key,
+                            attributeValue,
+                            conditionValue[key]!!,
+                            savedGroups
+                        )
+                    ) {
                         return false
                     }
                 }
@@ -544,6 +554,36 @@ internal class GBConditionEvaluator {
 
                         val regex = Regex(targetPrimitiveValue?.value.orEmpty())
                         regex.containsMatchIn(sourcePrimitiveValue?.value ?: "0")
+                    } catch (error: Throwable) {
+                        false
+                    }
+                }
+
+                "\$regexi" -> {
+                    return try {
+                        val regex =
+                            Regex(targetPrimitiveValue?.value.orEmpty(), RegexOption.IGNORE_CASE)
+                        regex.containsMatchIn(sourcePrimitiveValue?.value ?: "0")
+                    } catch (error: Throwable) {
+                        false
+                    }
+                }
+
+                "\$notRegex" -> {
+                    return try {
+                        val regex =
+                            Regex(targetPrimitiveValue?.value.orEmpty())
+                        !regex.containsMatchIn(sourcePrimitiveValue?.value ?: "0")
+                    } catch (error: Throwable) {
+                        false
+                    }
+                }
+
+                "\$notRegexi" -> {
+                    return try {
+                        val regex =
+                            Regex(targetPrimitiveValue?.value.orEmpty(), RegexOption.IGNORE_CASE)
+                        !regex.containsMatchIn(sourcePrimitiveValue?.value ?: "0")
                     } catch (error: Throwable) {
                         false
                     }
