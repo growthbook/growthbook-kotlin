@@ -270,7 +270,12 @@ internal class GBConditionEvaluator {
     /**
      * Evaluates Condition Value against given condition & attributes
      */
-    fun evalConditionValue(conditionValue: GBValue, attributeValue: GBValue?, savedGroups: Map<String, GBValue>?): Boolean {
+    fun evalConditionValue(conditionValue: GBValue, attributeValue: GBValue?, savedGroups: Map<String, GBValue>?, inSensitive: Boolean = false): Boolean {
+
+        // Simple equality comparison with optional case-insensitivity
+        if (inSensitive && conditionValue is GBString && attributeValue is GBString) {
+            return conditionValue.value.equals(attributeValue.value, ignoreCase = true)
+        }
 
         // If conditionValue is a string, number, boolean, return true
         // if it's "equal" to attributeValue and false if not.
@@ -301,7 +306,13 @@ internal class GBConditionEvaluator {
             if (isOperatorObject(conditionValue)) {
                 for (key in conditionValue.keys) {
                     // If evalOperatorCondition(key, attributeValue, value) is false, return false
-                    if (!evalOperatorCondition(key, attributeValue, conditionValue[key]!!, savedGroups)) {
+                    if (!evalOperatorCondition(
+                            key,
+                            attributeValue,
+                            conditionValue[key]!!,
+                            savedGroups
+                        )
+                    ) {
                         return false
                     }
                 }
@@ -419,6 +430,14 @@ internal class GBConditionEvaluator {
                         isIn(attributeValue, conditionValue)
                     } else conditionValue.contains(attributeValue)
                 }
+                // Evaluate INI operator - attributeValue in the conditionValue array
+                "\$ini" -> {
+                    return isIn(attributeValue, conditionValue, true)
+                }
+                // Evaluate NINI operator - attributeValue in the conditionValue array
+                "\$nini" -> {
+                    return !isIn(attributeValue, conditionValue, true)
+                }
                 // Evaluate NIN operator - attributeValue not in the conditionValue array
                 "\$nin" -> {
                     return if (attributeValue is GBArray) {
@@ -427,27 +446,13 @@ internal class GBConditionEvaluator {
                 }
                 // Evaluate ALL operator - whether condition contains all attribute
                 "\$all" -> {
-
-                    if (attributeValue is GBArray) {
-                        // Loop through conditionValue array
-                        // If none of the elements in the attributeValue array pass
-                        // evalConditionValue(conditionValue[i], attributeValue[j]), return false
-                        for (con in conditionValue) {
-                            var result = false
-                            for (attr in attributeValue) {
-                                if (evalConditionValue(con, attr, savedGroups)) {
-                                    result = true
-                                }
-                            }
-                            if (!result) {
-                                return false
-                            }
-                        }
-                        return true
-                    } else {
-                        // If attributeValue is not an array, return false
-                        return false
-                    }
+                    if (attributeValue !is GBArray) return false
+                    return isInAll(attributeValue, conditionValue, savedGroups, false)
+                }
+                // Evaluate ALLI operator - whether condition contains all attribute
+                "\$alli" -> {
+                    if (attributeValue !is GBArray) return false
+                    return isInAll(attributeValue, conditionValue, savedGroups, true)
                 }
             }
         } else if (attributeValue is GBArray) {
@@ -539,14 +544,35 @@ internal class GBConditionEvaluator {
                 }
                 // Evaluate REGEX operator - whether attribute contains condition regex
                 "\$regex" -> {
+                    return evalRegex(conditionValue = targetPrimitiveValue,
+                        attributeValue = sourcePrimitiveValue,
+                        ignoreCase = false,
+                        negate = false
+                    )
+                }
 
-                    return try {
+                "\$regexi" -> {
+                    return evalRegex(conditionValue = targetPrimitiveValue,
+                        attributeValue = sourcePrimitiveValue,
+                        ignoreCase = true,
+                        negate = false
+                    )
+                }
 
-                        val regex = Regex(targetPrimitiveValue?.value.orEmpty())
-                        regex.containsMatchIn(sourcePrimitiveValue?.value ?: "0")
-                    } catch (error: Throwable) {
-                        false
-                    }
+                "\$notRegex" -> {
+                    return evalRegex(conditionValue = targetPrimitiveValue,
+                        attributeValue = sourcePrimitiveValue,
+                        ignoreCase = false,
+                        negate = true
+                    )
+                }
+
+                "\$notRegexi" -> {
+                    return evalRegex(conditionValue = targetPrimitiveValue,
+                        attributeValue = sourcePrimitiveValue,
+                        ignoreCase = true,
+                        negate = true
+                    )
                 }
                 // Evaluate VEQ operator - whether versions are equals
                 "\$veq" -> return paddedVersionSource == paddedVersionTarget
@@ -569,7 +595,6 @@ internal class GBConditionEvaluator {
                         savedGroups?.get(conditionValue.asKey()) as? GBArray ?: GBArray(emptyList())
                     return isIn(attributeValue, gbArray)
                 }
-
                 "\$notInGroup" -> {
                     val gbArray =
                         savedGroups?.get(conditionValue.asKey()) as? GBArray ?: GBArray(emptyList())
@@ -587,23 +612,55 @@ internal class GBConditionEvaluator {
             else -> this.toString()
         }
 
-    private fun isIn(actualValue: GBValue, conditionValue: GBArray): Boolean {
+    private fun isIn(actualValue: GBValue?, conditionValue: GBArray, inSensitive: Boolean = false): Boolean {
+        fun caseFold(value: GBValue?): GBValue? {
+            return if (inSensitive && value is GBString) {
+                GBString(value.value.lowercase())
+            } else {
+                value
+            }
+        }
 
-        if (actualValue !is GBArray) return conditionValue.contains(actualValue)
+        if (actualValue is GBArray) {
+            if (actualValue.isEmpty()) return false
 
-        if (actualValue.size == 0) return false
-
-        actualValue.forEach {
-            if (getType(it) == GBAttributeType.GbString ||
-                getType(it) == GBAttributeType.GbBoolean ||
-                getType(it) == GBAttributeType.GbNumber
-            ) {
-                if (conditionValue.contains(it)) {
-                    return true
+            return actualValue.any { attr ->
+                conditionValue.any { cond ->
+                    caseFold(attr) == caseFold(cond)
                 }
             }
         }
-        return false
+
+        return conditionValue.any {
+            caseFold(actualValue) ==  caseFold(it)
+        }
+    }
+
+    private fun isInAll(
+        actual: GBValue,
+        expected: GBArray,
+        savedGroups: Map<String, GBValue>?,
+        inSensitive: Boolean = false
+    ): Boolean {
+        if (actual !is GBArray) return false
+
+        for (expectedItem in expected) {
+            var passed = false
+
+            for (actualItem in actual) {
+                if (evalConditionValue(
+                        expectedItem,
+                        actualItem,
+                        savedGroups,
+                        inSensitive)) {
+                    passed = true
+                    break
+                }
+            }
+            if (!passed) return false
+
+        }
+        return true
     }
 
     private fun comparisonTemplate(
@@ -633,4 +690,17 @@ internal class GBConditionEvaluator {
             is GBString -> this.value.toDoubleOrNull() ?: 0.0
             else -> 0.0
         }
+
+    private fun evalRegex(conditionValue: GBString?, attributeValue: GBString?, ignoreCase: Boolean, negate: Boolean): Boolean {
+        if (conditionValue == null || attributeValue == null) return false
+
+        return try {
+            val options = if (ignoreCase) setOf(RegexOption.IGNORE_CASE) else emptySet()
+            val regex = Regex(conditionValue.value, options)
+            val matches = regex.containsMatchIn(attributeValue.value)
+            if (negate) !matches else matches
+        } catch (t: Throwable) {
+            false
+        }
+    }
 }
