@@ -549,44 +549,35 @@ internal class GBConditionEvaluator {
                 }
                 // Evaluate REGEX operator - whether attribute contains condition regex
                 "\$regex" -> {
-
-                    return try {
-
-                        val regex = Regex(targetPrimitiveValue?.value.orEmpty())
-                        regex.containsMatchIn(sourcePrimitiveValue?.value ?: "0")
-                    } catch (error: Throwable) {
-                        false
-                    }
+                    return evalRegex(conditionValue = targetPrimitiveValue,
+                        attributeValue = sourcePrimitiveValue,
+                        ignoreCase = false,
+                        negate = false
+                    )
                 }
 
                 "\$regexi" -> {
-                    return try {
-                        val regex =
-                            Regex(targetPrimitiveValue?.value.orEmpty(), RegexOption.IGNORE_CASE)
-                        regex.containsMatchIn(sourcePrimitiveValue?.value ?: "0")
-                    } catch (error: Throwable) {
-                        false
-                    }
+                    return evalRegex(conditionValue = targetPrimitiveValue,
+                        attributeValue = sourcePrimitiveValue,
+                        ignoreCase = true,
+                        negate = false
+                    )
                 }
 
                 "\$notRegex" -> {
-                    return try {
-                        val regex =
-                            Regex(targetPrimitiveValue?.value.orEmpty())
-                        !regex.containsMatchIn(sourcePrimitiveValue?.value ?: "0")
-                    } catch (error: Throwable) {
-                        false
-                    }
+                    return evalRegex(conditionValue = targetPrimitiveValue,
+                        attributeValue = sourcePrimitiveValue,
+                        ignoreCase = false,
+                        negate = true
+                    )
                 }
 
                 "\$notRegexi" -> {
-                    return try {
-                        val regex =
-                            Regex(targetPrimitiveValue?.value.orEmpty(), RegexOption.IGNORE_CASE)
-                        !regex.containsMatchIn(sourcePrimitiveValue?.value ?: "0")
-                    } catch (error: Throwable) {
-                        false
-                    }
+                    return evalRegex(conditionValue = targetPrimitiveValue,
+                        attributeValue = sourcePrimitiveValue,
+                        ignoreCase = true,
+                        negate = true
+                    )
                 }
                 // Evaluate VEQ operator - whether versions are equals
                 "\$veq" -> return paddedVersionSource == paddedVersionTarget
@@ -673,4 +664,17 @@ internal class GBConditionEvaluator {
             is GBString -> this.value.toDoubleOrNull() ?: 0.0
             else -> 0.0
         }
+
+    private fun evalRegex(conditionValue: GBString?, attributeValue: GBString?, ignoreCase: Boolean, negate: Boolean): Boolean {
+        if (conditionValue == null || attributeValue == null) return false
+
+        return try {
+            val options = if (ignoreCase) setOf(RegexOption.IGNORE_CASE) else emptySet()
+            val regex = Regex(conditionValue.value, options)
+            val matches = regex.containsMatchIn(attributeValue.value)
+            if (negate) !matches else matches
+        } catch (t: Throwable) {
+            false
+        }
+    }
 }
