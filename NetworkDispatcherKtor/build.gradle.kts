@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "1.0.8"
+version = "1.0.9"
 
 kotlin {
     androidTarget {

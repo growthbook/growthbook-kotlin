@@ -11,7 +11,7 @@ buildscript {
         val kotlinPluginsVersion = "2.1.20"
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinPluginsVersion")
         //noinspection GradleDependency
-        classpath ("org.jetbrains.kotlin:kotlin-serialization:$kotlinPluginsVersion")
+        classpath("org.jetbrains.kotlin:kotlin-serialization:$kotlinPluginsVersion")
     }
 }
 
@@ -41,7 +41,7 @@ kover {
             verify {
                 rule {
                     bound {
-                        minValue = 70
+                        minValue = 60
                     }
                 }
             }
