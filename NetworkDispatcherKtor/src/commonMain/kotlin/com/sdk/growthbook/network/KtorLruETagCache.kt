@@ -13,7 +13,7 @@ import kotlinx.coroutines.internal.synchronized
  * @param maxSize Maximum number of entries to store (default: 100)
  */
 @OptIn(InternalCoroutinesApi::class)
-class LruETagCache(private val maxSize: Int = 100) : SynchronizedObject() {
+class KtorLruETagCache(private val maxSize: Int = 100) : SynchronizedObject() {
 
     private val cache = LinkedHashMap<String, String>()
 
