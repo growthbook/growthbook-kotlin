@@ -85,9 +85,9 @@ class GBNetworkDispatcherKtor(
 
     // Regex to match the desired URL pattern: "/api/features/<clientKey>"
     private val featuresPathPattern = Regex(".*/api/features/[^/]+")
-    
+
     // Thread-safe LRU cache with max 100 entries to prevent unbounded growth
-    private val eTagCache = LruETagCache(maxSize = 100)
+    private val eTagCache = KtorLruETagCache(maxSize = 100)
 
     /**
      * Function that execute API Call to fetch features
@@ -101,20 +101,28 @@ class GBNetworkDispatcherKtor(
             try {
                 val result = prepareGetRequest(request).execute()
                 try {
-                    // Store the ETag only if the URL matches featuresPathPattern
-                    if (featuresPathPattern.matches(request)) {
-                        eTagCache.put(request, result.headers["ETag"])
-                    }
-                    
-                    if (result.status == HttpStatusCode.OK) {
-                        onSuccess(result.body())
-                    } else {
-                        onError(
-                            Exception(
-                                "Response status in not ok: " +
-                                    "Response is: ${result.body<String>()}"
+                    when (result.status) {
+                        HttpStatusCode.OK -> {
+                            // Store the ETag only if the URL matches featuresPathPattern
+                            if (featuresPathPattern.matches(request)) {
+                                eTagCache.put(request, result.headers["ETag"])
+                            }
+                            onSuccess(result.body())
+                        }
+
+                        HttpStatusCode.NotModified -> {
+                            if (enableLogging) {
+                                println("GrowthBook: 304 Not Modified for $request")
+                            }
+                        }
+                        else -> {
+                            onError(
+                                Exception(
+                                    "Response status in not ok: " +
+                                        "Response is: ${result.body<String>()}"
+                                )
                             )
-                        )
+                        }
                     }
                 } catch (exception: Exception) {
                     onError(exception)
@@ -141,7 +149,7 @@ class GBNetworkDispatcherKtor(
         client.prepareGet(url) {
             headers {
                 headers.forEach { (key, value) -> append(key, value) }
-                
+
                 // Only add cache headers if URL matches featuresPathPattern
                 if (featuresPathPattern.matches(url)) {
                     // Add If-None-Match header if ETag is present
@@ -202,7 +210,8 @@ class GBNetworkDispatcherKtor(
                 } else {
                     val delayMs = retryManager.getBackoffDelay()
                     if (enableLogging) {
-                        val msg = if (error != null) "error = ${error.message}" else "connection closed"
+                        val msg =
+                            if (error != null) "error = ${error.message}" else "connection closed"
                         println(
                             "GrowthBook SSE (Ktor): $msg," +
                                 " retry ${retryManager.getCurrentRetry() + 1}/$maxRetries in ${delayMs}ms"
