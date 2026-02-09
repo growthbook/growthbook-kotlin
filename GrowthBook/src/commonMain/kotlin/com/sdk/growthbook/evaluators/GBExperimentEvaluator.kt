@@ -394,7 +394,9 @@ internal class GBExperimentEvaluator(
                 
                 // Save async to storage (fire and forget)
                 evaluationContext.stickyBucketService.coroutineScope.launch {
-                    evaluationContext.stickyBucketService.saveAssignments(doc)
+                    GBUtils.saveStickyBucketAssignment(
+                        evaluationContext.stickyBucketService, doc
+                    )
                 }
             }
         }

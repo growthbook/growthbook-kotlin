@@ -16,7 +16,10 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import com.sdk.growthbook.kotlinx.serialization.gbSerialize
+import com.sdk.growthbook.stickybucket.GBStickyBucketService
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Fowler-Noll-Vo hash - 32 bit
@@ -56,6 +59,7 @@ internal class FNV {
  */
 internal class GBUtils {
     companion object {
+        private val stickyBucketMutex = Mutex()
 
         /**
          * Hashes a string to a float between 0 and 1
@@ -343,21 +347,23 @@ internal class GBUtils {
         ) {
             val stickyBucketService = context.stickyBucketService ?: return
 
-            val attributes = getStickyBucketAttributes(
-                context = context,
-                data = data,
-                attributeOverrides = attributeOverrides
-            )
-
             stickyBucketService.coroutineScope.launch {
                 try {
-                    val assignments = stickyBucketService.getAllAssignments(attributes)
-                    context.stickyBucketAssignmentDocs = assignments
-                } catch (e : Exception) {
+                    refreshStickyBucketsSync(context, data, attributeOverrides)
+                } catch (e: Exception) {
                     println("GrowthBook: Failed to refresh sticky bucket assignments: ${e.message}")
                     e.printStackTrace()
                 }
 
+            }
+        }
+
+        suspend fun saveStickyBucketAssignment(
+            stickyBucketService: GBStickyBucketService,
+            doc: GBStickyAssignmentsDocument
+        ) {
+            stickyBucketMutex.withLock {
+                stickyBucketService.saveAssignments(doc)
             }
         }
 
@@ -380,7 +386,10 @@ internal class GBUtils {
             )
 
             // Directly call and wait for completion
-            context.stickyBucketAssignmentDocs = stickyBucketService.getAllAssignments(attributes)
+            stickyBucketMutex.withLock {
+                context.stickyBucketAssignmentDocs =
+                    stickyBucketService.getAllAssignments(attributes)
+            }
         }
 
         /**
