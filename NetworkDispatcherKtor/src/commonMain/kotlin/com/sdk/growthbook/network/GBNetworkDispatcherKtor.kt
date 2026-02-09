@@ -149,7 +149,6 @@ class GBNetworkDispatcherKtor(
                         append("If-None-Match", it)
                     }
                     append("Cache-Control", "max-age=3600")
-                    append("Accept-Encoding", "gzip, deflate, br")
                 }
             }
             queryParams.forEach { (key, value) -> addOrReplaceParameter(key, value) }
