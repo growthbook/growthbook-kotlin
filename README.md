@@ -374,7 +374,7 @@ streamingHost property was added to  to differentiate streaming host url from AP
     - bug fix
 - **v6.1.2** 2025-12-05
     - Add `startAutoRefreshFeatures()` and `stopAutoRefreshFeatures()` for better handling SSE connection
-- **v6.1.3** 2026-1-1
+- **v6.1.3** 2026-01-01
     - **IMPORTANT:** Add synchronous methods to prevent sticky bucket race conditions
     - Add `setAttributesSync()` - waits for sticky buckets to load before returning
     - Add `setAttributeOverridesSync()` - synchronous version of attribute overrides
@@ -383,7 +383,10 @@ streamingHost property was added to  to differentiate streaming host url from AP
     - Update lib up to 0.7.1 changelog
     - Add ETag caching to NetworkDispatchers
     - **Migration:** Use sync methods for login/logout/user switching to prevent race conditions where experiments were evaluated before sticky buckets loaded
-
+- **v6.1.4** 2025-02-13
+    - fix JsonDecodingException by removing Accept Encoding header in NetworkDispatchers
+    - synchronize saveContent and getContent in CachingAndroid
+    - Add Mutex to GBUtils file to synchronize all sticky bucket read/write operations refreshStickyBucketsSync and saveStickyBucketAssignment
 ## License
 
 This project uses the MIT license. The core GrowthBook app will always remain open and free, although we may add some
