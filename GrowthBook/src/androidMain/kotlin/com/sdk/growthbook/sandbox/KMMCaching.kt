@@ -32,22 +32,9 @@ class CachingAndroid : CachingLayer {
      */
     override fun saveContent(fileName: String, content: JsonElement) {
         synchronized(getLock(fileName)) {
-            val file = getTargetFile(fileName)
-
-            if (file != null) {
-                // If File already exists - delete that
-                if (file.exists()) {
-                    file.delete()
-                }
-
-                // Create New File
-                file.createNewFile()
-
-                val jsonContents = json.encodeToString(JsonElement.serializer(), content)
-
-                // Save contents in file
-                file.writeText(jsonContents)
-            }
+            val file = getTargetFile(fileName) ?: return
+            val jsonContents = json.encodeToString(JsonElement.serializer(), content)
+            file.writeText(jsonContents)
         }
     }
 
