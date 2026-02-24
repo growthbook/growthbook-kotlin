@@ -33,8 +33,15 @@ class CachingAndroid : CachingLayer {
     override fun saveContent(fileName: String, content: JsonElement) {
         synchronized(getLock(fileName)) {
             val file = getTargetFile(fileName) ?: return
+            val tempFile = File(file.parent, "${file.name}.tmp")
             val jsonContents = json.encodeToString(JsonElement.serializer(), content)
-            file.writeText(jsonContents)
+            try {
+                tempFile.writeText(jsonContents)
+                tempFile.renameTo(file)
+            } catch (e: Exception) {
+                tempFile.delete()
+                throw e
+            }
         }
     }
 
@@ -49,9 +56,14 @@ class CachingAndroid : CachingLayer {
             if (!file.exists()) return null
 
             // Read File Contents
-            val inputAsString = file.readText()
-            // return File Contents
-            return json.decodeFromString(JsonElement.serializer(), inputAsString)
+            return try {
+                val inputAsString = file.readText()
+                json.decodeFromString(JsonElement.serializer(), inputAsString)
+            } catch (_: Exception) {
+                // Corrupt cache — delete and return null
+                file.delete()
+                null
+            }
         }
     }
 
