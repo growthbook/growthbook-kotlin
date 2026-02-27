@@ -10,6 +10,11 @@ class CommonLogger: GBLogger {
         commonPrintln("warning: $warnMessage")
     }
 
+    override fun error(errorMessage: String, throwable: Throwable?) {
+        commonPrintln("error: $errorMessage")
+        throwable?.printStackTrace()
+    }
+
     private fun commonPrintln(string: String) {
         println("$LOG_TAG $string")
     }

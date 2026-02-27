@@ -1,6 +1,7 @@
 package com.sdk.growthbook.evaluators
 
 import com.sdk.growthbook.kotlinx.serialization.from
+import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
@@ -39,7 +40,7 @@ internal class GBFeatureEvaluator(
              */
             if (evaluationContext.stackContext.evaluatedFeatures.contains(featureKey)) {
                 if (evaluationContext.loggingEnabled) {
-                    println("evaluateFeature: circular dependency detected:")
+                    GB.warning("FeatureEvaluator: circular dependency detected for '$featureKey'")
                 }
 
                 val featureResultWhenCircularDependencyDetected = prepareResult(
@@ -57,7 +58,7 @@ internal class GBFeatureEvaluator(
              */
             if (forcedFeature.containsKey(featureKey)) {
                 if (evaluationContext.loggingEnabled) {
-                    println("Global override for forced feature with key: $featureKey and value ${forcedFeature[featureKey]}")
+                    GB.log("FeatureEvaluator: Global override for forced feature with key: $featureKey and value ${forcedFeature[featureKey]}")
                 }
                 return prepareResult(
                     featureKey = featureKey,
@@ -65,6 +66,7 @@ internal class GBFeatureEvaluator(
                     source = GBFeatureSource.override,
                 )
             }
+
 
             val targetFeature: GBFeature = evaluationContext.features.getValue(featureKey)
 
@@ -121,7 +123,7 @@ internal class GBFeatureEvaluator(
                                  */
                                 if (parentCondition.gate == true) {
                                     if (evaluationContext.loggingEnabled) {
-                                        println("Feature blocked by prerequisite")
+                                        GB.log("FeatureEvaluator: Feature blocked by prerequisite")
                                     }
 
                                     return prepareResult(
@@ -245,6 +247,7 @@ internal class GBFeatureEvaluator(
                             }
                         }
 
+
                         return prepareResult(
                             ruleId = rule.id,
                             featureKey = featureKey,
@@ -305,7 +308,6 @@ internal class GBFeatureEvaluator(
                     }
                 }
             }
-
             /**
              * Return (value = defaultValue or null, source = defaultValue)
              */
@@ -315,6 +317,9 @@ internal class GBFeatureEvaluator(
                 source = GBFeatureSource.defaultValue
             )
         } catch (exception: Exception) {
+            if (evaluationContext.loggingEnabled) {
+                GB.error("FeatureEvaluator: exception for '$featureKey'", exception)
+            }
             /**
              * If the key doesn't exist in context.features, return immediately
              * (value = null, source = unknownFeature).
