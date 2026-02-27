@@ -225,7 +225,7 @@ class GBSDKBuilder(
                 refreshHandler?.invoke(arg1, arg2)
 
                 if (arg2 != null && enableLogging) {
-                    println(
+                    GB.warning(
                         "GrowthBook error: " + arg2.errorMessage
                     )
                 }

@@ -33,6 +33,7 @@ import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.kotlinx.serialization.from
+import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.StackContext
 import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBucketsSync
 import kotlinx.coroutines.launch
@@ -432,7 +433,7 @@ class GrowthBookSDK(
                 callback.invoke(experiment, experimentResult)
             } catch (e: Exception) {
                 if (gbContext.enableLogging) {
-                    println("Error while run subscriptions: " + e.message)
+                    GB.error("Error while run subscriptions: ${e.message}", e)
                 }
             }
         }
