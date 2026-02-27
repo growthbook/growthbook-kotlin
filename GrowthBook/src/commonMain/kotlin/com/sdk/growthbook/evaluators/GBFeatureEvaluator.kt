@@ -278,7 +278,6 @@ internal class GBFeatureEvaluator(
                                 hashVersion = rule.hashVersion,
                                 filters = rule.filters,
                                 condition = rule.condition,
-                                parentConditions = rule.parentConditions
                             )
 
                             /**
