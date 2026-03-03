@@ -16,6 +16,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import com.sdk.growthbook.kotlinx.serialization.gbSerialize
+import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.stickybucket.GBStickyBucketService
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -351,8 +352,9 @@ internal class GBUtils {
                 try {
                     refreshStickyBucketsSync(context, data, attributeOverrides)
                 } catch (e: Exception) {
-                    println("GrowthBook: Failed to refresh sticky bucket assignments: ${e.message}")
-                    e.printStackTrace()
+                    if (context.enableLogging) {
+                        GB.error("GrowthBook: Failed to refresh sticky bucket assignments: ${e.message}", e)
+                    }
                 }
 
             }

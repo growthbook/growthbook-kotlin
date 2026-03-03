@@ -387,6 +387,9 @@ streamingHost property was added to  to differentiate streaming host url from AP
     - fix JsonDecodingException by removing Accept Encoding header in NetworkDispatchers
     - synchronize saveContent and getContent in CachingAndroid
     - Add Mutex to GBUtils file to synchronize all sticky bucket read/write operations refreshStickyBucketsSync and saveStickyBucketAssignment
+- **v6.1.5** 2025-03-03
+    - wrap onFeatureUsage and tracking callbacks in try-catch block to prevent crash in the SDK JsonDecodingException by removing Accept Encoding header in NetworkDispatchers
+    - fix prerequisite circular dependency
 ## License
 
 This project uses the MIT license. The core GrowthBook app will always remain open and free, although we may add some

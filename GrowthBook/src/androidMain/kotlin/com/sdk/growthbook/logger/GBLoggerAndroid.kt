@@ -13,6 +13,11 @@ class GBLoggerAndroid: GBLogger {
         Log.w(TAG, warnMessage)
     }
 
+    override fun error(errorMessage: String, throwable: Throwable?) {
+        if (throwable != null) Log.e(TAG, errorMessage, throwable)
+        else Log.e(TAG, errorMessage)
+    }
+
     companion object {
         private const val TAG = CommonLogger.Companion.LOG_TAG
     }
