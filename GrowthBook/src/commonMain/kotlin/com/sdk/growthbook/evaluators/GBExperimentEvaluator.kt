@@ -406,7 +406,11 @@ internal class GBExperimentEvaluator(
          * hashValue, experiment.key, and variationId has not been tracked before
          */
         if (!evaluationContext.gbExperimentHelper.isTracked(experiment, result)) {
-            evaluationContext.trackingCallback(experiment, result)
+            try {
+                evaluationContext.trackingCallback(experiment, result)
+            } catch (e: Exception) {
+                GB.error("ExperimentEvaluator: trackingCallback exception for '${experiment.key}'", e)
+            }
         }
 
         /**

@@ -67,7 +67,6 @@ internal class GBFeatureEvaluator(
                 )
             }
 
-
             val targetFeature: GBFeature = evaluationContext.features.getValue(featureKey)
 
             /**
@@ -219,11 +218,19 @@ internal class GBFeatureEvaluator(
                                         experiment = track.experiment,
                                         result = track.result
                                     )
+
                                 if (!isTrackedFlag) {
-                                    evaluationContext.trackingCallback(
-                                        track.experiment,
-                                        track.result
-                                    )
+                                    try {
+                                        evaluationContext.trackingCallback(
+                                            track.experiment,
+                                            track.result
+                                        )
+                                    } catch (e: Exception) {
+                                        GB.error(
+                                            "FeatureEvaluator: trackingCallback exception for '${featureKey}'",
+                                            e
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -361,9 +368,11 @@ internal class GBFeatureEvaluator(
             experimentResult = experimentResult
         )
 
-        evaluationContext.onFeatureUsage?.invoke(
-            featureKey, gbFeatureResult,
-        )
+        try {
+            evaluationContext.onFeatureUsage?.invoke(featureKey, gbFeatureResult)
+        } catch (e: Exception) {
+            GB.error("FeatureEvaluator: onFeatureUsage exception for '$featureKey'", e)
+        }
 
         return gbFeatureResult
     }
