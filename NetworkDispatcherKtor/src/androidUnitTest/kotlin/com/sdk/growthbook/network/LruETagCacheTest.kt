@@ -10,11 +10,11 @@ import kotlin.concurrent.thread
 
 class LruETagCacheTest {
     
-    private lateinit var cache: LruETagCache
+    private lateinit var cache: KtorLruETagCache
     
     @Before
     fun setup() {
-        cache = LruETagCache(maxSize = 3)
+        cache = KtorLruETagCache(maxSize = 3)
     }
     
     @Test
@@ -108,7 +108,7 @@ class LruETagCacheTest {
     
     @Test
     fun `test concurrent reads and writes`() {
-        val largeCache = LruETagCache(maxSize = 100)
+        val largeCache = KtorLruETagCache(maxSize = 100)
         val executor = Executors.newFixedThreadPool(10)
         val latch = CountDownLatch(100)
         
@@ -137,7 +137,7 @@ class LruETagCacheTest {
     
     @Test
     fun `test thread safety with rapid concurrent access`() {
-        val threadSafeCache = LruETagCache(maxSize = 10)
+        val threadSafeCache = KtorLruETagCache(maxSize = 10)
         val errors = mutableListOf<Throwable>()
         val threads = mutableListOf<Thread>()
         
@@ -174,7 +174,7 @@ class LruETagCacheTest {
     
     @Test
     fun `test large cache operations`() {
-        val largeCache = LruETagCache(maxSize = 100)
+        val largeCache = KtorLruETagCache(maxSize = 100)
         
         // Add 150 items
         repeat(150) { i ->

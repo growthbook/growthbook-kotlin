@@ -12,7 +12,7 @@ import kotlin.concurrent.write
  * 
  * @param maxSize Maximum number of entries to store (default: 100)
  */
-internal class LruETagCache(private val maxSize: Int = 100) {
+internal class OkHttpLruETagCache(private val maxSize: Int = 100) {
     
     // LinkedHashMap with accessOrder=true maintains access order (LRU)
     private val cache = object : LinkedHashMap<String, String>(
