@@ -2,6 +2,7 @@ package com.sdk.growthbook.evaluators
 
 import com.sdk.growthbook.kotlinx.serialization.from
 import com.sdk.growthbook.logger.GB
+import com.sdk.growthbook.model.GBArray
 import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
@@ -9,7 +10,9 @@ import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBFeatureSource
 import com.sdk.growthbook.model.GBJson
+import com.sdk.growthbook.model.GBNull
 import com.sdk.growthbook.model.GBNumber
+import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.utils.Constants
 import com.sdk.growthbook.utils.GBTrackData
@@ -238,8 +241,18 @@ internal class GBFeatureEvaluator(
                         if (rule.range == null) {
                             if (rule.coverage != null) {
                                 val key = rule.hashAttribute ?: Constants.ID_ATTRIBUTE_KEY
-                                val attributeValue =
-                                    evaluationContext.userContext.attributes[key]?.toString()
+                                val gbValue =
+                                    evaluationContext.userContext.attributes[key]
+                                val attributeValue = when (gbValue) {
+                                    is GBArray -> gbValue.toString()
+                                    is GBBoolean -> gbValue.value.toString()
+                                    is GBJson -> gbValue.toString()
+                                    is GBNumber -> gbValue.value.toString()
+                                    is GBString -> gbValue.value
+                                    GBNull -> null
+                                    GBValue.Unknown -> null
+                                    null -> null
+                                }
                                 if (attributeValue.isNullOrEmpty()) {
                                     continue@ruleLoop
                                 }
