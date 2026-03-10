@@ -1,5 +1,6 @@
 package com.sdk.growthbook.features
 
+import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBOptions
 import com.sdk.growthbook.network.NetworkDispatcher
@@ -100,7 +101,7 @@ internal class FeaturesDataSource(
         }
 
         if (gbContext.enableLogging) {
-            println(payload)
+            GB.log("FeaturesDataSource: payload: $payload")
         }
 
         /**

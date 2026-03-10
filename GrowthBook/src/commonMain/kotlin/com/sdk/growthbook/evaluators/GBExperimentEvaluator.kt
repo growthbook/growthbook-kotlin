@@ -51,7 +51,7 @@ internal class GBExperimentEvaluator(
         val forcedVariation = evaluationContext.forcedVariations[experiment.key]
         if (forcedVariation != null) {
             if (evaluationContext.loggingEnabled) {
-                GB.log("return forcedVariation $forcedVariation")
+                GB.log("GBExperimentEvaluator: return forcedVariation $forcedVariation")
             }
             return getExperimentResult(
                 featureId = featureId,
@@ -139,7 +139,7 @@ internal class GBExperimentEvaluator(
                     )
                 ) {
                     if (evaluationContext.loggingEnabled) {
-                        println("Skip because of filters")
+                        GB.log("GBExperimentEvaluator: Skip because of filters")
                     }
                     return getExperimentResult(
                         featureId = featureId,
@@ -239,7 +239,7 @@ internal class GBExperimentEvaluator(
                      */
                     if (!evalCondition) {
                         if (evaluationContext.loggingEnabled) {
-                            println("Feature blocked by prerequisite")
+                            GB.log("GBExperimentEvaluator: Feature blocked by prerequisite")
                         }
                         return getExperimentResult(
                             featureId = featureId,
@@ -263,7 +263,7 @@ internal class GBExperimentEvaluator(
         )
         if (hash == null) {
             if (evaluationContext.loggingEnabled) {
-                println("Skip because of invalid hash version")
+                GB.log("GBExperimentEvaluator: Skip because of invalid hash version")
             }
             return getExperimentResult(
                 featureId = featureId,
@@ -288,7 +288,7 @@ internal class GBExperimentEvaluator(
          */
         if (stickyBucketVersionIsBlocked) {
             if (evaluationContext.loggingEnabled) {
-                println("Skip because sticky bucket version is blocked")
+                GB.log("GBExperimentEvaluator: Skip because sticky bucket version is blocked")
             }
             return getExperimentResult(
                 featureId = featureId,
@@ -307,7 +307,7 @@ internal class GBExperimentEvaluator(
          */
         if (assigned < 0) {
             if (evaluationContext.loggingEnabled) {
-                println("Skip because of coverage")
+                GB.log("GBExperimentEvaluator: Skip because of coverage")
             }
             return getExperimentResult(
                 featureId = featureId,
@@ -360,7 +360,7 @@ internal class GBExperimentEvaluator(
         )
 
         if (evaluationContext.loggingEnabled) {
-            println("ExperimentResult: $result")
+            GB.log("GBExperimentEvaluator: ExperimentResult: $result")
         }
 
         /**
@@ -394,7 +394,9 @@ internal class GBExperimentEvaluator(
                 
                 // Save async to storage (fire and forget)
                 evaluationContext.stickyBucketService.coroutineScope.launch {
-                    evaluationContext.stickyBucketService.saveAssignments(doc)
+                    GBUtils.saveStickyBucketAssignment(
+                        evaluationContext.stickyBucketService, doc
+                    )
                 }
             }
         }
@@ -404,7 +406,11 @@ internal class GBExperimentEvaluator(
          * hashValue, experiment.key, and variationId has not been tracked before
          */
         if (!evaluationContext.gbExperimentHelper.isTracked(experiment, result)) {
-            evaluationContext.trackingCallback(experiment, result)
+            try {
+                evaluationContext.trackingCallback(experiment, result)
+            } catch (e: Exception) {
+                GB.error("ExperimentEvaluator: trackingCallback exception for '${experiment.key}'", e)
+            }
         }
 
         /**

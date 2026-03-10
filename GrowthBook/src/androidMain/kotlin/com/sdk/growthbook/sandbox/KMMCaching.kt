@@ -4,7 +4,7 @@ import android.content.Context
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import java.io.File
-import java.io.FileInputStream
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Actual Implementation for Caching in Android - As expected in KMM
@@ -18,32 +18,30 @@ internal actual object CachingImpl {
 /**
  * Android Caching Layer
  */
-class CachingAndroid: CachingLayer {
+class CachingAndroid : CachingLayer {
 
     /**
      * JSON Parser SetUp
      */
     private val json = Json { prettyPrint = true; isLenient = true; ignoreUnknownKeys = true }
 
+    private val fileLock = ConcurrentHashMap<String, Any>()
+
     /**
      * Save Content in Android App Specific Internal Memory
      */
     override fun saveContent(fileName: String, content: JsonElement) {
-        val file = getTargetFile(fileName)
-
-        if (file != null) {
-            // If File already exists - delete that
-            if (file.exists()) {
-                file.delete()
-            }
-
-            // Create New File
-            file.createNewFile()
-
+        synchronized(getLock(fileName)) {
+            val file = getTargetFile(fileName) ?: return
+            val tempFile = File(file.parent, "${file.name}.tmp")
             val jsonContents = json.encodeToString(JsonElement.serializer(), content)
-
-            // Save contents in file
-            file.appendText(jsonContents)
+            try {
+                tempFile.writeText(jsonContents)
+                tempFile.renameTo(file)
+            } catch (e: Exception) {
+                tempFile.delete()
+                throw e
+            }
         }
     }
 
@@ -52,17 +50,21 @@ class CachingAndroid: CachingLayer {
      */
     override fun getContent(fileName: String): JsonElement? {
 
-        val file = getTargetFile(fileName)
+        synchronized(getLock(fileName)) {
+            val file = getTargetFile(fileName) ?: return null
 
-        if (file != null && file.exists()) {
+            if (!file.exists()) return null
+
             // Read File Contents
-            val inputAsString = FileInputStream(file).bufferedReader().use { it.readText() }
-            // return File Contents
-            return json.decodeFromString(JsonElement.serializer(), inputAsString)
+            return try {
+                val inputAsString = file.readText()
+                json.decodeFromString(JsonElement.serializer(), inputAsString)
+            } catch (_: Exception) {
+                // Corrupt cache — delete and return null
+                file.delete()
+                null
+            }
         }
-
-        // Return null if file doesn't exist
-        return null
     }
 
     /**
@@ -81,6 +83,10 @@ class CachingAndroid: CachingLayer {
             targetFileName = fileName.removeSuffix(".txt")
         }
         return File(letDirectory, "$targetFileName.txt")
+    }
+
+    private fun getLock(fileName: String): Any {
+        return fileLock.getOrPut(fileName) { Any() }
     }
 
     companion object {
