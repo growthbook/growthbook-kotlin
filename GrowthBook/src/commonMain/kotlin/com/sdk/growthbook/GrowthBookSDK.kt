@@ -6,6 +6,7 @@ import kotlinx.serialization.json.JsonObject
 import com.sdk.growthbook.evaluators.EvaluationContext
 import com.sdk.growthbook.network.NetworkDispatcher
 import com.sdk.growthbook.utils.Crypto
+import com.sdk.growthbook.utils.Constants
 import com.sdk.growthbook.utils.GBCacheRefreshHandler
 import com.sdk.growthbook.utils.GBError
 import com.sdk.growthbook.utils.GBFeatures
@@ -78,6 +79,7 @@ class GrowthBookSDK(
         ),
         encryptionKey = gbContext.encryptionKey,
         cachingEnabled = cachingEnabled,
+        cacheKey = "${Constants.FEATURE_CACHE}_${gbContext.apiKey}",
     )
 
     init {
