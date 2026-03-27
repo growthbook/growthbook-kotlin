@@ -390,6 +390,9 @@ streamingHost property was added to  to differentiate streaming host url from AP
 - **v6.1.5** 2025-03-03
     - wrap onFeatureUsage and tracking callbacks in try-catch block to prevent crash in the SDK JsonDecodingException by removing Accept Encoding header in NetworkDispatchers
     - fix prerequisite circular dependency
+- **v7.0.0** 2026-03-27
+    - feat!: Scoped the feature cache key by clientKey (or API host) so each SDK instance uses its own isolated cache entry.
+    - fix: correctly handle empty string attributes
 ## License
 
 This project uses the MIT license. The core GrowthBook app will always remain open and free, although we may add some
