@@ -116,6 +116,7 @@ class GBSDKBuilder(
         return setStickyBucketService(
             GBStickyBucketServiceImp(
                 coroutineScope = coroutineScope,
+                prefix = "gbStickyBuckets__${apiKey}_",
                 localStorage = CachingImpl.getLayer(),
             )
         )
@@ -139,7 +140,7 @@ class GBSDKBuilder(
      */
     fun setPrefixForStickyBucketCachedDirectory(
         coroutineScope: CoroutineScope,
-        prefix: String = "gbStickyBuckets__"
+        prefix: String = "gbStickyBuckets__${apiKey}_"
     ): GBSDKBuilder {
         this.stickyBucketService = GBStickyBucketServiceImp(
             coroutineScope, prefix, CachingImpl.getLayer()

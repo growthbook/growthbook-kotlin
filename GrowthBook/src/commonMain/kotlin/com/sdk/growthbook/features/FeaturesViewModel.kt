@@ -36,6 +36,7 @@ internal class FeaturesViewModel(
     private val dataSource: FeaturesDataSource,
     private val encryptionKey: String? = null,
     private val cachingEnabled: Boolean,
+    private val cacheKey: String = Constants.FEATURE_CACHE,
 ) {
 
     /**
@@ -119,7 +120,7 @@ internal class FeaturesViewModel(
 
     private fun getDataFromCache(): FeaturesDataModel? {
         val dataModel = manager.getLayer().getData(
-            Constants.FEATURE_CACHE,
+            cacheKey,
             SerializableFeaturesDataModel.serializer()
         )
         return dataModel?.gbDeserialize()
@@ -241,7 +242,7 @@ internal class FeaturesViewModel(
 
     private fun putDataToCache(dataModel: FeaturesDataModel) {
         manager.getLayer().putData(
-            fileName = Constants.FEATURE_CACHE,
+            fileName = cacheKey,
             content = dataModel.gbSerialize(),
             serializer = SerializableFeaturesDataModel.serializer()
         )
