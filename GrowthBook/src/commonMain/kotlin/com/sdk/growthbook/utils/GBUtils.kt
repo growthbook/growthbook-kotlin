@@ -17,6 +17,7 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 import com.sdk.growthbook.kotlinx.serialization.gbSerialize
 import com.sdk.growthbook.logger.GB
+import com.sdk.growthbook.model.GBNull
 import com.sdk.growthbook.stickybucket.GBStickyBucketService
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -631,10 +632,13 @@ internal class GBUtils {
             return Pair(hashAttribute, hashValue)
         }
 
-        private fun GBValue?.toHashValue(): String =
+        internal fun GBValue?.toHashValue(): String =
             when (this) {
                 is GBString -> this.value // without quotes
-                else -> this?.gbSerialize().toString()
+                is GBValue.Unknown -> ""
+                is GBNull -> ""
+                null -> ""
+                else -> this.gbSerialize().toString()
             }
     }
 }

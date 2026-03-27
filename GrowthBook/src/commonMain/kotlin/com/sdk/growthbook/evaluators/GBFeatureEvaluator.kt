@@ -14,6 +14,7 @@ import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.utils.Constants
 import com.sdk.growthbook.utils.GBTrackData
 import com.sdk.growthbook.utils.GBUtils
+import com.sdk.growthbook.utils.GBUtils.Companion.toHashValue
 
 /**
  * Feature Evaluator Class
@@ -239,7 +240,8 @@ internal class GBFeatureEvaluator(
                             if (rule.coverage != null) {
                                 val key = rule.hashAttribute ?: Constants.ID_ATTRIBUTE_KEY
                                 val attributeValue =
-                                    evaluationContext.userContext.attributes[key]?.toString()
+                                    evaluationContext.userContext.attributes[key].toHashValue()
+
                                 if (attributeValue.isNullOrEmpty()) {
                                     continue@ruleLoop
                                 }
