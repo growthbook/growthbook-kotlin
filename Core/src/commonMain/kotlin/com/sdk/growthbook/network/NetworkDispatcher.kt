@@ -13,7 +13,8 @@ interface NetworkDispatcher {
     fun consumeGETRequest(
         request: String,
         onSuccess: (String) -> Unit,
-        onError: (Throwable) -> Unit
+        onError: (Throwable) -> Unit,
+        onNotModified: (() -> Unit)? = null
     ): Job
 
     fun consumeSSEConnection(

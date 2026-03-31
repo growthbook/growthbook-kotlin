@@ -156,6 +156,10 @@ class GrowthBookSDK(
         }
     }
 
+    override fun featuresNotModified() {
+        refreshHandler?.invoke(true, null)
+    }
+
     /**
      * The setEncryptedFeatures method takes an encrypted string with an encryption key
      * and then decrypts it with the default method of decrypting

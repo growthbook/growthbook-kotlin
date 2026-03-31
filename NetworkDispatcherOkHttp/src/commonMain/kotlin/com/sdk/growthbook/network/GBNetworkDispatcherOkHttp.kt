@@ -70,7 +70,8 @@ class GBNetworkDispatcherOkHttp(
     override fun consumeGETRequest(
         request: String,
         onSuccess: (String) -> Unit,
-        onError: (Throwable) -> Unit
+        onError: (Throwable) -> Unit,
+        onNotModified: (() -> Unit)?
     ): Job =
         CoroutineScope(PlatformDependentIODispatcher).launch {
             val getRequest = Request.Builder()
@@ -109,6 +110,7 @@ class GBNetworkDispatcherOkHttp(
                                 if (enableLogging) {
                                     println("GrowthBook: 304 Not Modified for $request")
                                 }
+                                onNotModified?.invoke()
 
                             }
                             else -> {

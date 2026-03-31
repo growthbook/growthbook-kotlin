@@ -43,7 +43,9 @@ internal class FeaturesDataSource(
      * Executes API Call to fetch features
      */
     fun fetchFeatures(
-        success: (FeaturesDataModel) -> Unit, failure: (Throwable?) -> Unit
+        success: (FeaturesDataModel) -> Unit,
+        failure: (Throwable?) -> Unit,
+        onNotModified: (() -> Unit)? = null
     ) {
         dispatcher.consumeGETRequest(request = getEndpoint(),
             onSuccess = { rawContent ->
@@ -55,7 +57,8 @@ internal class FeaturesDataSource(
             },
             onError = { apiTimeError ->
                 apiTimeError.also(failure)
-            })
+            },
+            onNotModified = onNotModified)
     }
 
     /**
