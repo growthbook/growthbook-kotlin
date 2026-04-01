@@ -393,6 +393,8 @@ streamingHost property was added to  to differentiate streaming host url from AP
 - **v7.0.0** 2026-03-27
     - feat!: Scoped the feature cache key by clientKey (or API host) so each SDK instance uses its own isolated cache entry.
     - fix: correctly handle empty string attributes
+- **v7.1.0** 2026-04-02
+    - feat: create new featureValue function, hide reified function from Objective-C
 ## License
 
 This project uses the MIT license. The core GrowthBook app will always remain open and free, although we may add some
