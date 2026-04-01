@@ -255,31 +255,11 @@ class GrowthBookSDK(
     @HiddenFromObjC
     @Deprecated("Use featureValue() instead", ReplaceWith("featureValue<V>(id)"))
     inline fun <reified V>feature(id: String): V? {
-        val listOfSupportedTypes = listOf(
-            Boolean::class, String::class,
-            Number::class, Short::class, Int::class,
-            Long::class, Float::class, Double::class,
-            GBJson::class,
-        )
-        if (V::class !in listOfSupportedTypes) {
-            return null
-        }
-
-        val gbFeatureResult = feature(id)
-        return when(val gbResultValue = gbFeatureResult.gbValue) {
-            is GBNull -> null
-            is GBBoolean -> gbResultValue.value as? V
-            is GBString -> gbResultValue.value as? V
-            is GBNumber -> gbResultValue.value as? V
-            is GBJson -> gbResultValue as? V
-            is GBValue.Unknown -> null
-            is GBArray -> null
-            null -> null
-        }
+        return extractFeatureValue(id)
     }
 
     /**
-     * The feature method takes a string argument,
+     * The featureValue method takes a string argument,
      * which is the unique identifier, and the type of the accessed feature.
      * The supported types of accessed features are:
      * [Boolean], [String], [Number], [Short],
@@ -288,27 +268,7 @@ class GrowthBookSDK(
      * @returns a feature value typed with specified type
      */
     inline fun <reified V>featureValue(id: String): V? {
-        val listOfSupportedTypes = listOf(
-            Boolean::class, String::class,
-            Number::class, Short::class, Int::class,
-            Long::class, Float::class, Double::class,
-            GBJson::class,
-        )
-        if (V::class !in listOfSupportedTypes) {
-            return null
-        }
-
-        val gbFeatureResult = feature(id)
-        return when(val gbResultValue = gbFeatureResult.gbValue) {
-            is GBNull -> null
-            is GBBoolean -> gbResultValue.value as? V
-            is GBString -> gbResultValue.value as? V
-            is GBNumber -> gbResultValue.value as? V
-            is GBJson -> gbResultValue as? V
-            is GBValue.Unknown -> null
-            is GBArray -> null
-            null -> null
-        }
+        return extractFeatureValue(id)
     }
 
     /**
@@ -441,6 +401,34 @@ class GrowthBookSDK(
                 data = dataModel,
                 attributeOverrides = attributeOverrides
             )
+        }
+    }
+
+    /**
+     * Helper method for reified feature and featureValue
+     */
+    @PublishedApi
+    internal inline fun <reified V>extractFeatureValue(id: String): V? {
+        val listOfSupportedTypes = listOf(
+            Boolean::class, String::class,
+            Number::class, Short::class, Int::class,
+            Long::class, Float::class, Double::class,
+            GBJson::class,
+        )
+        if (V::class !in listOfSupportedTypes) {
+            return null
+        }
+
+        val gbFeatureResult : GBFeatureResult = this.feature(id)
+        return when(val gbResultValue = gbFeatureResult.gbValue) {
+            is GBNull -> null
+            is GBBoolean -> gbResultValue.value as? V
+            is GBString -> gbResultValue.value as? V
+            is GBNumber -> gbResultValue.value as? V
+            is GBJson -> gbResultValue as? V
+            is GBValue.Unknown -> null
+            is GBArray -> null
+            null -> null
         }
     }
 
