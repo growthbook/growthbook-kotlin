@@ -38,6 +38,8 @@ import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.StackContext
 import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBucketsSync
 import kotlinx.coroutines.launch
+import kotlin.experimental.ExperimentalObjCRefinement
+import kotlin.native.HiddenFromObjC
 
 typealias GBTrackingCallback = (GBExperiment, GBExperimentResult) -> Unit
 typealias GBFeatureUsageCallback = (featureKey: String, gbFeatureResult: GBFeatureResult) -> Unit
@@ -249,7 +251,43 @@ class GrowthBookSDK(
      *
      * @returns a feature value typed with specified type
      */
+    @OptIn(ExperimentalObjCRefinement::class)
+    @HiddenFromObjC
+    @Deprecated("Use featureValue() instead", ReplaceWith("featureValue<V>(id)"))
     inline fun <reified V>feature(id: String): V? {
+        val listOfSupportedTypes = listOf(
+            Boolean::class, String::class,
+            Number::class, Short::class, Int::class,
+            Long::class, Float::class, Double::class,
+            GBJson::class,
+        )
+        if (V::class !in listOfSupportedTypes) {
+            return null
+        }
+
+        val gbFeatureResult = feature(id)
+        return when(val gbResultValue = gbFeatureResult.gbValue) {
+            is GBNull -> null
+            is GBBoolean -> gbResultValue.value as? V
+            is GBString -> gbResultValue.value as? V
+            is GBNumber -> gbResultValue.value as? V
+            is GBJson -> gbResultValue as? V
+            is GBValue.Unknown -> null
+            is GBArray -> null
+            null -> null
+        }
+    }
+
+    /**
+     * The feature method takes a string argument,
+     * which is the unique identifier, and the type of the accessed feature.
+     * The supported types of accessed features are:
+     * [Boolean], [String], [Number], [Short],
+     * [Int], [Long], [Float], [Double], [GBJson]
+     *
+     * @returns a feature value typed with specified type
+     */
+    inline fun <reified V>featureValue(id: String): V? {
         val listOfSupportedTypes = listOf(
             Boolean::class, String::class,
             Number::class, Short::class, Int::class,
