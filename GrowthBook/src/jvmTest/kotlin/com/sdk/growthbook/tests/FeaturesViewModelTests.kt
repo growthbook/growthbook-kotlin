@@ -19,6 +19,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     private var isSuccess: Boolean = false
     private var isError: Boolean = false
     private var hasFeatures: Boolean = false
+    private var isNotModified: Boolean = false
 
     private val gbContext = GBContext(
         "Key",
@@ -182,10 +183,36 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         assertTrue(!hasFeatures)
     }
 
+    @Test
+    fun testNotModified() {
+        isSuccess = false
+        isError = false
+        isNotModified = false
+
+        val viewModel = FeaturesViewModel(
+            delegate = this,
+            dataSource = FeaturesDataSource(
+                MockNetworkClient(successResponse = null, error = null, notModified = true),
+                gbContext, testGbOptions,
+            ),
+            cachingEnabled = false,
+        )
+
+        viewModel.fetchFeatures()
+
+        assertTrue(isNotModified)
+        assertTrue(!isSuccess)
+        assertTrue(!isError)
+    }
+
     override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
         isSuccess = true
         isError = false
         hasFeatures = features.isNotEmpty()
+    }
+
+    override fun featuresNotModified() {
+        isNotModified = true
     }
 
     override fun featuresFetchFailed(error: GBError, isRemote: Boolean) {

@@ -9,20 +9,22 @@ import com.sdk.growthbook.utils.SSEConnectionController
 
 open class MockNetworkClient(
     private val successResponse: String?,
-    private val error: Throwable?
+    private val error: Throwable?,
+    private val notModified: Boolean = false,
 ) : NetworkDispatcher {
 
     override fun consumeGETRequest(
         request: String,
         onSuccess: (String) -> Unit,
-        onError: (Throwable) -> Unit
-    ): Job{
+        onError: (Throwable) -> Unit,
+        onNotModified: (() -> Unit)?
+    ): Job {
 
         try {
-            if (successResponse != null) {
-                onSuccess(successResponse)
-            } else if (error != null) {
-                onError(error)
+            when {
+                notModified -> onNotModified?.invoke()
+                successResponse != null -> onSuccess(successResponse)
+                error != null -> onError(error)
             }
         } catch (ex: Exception) {
             onError(ex)
