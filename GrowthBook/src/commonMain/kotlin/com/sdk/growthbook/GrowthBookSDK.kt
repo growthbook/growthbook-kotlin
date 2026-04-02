@@ -156,7 +156,15 @@ class GrowthBookSDK(
         }
     }
 
+    /**
+     * Delegate that fire refreshHandler with success = true when a 304 response occurs
+     */
     override fun featuresNotModified() {
+        remoteSourceFeaturesFetchResult = FeaturesFetchResult.Success
+        if (gbContext.enableLogging) {
+            GB.log("GrowthBookSDK: Features not modified (304), cached data is still valid. " +
+                "Invoking refreshHandler with success=true")
+        }
         refreshHandler?.invoke(true, null)
     }
 
