@@ -7,12 +7,15 @@
 # GrowthBook - Kotlin SDK
 
 - **Lightweight and fast**
-- **Android apps & JVM projects**
+- **Kotlin Multiplatform (Android, iOS, JVM, JS, Wasm)**
     - **Android version 21 & above**
     - **JDK 17 & Above**
+    - **iOS (iosX64, iosArm64, iosSimulatorArm64)**
 
 - **Use your existing event tracking (GA, Segment, Mixpanel, custom)**
 - **Adjust variation weights and targeting without deploying new code**
+
+See [CHANGELOG.md](CHANGELOG.md) for version history.
 
 ## Setup
 
@@ -25,15 +28,16 @@ repositories {
 
 dependencies {
     // Add GrowthBook module:
-    implementation 'io.growthbook.sdk:GrowthBook:<version>' // 6.1.2 latest version when this file was edited
+    implementation 'io.growthbook.sdk:GrowthBook:7.1.0'
 
     // Add Network Dispatcher you prefer:
-    // 1) NetworkDispatcherKtor artifact contains the Network Dispatcher based on Ktor artifact
-    implementation 'io.growthbook.sdk:NetworkDispatcherKtor:1.0.8'
-    // 2) NetworkDispatcherOkHttp artifact contains the Network Dispatcher based on OkHttp artifact
-    implementation 'io.growthbook.sdk:NetworkDispatcherOkHttp:1.0.4'
+    // 1) NetworkDispatcherKtor — supports Android, iOS, JVM, JS, Wasm
+    implementation 'io.growthbook.sdk:NetworkDispatcherKtor:1.0.12'
+    // 2) NetworkDispatcherOkHttp — supports Android and JVM only
+    implementation 'io.growthbook.sdk:NetworkDispatcherOkHttp:1.0.7'
 }
 ```
+
 If you are not sure which dispatcher to choose we recommend to use network dispatcher based on Ktor.
 
 The main class of `NetworkDispatcherKtor` artifact is `GBNetworkDispatcherKtor` while the main class of `NetworkDispatcherOkHttp` artifact is `GBNetworkDispatcherOkHttp`.
@@ -56,7 +60,7 @@ Integration is super easy:
 Now you can start/stop tests, adjust coverage and variation weights, and apply a winning variation to 100% of traffic,
 all within the Growth Book App without deploying code changes to your site.
 
- `initialize()` method should be called in order to obtain SDK instance:
+`initialize()` method should be called in order to obtain SDK instance:
 
 ```kotlin
 var sdkInstance: GrowthBookSDK = GBSDKBuilder(
@@ -90,6 +94,13 @@ If you are accessing features the first time there will be no features right aft
 
     ```kotlin
   fun feature(id: String) : GBFeatureResult
+    ```
+- The featureValue method takes a string argument, which is the unique identifier, and the type of the accessed feature. 
+The supported types of accessed features are: Boolean, String, Number, Short, Int, Long, Float, Double], GBJson - 
+and returns a feature value typed with specified type.
+
+    ```kotlin
+  inline fun <reified V>featureValue(id: String): V?
     ```
 
 - If you changed, added or removed any features, you can call the refreshCache method to clear the cache and download
@@ -220,7 +231,7 @@ If you are accessing features the first time there will be no features right aft
 
 ## Models
 
-This SDK operates with such models as `GBContext`, `GBFeature`, `GBFeatureRule`, `GBFeatureSource`, `GBFeatureResult`, `GBExperiment`, `GBExperimentResult`, etc. 
+This SDK operates with such models as `GBContext`, `GBFeature`, `GBFeatureRule`, `GBFeatureSource`, `GBFeatureResult`, `GBExperiment`, `GBExperimentResult`, etc.
 
 These models can be found in `model` package. Some entities were put in utils/Constants.kt file. In JS SDK there is only one entity "Result" while in this SDK `GBFeatureResult`, `GBExperimentResult` are present.
 
@@ -346,57 +357,7 @@ class GBStickyBucketServiceImp(
 }
 ```
 
-## Changelog
-- **v1.1.63** 2024-11-26
-    - The type of `value` field of `GBFeatureResult` class was changed to `kotlinx.serialization.json.JsonElement`
-- **v2.0.0** 2025-01-10
-    - the `value` field was renamed to `gbValue`, the type of this field was changed to `GBValue`;
-    - `inline fun <reified V>feature(id: String): V?` was added (useful when you need only feature value and you know the type of this feature)
-- **v3.0.0** 2025-01-27
-    - user attributes type was changed (map of GB values);
-    - attributesOverride is map of GB values;
-    - forced features is map of GB values
-- **v4.0.0** 2025-03-03
-    - `initialize()` method was changed from non-suspend to suspend method
-in order to get rid of null on the first access. It is expected that user of
-the SDK calls `initialize()` from coroutine. For those who doesn't use coroutines,
-they can use `initializeWithoutWaitForCall()` method
-- **v5.0.0** 2025-05-22
-    - GB values were moved to :Core module because they are used in :GrowthBookKotlinxSerialization
-module;
-    - forcedFeature field of GBFeatureEvaluator is a map of GB values.
-- **v6.0.0** 2025-05-22
-    - hostURL property was renamed to apiHost in order to follow the same way as Typescript SDK follows,
-streamingHost property was added to  to differentiate streaming host url from API host.
-- **v6.1.0** 2025-08-15
-    - `GBStickyBucketService` methods were changed to suspend, `coroutineScope` was added.
-- **v6.1.1** 2025-10-20
-    - bug fix
-- **v6.1.2** 2025-12-05
-    - Add `startAutoRefreshFeatures()` and `stopAutoRefreshFeatures()` for better handling SSE connection
-- **v6.1.3** 2026-01-01
-    - **IMPORTANT:** Add synchronous methods to prevent sticky bucket race conditions
-    - Add `setAttributesSync()` - waits for sticky buckets to load before returning
-    - Add `setAttributeOverridesSync()` - synchronous version of attribute overrides
-    - Add `refreshStickyBucketsSync()` utility function
-    - Remove `StickyBucketServiceHelper` internal class (no longer needed)
-    - Update lib up to 0.7.1 changelog
-    - Add ETag caching to NetworkDispatchers
-    - **Migration:** Use sync methods for login/logout/user switching to prevent race conditions where experiments were evaluated before sticky buckets loaded
-- **v6.1.4** 2025-02-13
-    - fix JsonDecodingException by removing Accept Encoding header in NetworkDispatchers
-    - synchronize saveContent and getContent in CachingAndroid
-    - Add Mutex to GBUtils file to synchronize all sticky bucket read/write operations refreshStickyBucketsSync and saveStickyBucketAssignment
-- **v6.1.5** 2025-03-03
-    - wrap onFeatureUsage and tracking callbacks in try-catch block to prevent crash in the SDK JsonDecodingException by removing Accept Encoding header in NetworkDispatchers
-    - fix prerequisite circular dependency
-- **v7.0.0** 2026-03-27
-    - feat!: Scoped the feature cache key by clientKey (or API host) so each SDK instance uses its own isolated cache entry.
-    - fix: correctly handle empty string attributes
-- **v7.1.0** 2026-04-02
-    - feat: create new featureValue function, hide reified function from Objective-C
 ## License
 
 This project uses the MIT license. The core GrowthBook app will always remain open and free, although we may add some
 commercial enterprise add-ons in the future.
- 
