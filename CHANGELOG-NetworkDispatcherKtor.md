@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.0.12] - 2026-04-*
+## [1.0.12] - 2026-04-07
 
 ### Added
 - iOS targets support: `iosX64`, `iosArm64`, `iosSimulatorArm64`
