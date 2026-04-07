@@ -18,6 +18,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import com.sdk.growthbook.kotlinx.serialization.from
 import com.sdk.growthbook.kotlinx.serialization.gbSerialize
+import com.sdk.growthbook.model.GBBoolean
+import com.sdk.growthbook.model.GBFeature
+import com.sdk.growthbook.model.GBString
 
 class GBFeatureValueTests {
 
@@ -129,6 +132,74 @@ class GBFeatureValueTests {
         print(failedScenarios)
 
         assertTrue(failedScenarios.size == 0)
+    }
+
+    @Test
+    fun `featureValue returns typed value for Boolean feature`() {
+        val sdk = GBSDKBuilder(
+            apiKey = "",
+            apiHost = "",
+            networkDispatcher = MockNetworkClient(successResponse = null, error = null),
+            attributes = emptyMap(),
+            trackingCallback = { _, _ -> },
+        ).initialize()
+
+        sdk.getGBContext().features = mapOf(
+            "bool-feature" to GBFeature(
+                GBBoolean(true)
+            )
+        )
+
+        val result = sdk.featureValue<Boolean>("bool-feature")
+        assertEquals(true, result)
+    }
+
+    @Test
+    fun `featureValue returns typed value for String feature`() {
+        val sdk = GBSDKBuilder(
+            apiKey = "",
+            apiHost = "",
+            networkDispatcher = MockNetworkClient(successResponse = null, error = null),
+            attributes = emptyMap(),
+            trackingCallback = { _, _ -> },
+        ).initialize()
+
+        sdk.getGBContext().features = mapOf(
+            "str-feature" to GBFeature(
+                GBString("hello")
+            )
+        )
+
+        val result = sdk.featureValue<String>("str-feature")
+        assertEquals("hello", result)
+    }
+
+    @Test
+    fun `featureValue returns null for unsupported type`() {
+        val sdk = GBSDKBuilder(
+            apiKey = "",
+            apiHost = "",
+            networkDispatcher = MockNetworkClient(successResponse = null, error = null),
+            attributes = emptyMap(),
+            trackingCallback = { _, _ -> },
+        ).initialize()
+
+        val result = sdk.featureValue<List<String>>("any-feature")
+        assertEquals(null, result)
+    }
+
+    @Test
+    fun `featureValue returns null for unknown feature`() {
+        val sdk = GBSDKBuilder(
+            apiKey = "",
+            apiHost = "",
+            networkDispatcher = MockNetworkClient(successResponse = null, error = null),
+            attributes = emptyMap(),
+            trackingCallback = { _, _ -> },
+        ).initialize()
+
+        val result = sdk.featureValue<Boolean>("nonexistent")
+        assertEquals(null, result)
     }
 
     @Test
