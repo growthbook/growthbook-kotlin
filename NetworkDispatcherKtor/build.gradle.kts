@@ -55,6 +55,16 @@ kotlin {
                 implementation("io.ktor:ktor-client-android:$ktorVersion")
             }
         }
+        val iosMain by creating {
+            dependsOn(commonMain)
+            dependencies {
+                implementation("io.ktor:ktor-client-darwin:$ktorVersion")
+            }
+        }
+        val iosX64Main by getting { dependsOn(iosMain) }
+        val iosArm64Main by getting { dependsOn(iosMain) }
+        val iosSimulatorArm64Main by getting { dependsOn(iosMain) }
+
         val androidUnitTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
