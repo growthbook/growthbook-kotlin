@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 fix: fire refreshHandler with success on 304 Not Modified response
 
+### Added
+Support for case-insensitive operators
+
 ---
 
 ## [7.1.0] - 2026-04-07
