@@ -147,6 +147,27 @@ class MockResponse {
             }
         """.trimIndent()
 
+        // Has encryptedFeatures (triggers the "else" branch in features handling when encryptionKey
+        // is empty) and plain savedGroups, so savedGroupsFetchedSuccessfully is called
+        val successResponseWithSavedGroups = """
+            {
+                "status": 200,
+                "encryptedFeatures": "dummy",
+                "savedGroups": {
+                    "group1": [1, 2, 3]
+                }
+            }
+        """.trimIndent()
+
+        // Has encryptedFeatures but no savedGroups/encryptedSavedGroups,
+        // so savedGroupsFetchFailed is called when encryptionKey is empty
+        val successResponseWithEncryptedFeaturesOnly = """
+            {
+                "status": 200,
+                "encryptedFeatures": "dummy"
+            }
+        """.trimIndent()
+
         val successResponseEncryptedFeatures = """
        {
             "status":200,

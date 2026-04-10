@@ -51,6 +51,25 @@ class GrowthBookSDKBuilderTests {
     }
 
     @Test
+    fun testSDKInitilizationWithCallback() {
+
+        GBSDKBuilder(
+            testApiKey,
+            testHostURL,
+            attributes = testAttributes,
+            encryptionKey = null,
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
+            networkDispatcher = MockNetworkClient(null, null),
+            remoteEval = false
+        ).initialize { sdkInstance ->
+            assertEquals(sdkInstance.getGBContext().apiKey, testApiKey)
+            assertTrue(sdkInstance.getGBContext().enabled)
+            assertFalse(sdkInstance.getGBContext().qaMode)
+            assertTrue(sdkInstance.getGBContext().attributes == testAttributes)
+        }
+    }
+
+    @Test
     fun testSDKInitilizationOverride() {
 
         val variations: HashMap<String, Int> = HashMap()

@@ -12,6 +12,7 @@ import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBOptions
 import kotlinx.serialization.json.JsonObject
 import kotlin.test.Test
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class FeaturesViewModelTests : FeaturesFlowDelegate {
@@ -19,6 +20,9 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     private var isSuccess: Boolean = false
     private var isError: Boolean = false
     private var hasFeatures: Boolean = false
+    private var featuresAPIModelCalled: Boolean = false
+    private var receivedFromCache: Boolean = false
+    private var receivedCacheError: Boolean = false
 
     private val gbContext = GBContext(
         "Key",
@@ -182,16 +186,179 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         assertTrue(!hasFeatures)
     }
 
+    @Test
+    fun testSuccessWithCachingEnabled() {
+        isSuccess = false
+        isError = true
+        val viewModel = FeaturesViewModel(
+            this,
+            FeaturesDataSource(MockNetworkClient(MockResponse.successResponse, null), gbContext, testGbOptions),
+            "3tfeoyW0wlo47bDnbWDkxg==",
+            cachingEnabled = true,
+        )
+
+        viewModel.fetchFeatures()
+
+        assertTrue(isSuccess)
+        assertTrue(!isError)
+        assertTrue(hasFeatures)
+    }
+
+    @Test
+    fun testFeaturesAPIModelSuccessfullyCalled() {
+        featuresAPIModelCalled = false
+        val viewModel = FeaturesViewModel(
+            this,
+            FeaturesDataSource(MockNetworkClient(MockResponse.successResponse, null), gbContext, testGbOptions),
+            "3tfeoyW0wlo47bDnbWDkxg==",
+            cachingEnabled = false,
+        )
+
+        viewModel.fetchFeatures()
+
+        assertTrue(featuresAPIModelCalled)
+    }
+
+    @Test
+    fun testSavedGroupsFetchedSuccessfully() {
+        isSuccess = false
+        isError = true
+        // encryptedFeatures present + empty encryptionKey causes the features branch to
+        // fall through, reaching the savedGroups handling path
+        val viewModel = FeaturesViewModel(
+            delegate = this,
+            dataSource = FeaturesDataSource(
+                MockNetworkClient(MockResponse.successResponseWithSavedGroups, null),
+                gbContext, testGbOptions,
+            ),
+            encryptionKey = "",
+            cachingEnabled = false,
+        )
+
+        viewModel.fetchFeatures()
+
+        assertTrue(isSuccess)
+        assertTrue(!isError)
+    }
+
+    @Test
+    fun testSavedGroupsFetchFailed() {
+        isSuccess = false
+        isError = true
+        // encryptedFeatures present + empty encryptionKey + no savedGroups → savedGroupsFetchFailed
+        val viewModel = FeaturesViewModel(
+            delegate = this,
+            dataSource = FeaturesDataSource(
+                MockNetworkClient(MockResponse.successResponseWithEncryptedFeaturesOnly, null),
+                gbContext, testGbOptions,
+            ),
+            encryptionKey = "",
+            cachingEnabled = false,
+        )
+
+        viewModel.fetchFeatures()
+
+        assertTrue(!isSuccess)
+        assertTrue(isError)
+    }
+
+    // --- handleFetchFeaturesWithoutRemoteEval (cache paths) ---
+
+    @Test
+    fun testHandleFetchFeaturesWithoutRemoteEvalPlainFeatures() {
+        // Cache pre-loaded with plain features → featuresFetchedSuccessfully(isRemote=false)
+        receivedFromCache = false
+        val cacheLayer = MockCachingLayer.fromApiResponse(MockResponse.successResponse)
+        val viewModel = FeaturesViewModel(
+            delegate = this,
+            dataSource = FeaturesDataSource(
+                MockNetworkClient(MockResponse.successResponse, null),
+                gbContext, testGbOptions,
+            ),
+            encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
+            cachingEnabled = false,
+            cachingLayer = cacheLayer,
+        )
+
+        viewModel.fetchFeatures()
+
+        assertTrue(receivedFromCache, "Expected featuresFetchedSuccessfully(isRemote=false) from cache")
+        assertTrue(hasFeatures)
+    }
+
+    @Test
+    fun testHandleFetchFeaturesWithoutRemoteEvalEncryptedFeatures() {
+        // Cache pre-loaded with encryptedFeatures + valid key → featuresFetchedSuccessfully(isRemote=false)
+        receivedFromCache = false
+        val cacheLayer = MockCachingLayer.fromApiResponse(MockResponse.successResponseEncryptedFeatures)
+        val viewModel = FeaturesViewModel(
+            delegate = this,
+            dataSource = FeaturesDataSource(
+                MockNetworkClient(MockResponse.successResponseEncryptedFeatures, null),
+                gbContext, testGbOptions,
+            ),
+            encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
+            cachingEnabled = false,
+            cachingLayer = cacheLayer,
+        )
+
+        viewModel.fetchFeatures()
+
+        assertTrue(receivedFromCache, "Expected featuresFetchedSuccessfully(isRemote=false) from encrypted cache")
+        assertTrue(hasFeatures)
+    }
+
+    @Test
+    fun testFetchFeaturesWithCacheException() {
+        // Cache throws → featuresFetchFailed(isRemote=false); network also fails → final state is error
+        receivedCacheError = false
+        val cacheLayer = MockCachingLayer(throwOnGet = true)
+        val viewModel = FeaturesViewModel(
+            delegate = this,
+            dataSource = FeaturesDataSource(
+                MockNetworkClient(null, Throwable("Network error")),
+                gbContext, testGbOptions,
+            ),
+            cachingEnabled = false,
+            cachingLayer = cacheLayer,
+        )
+
+        viewModel.fetchFeatures()
+
+        assertTrue(receivedCacheError, "Expected featuresFetchFailed(isRemote=false) from cache exception")
+        assertTrue(isError)
+        assertTrue(!isSuccess)
+    }
+
+    @Test
+    fun testAutoRefreshFeaturesReturnsFlow() {
+        val viewModel = FeaturesViewModel(
+            delegate = this,
+            dataSource = FeaturesDataSource(
+                MockNetworkClient(MockResponse.successResponse, null),
+                gbContext, testGbOptions,
+            ),
+            encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
+            cachingEnabled = false,
+        )
+
+        val flow = viewModel.autoRefreshFeatures()
+
+        assertNotNull(flow)
+    }
+
     override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
         isSuccess = true
         isError = false
         hasFeatures = features.isNotEmpty()
+        if (!isRemote) receivedFromCache = true
     }
 
     override fun featuresFetchFailed(error: GBError, isRemote: Boolean) {
         isSuccess = false
         isError = true
         hasFeatures = false
+        if (!isRemote) receivedCacheError = true
     }
 
     override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) {
@@ -208,5 +375,6 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         isSuccess = true
         isError = false
         hasFeatures = !model.features.isNullOrEmpty()
+        featuresAPIModelCalled = true
     }
 }
