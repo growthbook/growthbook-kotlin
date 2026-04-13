@@ -16,7 +16,7 @@ open class MockNetworkClient(
         request: String,
         onSuccess: (String) -> Unit,
         onError: (Throwable) -> Unit
-    ): Job{
+    ): Job {
 
         try {
             if (successResponse != null) {
@@ -31,7 +31,10 @@ open class MockNetworkClient(
         return Job()
     }
 
-    override fun consumeSSEConnection(url: String, sseConnectionController: SSEConnectionController?): Flow<Resource<String>> {
+    override fun consumeSSEConnection(
+        url: String,
+        sseConnectionController: SSEConnectionController?
+    ): Flow<Resource<String>> {
         return emptyFlow()
     }
 

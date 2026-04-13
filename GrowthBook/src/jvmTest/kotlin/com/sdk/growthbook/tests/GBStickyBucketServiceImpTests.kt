@@ -41,10 +41,6 @@ class GBStickyBucketServiceImpTests {
     private val scope = TestScope()
     private val prefix = "gbStickyBuckets__"
 
-    // -------------------------------------------------------------------------
-    // getAssignments
-    // -------------------------------------------------------------------------
-
     @Test
     fun `getAssignments returns null when localStorage is null`() = scope.runTest {
         val service = GBStickyBucketServiceImp(scope, localStorage = null)
@@ -72,7 +68,12 @@ class GBStickyBucketServiceImpTests {
             attributeValue = "user-1",
             assignments = mapOf("exp-1" to "0")
         )
-        val encoded = Json.parseToJsonElement(Json.encodeToString(GBStickyAssignmentsDocument.serializer(), doc))
+        val encoded = Json.parseToJsonElement(
+            Json.encodeToString(
+                GBStickyAssignmentsDocument.serializer(),
+                doc
+            )
+        )
         cache.store["${prefix}id||user-1"] = encoded
 
         val service = GBStickyBucketServiceImp(scope, localStorage = cache)
@@ -158,14 +159,16 @@ class GBStickyBucketServiceImpTests {
     }
 
     @Test
-    fun `getAllAssignments returns empty map when no attributes match cached keys`() = scope.runTest {
-        val cache = MapCachingLayer()
-        val service = GBStickyBucketServiceImp(scope, localStorage = cache)
+    fun `getAllAssignments returns empty map when no attributes match cached keys`() =
+        scope.runTest {
+            val cache = MapCachingLayer()
+            val service = GBStickyBucketServiceImp(scope, localStorage = cache)
 
-        val result = service.getAllAssignments(mapOf("id" to "user-1", "deviceId" to "device-abc"))
+            val result =
+                service.getAllAssignments(mapOf("id" to "user-1", "deviceId" to "device-abc"))
 
-        assertEquals(emptyMap(), result)
-    }
+            assertEquals(emptyMap(), result)
+        }
 
     @Test
     fun `getAllAssignments returns all matching documents`() = scope.runTest {

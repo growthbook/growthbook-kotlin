@@ -97,7 +97,8 @@ class OkHttpJsonExtensionTest {
 
     @Test
     fun `nested list produces nested JsonArray`() {
-        val result = mapOf("matrix" to listOf(listOf(1, 2), listOf(3, 4))).toJsonElement().jsonObject
+        val result =
+            mapOf("matrix" to listOf(listOf(1, 2), listOf(3, 4))).toJsonElement().jsonObject
         val inner = result["matrix"]!!.jsonArray[0].jsonArray
         assertEquals(1.0, inner[0].jsonPrimitive.content.toDouble(), 0.0)
     }
@@ -129,6 +130,7 @@ class OkHttpJsonExtensionTest {
     @Test
     fun `unknown type falls back to toString`() {
         data class Custom(val x: Int)
+
         val result = mapOf("obj" to Custom(99)).toJsonElement().jsonObject
         assertEquals("Custom(x=99)", result["obj"]!!.jsonPrimitive.content)
     }

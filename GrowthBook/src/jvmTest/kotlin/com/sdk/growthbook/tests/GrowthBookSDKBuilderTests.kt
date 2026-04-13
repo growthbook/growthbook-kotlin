@@ -434,7 +434,7 @@ class GrowthBookSDKBuilderTests {
     @Test
     fun test_savedGroupsFetchedSuccessfully_isRemoteTrue_callsRefreshHandlerWithTrue() {
         var handlerSuccess: Boolean? = null
-        var handlerError: GBError? = GBError(null) // sentinel
+        var handlerError: GBError? = GBError(null)
         val sdk = buildSdkWithHandler(refreshHandler = { success, error ->
             handlerSuccess = success
             handlerError = error

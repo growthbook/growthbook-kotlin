@@ -67,7 +67,6 @@ class OkHttpLruETagCacheTest {
         cache.put("url2", "e2")
         cache.put("url3", "e3")
 
-        // url4 pushes url1 out (insertion order, url1 is oldest)
         cache.put("url4", "e4")
 
         assertNull(cache.get("url1"))
@@ -83,13 +82,12 @@ class OkHttpLruETagCacheTest {
         cache.put("url2", "e2")
         cache.put("url3", "e3")
 
-        // Touch url1 so url2 becomes the LRU
         cache.get("url1")
 
         cache.put("url4", "e4")
 
-        assertEquals("e1", cache.get("url1"))  // promoted — still present
-        assertNull(cache.get("url2"))           // evicted
+        assertEquals("e1", cache.get("url1"))
+        assertNull(cache.get("url2"))
         assertEquals("e3", cache.get("url3"))
         assertEquals("e4", cache.get("url4"))
     }
@@ -105,10 +103,6 @@ class OkHttpLruETagCacheTest {
         assertEquals(2, cache.size())
         assertEquals("e1-updated", cache.get("url1"))
     }
-
-    // -------------------------------------------------------------------------
-    // remove
-    // -------------------------------------------------------------------------
 
     @Test
     fun `remove returns the ETag and deletes it`() {
@@ -137,10 +131,6 @@ class OkHttpLruETagCacheTest {
         assertEquals(1, cache.size())
     }
 
-    // -------------------------------------------------------------------------
-    // clear
-    // -------------------------------------------------------------------------
-
     @Test
     fun `clear removes all entries`() {
         cache.put("url1", "e1")
@@ -160,10 +150,6 @@ class OkHttpLruETagCacheTest {
         cache.clear()
         assertEquals(0, cache.size())
     }
-
-    // -------------------------------------------------------------------------
-    // size / contains
-    // -------------------------------------------------------------------------
 
     @Test
     fun `size reflects number of stored entries`() {
@@ -199,10 +185,6 @@ class OkHttpLruETagCacheTest {
         assertFalse(cache.contains("url1"))
     }
 
-    // -------------------------------------------------------------------------
-    // Large cache / eviction boundary
-    // -------------------------------------------------------------------------
-
     @Test
     fun `large cache evicts only excess entries`() {
         val large = OkHttpLruETagCache(maxSize = 100)
@@ -210,15 +192,9 @@ class OkHttpLruETagCacheTest {
         repeat(150) { i -> large.put("url$i", "etag$i") }
 
         assertEquals(100, large.size())
-        // First 50 evicted
         repeat(50) { i -> assertNull(large.get("url$i")) }
-        // Last 100 still present
         repeat(100) { i -> assertEquals("etag${i + 50}", large.get("url${i + 50}")) }
     }
-
-    // -------------------------------------------------------------------------
-    // Thread safety
-    // -------------------------------------------------------------------------
 
     @Test
     fun `concurrent reads and writes do not corrupt cache`() {

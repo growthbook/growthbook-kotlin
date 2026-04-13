@@ -21,10 +21,6 @@ private val fakeEventSource: EventSource = object : EventSource {
  */
 class GBEventSourceListenerTest {
 
-    // -------------------------------------------------------------------------
-    // Fake handler that records calls
-    // -------------------------------------------------------------------------
-
     private class RecordingHandler : GBEventSourceHandler {
         val closeCalls = mutableListOf<EventSource?>()
         val featureResponses = mutableListOf<String?>()
@@ -45,10 +41,6 @@ class GBEventSourceListenerTest {
 
     private fun listenerWith(handler: RecordingHandler, logging: Boolean = false) =
         GBEventSourceListener(handler, logging)
-
-    // -------------------------------------------------------------------------
-    // onEvent — data routing
-    // -------------------------------------------------------------------------
 
     @Test
     fun `onEvent with valid data calls onFeaturesResponse`() {
@@ -89,17 +81,13 @@ class GBEventSourceListenerTest {
             override fun onFeaturesResponse(featuresJsonResponse: String?) {
                 throw RuntimeException("handler crash")
             }
+
             override fun onFailure(eventSource: EventSource?, error: Throwable?) {}
         }
         val listener = GBEventSourceListener(crashingHandler, enableLogging = false)
 
-        // Should not throw
         listener.onEvent(fakeEventSource, id = null, type = null, data = """{"x":1}""")
     }
-
-    // -------------------------------------------------------------------------
-    // onClosed
-    // -------------------------------------------------------------------------
 
     @Test
     fun `onClosed calls handler onClose`() {
@@ -110,10 +98,6 @@ class GBEventSourceListenerTest {
 
         assertEquals(1, handler.closeCalls.size)
     }
-
-    // -------------------------------------------------------------------------
-    // onFailure
-    // -------------------------------------------------------------------------
 
     @Test
     fun `onFailure calls handler onFailure with error`() {

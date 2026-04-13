@@ -223,6 +223,7 @@ class ExtensionsTest {
     @Test
     fun `List toJsonElement - unknown type falls back to toString`() {
         data class Custom(val x: Int)
+
         val result = listOf(Custom(7)).toJsonElement().jsonArray
         assertEquals("Custom(x=7)", result[0].jsonPrimitive.content)
     }
@@ -291,6 +292,7 @@ class ExtensionsTest {
     @Test
     fun `Map toJsonElement - unknown type falls back to toString`() {
         data class Custom(val n: Int)
+
         val result = mapOf("obj" to Custom(5)).toJsonElement().jsonObject
         assertEquals("Custom(n=5)", result["obj"]!!.jsonPrimitive.content)
     }

@@ -93,7 +93,6 @@ class GBNetworkDispatcherOkHttpTest {
 
     @Test
     fun `GET 304 calls neither onSuccess nor onError`() {
-        // MockWebServer: for 304 we need a plain enqueue — no latch helper here
         server.enqueue(MockResponse().setResponseCode(304))
 
         val latch = CountDownLatch(1)
@@ -106,7 +105,6 @@ class GBNetworkDispatcherOkHttpTest {
             onError = { errorCalled = true; latch.countDown() },
         )
 
-        // 304 path fires neither callback — latch should NOT count down
         assertFalse("onSuccess must not be called on 304", latch.await(1, TimeUnit.SECONDS))
         assertFalse(successCalled)
         assertFalse(errorCalled)
@@ -167,13 +165,13 @@ class GBNetworkDispatcherOkHttpTest {
         server.enqueue(MockResponse().setBody(RESPONSE_BODY).addHeader("ETag", "\"v1\""))
         server.enqueue(MockResponse().setResponseCode(304))
 
-        getSync(featuresUrl())     // first — stores ETag, no latch for 304 second call
-        // For the 304 second request we drive it manually
+        getSync(featuresUrl())
+
         val latch = CountDownLatch(1)
         dispatcher.consumeGETRequest(featuresUrl(), {}, { latch.countDown() })
-        latch.await(2, TimeUnit.SECONDS) // 304 fires no callback, so we just wait briefly
+        latch.await(2, TimeUnit.SECONDS)
 
-        server.takeRequest() // discard first request
+        server.takeRequest()
         val second = server.takeRequest()
         assertEquals("\"v1\"", second.getHeader("If-None-Match"))
     }
