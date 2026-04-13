@@ -35,6 +35,7 @@ kotlin {
         val androidUnitTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
+                implementation("com.squareup.okhttp3:mockwebserver:$okhttpVersion")
             }
         }
     }
