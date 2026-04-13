@@ -14,9 +14,6 @@ import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.toGbBoolean
 import com.sdk.growthbook.stickybucket.GBStickyBucketServiceImp
-import com.sdk.growthbook.utils.GBUtils
-import io.mockk.mockk
-import io.mockk.verify
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
