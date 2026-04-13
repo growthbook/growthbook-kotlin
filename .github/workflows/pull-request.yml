@@ -6,9 +6,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
     steps:
       - uses: actions/checkout@v4
 
@@ -24,21 +21,13 @@ jobs:
       - name: Generate kover coverage report
         run: ./gradlew koverXmlReport
 
-      - name: Upload Report Artifact
-        if: always()
+      - name: Save PR number
+        run: echo ${{ github.event.number }} > pr-number.txt
+
+      - name: Upload report and PR number
         uses: actions/upload-artifact@v4
         with:
-          name: kover-report
-          path: build/reports/kover/report.xml
-
-      - name: Add coverage report to PR
-        id: kover
-        uses: mi-kas/kover-report@v1
-        continue-on-error: true
-        with:
-          path: ${{ github.workspace }}/build/reports/kover/report.xml
-          title: "📊 Test coverage rate"
-          update-comment: true
-          min-coverage-overall: 70
-          min-coverage-changed-files: 70
-          coverage-counter-type: LINE
+          name: coverage-report
+          path: |
+            build/reports/kover/report.xml
+            pr-number.txt
