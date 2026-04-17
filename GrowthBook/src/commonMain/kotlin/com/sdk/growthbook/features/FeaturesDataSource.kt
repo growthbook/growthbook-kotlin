@@ -4,6 +4,7 @@ import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBOptions
 import com.sdk.growthbook.network.NetworkDispatcher
+import com.sdk.growthbook.network.NetworkDispatcherWithNotModified
 import com.sdk.growthbook.serializable_model.SerializableFeaturesDataModel
 import com.sdk.growthbook.serializable_model.gbDeserialize
 import com.sdk.growthbook.utils.FeatureRefreshStrategy
@@ -45,20 +46,36 @@ internal class FeaturesDataSource(
     fun fetchFeatures(
         success: (FeaturesDataModel) -> Unit,
         failure: (Throwable?) -> Unit,
-        onNotModified: (() -> Unit)? = null
+        onNotModified: (() -> Unit)
     ) {
-        dispatcher.consumeGETRequest(request = getEndpoint(),
-            onSuccess = { rawContent ->
-                val result = jsonParser.decodeFromString(
-                    deserializer = SerializableFeaturesDataModel.serializer(),
-                    string = rawContent
-                )
-                success.invoke(result.gbDeserialize())
-            },
-            onError = { apiTimeError ->
-                apiTimeError.also(failure)
-            },
-            onNotModified = onNotModified)
+        if (dispatcher is NetworkDispatcherWithNotModified) {
+            dispatcher.consumeGETRequestWithNotModified(request = getEndpoint(),
+                onSuccess = { rawContent ->
+                    val result = jsonParser.decodeFromString(
+                        deserializer = SerializableFeaturesDataModel.serializer(),
+                        string = rawContent
+                    )
+                    success.invoke(result.gbDeserialize())
+                },
+                onError = { apiTimeError ->
+                    apiTimeError.also(failure)
+                },
+                onNotModified = onNotModified
+            )
+        } else {
+            dispatcher.consumeGETRequest(
+                request = getEndpoint(),
+                onSuccess = { rawContent ->
+                    val result = jsonParser.decodeFromString(
+                        deserializer = SerializableFeaturesDataModel.serializer(),
+                        string = rawContent
+                    )
+                    success.invoke(result.gbDeserialize())
+                },
+                onError = { apiTimeError ->
+                    apiTimeError.also(failure)
+                })
+        }
     }
 
     /**
