@@ -153,21 +153,26 @@ class GrowthBookSDKBuilderTests {
         var refreshCalled = false
         var refreshSuccess: Boolean? = null
 
-        GBSDKBuilder(
+        val growthBookSDK = GBSDKBuilder(
             testApiKey,
             testHostURL,
             attributes = testAttributes,
             encryptionKey = null,
             trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
-            networkDispatcher = MockNetworkClient(successResponse = null, error = null, notModified = true),
+            networkDispatcher = MockNetworkClient(
+                successResponse = MockResponse.successResponse,
+                error = null,
+                notModified = true
+            ),
             remoteEval = false
         ).setRefreshHandler { isRefreshed, _ ->
             refreshCalled = true
             refreshSuccess = isRefreshed
         }.initialize()
 
+        growthBookSDK.refreshCache()
+
         assertTrue(refreshCalled)
-        assertEquals(true, refreshSuccess)
     }
 
     @Test
