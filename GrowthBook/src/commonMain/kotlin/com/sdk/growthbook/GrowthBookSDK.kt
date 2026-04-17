@@ -69,6 +69,7 @@ class GrowthBookSDK(
     private var subscriptions: MutableList<GBExperimentRunCallback> = mutableListOf()
     private var assigned: MutableMap<String, Pair<GBExperiment, GBExperimentResult>> =
         mutableMapOf()
+    private var hasFeaturesPayload: Boolean = false
 
     /**
      * JAVA Consumers preset Features
@@ -152,6 +153,7 @@ class GrowthBookSDK(
      */
     override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
         gbContext.features = features
+        hasFeaturesPayload = true
         if (isRemote) {
             remoteSourceFeaturesFetchResult = FeaturesFetchResult.Success
             this.refreshHandler?.invoke(true, null)
@@ -162,12 +164,16 @@ class GrowthBookSDK(
      * Delegate that fire refreshHandler with success = true when a 304 response occurs
      */
     override fun featuresNotModified() {
-        remoteSourceFeaturesFetchResult = FeaturesFetchResult.Success
-        if (gbContext.enableLogging) {
-            GB.log("GrowthBookSDK: Features not modified (304), cached data is still valid. " +
-                "Invoking refreshHandler with success=true")
+        if (hasFeaturesPayload) {
+            remoteSourceFeaturesFetchResult = FeaturesFetchResult.Success
+            if (gbContext.enableLogging) {
+                GB.log(
+                    "GrowthBookSDK: Features not modified (304), cached data is still valid. " +
+                        "Invoking refreshHandler with success=true"
+                )
+            }
+            refreshHandler?.invoke(true, null)
         }
-        refreshHandler?.invoke(true, null)
     }
 
     /**
