@@ -5,14 +5,34 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import com.sdk.growthbook.utils.Resource
 import com.sdk.growthbook.network.NetworkDispatcher
+import com.sdk.growthbook.network.NetworkDispatcherWithNotModified
 import com.sdk.growthbook.utils.SSEConnectionController
 
 open class MockNetworkClient(
     private val successResponse: String?,
     private val error: Throwable?,
     private val notModified: Boolean = false,
-) : NetworkDispatcher {
+) : NetworkDispatcherWithNotModified {
 
+    override fun consumeGETRequestWithNotModified(
+        request: String,
+        onSuccess: (String) -> Unit,
+        onError: (Throwable) -> Unit,
+        onNotModified: (() -> Unit)
+    ): Job {
+
+        try {
+            when {
+                notModified -> onNotModified.invoke()
+                successResponse != null -> onSuccess(successResponse)
+                error != null -> onError(error)
+            }
+        } catch (ex: Exception) {
+            onError(ex)
+        }
+
+        return Job()
+    }
     override fun consumeGETRequest(
         request: String,
         onSuccess: (String) -> Unit,
