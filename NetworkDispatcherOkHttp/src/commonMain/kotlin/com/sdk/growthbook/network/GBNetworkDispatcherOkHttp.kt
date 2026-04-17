@@ -56,72 +56,30 @@ class GBNetworkDispatcherOkHttp(
     private val initialRetryDelayMs: Long = 1000L,
     private val maxRetryDelayMs: Long = 30_000L,
 
-    ) : NetworkDispatcher {
+    ) : NetworkDispatcherWithNotModified {
 
     // Regex to match the desired URL pattern: "/api/features/<clientKey>"
     private val featuresPathPattern = Regex(".*/api/features/[^/]+")
-    
+
     // Thread-safe LRU cache with max 100 entries to prevent unbounded growth
     private val eTagCache = OkHttpLruETagCache(maxSize = 100)
 
     /**
      * Function that execute API Call to fetch features
      */
-    override fun consumeGETRequest(
+    override fun consumeGETRequestWithNotModified(
         request: String,
         onSuccess: (String) -> Unit,
         onError: (Throwable) -> Unit,
-        onNotModified: (() -> Unit)?
+        onNotModified: (() -> Unit)
     ): Job =
-        CoroutineScope(PlatformDependentIODispatcher).launch {
-            val getRequest = Request.Builder()
-                .url(request)
-                .addHeader("Cache-Control", "max-age=3600")
-                .apply {
-                    // Only add If-None-Match header if URL matches featuresPathPattern
-                    if (featuresPathPattern.matches(request)) {
-                        // Add If-None-Match header if ETag is present
-                        eTagCache.get(request)?.let {
-                            header("If-None-Match", it)
-                        }
-                    }
-                }
-                .build()
-            client.newCall(getRequest).enqueue(object : Callback {
-                override fun onFailure(call: Call, e: IOException) {
-                    onError(e)
-                }
+        handleGetRequest(request, onSuccess, onError, onNotModified)
 
-                override fun onResponse(call: Call, response: Response) {
-                    response.use { resp ->
-                        when (resp.code) {
-                            in 200 ..299 -> {
-                                // Store the ETag only if the URL matches featuresPathPattern
-                                if (featuresPathPattern.matches(request)) {
-                                    eTagCache.put(request, resp.headers["ETag"])
-                                }
-
-                                resp.body?.string()?.let { body ->
-                                    onSuccess(body)
-                                } ?: onError(Exception("Response body is null: ${resp.body}"))
-                            }
-
-                            304 -> {
-                                if (enableLogging) {
-                                    println("GrowthBook: 304 Not Modified for $request")
-                                }
-                                onNotModified?.invoke()
-
-                            }
-                            else -> {
-                                onError(IOException("Unexpected code $resp"))
-
-                            }
-                        }
-                    }
-                }
-            })
-        }
+    override fun consumeGETRequest(
+        request: String,
+        onSuccess: (String) -> Unit,
+        onError: (Throwable) -> Unit
+    ): Job = handleGetRequest(request, onSuccess, onError)
 
     /**
      * Method that make POST request to server for remote feature evaluation
@@ -158,6 +116,62 @@ class GBNetworkDispatcherOkHttp(
                         resp.body?.string()?.let { body ->
                             onSuccess(body)
                         } ?: onError(IOException("Response body is null: ${resp.body}"))
+                    }
+                }
+            })
+        }
+    }
+
+    private fun handleGetRequest(
+        request: String,
+        onSuccess: (String) -> Unit,
+        onError: (Throwable) -> Unit,
+        onNotModified: (() -> Unit)? = null
+    ): Job {
+        return CoroutineScope(PlatformDependentIODispatcher).launch {
+            val getRequest = Request.Builder()
+                .url(request)
+                .addHeader("Cache-Control", "max-age=3600")
+                .apply {
+                    // Only add If-None-Match header if URL matches featuresPathPattern
+                    if (featuresPathPattern.matches(request)) {
+                        // Add If-None-Match header if ETag is present
+                        eTagCache.get(request)?.let {
+                            header("If-None-Match", it)
+                        }
+                    }
+                }
+                .build()
+            client.newCall(getRequest).enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    onError(e)
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    response.use { resp ->
+                        when (resp.code) {
+                            in 200..299 -> {
+                                // Store the ETag only if the URL matches featuresPathPattern
+                                if (featuresPathPattern.matches(request)) {
+                                    eTagCache.put(request, resp.headers["ETag"])
+                                }
+
+                                resp.body?.string()?.let { body ->
+                                    onSuccess(body)
+                                } ?: onError(Exception("Response body is null: ${resp.body}"))
+                            }
+
+                            304 -> {
+                                if (enableLogging) {
+                                    println("GrowthBook: 304 Not Modified for $request")
+                                }
+                                onNotModified?.invoke()
+                            }
+
+                            else -> {
+                                onError(IOException("Unexpected code $resp"))
+                            }
+                        }
                     }
                 }
             })
@@ -270,7 +284,8 @@ class GBNetworkDispatcherOkHttp(
 
                                 override fun onFailure(
                                     eventSource: EventSource?,
-                                    error: Throwable?) {
+                                    error: Throwable?
+                                ) {
                                     if (enableLogging) {
                                         println("GrowthBook SSE (OkHttp): onFailure ${error?.message}")
                                     }
