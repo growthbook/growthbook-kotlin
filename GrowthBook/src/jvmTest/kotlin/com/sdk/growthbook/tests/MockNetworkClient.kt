@@ -16,7 +16,7 @@ open class MockNetworkClient(
         request: String,
         onSuccess: (String) -> Unit,
         onError: (Throwable) -> Unit
-    ): Job{
+    ): Job {
 
         try {
             if (successResponse != null) {
@@ -31,7 +31,10 @@ open class MockNetworkClient(
         return Job()
     }
 
-    override fun consumeSSEConnection(url: String, sseConnectionController: SSEConnectionController?): Flow<Resource<String>> {
+    override fun consumeSSEConnection(
+        url: String,
+        sseConnectionController: SSEConnectionController?
+    ): Flow<Resource<String>> {
         return emptyFlow()
     }
 
@@ -144,6 +147,27 @@ class MockResponse {
                   ]
                 }
               }
+            }
+        """.trimIndent()
+
+        // Has encryptedFeatures (triggers the "else" branch in features handling when encryptionKey
+        // is empty) and plain savedGroups, so savedGroupsFetchedSuccessfully is called
+        val successResponseWithSavedGroups = """
+            {
+                "status": 200,
+                "encryptedFeatures": "dummy",
+                "savedGroups": {
+                    "group1": [1, 2, 3]
+                }
+            }
+        """.trimIndent()
+
+        // Has encryptedFeatures but no savedGroups/encryptedSavedGroups,
+        // so savedGroupsFetchFailed is called when encryptionKey is empty
+        val successResponseWithEncryptedFeaturesOnly = """
+            {
+                "status": 200,
+                "encryptedFeatures": "dummy"
             }
         """.trimIndent()
 

@@ -8,6 +8,7 @@ import com.sdk.growthbook.utils.GBRemoteEvalParams
 import com.sdk.growthbook.utils.Resource
 import com.sdk.growthbook.utils.getFeaturesFromEncryptedFeatures
 import com.sdk.growthbook.sandbox.CachingImpl
+import com.sdk.growthbook.sandbox.CachingLayer
 import com.sdk.growthbook.sandbox.getData
 import com.sdk.growthbook.sandbox.putData
 import com.sdk.growthbook.serializable_model.SerializableFeaturesDataModel
@@ -37,12 +38,8 @@ internal class FeaturesViewModel(
     private val encryptionKey: String? = null,
     private val cachingEnabled: Boolean,
     private val cacheKey: String = Constants.FEATURE_CACHE,
+    private val cachingLayer: CachingLayer = CachingImpl.getLayer(),
 ) {
-
-    /**
-     * Caching Manager
-     */
-    private val manager = CachingImpl
 
     /**
      * SSEConnectionController for managing the lifecycle state
@@ -119,7 +116,7 @@ internal class FeaturesViewModel(
     }
 
     private fun getDataFromCache(): FeaturesDataModel? {
-        val dataModel = manager.getLayer().getData(
+        val dataModel = cachingLayer.getData(
             cacheKey,
             SerializableFeaturesDataModel.serializer()
         )
@@ -241,7 +238,7 @@ internal class FeaturesViewModel(
     }
 
     private fun putDataToCache(dataModel: FeaturesDataModel) {
-        manager.getLayer().putData(
+        cachingLayer.putData(
             fileName = cacheKey,
             content = dataModel.gbSerialize(),
             serializer = SerializableFeaturesDataModel.serializer()
