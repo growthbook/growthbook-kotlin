@@ -12,6 +12,7 @@ import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.HttpTimeoutConfig.Companion.INFINITE_TIMEOUT_MS
 import io.ktor.client.plugins.ServerResponseException
+import io.ktor.client.plugins.compression.ContentEncoding
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.sse.SSE
 import io.ktor.client.request.HttpRequestBuilder
@@ -61,6 +62,11 @@ internal fun createDefaultHttpClient(): HttpClient =
             socketTimeoutMillis = INFINITE_TIMEOUT_MS
             requestTimeoutMillis = INFINITE_TIMEOUT_MS
             connectTimeoutMillis = 30_000
+        }
+
+        install(ContentEncoding) {
+            deflate(1.0F)
+            gzip(0.9F)
         }
     }
 
