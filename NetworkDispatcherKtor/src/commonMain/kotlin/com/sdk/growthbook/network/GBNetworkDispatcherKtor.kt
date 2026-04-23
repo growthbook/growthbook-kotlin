@@ -81,7 +81,7 @@ class GBNetworkDispatcherKtor(
     private val maxRetries: Int = 10,
     private val initialRetryDelayMs: Long = 1000L,
     private val maxRetryDelayMs: Long = 30_000L
-) : NetworkDispatcher {
+) : NetworkDispatcherWithNotModified {
 
     // Regex to match the desired URL pattern: "/api/features/<clientKey>"
     private val featuresPathPattern = Regex(".*/api/features/[^/]+")
@@ -92,12 +92,27 @@ class GBNetworkDispatcherKtor(
     /**
      * Function that execute API Call to fetch features
      */
+
+    override fun consumeGETRequestWithNotModified(
+        request: String,
+        onSuccess: (String) -> Unit,
+        onError: (Throwable) -> Unit,
+        onNotModified: () -> Unit
+    ): Job = handleGetRequest(request, onSuccess, onError, onNotModified)
+
     override fun consumeGETRequest(
         request: String,
         onSuccess: (String) -> Unit,
         onError: (Throwable) -> Unit
-    ): Job =
-        CoroutineScope(PlatformDependentIODispatcher).launch {
+    ): Job = handleGetRequest(request, onSuccess, onError)
+
+    private fun handleGetRequest(
+        request: String,
+        onSuccess: (String) -> Unit,
+        onError: (Throwable) -> Unit,
+        onNotModified: (() -> Unit)? = null
+    ): Job {
+        return CoroutineScope(PlatformDependentIODispatcher).launch {
             try {
                 val result = prepareGetRequest(request).execute()
                 try {
@@ -114,7 +129,9 @@ class GBNetworkDispatcherKtor(
                             if (enableLogging) {
                                 println("GrowthBook: 304 Not Modified for $request")
                             }
+                            onNotModified?.invoke()
                         }
+
                         else -> {
                             onError(
                                 Exception(
@@ -137,6 +154,7 @@ class GBNetworkDispatcherKtor(
                 onError(exception)
             }
         }
+    }
 
     /**
      * Supportive method for preparing GET request for consuming SSE connection

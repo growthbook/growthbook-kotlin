@@ -69,6 +69,7 @@ class GrowthBookSDK(
     private var subscriptions: MutableList<GBExperimentRunCallback> = mutableListOf()
     private var assigned: MutableMap<String, Pair<GBExperiment, GBExperimentResult>> =
         mutableMapOf()
+    private var hasFeaturesPayload: Boolean = false
 
     /**
      * JAVA Consumers preset Features
@@ -152,10 +153,41 @@ class GrowthBookSDK(
      */
     override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
         gbContext.features = features
+        hasFeaturesPayload = true
         if (isRemote) {
             remoteSourceFeaturesFetchResult = FeaturesFetchResult.Success
             this.refreshHandler?.invoke(true, null)
         }
+    }
+
+    /**
+     * Delegate that fire refreshHandler with success = true when a 304 response occurs.
+     * Only treated as success when the SDK instance has a loaded feature payload.
+     * Without prior state a 304 cannot guarantee features are available
+     */
+    override fun featuresNotModified() {
+        if (!hasFeaturesPayload) {
+            if (gbContext.enableLogging) {
+                GB.log(
+                    "GrowthBookSDK: Received 304 but no feature payload has been loaded by GrowthBook instance - treating as fetch failure so features are retried."
+                )
+            }
+            remoteSourceFeaturesFetchResult = FeaturesFetchResult.Failed
+            refreshHandler?.invoke(
+                false,
+                GBError(Exception("304 received before any feature payload was loaded"))
+            )
+            return
+        }
+        remoteSourceFeaturesFetchResult = FeaturesFetchResult.Success
+
+        if (gbContext.enableLogging) {
+            GB.log(
+                "GrowthBookSDK: Features not modified (304), cached data is still valid. " +
+                    "Invoking refreshHandler with success=true"
+            )
+        }
+        refreshHandler?.invoke(true, null)
     }
 
     /**
@@ -211,14 +243,16 @@ class GrowthBookSDK(
      * @returns a [GBFeatureResult] object
      */
     suspend fun suspendFeature(id: String): GBFeatureResult {
-        return when(remoteSourceFeaturesFetchResult) {
+        return when (remoteSourceFeaturesFetchResult) {
             FeaturesFetchResult.Success -> {
                 feature(id)
             }
+
             FeaturesFetchResult.NoResultYet -> {
                 delay(TIME_FOR_CALL_WAIT_MILLIS)
                 suspendFeature(id)
             }
+
             FeaturesFetchResult.Failed -> {
                 featuresViewModel.fetchFeatures()
                 delay(TIME_FOR_CALL_WAIT_MILLIS)
@@ -254,7 +288,7 @@ class GrowthBookSDK(
     @OptIn(ExperimentalObjCRefinement::class)
     @HiddenFromObjC
     @Deprecated("Use featureValue() instead", ReplaceWith("featureValue<V>(id)"))
-    inline fun <reified V>feature(id: String): V? {
+    inline fun <reified V> feature(id: String): V? {
         return extractFeatureValue(id)
     }
 
@@ -267,7 +301,7 @@ class GrowthBookSDK(
      *
      * @returns a feature value typed with specified type
      */
-    inline fun <reified V>featureValue(id: String): V? {
+    inline fun <reified V> featureValue(id: String): V? {
         return extractFeatureValue(id)
     }
 
@@ -408,7 +442,7 @@ class GrowthBookSDK(
      * Helper method for reified feature and featureValue
      */
     @PublishedApi
-    internal inline fun <reified V>extractFeatureValue(id: String): V? {
+    internal inline fun <reified V> extractFeatureValue(id: String): V? {
         val listOfSupportedTypes = listOf(
             Boolean::class, String::class,
             Number::class, Short::class, Int::class,
@@ -419,8 +453,8 @@ class GrowthBookSDK(
             return null
         }
 
-        val gbFeatureResult : GBFeatureResult = this.feature(id)
-        return when(val gbResultValue = gbFeatureResult.gbValue) {
+        val gbFeatureResult: GBFeatureResult = this.feature(id)
+        return when (val gbResultValue = gbFeatureResult.gbValue) {
             is GBNull -> null
             is GBBoolean -> gbResultValue.value as? V
             is GBString -> gbResultValue.value as? V
