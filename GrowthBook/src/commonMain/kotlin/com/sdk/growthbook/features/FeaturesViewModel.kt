@@ -27,6 +27,7 @@ internal interface FeaturesFlowDelegate {
     fun featuresFetchFailed(error: GBError, isRemote: Boolean)
     fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean)
     fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean)
+    fun featuresNotModified()
 }
 
 /**
@@ -87,6 +88,9 @@ internal class FeaturesViewModel(
                 failure = { error ->
                     // Call Error Delegate with mention of data not available but its not remote
                     this.delegate.featuresFetchFailed(GBError(error), true)
+                },
+                onNotModified = {
+                    this.delegate.featuresNotModified()
                 }
             )
         }
