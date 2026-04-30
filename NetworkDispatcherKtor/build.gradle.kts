@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "1.0.13"
+version = "1.0.14"
 
 kotlin {
     androidTarget {
@@ -39,7 +39,7 @@ kotlin {
     iosArm64()
     iosSimulatorArm64()
 
-    val ktorVersion = "3.1.2"
+    val ktorVersion = "3.4.2"
     //noinspection UseTomlInstead
     sourceSets {
         val commonMain by getting {
@@ -48,6 +48,7 @@ kotlin {
                 api("io.ktor:ktor-client-core:$ktorVersion")
                 implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+                implementation("io.ktor:ktor-client-encoding:${ktorVersion}")
             }
         }
         val androidMain by getting {
