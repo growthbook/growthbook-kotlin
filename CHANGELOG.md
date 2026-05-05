@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [7.2.0] - 2026-00-00
+
+### Added
+- Plugin system: `GrowthBookPlugin` interface for observing experiment and feature evaluations
+- Built-in `GrowthBookTrackingPlugin` that batches events and POSTs them to the GrowthBook ingest endpoint
+- `GBSDKBuilder.setPlugins()` to register plugins with the SDK
+
+---
+
 ## [7.1.1] - 2026-04-23
 
 ### Fixed
