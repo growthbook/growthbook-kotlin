@@ -35,6 +35,7 @@ import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.kotlinx.serialization.from
 import com.sdk.growthbook.logger.GB
+import com.sdk.growthbook.plugin.tracking.PluginRegistry
 import com.sdk.growthbook.model.StackContext
 import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBucketsSync
 import kotlinx.coroutines.launch
@@ -57,7 +58,7 @@ class GrowthBookSDK(
     networkDispatcher: NetworkDispatcher,
     features: GBFeatures? = null,
     savedGroups: Map<String, GBValue>? = null,
-    cachingEnabled: Boolean,
+    cachingEnabled: Boolean
 ) : FeaturesFlowDelegate {
 
     private var savedGroups: Map<String, GBValue>? = emptyMap()
@@ -70,6 +71,7 @@ class GrowthBookSDK(
     private var assigned: MutableMap<String, Pair<GBExperiment, GBExperimentResult>> =
         mutableMapOf()
     private var hasFeaturesPayload: Boolean = false
+    var pluginRegistry: PluginRegistry? = null
 
     /**
      * JAVA Consumers preset Features
@@ -86,6 +88,8 @@ class GrowthBookSDK(
     )
 
     init {
+        pluginRegistry = PluginRegistry(gbContext.plugins)
+        pluginRegistry?.initAll()
         if (features != null) {
             gbContext.features = features
         } else {
@@ -501,12 +505,21 @@ class GrowthBookSDK(
         }
     }
 
+    /**
+     * Flushes registered plugins (including the built-in tracking plugin)
+     * so any buffered events are sent before the instance is discarded.
+     * Safe to call multiple times.
+     */
+    fun close() {
+        pluginRegistry?.closeAll()
+    }
+
     private enum class FeaturesFetchResult {
         NoResultYet, Success, Failed
     }
 
     private fun createEvaluationContext() =
-        createEvaluationContext(gbContext, gbExperimentHelper)
+        createEvaluationContext(gbContext, gbExperimentHelper, pluginRegistry)
 
     //@ThreadLocal
     internal companion object {
@@ -517,6 +530,7 @@ class GrowthBookSDK(
         private fun createEvaluationContext(
             gbContext: GBContext,
             gbExperimentHelper: GBExperimentHelper,
+            pluginRegistry: PluginRegistry?
         ) =
             EvaluationContext(
                 enabled = gbContext.enabled,
@@ -533,7 +547,8 @@ class GrowthBookSDK(
                     attributes = gbContext.attributes,
                     stickyBucketAssignmentDocs = gbContext.stickyBucketAssignmentDocs,
                 ),
-                stackContext = StackContext(null, mutableSetOf())
+                stackContext = StackContext(null, mutableSetOf()),
+                pluginRegistry = pluginRegistry
             )
     }
 }

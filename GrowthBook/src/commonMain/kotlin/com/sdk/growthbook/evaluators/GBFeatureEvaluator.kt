@@ -226,6 +226,11 @@ internal class GBFeatureEvaluator(
                                             track.experiment,
                                             track.result
                                         )
+                                        evaluationContext.pluginRegistry?.fireExperimentViewed(
+                                            track.experiment,
+                                            track.result,
+                                            evaluationContext.userContext.attributes
+                                        )
                                     } catch (e: Exception) {
                                         GB.error(
                                             "FeatureEvaluator: trackingCallback exception for '${featureKey}'",
@@ -372,6 +377,11 @@ internal class GBFeatureEvaluator(
 
         try {
             evaluationContext.onFeatureUsage?.invoke(featureKey, gbFeatureResult)
+            evaluationContext.pluginRegistry?.fireFeatureEvaluated(
+                featureKey,
+                gbFeatureResult,
+                evaluationContext.userContext.attributes
+            )
         } catch (e: Exception) {
             GB.error("FeatureEvaluator: onFeatureUsage exception for '$featureKey'", e)
         }

@@ -5,6 +5,7 @@ import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBOptions
+import com.sdk.growthbook.plugin.tracking.GrowthBookPlugin
 import com.sdk.growthbook.network.NetworkDispatcher
 import com.sdk.growthbook.sandbox.CachingImpl
 import com.sdk.growthbook.stickybucket.GBStickyBucketService
@@ -103,6 +104,7 @@ class GBSDKBuilder(
     private var refreshHandler: GBCacheRefreshHandler? = null
     private var stickyBucketService: GBStickyBucketService? = null
     private var featureUsageCallback: GBFeatureUsageCallback? = null
+    private var plugins: List<GrowthBookPlugin>? = null
 
     /**
      * Set Refresh Handler - Will be called when cache is refreshed
@@ -154,6 +156,15 @@ class GBSDKBuilder(
      */
     fun setFeatureUsageCallback(featureUsageCallback: GBFeatureUsageCallback): GBSDKBuilder {
         this.featureUsageCallback = featureUsageCallback
+        return this
+    }
+
+    /**
+     * Registers plugins that receive lifecycle callbacks: [GrowthBookPlugin.init],
+     * [GrowthBookPlugin.onExperimentViewed], [GrowthBookPlugin.onFeatureEvaluated], and [GrowthBookPlugin.close].
+     */
+    fun setPlugins(plugins: List<GrowthBookPlugin>): GBSDKBuilder {
+        this.plugins = plugins
         return this
     }
 
@@ -210,6 +221,7 @@ class GBSDKBuilder(
             remoteEval = remoteEval,
             enableLogging = enableLogging,
             stickyBucketService = stickyBucketService,
+            plugins = plugins
         )
 
     private inner class WaitForCallCaseHelper(
