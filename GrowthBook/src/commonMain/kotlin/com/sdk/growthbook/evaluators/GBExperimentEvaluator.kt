@@ -411,6 +411,11 @@ internal class GBExperimentEvaluator(
             } catch (e: Exception) {
                 GB.error("ExperimentEvaluator: trackingCallback exception for '${experiment.key}'", e)
             }
+            evaluationContext.pluginRegistry?.fireExperimentViewed(
+                experiment,
+                result,
+                evaluationContext.userContext.attributes
+            )
         }
 
         /**

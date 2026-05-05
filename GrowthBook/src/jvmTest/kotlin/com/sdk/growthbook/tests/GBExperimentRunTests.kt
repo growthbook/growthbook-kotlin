@@ -83,7 +83,8 @@ class GBExperimentRunTests {
                         attributes = gbContext.attributes,
                         stickyBucketAssignmentDocs = gbContext.stickyBucketAssignmentDocs,
                     ),
-                    stackContext = StackContext(null, mutableSetOf())
+                    stackContext = StackContext(null, mutableSetOf()),
+                    pluginRegistry = null
                 )
 
                 val evaluator = GBExperimentEvaluator(testScopeEvaluationContext)
@@ -153,7 +154,8 @@ class GBExperimentRunTests {
                     qaMode = testContext.qaMode,
                     stickyBucketAssignmentDocs = null,
                 ),
-                stackContext = StackContext(null, mutableSetOf())
+                stackContext = StackContext(null, mutableSetOf()),
+                pluginRegistry = null
 
             )
 

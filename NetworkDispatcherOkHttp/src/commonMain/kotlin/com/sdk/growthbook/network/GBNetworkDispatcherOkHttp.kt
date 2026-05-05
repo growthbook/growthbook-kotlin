@@ -7,6 +7,7 @@ import com.sdk.growthbook.utils.Resource
 import com.sdk.growthbook.utils.SSEConnectionController
 import com.sdk.growthbook.utils.SSEConnectionState
 import com.sdk.growthbook.utils.SSERetryManager
+import com.sdk.growthbook.utils.toJsonElement
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.awaitClose
@@ -14,10 +15,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -56,7 +54,7 @@ class GBNetworkDispatcherOkHttp(
     private val initialRetryDelayMs: Long = 1000L,
     private val maxRetryDelayMs: Long = 30_000L,
 
-    ) : NetworkDispatcherWithNotModified {
+    ) : NetworkDispatcherWithNotModified, TrackingNetworkDispatcher {
 
     // Regex to match the desired URL pattern: "/api/features/<clientKey>"
     private val featuresPathPattern = Regex(".*/api/features/[^/]+")
@@ -325,38 +323,44 @@ class GBNetworkDispatcherOkHttp(
         }
     }
 
+    override fun consumePOSTRequest(
+        url: String,
+        headers: Map<String, String>,
+        body: JsonElement,
+        onSuccess: (String) -> Unit,
+        onError: (Throwable) -> Unit
+    ) {
+        CoroutineScope(PlatformDependentIODispatcher).launch {
+            val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
+            val requestBody: RequestBody = body.toString().toRequestBody(mediaType)
+            val postRequest = Request.Builder()
+                .url(url)
+                .addHeader("Content-Type", "application/json")
+                .addHeader("Accept", "application/json")
+                .apply { headers.forEach { (key, value) -> addHeader(key, value) } }
+                .post(requestBody)
+                .build()
+            client.newCall(postRequest).enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    onError(e)
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    response.use { resp ->
+                        if (!resp.isSuccessful || resp.code !in 200..299) {
+                            val errorBody = resp.body?.string() ?: ""
+                            onError(IOException("Unexpected code ${resp.code}: $errorBody"))
+                            return
+                        }
+                        resp.body?.string()?.let { onSuccess(it) }
+                            ?: onError(IOException("Response body is null"))
+                    }
+                }
+            })
+        }
+    }
+
     fun setLoggingEnabled(enabled: Boolean) {
         enableLogging = enabled
     }
-}
-
-internal fun Map<*, *>.toJsonElement(): JsonElement {
-    val map: MutableMap<String, JsonElement> = mutableMapOf()
-    this.forEach {
-        val key = it.key as? String ?: return@forEach
-        val value = it.value ?: return@forEach
-        map[key] = when (value) {
-            is Map<*, *> -> (value).toJsonElement()
-            is List<*> -> value.toJsonElement()
-            is Boolean -> JsonPrimitive(value)
-            is Number -> JsonPrimitive(value)
-            else -> JsonPrimitive(value.toString())
-        }
-    }
-    return JsonObject(map)
-}
-
-internal fun List<*>.toJsonElement(): JsonElement {
-    val list: MutableList<JsonElement> = mutableListOf()
-    this.forEach {
-        val value = it ?: return@forEach
-        when (value) {
-            is Map<*, *> -> list.add((value).toJsonElement())
-            is List<*> -> list.add(value.toJsonElement())
-            is Boolean -> list.add(JsonPrimitive(value))
-            is Number -> list.add(JsonPrimitive(value))
-            else -> list.add(JsonPrimitive(value.toString()))
-        }
-    }
-    return JsonArray(list)
 }

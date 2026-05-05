@@ -1,6 +1,7 @@
 package com.sdk.growthbook.model
 
 import com.sdk.growthbook.GBTrackingCallback
+import com.sdk.growthbook.plugin.tracking.GrowthBookPlugin
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.utils.GBStickyAssignmentsDocument
 import com.sdk.growthbook.utils.GBStickyAttributeKey
@@ -79,7 +80,17 @@ data class GBContext(
      */
     val enableLogging: Boolean = false,
 
-    var savedGroups: Map<String, GBValue>? = null
+    /**
+     * Saved Groups let you target the same group of users across multiple features and experiments.
+     */
+    var savedGroups: Map<String, GBValue>? = null,
+
+    /**
+     * Plugins registered with the GrowthBook. See
+     * [GrowthBookPlugin] and
+     * [com.sdk.growthbook.plugin.tracking.GrowthBookTrackingPlugin].
+     */
+    var plugins: List<GrowthBookPlugin>? = null
 ) {
 
     // Keys are unique identifiers for the features and the values are Feature objects.
