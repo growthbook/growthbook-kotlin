@@ -3,12 +3,13 @@ import org.jetbrains.kotlin.gradle.targets.js.yarn.yarn
 
 plugins {
     kotlin("multiplatform")
+    kotlin("plugin.serialization")
     id("com.android.library")
     id("org.jetbrains.dokka") version "1.9.10"
 }
 
 group = "io.growthbook.sdk"
-version = "1.0.0"
+version = "1.1.0"
 
 kotlin {
     androidTarget {
@@ -41,6 +42,12 @@ kotlin {
             dependencies {
                 implementation(project(":Core"))
                 api(libs.kotlinx.serialization.json)
+            }
+        }
+
+        val jvmTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
             }
         }
     }
