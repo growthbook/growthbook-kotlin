@@ -22,6 +22,8 @@ import com.sdk.growthbook.model.GBArray
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBBoolean
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
 
 fun GBValue.gbSerialize(): JsonElement =
     when(this) {
@@ -39,6 +41,15 @@ fun GBValue.gbSerialize(): JsonElement =
 fun GBJson.gbSerialize() = JsonObject(
     this.mapValues { it.value.gbSerialize() }
 )
+
+inline fun <reified T> GBValue.decodeAs(json: Json = Json): T? {
+    val jsonElement = this.gbSerialize()
+    return try {
+        json.decodeFromJsonElement(jsonElement)
+    } catch (e: Exception) {
+        null
+    }
+}
 
 fun GBValue.Companion.from(jsonElement: JsonElement): GBValue =
     when(jsonElement) {

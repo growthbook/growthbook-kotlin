@@ -39,8 +39,8 @@ class GBNumber(val value: Number): GBValue() {
 
 }
 
-class GBArray(
-    value: List<GBValue>
+data class GBArray(
+    val value: List<GBValue>
 ): GBValue(), List<GBValue> by value
 data class GBJson(
     private val value: Map<String, GBValue>,
