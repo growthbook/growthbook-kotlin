@@ -154,19 +154,7 @@ and returns a feature value typed with specified type.
 - stop receiving Features automatically during SSE connection
 
   ```kotlin
-  fun stopAutoRefreshFeatures(): Flow<Resource<GBFeatures?>>{}
-  ```
-
-- Delegate that set to Context successfully fetched features
-
-  ```kotlin
-  fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {}
-  ```
-
-- Delegate which inform that fetching features failed
-
-  ```kotlin
-  fun featuresFetchFailed(error: GBError, isRemote: Boolean) {}
+  fun stopAutoRefreshFeatures() {}
   ```
 
 - The isOn method takes a single string argument, which is the unique identifier for the feature and returns the feature
@@ -179,54 +167,48 @@ and returns a feature value typed with specified type.
 - The setForcedFeatures method setup the Map of user's (forced) features
 
   ```kotlin
-  fun setForcedFeatures(forcedFeatures: Map<String, Any>) {}
+  fun setForcedFeatures(forcedFeatures: Map<String, GBValue>) {}
   ```
 
-- The getForcedFeatures method for mapping model object for request's body type
-
-  ```kotlin
-  fun getForcedFeatures(): List<List<Any>> {}
-  ```
-
-- The setAttributes method replaces the Map of user attributes that are used to assign variations
+- The getForcedFeatures method returns the Map of currently set forced features
 
   ```kotlin
-  fun setAttributes(attributes: Map<String, Any>) {}
+  fun getForcedFeatures(): Map<String, GBValue> {}
   ```
-- **NEW:** The setAttributesSync method is a synchronous version that waits for sticky bucket assignments to load before returning. Use this for login, logout, and user switching to prevent race conditions.
+
+- The setAttributes method replaces the Map of user attributes that are used to assign variations.
+
   ```kotlin
-    suspend fun setAttributesSync(attributes: Map) {}
+  fun setAttributes(attributes: Map<String, GBValue>) {}
   ```
-  Example usage:
-    ```kotlin
-   lifecycleScope.launch {
+
+- The setAttributeOverrides method replaces the Map of attribute overrides used for Sticky Bucketing.
+
+  ```kotlin
+  fun setAttributeOverrides(overrides: Map<String, GBValue>) {}
+  ```
+
+- If you use Sticky Bucketing and need to guarantee that assignments are loaded before evaluating
+  experiments (e.g. after login or user switch), use the coroutine versions:
+
+  ```kotlin
+  suspend fun setAttributesSync(attributes: Map<String, GBValue>) {}
+  suspend fun setAttributeOverridesSync(overrides: Map<String, GBValue>) {}
+  ```
+
+  Example:
+  ```kotlin
+  lifecycleScope.launch {
       sdk.setAttributesSync(loginAttributes)
-      // Sticky buckets are guaranteed to be loaded here
-      val result = sdk.feature("my-experiment")
+      val result = sdk.feature("my-experiment") // sticky buckets guaranteed
   }
   ```
-
-- The setAttributeOverrides method replaces the Map of user overrides attribute that are used for Sticky Bucketing
-
-  ```kotlin
-  fun setAttributeOverrides(overrides: Map<String, Any>) {}
-  ```
-- **NEW:** The setAttributeOverridesSync method is a synchronous version that waits for sticky bucket assignments to load
-    ```kotlin
-  suspend fun setAttributeOverridesSync(overrides: Map) {}
-    ```
 
 - The setForcedVariations method setup the Map of user's (forced) variations to assign a specific variation (used for
   QA)
 
   ```kotlin
   fun setForcedVariations(forcedVariations: Map<String, Any>) {}
-  ```
-
-- Delegate that call refresh Sticky Bucket Service after success fetched features
-
-  ```kotlin
-  fun featuresAPIModelSuccessfully(model: FeaturesDataModel) {}
   ```
 
 ## Models
