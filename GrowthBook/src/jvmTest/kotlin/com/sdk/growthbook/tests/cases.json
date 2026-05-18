@@ -482,6 +482,18 @@
       false
     ],
     [
+      "$in - fail (case sensitive mismatch)",
+      {
+        "country": {
+          "$in": ["us", "uk"]
+        }
+      },
+      {
+        "country": "US"
+      },
+      false
+    ],
+    [
       "$nin - pass",
       {
         "num": {
@@ -576,6 +588,198 @@
         "tags": []
       },
       true
+    ],
+    [
+      "$nin - pass (case sensitive mismatch)",
+      {
+        "country": {
+          "$nin": ["us", "uk"]
+        }
+      },
+      {
+        "country": "US"
+      },
+      true
+    ],
+    [
+      "$ini - pass (case insensitive match)",
+      {
+        "country": {
+          "$ini": ["us", "uk"]
+        }
+      },
+      {
+        "country": "US"
+      },
+      true
+    ],
+    [
+      "$ini - pass (uppercase pattern, lowercase value)",
+      {
+        "country": {
+          "$ini": ["US", "UK"]
+        }
+      },
+      {
+        "country": "us"
+      },
+      true
+    ],
+    [
+      "$ini - pass (mixed case)",
+      {
+        "country": {
+          "$ini": ["Us", "Uk"]
+        }
+      },
+      {
+        "country": "US"
+      },
+      true
+    ],
+    [
+      "$ini - fail (no match)",
+      {
+        "country": {
+          "$ini": ["us", "uk"]
+        }
+      },
+      {
+        "country": "CA"
+      },
+      false
+    ],
+    [
+      "$ini - array pass 1",
+      {
+        "tags": {
+          "$ini": ["a", "b"]
+        }
+      },
+      {
+        "tags": ["d", "e", "A"]
+      },
+      true
+    ],
+    [
+      "$ini - array pass 2",
+      {
+        "tags": {
+          "$ini": ["A", "B"]
+        }
+      },
+      {
+        "tags": ["d", "b", "f"]
+      },
+      true
+    ],
+    [
+      "$ini - array fail",
+      {
+        "tags": {
+          "$ini": ["a", "b"]
+        }
+      },
+      {
+        "tags": ["d", "e", "f"]
+      },
+      false
+    ],
+    [
+      "$ini - not array",
+      {
+        "num": {
+          "$ini": 1
+        }
+      },
+      {
+        "num": 1
+      },
+      false
+    ],
+    [
+      "$nini - pass (case insensitive match)",
+      {
+        "country": {
+          "$nini": ["us", "uk"]
+        }
+      },
+      {
+        "country": "CA"
+      },
+      true
+    ],
+    [
+      "$nini - fail (case insensitive match)",
+      {
+        "country": {
+          "$nini": ["us", "uk"]
+        }
+      },
+      {
+        "country": "US"
+      },
+      false
+    ],
+    [
+      "$nini - fail (uppercase pattern, lowercase value)",
+      {
+        "country": {
+          "$nini": ["US", "UK"]
+        }
+      },
+      {
+        "country": "us"
+      },
+      false
+    ],
+    [
+      "$nini - array pass",
+      {
+        "tags": {
+          "$nini": ["a", "b"]
+        }
+      },
+      {
+        "tags": ["d", "e", "f"]
+      },
+      true
+    ],
+    [
+      "$nini - array fail 1",
+      {
+        "tags": {
+          "$nini": ["a", "b"]
+        }
+      },
+      {
+        "tags": ["d", "e", "A"]
+      },
+      false
+    ],
+    [
+      "$nini - array fail 2",
+      {
+        "tags": {
+          "$nini": ["A", "B"]
+        }
+      },
+      {
+        "tags": ["d", "b", "f"]
+      },
+      false
+    ],
+    [
+      "$nini - not array",
+      {
+        "num": {
+          "$nini": 1
+        }
+      },
+      {
+        "num": 1
+      },
+      false
     ],
     [
       "$elemMatch - pass - flat arrays",
@@ -758,6 +962,18 @@
       false
     ],
     [
+      "$regex - fail (case sensitive mismatch)",
+      {
+        "userAgent": {
+          "$regex": "(mobile|tablet)"
+        }
+      },
+      {
+        "userAgent": "Android Mobile Browser"
+      },
+      false
+    ],
+    [
       "$regexi - pass (case insensitive match)",
       {
         "userAgent": {
@@ -790,138 +1006,6 @@
       },
       {
         "userAgent": "Chrome Desktop Browser"
-      },
-      false
-    ],
-    [
-      "$notRegex - pass",
-      {
-        "userAgent": {
-          "$notRegex": "(Mobile|Tablet)"
-        }
-      },
-      {
-        "userAgent": "Chrome Desktop Browser"
-      },
-      true
-    ],
-    [
-      "$notRegex - fail",
-      {
-        "userAgent": {
-          "$notRegex": "(Mobile|Tablet)"
-        }
-      },
-      {
-        "userAgent": "Android Mobile Browser"
-      },
-      false
-    ],
-    [
-      "$notRegexi - pass",
-      {
-        "userAgent": {
-          "$notRegexi": "(mobile|tablet)"
-        }
-      },
-      {
-        "userAgent": "Chrome Desktop Browser"
-      },
-      true
-    ],
-    [
-      "$notRegexi - fail",
-      {
-        "userAgent": {
-          "$notRegexi": "(mobile|tablet)"
-        }
-      },
-      {
-        "userAgent": "Android Mobile Browser"
-      },
-      false
-    ],
-    [
-      "$ini - pass",
-      {
-        "tags": {
-          "$ini": ["A", "B"]
-        }
-      },
-      {
-        "tags": "a"
-      },
-      true
-    ],
-    [
-      "$ini - fail",
-      {
-        "tags": {
-          "$ini": ["a", "b"]
-        }
-      },
-      {
-        "tags": "c"
-      },
-      false
-    ],
-    [
-      "$ini - array pass",
-      {
-        "tags": {
-          "$ini": ["A", "B"]
-        }
-      },
-      {
-        "tags": ["d", "a"]
-      },
-      true
-    ],
-    [
-      "$nini - pass",
-      {
-        "tags": {
-          "$nini": ["A", "B"]
-        }
-      },
-      {
-        "tags": "c"
-      },
-      true
-    ],
-    [
-      "$nini - fail",
-      {
-        "tags": {
-          "$nini": ["A", "B"]
-        }
-      },
-      {
-        "tags": "a"
-      },
-      false
-    ],
-    [
-      "$alli - pass",
-      {
-        "tags": {
-          "$alli": ["A", "B"]
-        }
-      },
-      {
-        "tags": ["a", "b", "c"]
-      },
-      true
-    ],
-    [
-      "$alli - fail",
-      {
-        "tags": {
-          "$alli": ["A", "B"]
-        }
-      },
-      {
-        "tags": ["a", "c"]
       },
       false
     ],
@@ -1603,6 +1687,78 @@
       {
         "tags": {
           "$all": ["one", "three"]
+        }
+      },
+      {
+        "tags": "hello"
+      },
+      false
+    ],
+    [
+      "$all - fail (case sensitive mismatch)",
+      {
+        "tags": {
+          "$all": ["one", "three"]
+        }
+      },
+      {
+        "tags": ["ONE", "two", "THREE"]
+      },
+      false
+    ],
+    [
+      "$alli - pass (case insensitive match)",
+      {
+        "tags": {
+          "$alli": ["one", "three"]
+        }
+      },
+      {
+        "tags": ["ONE", "two", "THREE"]
+      },
+      true
+    ],
+    [
+      "$alli - pass (uppercase pattern, lowercase value)",
+      {
+        "tags": {
+          "$alli": ["ONE", "THREE"]
+        }
+      },
+      {
+        "tags": ["one", "two", "three"]
+      },
+      true
+    ],
+    [
+      "$alli - pass (mixed case)",
+      {
+        "tags": {
+          "$alli": ["One", "Three"]
+        }
+      },
+      {
+        "tags": ["ONE", "two", "three"]
+      },
+      true
+    ],
+    [
+      "$alli - fail (case insensitive, missing value)",
+      {
+        "tags": {
+          "$alli": ["one", "three"]
+        }
+      },
+      {
+        "tags": ["ONE", "two", "four"]
+      },
+      false
+    ],
+    [
+      "$alli - fail not array",
+      {
+        "tags": {
+          "$alli": ["one", "three"]
         }
       },
       {
@@ -6546,65 +6702,6 @@
       }
     ],
     [
-      "disables sticky bucketing when disabled by experiment",
-      {
-        "attributes": {
-          "id": "i123",
-          "foo": "bar",
-          "country": "USA"
-        },
-        "features": {
-          "exp1": {
-            "defaultValue": "control",
-            "rules": [
-              {
-                "key": "feature-exp",
-                "seed": "feature-exp",
-                "hashAttribute": "id",
-                "fallbackAttribute": "deviceId",
-                "hashVersion": 2,
-                "bucketVersion": 1,
-                "disableStickyBucketing": true,
-                "condition": { "country": "USA" },
-                "variations": ["control", "red", "blue"],
-                "meta": [{ "key": "0" }, { "key": "1" }, { "key": "2" }],
-                "coverage": 1,
-                "weights": [0.3334, 0.3333, 0.3333],
-                "phase": "0"
-              }
-            ]
-          }
-        }
-      },
-      [
-        {
-          "attributeName": "id",
-          "attributeValue": "i123",
-          "assignments": { "feature-exp__0": "1" }
-        }
-      ],
-      "exp1",
-      {
-        "bucket": 0.9943,
-        "featureId": "exp1",
-        "hashAttribute": "id",
-        "hashUsed": true,
-        "hashValue": "i123",
-        "inExperiment": true,
-        "key": "2",
-        "stickyBucketUsed": false,
-        "value": "blue",
-        "variationId": 2
-      },
-      {
-        "id||i123": {
-          "attributeName": "id",
-          "attributeValue": "i123",
-          "assignments": { "feature-exp__0": "1" }
-        }
-      }
-    ],
-    [
       "uses a sticky bucket when sticky bucket version == experiment.minBucketVersion === experiment.bucketVersion",
       {
         "attributes": {
@@ -6844,6 +6941,65 @@
           },
           "attributeName": "deviceId",
           "attributeValue": "d123"
+        }
+      }
+    ],
+    [
+      "disables sticky bucketing when disabled by experiment",
+      {
+        "attributes": {
+          "id": "i123",
+          "foo": "bar",
+          "country": "USA"
+        },
+        "features": {
+          "exp1": {
+            "defaultValue": "control",
+            "rules": [
+              {
+                "key": "feature-exp",
+                "seed": "feature-exp",
+                "hashAttribute": "id",
+                "fallbackAttribute": "deviceId",
+                "hashVersion": 2,
+                "bucketVersion": 1,
+                "disableStickyBucketing": true,
+                "condition": { "country": "USA" },
+                "variations": ["control", "red", "blue"],
+                "meta": [{ "key": "0" }, { "key": "1" }, { "key": "2" }],
+                "coverage": 1,
+                "weights": [0.3334, 0.3333, 0.3333],
+                "phase": "0"
+              }
+            ]
+          }
+        }
+      },
+      [
+        {
+          "attributeName": "id",
+          "attributeValue": "i123",
+          "assignments": { "feature-exp__0": "1" }
+        }
+      ],
+      "exp1",
+      {
+        "bucket": 0.9943,
+        "featureId": "exp1",
+        "hashAttribute": "id",
+        "hashUsed": true,
+        "hashValue": "i123",
+        "inExperiment": true,
+        "key": "2",
+        "stickyBucketUsed": false,
+        "value": "blue",
+        "variationId": 2
+      },
+      {
+        "id||i123": {
+          "attributeName": "id",
+          "attributeValue": "i123",
+          "assignments": { "feature-exp__0": "1" }
         }
       }
     ]

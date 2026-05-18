@@ -415,7 +415,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         isError = false
     }
 
-    override fun featuresAPIModelSuccessfully(model: FeaturesDataModel) {
+    override suspend fun onPayloadReady(model: FeaturesDataModel) {
         isSuccess = true
         isError = false
         hasFeatures = !model.features.isNullOrEmpty()
