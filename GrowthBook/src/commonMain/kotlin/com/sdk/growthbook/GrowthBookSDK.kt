@@ -37,6 +37,8 @@ import com.sdk.growthbook.kotlinx.serialization.from
 import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.StackContext
 import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBuckets
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlin.experimental.ExperimentalObjCRefinement
 import kotlin.native.HiddenFromObjC
@@ -83,6 +85,9 @@ class GrowthBookSDK(
         encryptionKey = gbContext.encryptionKey,
         cachingEnabled = cachingEnabled,
         cacheKey = "${Constants.FEATURE_CACHE}_${gbContext.apiKey}",
+        coroutineScope = gbContext.stickyBucketService?.coroutineScope ?: CoroutineScope(
+            PlatformDependentIODispatcher + SupervisorJob()
+        )
     )
 
     init {

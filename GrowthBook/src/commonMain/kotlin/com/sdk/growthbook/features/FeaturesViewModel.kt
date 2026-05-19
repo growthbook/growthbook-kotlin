@@ -1,5 +1,6 @@
 package com.sdk.growthbook.features
 
+import com.sdk.growthbook.PlatformDependentIODispatcher
 import com.sdk.growthbook.utils.Constants
 import com.sdk.growthbook.utils.DefaultCrypto
 import com.sdk.growthbook.utils.GBError
@@ -16,7 +17,7 @@ import com.sdk.growthbook.serializable_model.gbDeserialize
 import com.sdk.growthbook.utils.SSEConnectionController
 import com.sdk.growthbook.utils.getSavedGroupFromEncryptedSavedGroup
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
@@ -43,7 +44,9 @@ internal class FeaturesViewModel(
     private val cachingEnabled: Boolean,
     private val cacheKey: String = Constants.FEATURE_CACHE,
     private val cachingLayer: CachingLayer = CachingImpl.getLayer(),
-    private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Unconfined),
+    private val coroutineScope: CoroutineScope = CoroutineScope(
+        PlatformDependentIODispatcher + SupervisorJob()
+    )
 ) {
 
     /**
