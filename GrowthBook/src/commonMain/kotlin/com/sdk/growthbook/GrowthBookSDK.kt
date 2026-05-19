@@ -267,13 +267,11 @@ class GrowthBookSDK(
      * @returns a [GBFeatureResult] object
      */
     fun feature(id: String): GBFeatureResult {
-        val evaluator = GBFeatureEvaluator(
-            createEvaluationContext(), this.forcedFeatures,
-        )
-        return evaluator.evaluateFeature(
-            featureKey = id,
-            attributeOverrides = attributeOverrides,
-        )
+        val evalContext = createEvaluationContext()
+        val evaluator = GBFeatureEvaluator(evalContext, this.forcedFeatures)
+        val result = evaluator.evaluateFeature(featureKey = id, attributeOverrides = attributeOverrides)
+        gbContext.stickyBucketAssignmentDocs = evalContext.userContext.stickyBucketAssignmentDocs
+        return result
     }
 
     /**
@@ -317,13 +315,16 @@ class GrowthBookSDK(
      * The run method takes an Experiment object and returns an ExperimentResult
      */
     fun run(experiment: GBExperiment): GBExperimentResult {
+        val evalContext = createEvaluationContext()
         val evaluator = GBExperimentEvaluator(
-            createEvaluationContext()
+            evalContext
         )
         val result = evaluator.evaluateExperiment(
             experiment = experiment,
             attributeOverrides = attributeOverrides
         )
+
+        gbContext.stickyBucketAssignmentDocs = evalContext.userContext.stickyBucketAssignmentDocs
 
         fireSubscriptions(experiment, result)
         return result
