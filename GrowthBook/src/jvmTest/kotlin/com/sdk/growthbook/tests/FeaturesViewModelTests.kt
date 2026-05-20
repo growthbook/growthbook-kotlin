@@ -10,6 +10,7 @@ import com.sdk.growthbook.features.FeaturesViewModel
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBOptions
+import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.json.JsonObject
 import kotlin.test.Test
 import kotlin.test.assertNotNull
@@ -49,6 +50,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 testGbOptions
             ),
             "3tfeoyW0wlo47bDnbWDkxg==", false,
+            coroutineContext = Dispatchers.Unconfined,
         )
 
         viewModel.fetchFeatures()
@@ -71,6 +73,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 gbContext, testGbOptions,
             ),
             "3tfeoyW0wlo47bDnbWDkxg==", false,
+            coroutineContext = Dispatchers.Unconfined,
         )
 
         viewModel.fetchFeatures()
@@ -94,6 +97,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 gbContext, testGbOptions,
             ),
             cachingEnabled = false,
+            coroutineContext = Dispatchers.Unconfined,
         )
 
         viewModel.fetchFeatures()
@@ -118,6 +122,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             ),
             encryptionKey = "",
             cachingEnabled = false,
+            coroutineContext = Dispatchers.Unconfined,
         )
         viewModel.fetchFeatures()
 
@@ -143,6 +148,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 ),
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = false,
+            coroutineContext = Dispatchers.Unconfined,
         )
         val forcedFeature = mapOf("feature" to GBNumber(123))
         val forcedVariation = mapOf("feature" to 123)
@@ -176,6 +182,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 ),
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = false,
+            coroutineContext = Dispatchers.Unconfined,
         )
         val forcedFeature = mapOf("feature" to GBNumber(123))
         val forcedVariation = mapOf("feature" to 123)
@@ -206,6 +213,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 gbContext, testGbOptions,
             ),
             cachingEnabled = false,
+            coroutineContext = Dispatchers.Unconfined,
         )
 
         viewModel.fetchFeatures()
@@ -228,6 +236,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             ),
             "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = true,
+            coroutineContext = Dispatchers.Unconfined,
         )
 
         viewModel.fetchFeatures()
@@ -249,6 +258,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             ),
             "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = false,
+            coroutineContext = Dispatchers.Unconfined,
         )
 
         viewModel.fetchFeatures()
@@ -269,6 +279,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             ),
             encryptionKey = "",
             cachingEnabled = false,
+            coroutineContext = Dispatchers.Unconfined,
         )
 
         viewModel.fetchFeatures()
@@ -289,6 +300,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             ),
             encryptionKey = "",
             cachingEnabled = false,
+            coroutineContext = Dispatchers.Unconfined,
         )
 
         viewModel.fetchFeatures()
@@ -310,6 +322,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = false,
             cachingLayer = cacheLayer,
+            coroutineContext = Dispatchers.Unconfined,
         )
 
         viewModel.fetchFeatures()
@@ -335,6 +348,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = false,
             cachingLayer = cacheLayer,
+            coroutineContext = Dispatchers.Unconfined,
         )
 
         viewModel.fetchFeatures()
@@ -358,6 +372,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             ),
             cachingEnabled = false,
             cachingLayer = cacheLayer,
+            coroutineContext = Dispatchers.Unconfined,
         )
 
         viewModel.fetchFeatures()
@@ -380,6 +395,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             ),
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = false,
+            coroutineContext = Dispatchers.Unconfined,
         )
 
         val flow = viewModel.autoRefreshFeatures()

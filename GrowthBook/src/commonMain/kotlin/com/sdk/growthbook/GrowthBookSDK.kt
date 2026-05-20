@@ -84,10 +84,7 @@ class GrowthBookSDK(
         ),
         encryptionKey = gbContext.encryptionKey,
         cachingEnabled = cachingEnabled,
-        cacheKey = "${Constants.FEATURE_CACHE}_${gbContext.apiKey}",
-        coroutineScope = gbContext.stickyBucketService?.coroutineScope ?: CoroutineScope(
-            PlatformDependentIODispatcher + SupervisorJob()
-        )
+        cacheKey = "${Constants.FEATURE_CACHE}_${gbContext.apiKey}"
     )
 
     init {
