@@ -1,6 +1,7 @@
 package com.sdk.growthbook.features
 
 import com.sdk.growthbook.utils.Constants
+import kotlin.coroutines.CoroutineContext
 import com.sdk.growthbook.utils.DefaultCrypto
 import com.sdk.growthbook.utils.GBError
 import com.sdk.growthbook.utils.GBFeatures
@@ -15,7 +16,12 @@ import com.sdk.growthbook.serializable_model.SerializableFeaturesDataModel
 import com.sdk.growthbook.serializable_model.gbDeserialize
 import com.sdk.growthbook.utils.SSEConnectionController
 import com.sdk.growthbook.utils.getSavedGroupFromEncryptedSavedGroup
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -23,7 +29,7 @@ import kotlinx.serialization.json.JsonObject
  */
 internal interface FeaturesFlowDelegate {
     fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean)
-    fun featuresAPIModelSuccessfully(model: FeaturesDataModel)
+    suspend fun onPayloadReady(model: FeaturesDataModel)
     fun featuresFetchFailed(error: GBError, isRemote: Boolean)
     fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean)
     fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean)
@@ -40,6 +46,7 @@ internal class FeaturesViewModel(
     private val cachingEnabled: Boolean,
     private val cacheKey: String = Constants.FEATURE_CACHE,
     private val cachingLayer: CachingLayer = CachingImpl.getLayer(),
+    coroutineContext: CoroutineContext = Dispatchers.Unconfined,
 ) {
 
     /**
@@ -47,6 +54,8 @@ internal class FeaturesViewModel(
      */
     val sseController: SSEConnectionController
         get() = dataSource.sseController
+
+    private val coroutineScope: CoroutineScope = CoroutineScope(coroutineContext + SupervisorJob())
 
     /**
      * Fetch Features
@@ -74,7 +83,9 @@ internal class FeaturesViewModel(
             dataSource.fetchRemoteEval(
                 params = payload,
                 success = { responseFeaturesDataModel ->
-                    prepareFeaturesDataForRemoteEval(responseFeaturesDataModel.data)
+                    coroutineScope.launch {
+                        prepareFeaturesDataForRemoteEval(responseFeaturesDataModel.data)
+                    }
                 },
                 failure = { error ->
                     this.delegate.featuresFetchFailed(GBError(error.exception), true)
@@ -83,7 +94,9 @@ internal class FeaturesViewModel(
         } else {
             dataSource.fetchFeatures(
                 success = { dataModel ->
-                    prepareFeaturesDataForRemoteEval(dataModel)
+                    coroutineScope.launch {
+                        prepareFeaturesDataForRemoteEval(dataModel)
+                    }
                 },
                 failure = { error ->
                     // Call Error Delegate with mention of data not available but its not remote
@@ -133,7 +146,9 @@ internal class FeaturesViewModel(
     fun autoRefreshFeatures(): Flow<Resource<GBFeatures?>> {
         sseController.start()
         return dataSource.autoRefresh(success = { dataModel ->
-            prepareFeaturesDataForRemoteEval(dataModel = dataModel)
+            coroutineScope.launch {
+                prepareFeaturesDataForRemoteEval(dataModel = dataModel)
+            }
         }, failure = { error ->
             // Call Error Delegate with mention of data not available but its not remote
             this.delegate.featuresFetchFailed(GBError(error), true)
@@ -141,9 +156,11 @@ internal class FeaturesViewModel(
     }
 
     /**
-     * Cache API Response and push success event
+     * Cache API Response and push success event.
+     * Awaits sticky bucket refresh before notifying delegate of ready features,
+     * mirroring TypeScript's setPayload: await refreshStickyBuckets → set features.
      */
-    private fun prepareFeaturesDataForRemoteEval(dataModel: FeaturesDataModel?) {
+    private suspend fun prepareFeaturesDataForRemoteEval(dataModel: FeaturesDataModel?) {
         var features = dataModel?.features
         var savedGroups = dataModel?.savedGroups
         val encryptedFeatures = dataModel?.encryptedFeatures
@@ -155,7 +172,10 @@ internal class FeaturesViewModel(
                     putDataToCache(dataModel)
                 }
 
-                delegate.featuresAPIModelSuccessfully(dataModel)
+                // Await sticky bucket refresh before setting features in context —
+                // same ordering as TypeScript setPayload.
+                delegate.onPayloadReady(dataModel)
+
                 if (!features.isNullOrEmpty()) {
                     this.delegate.featuresFetchedSuccessfully(
                         features = features,

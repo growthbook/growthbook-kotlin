@@ -36,7 +36,9 @@ import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.kotlinx.serialization.from
 import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.StackContext
-import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBucketsSync
+import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBuckets
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlin.experimental.ExperimentalObjCRefinement
 import kotlin.native.HiddenFromObjC
@@ -82,7 +84,7 @@ class GrowthBookSDK(
         ),
         encryptionKey = gbContext.encryptionKey,
         cachingEnabled = cachingEnabled,
-        cacheKey = "${Constants.FEATURE_CACHE}_${gbContext.apiKey}",
+        cacheKey = "${Constants.FEATURE_CACHE}_${gbContext.apiKey}"
     )
 
     init {
@@ -267,13 +269,11 @@ class GrowthBookSDK(
      * @returns a [GBFeatureResult] object
      */
     fun feature(id: String): GBFeatureResult {
-        val evaluator = GBFeatureEvaluator(
-            createEvaluationContext(), this.forcedFeatures,
-        )
-        return evaluator.evaluateFeature(
-            featureKey = id,
-            attributeOverrides = attributeOverrides,
-        )
+        val evalContext = createEvaluationContext()
+        val evaluator = GBFeatureEvaluator(evalContext, this.forcedFeatures)
+        val result = evaluator.evaluateFeature(featureKey = id, attributeOverrides = attributeOverrides)
+        gbContext.stickyBucketAssignmentDocs = evalContext.userContext.stickyBucketAssignmentDocs
+        return result
     }
 
     /**
@@ -317,21 +317,27 @@ class GrowthBookSDK(
      * The run method takes an Experiment object and returns an ExperimentResult
      */
     fun run(experiment: GBExperiment): GBExperimentResult {
+        val evalContext = createEvaluationContext()
         val evaluator = GBExperimentEvaluator(
-            createEvaluationContext()
+            evalContext
         )
         val result = evaluator.evaluateExperiment(
             experiment = experiment,
             attributeOverrides = attributeOverrides
         )
 
+        gbContext.stickyBucketAssignmentDocs = evalContext.userContext.stickyBucketAssignmentDocs
+
         fireSubscriptions(experiment, result)
         return result
     }
 
     /**
-     * The setAttributes method replaces the Map of user attributes
-     * that are used to assign variations
+     * Replaces the Map of user attributes used to assign variations.
+     *
+     * Sticky bucket refresh runs in the background (fire-and-forget).
+     * If you use Sticky Bucketing and need to evaluate experiments immediately
+     * after setting attributes, use [setAttributesSync] instead.
      */
     fun setAttributes(attributes: Map<String, GBValue>) {
         gbContext.attributes = attributes
@@ -339,28 +345,25 @@ class GrowthBookSDK(
     }
 
     /**
-     * Synchronous version of setAttributes that waits for sticky buckets to load.
+     * Coroutine version of [setAttributes] that awaits sticky bucket refresh before returning.
      *
-     * Use this method when switching users, during login/logout, or any scenario
-     * where you need to ensure sticky bucket assignments are loaded before
-     * evaluating experiments.
+     * Note: despite the "Sync" suffix this is a suspend function — it does not block the thread.
+     * Use this when you use Sticky Bucketing and need to guarantee that assignments are loaded
+     * before evaluating experiments (e.g. after login or user switch).
      *
      * Example:
      * ```kotlin
      * lifecycleScope.launch {
      *     sdk.setAttributesSync(loginAttributes)
-     *     // Sticky buckets guaranteed to be loaded here
-     *     val result = sdk.feature("my-experiment")
+     *     val result = sdk.feature("my-experiment") // sticky buckets guaranteed
      * }
      * ```
-     *
-     * @param attributes The user attributes map
      */
     suspend fun setAttributesSync(attributes: Map<String, GBValue>) {
         gbContext.attributes = attributes
 
         if (gbContext.stickyBucketService != null) {
-            refreshStickyBucketsSync(
+            refreshStickyBuckets(
                 context = gbContext,
                 data = null,
                 attributeOverrides = attributeOverrides
@@ -369,8 +372,11 @@ class GrowthBookSDK(
     }
 
     /**
-     * The setAttributeOverrides method replaces the Map of user overrides attribute
-     * that are used for Sticky Bucketing
+     * Replaces the Map of attribute overrides used for Sticky Bucketing.
+     *
+     * Sticky bucket refresh runs in the background (fire-and-forget).
+     * If you need to guarantee assignments are loaded before evaluating experiments,
+     * use [setAttributeOverridesSync] instead.
      */
     fun setAttributeOverrides(overrides: Map<String, GBValue>) {
         attributeOverrides = overrides
@@ -381,15 +387,15 @@ class GrowthBookSDK(
     }
 
     /**
-     * Synchronous version of setAttributeOverrides that waits for sticky buckets to load.
+     * Coroutine version of [setAttributeOverrides] that awaits sticky bucket refresh before returning.
      *
-     * @param overrides The attribute overrides map
+     * Note: despite the "Sync" suffix this is a suspend function — it does not block the thread.
      */
     suspend fun setAttributeOverridesSync(overrides: Map<String, GBValue>) {
         attributeOverrides = overrides
 
         if (gbContext.stickyBucketService != null) {
-            refreshStickyBucketsSync(
+            refreshStickyBuckets(
                 context = gbContext,
                 data = null,
                 attributeOverrides = attributeOverrides
@@ -418,23 +424,36 @@ class GrowthBookSDK(
     }
 
     /**
-     * Delegate that call refresh Sticky Bucket Service
-     * after success fetched features
+     * Called after the full API payload is received, before features are applied to context.
+     * Awaits sticky bucket refresh so that context is consistent when featuresFetchedSuccessfully fires.
      */
-    override fun featuresAPIModelSuccessfully(model: FeaturesDataModel) {
-        refreshStickyBucketService(dataModel = model)
-    }
-
-    /**
-     * Method for update latest attributes
-     */
-    private fun refreshStickyBucketService(dataModel: FeaturesDataModel? = null) {
-        gbContext.stickyBucketService?.coroutineScope?.launch {
-            refreshStickyBucketsSync(
+    override suspend fun onPayloadReady(model: FeaturesDataModel) {
+        try {
+            refreshStickyBuckets(
                 context = gbContext,
-                data = dataModel,
+                data = model,
                 attributeOverrides = attributeOverrides
             )
+        } catch (e: Exception) {
+            if (gbContext.enableLogging) {
+                GB.error("GrowthBook: Failed to refresh sticky buckets on payload ready: ${e.message}", e)
+            }
+        }
+    }
+
+    private fun refreshStickyBucketService(dataModel: FeaturesDataModel? = null) {
+        gbContext.stickyBucketService?.coroutineScope?.launch {
+            try {
+                refreshStickyBuckets(
+                    context = gbContext,
+                    data = dataModel,
+                    attributeOverrides = attributeOverrides
+                )
+            } catch (e: Exception) {
+                if (gbContext.enableLogging) {
+                    GB.error("GrowthBook: Failed to refresh sticky bucket assignments: ${e.message}", e)
+                }
+            }
         }
     }
 
