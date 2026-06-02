@@ -17,6 +17,7 @@ import com.sdk.growthbook.utils.SSEConnectionController
 import com.sdk.growthbook.utils.getSavedGroupFromEncryptedSavedGroup
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonObject
+import kotlin.time.Clock
 
 /**
  * Interface for Feature API Completion Events
@@ -40,6 +41,7 @@ internal class FeaturesViewModel(
     private val cachingEnabled: Boolean,
     private val cacheKey: String = Constants.FEATURE_CACHE,
     private val cachingLayer: CachingLayer = CachingImpl.getLayer(),
+    private val backgroundFetchInterval: Long? = null
 ) {
 
     /**
@@ -51,13 +53,21 @@ internal class FeaturesViewModel(
     /**
      * Fetch Features
      */
-    fun fetchFeatures(remoteEval: Boolean = false, payload: GBRemoteEvalParams? = null) {
+    fun fetchFeatures(remoteEval: Boolean = false, payload: GBRemoteEvalParams? = null, forceRefresh: Boolean = false) {
         try {
             // Check for cache data
-            val dataModel = getDataFromCache()
-            if (dataModel != null) {
+            val cachedEntry = getDataFromCache()
+            if (cachedEntry != null) {
                 // Call Success Delegate with mention of data available but its not remote
-                handleFetchFeaturesWithoutRemoteEval(dataModel)
+                handleFetchFeaturesWithoutRemoteEval(cachedEntry.first)
+                if (!forceRefresh && !remoteEval) {
+                    val cachedAt = cachedEntry.second
+                    if (backgroundFetchInterval != null && cachedAt != null) {
+                        if (Clock.System.now().toEpochMilliseconds() - cachedAt < backgroundFetchInterval) {
+                            return
+                        }
+                    }
+                }
             }
         } catch (error: Throwable) {
             // Call Error Delegate with mention of data not available but its not remote
@@ -119,12 +129,12 @@ internal class FeaturesViewModel(
         }
     }
 
-    private fun getDataFromCache(): FeaturesDataModel? {
-        val dataModel = cachingLayer.getData(
+    private fun getDataFromCache(): Pair<FeaturesDataModel, Long?>? {
+        val serializable = cachingLayer.getData(
             cacheKey,
             SerializableFeaturesDataModel.serializer()
-        )
-        return dataModel?.gbDeserialize()
+        ) ?: return null
+        return serializable.gbDeserialize() to serializable.cachedAt
     }
 
     /**
@@ -244,7 +254,7 @@ internal class FeaturesViewModel(
     private fun putDataToCache(dataModel: FeaturesDataModel) {
         cachingLayer.putData(
             fileName = cacheKey,
-            content = dataModel.gbSerialize(),
+            content = dataModel.gbSerialize().copy(cachedAt = Clock.System.now().toEpochMilliseconds()),
             serializer = SerializableFeaturesDataModel.serializer()
         )
     }

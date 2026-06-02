@@ -35,10 +35,10 @@ internal class MockCachingLayer(
          * Builds a JsonElement that represents a cached FeaturesDataModel
          * by deserializing the given raw API response string and re-encoding it.
          */
-        fun fromApiResponse(rawJson: String): MockCachingLayer {
+        fun fromApiResponse(rawJson: String, cachedAt: Long? = null): MockCachingLayer {
             val serializable = json.decodeFromString(
                 SerializableFeaturesDataModel.serializer(), rawJson
-            )
+            ).copy(cachedAt = cachedAt)
             val element = Json.encodeToJsonElement(
                 SerializableFeaturesDataModel.serializer(), serializable
             )

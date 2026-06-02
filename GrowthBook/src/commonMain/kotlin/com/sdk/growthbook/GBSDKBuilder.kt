@@ -103,6 +103,7 @@ class GBSDKBuilder(
     private var refreshHandler: GBCacheRefreshHandler? = null
     private var stickyBucketService: GBStickyBucketService? = null
     private var featureUsageCallback: GBFeatureUsageCallback? = null
+    private var backgroundFetchInterval: Long? = null
 
     /**
      * Set Refresh Handler - Will be called when cache is refreshed
@@ -157,6 +158,11 @@ class GBSDKBuilder(
         return this
     }
 
+    fun setBackgroundFetchInterval(intervalMs: Long): GBSDKBuilder {
+        this.backgroundFetchInterval = intervalMs
+        return this
+    }
+
     /**
      * Initialize the Kotlin SDK and provide it when ready
      */
@@ -194,6 +200,7 @@ class GBSDKBuilder(
             refreshHandler,
             networkDispatcher,
             cachingEnabled = cachingEnabled,
+            backgroundFetchInterval = backgroundFetchInterval,
         )
     }
 
@@ -244,6 +251,7 @@ class GBSDKBuilder(
                 internalRefreshHandler,
                 networkDispatcher,
                 cachingEnabled = cachingEnabled,
+                backgroundFetchInterval = backgroundFetchInterval
             )
         }
     }

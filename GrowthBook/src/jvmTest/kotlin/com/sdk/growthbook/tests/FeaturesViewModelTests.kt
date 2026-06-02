@@ -10,10 +10,13 @@ import com.sdk.growthbook.features.FeaturesViewModel
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBOptions
+import kotlinx.coroutines.Job
 import kotlinx.serialization.json.JsonObject
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Clock
 
 class FeaturesViewModelTests : FeaturesFlowDelegate {
 
@@ -385,6 +388,71 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         val flow = viewModel.autoRefreshFeatures()
 
         assertNotNull(flow)
+    }
+
+    @Test
+    fun testSkipsNetworkWhenCacheIsFresh() {
+        var networkCallCount = 0
+        val mockClient = object : MockNetworkClient(MockResponse.successResponse, null) {
+            override fun consumeGETRequestWithNotModified(
+                request: String,
+                onSuccess: (String) -> Unit,
+                onError: (Throwable) -> Unit,
+                onNotModified: (() -> Unit)
+            ): Job {
+                networkCallCount++
+                return super.consumeGETRequestWithNotModified(request, onSuccess, onError, onNotModified)
+            }
+        }
+        val cacheLayer = MockCachingLayer.fromApiResponse(
+            MockResponse.successResponse,
+            cachedAt = Clock.System.now().toEpochMilliseconds()
+        )
+        val viewModel = FeaturesViewModel(
+            delegate = this,
+            dataSource = FeaturesDataSource(mockClient, gbContext, testGbOptions),
+            encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
+            cachingEnabled = false,
+            cachingLayer = cacheLayer,
+            backgroundFetchInterval = 48 * 60 * 60 * 1000L,
+        )
+
+        viewModel.fetchFeatures()
+
+        assertEquals(0, networkCallCount, "Network should not be called when cache is fresh")
+    }
+
+    @Test
+    fun testFetchesNetworkWhenCacheIsStale() {
+        var networkCallCount = 0
+        val mockClient = object : MockNetworkClient(MockResponse.successResponse, null) {
+            override fun consumeGETRequestWithNotModified(
+                request: String,
+                onSuccess: (String) -> Unit,
+                onError: (Throwable) -> Unit,
+                onNotModified: (() -> Unit)
+            ): Job {
+                networkCallCount++
+                return super.consumeGETRequestWithNotModified(request, onSuccess, onError, onNotModified)
+            }
+        }
+        val staleTime = Clock.System.now().toEpochMilliseconds() - (49 * 60 * 60 * 1000L)
+        val cacheLayer = MockCachingLayer.fromApiResponse(
+            MockResponse.successResponse,
+            cachedAt = staleTime
+        )
+        val viewModel = FeaturesViewModel(
+            delegate = this,
+            dataSource = FeaturesDataSource(mockClient, gbContext, testGbOptions),
+            encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
+            cachingEnabled = false,
+            cachingLayer = cacheLayer,
+            backgroundFetchInterval = 48 * 60 * 60 * 1000L,
+        )
+
+        viewModel.fetchFeatures()
+
+        assertEquals(1, networkCallCount, "Network should be called when cache is stale")
     }
 
     override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {

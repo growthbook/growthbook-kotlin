@@ -58,6 +58,7 @@ class GrowthBookSDK(
     features: GBFeatures? = null,
     savedGroups: Map<String, GBValue>? = null,
     cachingEnabled: Boolean,
+    private val backgroundFetchInterval: Long? = null,
 ) : FeaturesFlowDelegate {
 
     private var savedGroups: Map<String, GBValue>? = emptyMap()
@@ -82,6 +83,7 @@ class GrowthBookSDK(
         ),
         encryptionKey = gbContext.encryptionKey,
         cachingEnabled = cachingEnabled,
+        backgroundFetchInterval = backgroundFetchInterval,
         cacheKey = "${Constants.FEATURE_CACHE}_${gbContext.apiKey}",
     )
 
@@ -89,7 +91,11 @@ class GrowthBookSDK(
         if (features != null) {
             gbContext.features = features
         } else {
-            refreshCache()
+            if (gbContext.remoteEval) {
+                refreshForRemoteEval()
+            } else {
+                featuresViewModel.fetchFeatures()
+            }
         }
         this.savedGroups = savedGroups
         refreshStickyBucketService()
@@ -102,7 +108,7 @@ class GrowthBookSDK(
         if (gbContext.remoteEval) {
             refreshForRemoteEval()
         } else {
-            featuresViewModel.fetchFeatures()
+            featuresViewModel.fetchFeatures(forceRefresh = true)
         }
     }
 
