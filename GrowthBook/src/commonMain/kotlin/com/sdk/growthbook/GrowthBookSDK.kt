@@ -249,20 +249,22 @@ class GrowthBookSDK(
      * @returns a [GBFeatureResult] object
      */
     suspend fun suspendFeature(id: String): GBFeatureResult {
-        return when (remoteSourceFeaturesFetchResult) {
-            FeaturesFetchResult.Success -> {
-                feature(id)
-            }
+        var attempt = 0
+        var delaysMs = INITIAL_RETRY_DELAY_MILLIS
 
-            FeaturesFetchResult.NoResultYet -> {
-                delay(TIME_FOR_CALL_WAIT_MILLIS)
-                suspendFeature(id)
-            }
+        while (true) {
+            when (remoteSourceFeaturesFetchResult) {
+                FeaturesFetchResult.Success -> return feature(id)
 
-            FeaturesFetchResult.Failed -> {
-                featuresViewModel.fetchFeatures()
-                delay(TIME_FOR_CALL_WAIT_MILLIS)
-                suspendFeature(id)
+                FeaturesFetchResult.NoResultYet -> delay(TIME_FOR_CALL_WAIT_MILLIS)
+
+                FeaturesFetchResult.Failed -> {
+                    if (attempt >= MAX_RETRY_ATTEMPTS) return feature(id)
+                    featuresViewModel.fetchFeatures(forceRefresh = true)
+                    delay(delaysMs)
+                    delaysMs = minOf(delaysMs * 2, MAX_RETRY_DELAY_MILLIS)
+                    attempt++
+                }
             }
         }
     }
@@ -519,6 +521,9 @@ class GrowthBookSDK(
 
         // After this period of time a call status is checked again
         private const val TIME_FOR_CALL_WAIT_MILLIS = 1000L
+        private const val INITIAL_RETRY_DELAY_MILLIS = 1000L
+        private const val MAX_RETRY_DELAY_MILLIS = 60_000L
+        private const val MAX_RETRY_ATTEMPTS = 5
 
         private fun createEvaluationContext(
             gbContext: GBContext,

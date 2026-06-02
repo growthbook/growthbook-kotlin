@@ -165,7 +165,7 @@ internal class VerifySDKReturnFeatureValues {
         // fetchFeature() triggers featuresFetchFailed()
 
         val mockedFeaturesViewModel: FeaturesViewModel = mockk {
-            every { fetchFeatures() } returns Unit
+            every { fetchFeatures(any(), any(), any()) } returns Unit
         }
         gbSdk.featuresViewModel = mockedFeaturesViewModel
 
@@ -182,7 +182,7 @@ internal class VerifySDKReturnFeatureValues {
             job.cancel()
             // or gbSdk.featuresFetchedSuccessfully(emptyMap(), true)
 
-            coVerify { mockedFeaturesViewModel.fetchFeatures() }
+            coVerify { mockedFeaturesViewModel.fetchFeatures(forceRefresh = true) }
         }
     }
 
