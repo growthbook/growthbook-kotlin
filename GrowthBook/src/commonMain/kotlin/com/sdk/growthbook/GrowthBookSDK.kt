@@ -261,6 +261,9 @@ class GrowthBookSDK(
                 FeaturesFetchResult.Failed -> {
                     if (attempt >= MAX_RETRY_ATTEMPTS) return feature(id)
                     featuresViewModel.fetchFeatures(forceRefresh = true)
+                    if (gbContext.enableLogging) {
+                        GB.log("GrowthBookSDK: suspendFeature: retry attempt ${attempt + 1}/$MAX_RETRY_ATTEMPTS, waiting ${delaysMs}ms")
+                    }
                     delay(delaysMs)
                     delaysMs = minOf(delaysMs * 2, MAX_RETRY_DELAY_MILLIS)
                     attempt++
