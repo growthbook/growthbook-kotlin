@@ -9,6 +9,7 @@ import com.sdk.growthbook.model.GBFeatureSource
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.utils.GBUtils
 import com.sdk.growthbook.kotlinx.serialization.from
+import com.sdk.growthbook.utils.GBUtils.Companion.getAttributes
 import kotlinx.coroutines.launch
 
 /**
@@ -134,7 +135,7 @@ internal class GBExperimentEvaluator(
             if (experiment.filters != null) {
                 if (GBUtils.isFilteredOut(
                         filters = experiment.filters,
-                        attributeOverrides = evaluationContext.userContext.attributes,
+                        attributeOverrides = attributeOverrides,
                         evaluationContext = evaluationContext,
                     )
                 ) {
@@ -177,7 +178,10 @@ internal class GBExperimentEvaluator(
              * return immediately (not in experiment, variationId 0)
              */
             if (experiment.condition != null) {
-                val attr = evaluationContext.userContext.attributes
+                val attr = getAttributes(
+                    attributeOverrides = attributeOverrides,
+                    attributes = evaluationContext.userContext.attributes,
+                )
                 val conditionObj: GBJson = experiment.condition!!.let(GBValue::from) as? GBJson
                     ?: GBJson(emptyMap())
                 val evaluationResult = GBConditionEvaluator().evalCondition(
@@ -209,8 +213,7 @@ internal class GBExperimentEvaluator(
                     val parentResult = GBFeatureEvaluator(evaluationContext)
                         .evaluateFeature(
                             featureKey = parentCondition.id,
-                            attributeOverrides = parentCondition.condition
-                                .jsonObject.mapValues { GBValue.from(it.value) }
+                            attributeOverrides = attributeOverrides
                         )
                     if (parentResult.source == GBFeatureSource.cyclicPrerequisite) {
                         return getExperimentResult(

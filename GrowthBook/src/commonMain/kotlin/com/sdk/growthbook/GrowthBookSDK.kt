@@ -341,6 +341,7 @@ class GrowthBookSDK(
      */
     fun setAttributes(attributes: Map<String, GBValue>) {
         gbContext.attributes = attributes
+        gbContext.stickyBucketAssignmentDocs = null
         refreshStickyBucketService()
     }
 
@@ -381,6 +382,7 @@ class GrowthBookSDK(
     fun setAttributeOverrides(overrides: Map<String, GBValue>) {
         attributeOverrides = overrides
         if (gbContext.stickyBucketService != null) {
+            gbContext.stickyBucketAssignmentDocs = null
             refreshStickyBucketService()
         }
         refreshForRemoteEval()

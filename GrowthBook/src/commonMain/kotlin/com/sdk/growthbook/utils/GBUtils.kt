@@ -273,9 +273,12 @@ internal class GBUtils {
             return filters.any { filter: GBFilter ->
                 val hashAttribute: String = filter.attribute ?: "id"
 
-                val hashValueElement: GBValue =
-                    evaluationContext.userContext
-                        .attributes.getValue(hashAttribute)
+                val merged = getAttributes(
+                    evaluationContext.userContext.attributes,
+                    attributeOverrides
+                )
+
+                val hashValueElement: GBValue = merged.getValue(hashAttribute)
 
                 if (hashValueElement is GBValue.Unknown) return@any true
                 if (hashValueElement.gbSerialize() !is JsonPrimitive) return@any true
@@ -298,6 +301,15 @@ internal class GBUtils {
                     )
                 }
             }
+        }
+
+        /**
+         * The method that merge together attributes of Context and override attribute
+         */
+        fun getAttributes(
+            attributes: Map<String, GBValue>, attributeOverrides: Map<String, GBValue>,
+        ): Map<String, GBValue> {
+            return attributes + attributeOverrides
         }
 
         /**
