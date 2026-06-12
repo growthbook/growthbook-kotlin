@@ -36,8 +36,13 @@ class CachingAndroid : CachingLayer {
             val tempFile = File(file.parent, "${file.name}.tmp")
             val jsonContents = json.encodeToString(JsonElement.serializer(), content)
             try {
-                tempFile.writeText(jsonContents)
-                tempFile.renameTo(file)
+                FileOutputStream(tempFile).use { out ->
+                    out.write(jsonContents.toByteArray())
+                    out.fd.sync()
+                }
+                if (!tempFile.renameTo(file)) {
+                    throw IOException("Failed to rename ${tempFile.name} to ${file.name}")
+                }
             } catch (e: Exception) {
                 tempFile.delete()
                 throw e
