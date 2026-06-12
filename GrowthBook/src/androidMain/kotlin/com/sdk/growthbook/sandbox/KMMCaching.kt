@@ -10,9 +10,7 @@ import java.util.concurrent.ConcurrentHashMap
  * Actual Implementation for Caching in Android - As expected in KMM
  */
 internal actual object CachingImpl {
-    actual fun getLayer(): CachingLayer {
-        return CachingAndroid()
-    }
+    actual fun getLayer(): CachingLayer = CachingAndroid.instance
 }
 
 /**
@@ -64,8 +62,8 @@ class CachingAndroid : CachingLayer {
             return try {
                 val inputAsString = file.readText()
                 json.decodeFromString(JsonElement.serializer(), inputAsString)
-            } catch (_: Exception) {
-                // Corrupt cache — delete and return null
+            } catch (e: Exception) {
+                GB.error("CachingAndroid: corrupt cache file '$fileName', deleting", e)
                 file.delete()
                 null
             }
@@ -95,6 +93,8 @@ class CachingAndroid : CachingLayer {
     }
 
     companion object {
+        internal val instance: CachingAndroid = CachingAndroid()
+
         internal var filesDir: File? = null
 
         /**
