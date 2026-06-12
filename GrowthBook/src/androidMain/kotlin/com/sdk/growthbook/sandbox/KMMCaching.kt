@@ -1,9 +1,12 @@
 package com.sdk.growthbook.sandbox
 
 import android.content.Context
+import com.sdk.growthbook.logger.GB
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -56,6 +59,10 @@ class CachingAndroid : CachingLayer {
         synchronized(getLock(fileName)) {
             val file = getTargetFile(fileName) ?: return null
 
+            if (!file.exists()) {
+                migrateLegacyCache(newFile = file)
+            }
+
             if (!file.exists()) return null
 
             // Read File Contents
@@ -86,6 +93,14 @@ class CachingAndroid : CachingLayer {
             targetFileName = fileName.removeSuffix(".txt")
         }
         return File(letDirectory, "$targetFileName.txt")
+    }
+
+    private fun migrateLegacyCache(newFile: File) {
+        val legacyFile = getTargetFile("FeatureCache") ?: return
+        if (!legacyFile.exists()) return
+        if (!legacyFile.renameTo(newFile)) {
+            legacyFile.delete()
+        }
     }
 
     private fun getLock(fileName: String): Any {
