@@ -15,6 +15,7 @@ import com.sdk.growthbook.serializable_model.SerializableFeaturesDataModel
 import com.sdk.growthbook.serializable_model.gbDeserialize
 import com.sdk.growthbook.utils.SSEConnectionController
 import com.sdk.growthbook.utils.getSavedGroupFromEncryptedSavedGroup
+import com.sdk.growthbook.logger.GB
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonObject
 
@@ -60,7 +61,7 @@ internal class FeaturesViewModel(
                 handleFetchFeaturesWithoutRemoteEval(dataModel)
             }
         } catch (error: Throwable) {
-            // Call Error Delegate with mention of data not available but its not remote
+            GB.error("FeaturesViewModel: cache read failed", error)
             this.delegate.featuresFetchFailed(GBError(error), false)
         }
         handleFetchFeaturesWithRemoteEval(remoteEval, payload)
@@ -151,11 +152,14 @@ internal class FeaturesViewModel(
 
         try {
             if (dataModel != null) {
-                if (cachingEnabled) {
-                    putDataToCache(dataModel)
-                }
-
                 delegate.featuresAPIModelSuccessfully(dataModel)
+                if (cachingEnabled) {
+                    try {
+                        putDataToCache(dataModel)
+                    } catch (e: Throwable) {
+                        GB.error("FeaturesViewModel: cache write failed, features still applied", e)
+                    }
+                }
                 if (!features.isNullOrEmpty()) {
                     this.delegate.featuresFetchedSuccessfully(
                         features = features,
@@ -236,6 +240,7 @@ internal class FeaturesViewModel(
                 }
             }
         } catch (error: Throwable) {
+            GB.error("FeaturesViewModel: failed to process remote features payload", error)
             this.delegate.featuresFetchFailed(error = GBError(error), isRemote = true)
             return
         }
