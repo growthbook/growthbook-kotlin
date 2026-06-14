@@ -107,7 +107,7 @@ var sdkInstance: GrowthBookSDK = GBSDKBuilder(
 
 The seeded features are applied immediately. The normal cache/network refresh still runs on top and overwrites the seed as fresher data arrives. Effective precedence: **network > disk cache > seed > code defaults**.
 
-> **Upgrading from 6.x:** The cache file is automatically migrated from `FeatureCache.txt` to the new scoped `FeatureCache_<clientKey>.txt` on first launch — no cold start on code defaults.
+> **Upgrading from 6.x:** The cache file is automatically migrated from `FeatureCache.txt` to the new scoped `FeatureCache_<clientKey>.txt` on first launch. Single-instance apps migrate transparently with no cold start. Apps that use multiple SDK instances with different `clientKey`s may see one cold start without cache on the first launch after upgrade — features self-correct after the first successful fetch.
 
 ## Usage
 
