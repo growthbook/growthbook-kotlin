@@ -6,6 +6,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Rule
 import org.junit.rules.TemporaryFolder
+import java.io.File
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -49,5 +51,31 @@ class AndroidCachingTest {
 
         assertTrue(fileContents != null)
         assertTrue(fileContents.jsonPrimitive.content == "GrowthBook")
+    }
+
+    @Test
+    fun testLegacyCacheMigratedToScopedFeatureCache() {
+        val manager = CachingAndroid()
+        val gbDir = File(CachingAndroid.filesDir, "GrowthBook-KMM").also { it.mkdirs() }
+        File(gbDir, "FeatureCache.txt").writeText("\"cached-features\"")
+
+        val result = manager.getContent("FeatureCache_myApiKey")
+
+        assertTrue(result != null)
+        assertTrue(result.jsonPrimitive.content == "cached-features")
+        assertTrue(!File(gbDir, "FeatureCache.txt").exists())
+    }
+
+    @Test
+    fun testLegacyCacheNotMigratedToStickyBucketFile() {
+        val manager = CachingAndroid()
+        val gbDir = File(CachingAndroid.filesDir, "GrowthBook-KMM").also { it.mkdirs() }
+        val legacyFile = File(gbDir, "FeatureCache.txt")
+        legacyFile.writeText("\"cached-features\"")
+
+        val stickyBucketResult = manager.getContent("gbStickyBuckets__id||user123")
+
+        assertNull(stickyBucketResult)
+        assertTrue(legacyFile.exists(), "Legacy FeatureCache.txt must not be consumed by a sticky bucket read")
     }
 }

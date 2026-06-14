@@ -96,6 +96,7 @@ class CachingAndroid : CachingLayer {
     }
 
     private fun migrateLegacyCache(newFile: File) {
+        if (!newFile.name.startsWith("FeatureCache")) return
         val legacyFile = getTargetFile("FeatureCache") ?: return
         if (!legacyFile.exists()) return
         if (!legacyFile.renameTo(newFile)) {
