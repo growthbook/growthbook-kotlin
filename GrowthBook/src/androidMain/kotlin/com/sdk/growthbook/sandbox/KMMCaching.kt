@@ -100,7 +100,8 @@ class CachingAndroid : CachingLayer {
         val legacyFile = getTargetFile("FeatureCache") ?: return
         if (!legacyFile.exists()) return
         if (!legacyFile.renameTo(newFile)) {
-            legacyFile.delete()
+            GB.warning("CachingAndroid: failed to migrate legacy cache to " +
+                "${newFile.name}, will retry on next launch")
         }
     }
 
