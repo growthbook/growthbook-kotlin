@@ -34,8 +34,13 @@ class CachingAndroid : CachingLayer {
     override fun saveContent(fileName: String, content: JsonElement) {
         synchronized(getLock(fileName)) {
             val file = getTargetFile(fileName) ?: return
-            val tempFile = File(file.parent, "${file.name}.tmp")
             val jsonContents = json.encodeToString(JsonElement.serializer(), content)
+            // Unique temp file per write: the per-file lock only serializes writers within
+            // a single process, so a fixed temp name could still be interleaved by another
+            // process (or a separately-constructed instance) writing the same cache file.
+            // A unique temp keeps each write self-contained; rename is then last-writer-wins
+            // of a complete payload, never a corrupt one.
+            val tempFile = File.createTempFile(file.name, ".tmp", file.parentFile)
             try {
                 FileOutputStream(tempFile).use { out ->
                     out.write(jsonContents.toByteArray())
