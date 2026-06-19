@@ -69,7 +69,11 @@ class GrowthBookSDK(
     private var subscriptions: MutableList<GBExperimentRunCallback> = mutableListOf()
     private var assigned: MutableMap<String, Pair<GBExperiment, GBExperimentResult>> =
         mutableMapOf()
-    private var hasFeaturesPayload: Boolean = false
+    // True once any usable feature payload is present. Initialized from the context so
+    // bundled features seeded via setInitialFeatures() before construction count as a
+    // payload — otherwise a 304 arriving before the first remote fetch would be treated
+    // as a failure, breaking the offline-first fallback.
+    private var hasFeaturesPayload: Boolean = gbContext.features.isNotEmpty()
 
     /**
      * JAVA Consumers preset Features
@@ -88,6 +92,7 @@ class GrowthBookSDK(
     init {
         if (features != null) {
             gbContext.features = features
+            hasFeaturesPayload = true
         } else {
             refreshCache()
         }

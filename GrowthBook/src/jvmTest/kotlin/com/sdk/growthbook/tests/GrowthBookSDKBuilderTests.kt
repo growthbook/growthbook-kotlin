@@ -700,6 +700,43 @@ class GrowthBookSDKBuilderTests {
         )
     }
 
+    @Test
+    fun testSetInitialFeaturesTreats304AsSuccess() {
+        val bundledFeatures: GBFeatures = mapOf("bundled-feature" to GBFeature())
+        var refreshCalled = false
+        var refreshSuccess: Boolean? = null
+
+        val sdkInstance = GBSDKBuilder(
+            testApiKey,
+            testHostURL,
+            attributes = testAttributes,
+            encryptionKey = null,
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
+            networkDispatcher = MockNetworkClient(
+                successResponse = null,
+                error = null,
+                notModified = true
+            ),
+        )
+            .setInitialFeatures(bundledFeatures)
+            .setRefreshHandler { success, _ ->
+                refreshCalled = true
+                refreshSuccess = success
+            }
+            .initialize()
+
+        assertTrue(refreshCalled, "Refresh handler should be invoked on a 304 response")
+        assertEquals(
+            true, refreshSuccess,
+            "A 304 must be treated as success when bundled initial features are present, " +
+                "preserving offline-first behavior"
+        )
+        assertTrue(
+            sdkInstance.getFeatures().containsKey("bundled-feature"),
+            "Bundled initial features should remain available after a 304"
+        )
+    }
+
 //    @Test
 //    fun testSDKFeaturesDataJAVA() {
 //
