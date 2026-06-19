@@ -10,10 +10,12 @@ import kotlinx.serialization.json.JsonElement
  *
  * @param initialContent  pre-loaded JsonElement returned by getContent (null = empty cache)
  * @param throwOnGet      if true, getContent throws to simulate a corrupted/unreadable cache
+ * @param throwOnPut      if true, saveContent throws to simulate disk full / write failure
  */
 internal class MockCachingLayer(
     private val initialContent: JsonElement? = null,
     private val throwOnGet: Boolean = false,
+    private val throwOnPut: Boolean = false,
 ) : CachingLayer {
 
     var savedContent: JsonElement? = null
@@ -25,6 +27,7 @@ internal class MockCachingLayer(
     }
 
     override fun saveContent(fileName: String, content: JsonElement) {
+        if (throwOnPut) throw Exception("Disk full")
         savedContent = content
     }
 
