@@ -28,7 +28,7 @@ repositories {
 
 dependencies {
     // Add GrowthBook module:
-    implementation 'io.growthbook.sdk:GrowthBook:7.1.0'
+    implementation 'io.growthbook.sdk:GrowthBook:7.2.0'
 
     // Add Network Dispatcher you prefer:
     // 1) NetworkDispatcherKtor — supports Android, iOS, JVM, JS, Wasm
@@ -80,8 +80,34 @@ If you are accessing features the first time there will be no features right aft
     .setEnabled(true) // Enable / Disable experiments
     .setQAMode(true) // Enable / Disable QA Mode
     .setForcedVariations(<HashMap>) // Pass Forced Variations
+    .setInitialFeatures(<GBFeatures>) // Seed bundled fallback features (see below)
 .initialize()
 ```
+
+#### Bundled fallback features (`setInitialFeatures`)
+
+For a robust offline-first setup, you can bundle a known-good features payload (snapshotted from the API at build time) and seed the SDK with it at init. This gives flags a valid value from the first millisecond — on first installs, offline launches, and empty/corrupt cache — instead of falling back to hardcoded code defaults.
+
+```kotlin
+val bundledFeatures: GBFeatures = mapOf(
+    "dark-mode" to GBFeature(defaultValue = GBBoolean(false)),
+    "new-checkout" to GBFeature(defaultValue = GBBoolean(true)),
+)
+
+var sdkInstance: GrowthBookSDK = GBSDKBuilder(
+    apiKey = <API_KEY>,
+    hostURL = <GrowthBook_URL>,
+    attributes = hashMapOf(),
+    trackingCallback = { _, _ -> },
+    networkDispatcher = GBNetworkDispatcherKtor(),
+)
+    .setInitialFeatures(bundledFeatures)
+    .initialize()
+```
+
+The seeded features are applied immediately. The normal cache/network refresh still runs on top and overwrites the seed as fresher data arrives. Effective precedence: **network > disk cache > seed > code defaults**.
+
+> **Upgrading from 6.x (Android):** Persistent caching is only implemented on Android; other platforms do not cache features to disk, so this upgrade note does not apply to them. On Android the cache file is automatically migrated from `FeatureCache.txt` to the new scoped `FeatureCache_<clientKey>.txt` on first launch. Single-instance apps migrate transparently with no cold start. Apps that use multiple SDK instances with different `clientKey`s may see one cold start without cache on the first launch after upgrade — features self-correct after the first successful fetch.
 
 ## Usage
 
