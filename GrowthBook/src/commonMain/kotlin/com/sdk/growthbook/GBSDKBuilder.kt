@@ -105,7 +105,7 @@ class GBSDKBuilder(
     private var stickyBucketService: GBStickyBucketService? = null
     private var featureUsageCallback: GBFeatureUsageCallback? = null
     private var initialFeatures: GBFeatures? = null
-    private var backgroundFetchInterval: Long? = null
+    private var cacheMaxAge: Long? = null
 
     /**
      * Set Refresh Handler - Will be called when cache is refreshed
@@ -171,8 +171,19 @@ class GBSDKBuilder(
         return this
     }
 
-    fun setBackgroundFetchInterval(intervalMs: Long): GBSDKBuilder {
-        this.backgroundFetchInterval = intervalMs
+    /**
+     * Sets the freshness window for cached features.
+     *
+     * While the cache is younger than this age, the network call on the next
+     * fetch is skipped and the cached features are served as the authoritative
+     * result. Once the cache is older, the SDK refetches from the network.
+     * This is a cache-staleness gate evaluated on the next fetch, not a
+     * background polling mechanism. When unset, the SDK always refetches.
+     *
+     * @param cacheMaxAge freshness window in milliseconds.
+     */
+    fun setCacheMaxAge(cacheMaxAge: Long): GBSDKBuilder {
+        this.cacheMaxAge = cacheMaxAge
         return this
     }
 
@@ -215,7 +226,7 @@ class GBSDKBuilder(
             refreshHandler,
             networkDispatcher,
             cachingEnabled = cachingEnabled,
-            backgroundFetchInterval = backgroundFetchInterval,
+            cacheMaxAge = cacheMaxAge,
         )
     }
 
@@ -268,7 +279,7 @@ class GBSDKBuilder(
                 internalRefreshHandler,
                 networkDispatcher,
                 cachingEnabled = cachingEnabled,
-                backgroundFetchInterval = backgroundFetchInterval
+                cacheMaxAge = cacheMaxAge
             )
         }
     }

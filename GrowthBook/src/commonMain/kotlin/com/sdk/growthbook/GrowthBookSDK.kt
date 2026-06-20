@@ -21,6 +21,7 @@ import com.sdk.growthbook.features.FeaturesDataModel
 import com.sdk.growthbook.features.FeaturesDataSource
 import com.sdk.growthbook.features.FeaturesFlowDelegate
 import com.sdk.growthbook.features.FeaturesViewModel
+import com.sdk.growthbook.features.FetchPolicy
 import com.sdk.growthbook.model.GBJson
 import com.sdk.growthbook.model.GBNull
 import com.sdk.growthbook.model.GBArray
@@ -58,7 +59,7 @@ class GrowthBookSDK(
     features: GBFeatures? = null,
     savedGroups: Map<String, GBValue>? = null,
     cachingEnabled: Boolean,
-    private val backgroundFetchInterval: Long? = null,
+    private val cacheMaxAge: Long? = null,
 ) : FeaturesFlowDelegate {
 
     private var savedGroups: Map<String, GBValue>? = emptyMap()
@@ -87,7 +88,7 @@ class GrowthBookSDK(
         ),
         encryptionKey = gbContext.encryptionKey,
         cachingEnabled = cachingEnabled,
-        backgroundFetchInterval = backgroundFetchInterval,
+        cacheMaxAge = cacheMaxAge,
         cacheKey = "${Constants.FEATURE_CACHE}_${gbContext.apiKey}",
     )
 
@@ -107,13 +108,18 @@ class GrowthBookSDK(
     }
 
     /**
-     * Manually Refresh Cache
+     * Manually refreshes features from the network.
+     *
+     * This is an explicit refresh and always bypasses the cache freshness
+     * window set via [GBSDKBuilder.setCacheMaxAge]: it hits the network even
+     * if the cached features are still within their max age. In remote-eval
+     * mode it re-runs the remote evaluation instead.
      */
     fun refreshCache() {
         if (gbContext.remoteEval) {
             refreshForRemoteEval()
         } else {
-            featuresViewModel.fetchFeatures(forceRefresh = true)
+            featuresViewModel.fetchFeatures(policy = FetchPolicy.ForceNetwork)
         }
     }
 
@@ -265,7 +271,7 @@ class GrowthBookSDK(
 
                 FeaturesFetchResult.Failed -> {
                     if (attempt >= MAX_RETRY_ATTEMPTS) return feature(id)
-                    featuresViewModel.fetchFeatures(forceRefresh = true)
+                    featuresViewModel.fetchFeatures(policy = FetchPolicy.ForceNetwork)
                     if (gbContext.enableLogging) {
                         GB.log("GrowthBookSDK: suspendFeature: retry attempt ${attempt + 1}/$MAX_RETRY_ATTEMPTS, waiting ${delaysMs}ms")
                     }
