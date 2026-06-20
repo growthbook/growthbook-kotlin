@@ -20,6 +20,7 @@ import org.intellij.lang.annotations.Language
 import org.junit.Test
 import kotlin.test.assertEquals
 import com.sdk.growthbook.features.FeaturesViewModel
+import com.sdk.growthbook.features.FetchPolicy
 import com.sdk.growthbook.kotlinx.serialization.gbSerialize
 
 internal class VerifySDKReturnFeatureValues {
@@ -182,7 +183,7 @@ internal class VerifySDKReturnFeatureValues {
             job.cancel()
             // or gbSdk.featuresFetchedSuccessfully(emptyMap(), true)
 
-            coVerify { mockedFeaturesViewModel.fetchFeatures(forceRefresh = true) }
+            coVerify { mockedFeaturesViewModel.fetchFeatures(policy = FetchPolicy.ForceNetwork) }
         }
     }
 

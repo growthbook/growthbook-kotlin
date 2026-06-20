@@ -301,7 +301,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     }
 
     @Test
-    fun testHandleFetchFeaturesWithoutRemoteEvalPlainFeatures() {
+    fun testApplyCachedFeaturesForPlainFeatures() {
         receivedFromCache = false
         val cacheLayer = MockCachingLayer.fromApiResponse(MockResponse.successResponse)
         val viewModel = FeaturesViewModel(
@@ -325,7 +325,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     }
 
     @Test
-    fun testHandleFetchFeaturesWithoutRemoteEvalEncryptedFeatures() {
+    fun testApplyCachedFeaturesForEncryptedFeatures() {
         receivedFromCache = false
         val cacheLayer =
             MockCachingLayer.fromApiResponse(MockResponse.successResponseEncryptedFeatures)
@@ -437,7 +437,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = false,
             cachingLayer = cacheLayer,
-            backgroundFetchInterval = 48 * 60 * 60 * 1000L,
+            cacheMaxAge = 48 * 60 * 60 * 1000L,
         )
 
         viewModel.fetchFeatures()
@@ -470,7 +470,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = false,
             cachingLayer = cacheLayer,
-            backgroundFetchInterval = 48 * 60 * 60 * 1000L,
+            cacheMaxAge = 48 * 60 * 60 * 1000L,
         )
 
         viewModel.fetchFeatures()

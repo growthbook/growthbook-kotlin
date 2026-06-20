@@ -1,21 +1,18 @@
 package com.sdk.growthbook.features
 
-import com.sdk.growthbook.utils.Constants
-import com.sdk.growthbook.utils.DefaultCrypto
-import com.sdk.growthbook.utils.GBError
-import com.sdk.growthbook.utils.GBFeatures
-import com.sdk.growthbook.utils.GBRemoteEvalParams
-import com.sdk.growthbook.utils.Resource
-import com.sdk.growthbook.utils.getFeaturesFromEncryptedFeatures
+import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.sandbox.CachingImpl
 import com.sdk.growthbook.sandbox.CachingLayer
 import com.sdk.growthbook.sandbox.getData
 import com.sdk.growthbook.sandbox.putData
 import com.sdk.growthbook.serializable_model.SerializableFeaturesDataModel
 import com.sdk.growthbook.serializable_model.gbDeserialize
+import com.sdk.growthbook.utils.Constants
+import com.sdk.growthbook.utils.GBError
+import com.sdk.growthbook.utils.GBFeatures
+import com.sdk.growthbook.utils.GBRemoteEvalParams
+import com.sdk.growthbook.utils.Resource
 import com.sdk.growthbook.utils.SSEConnectionController
-import com.sdk.growthbook.utils.getSavedGroupFromEncryptedSavedGroup
-import com.sdk.growthbook.logger.GB
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonObject
 import kotlin.time.Clock
@@ -33,7 +30,9 @@ internal interface FeaturesFlowDelegate {
 }
 
 /**
- * View Model for Features
+ * Orchestrates feature loading: serves cache first, then falls back to the
+ * network, decodes the payload and notifies [delegate] of the outcome.
+ * Pipeline: source (cache|network|SSE) -> decode -> FetchOutcome -> dispatch.
  */
 internal class FeaturesViewModel(
     private val delegate: FeaturesFlowDelegate,
@@ -42,7 +41,8 @@ internal class FeaturesViewModel(
     private val cachingEnabled: Boolean,
     private val cacheKey: String = Constants.FEATURE_CACHE,
     private val cachingLayer: CachingLayer = CachingImpl.getLayer(),
-    private val backgroundFetchInterval: Long? = null
+    private val cacheMaxAge: Long? = null,
+    private val decoder: FeaturePayloadDecoder = FeaturePayloadDecoder(encryptionKey)
 ) {
 
     /**
@@ -51,216 +51,144 @@ internal class FeaturesViewModel(
     val sseController: SSEConnectionController
         get() = dataSource.sseController
 
-    /**
-     * Fetch Features
-     */
-    fun fetchFeatures(remoteEval: Boolean = false, payload: GBRemoteEvalParams? = null, forceRefresh: Boolean = false) {
-        try {
-            // Check for cache data
-            val cachedEntry = getDataFromCache()
-            if (cachedEntry != null) {
-                // Call Success Delegate with mention of data available but its not remote
-                handleFetchFeaturesWithoutRemoteEval(cachedEntry.first)
-                if (!forceRefresh && !remoteEval) {
-                    val cachedAt = cachedEntry.second
-                    if (backgroundFetchInterval != null && cachedAt != null) {
-                        if (Clock.System.now().toEpochMilliseconds() - cachedAt < backgroundFetchInterval) {
-                            return
-                        }
-                    }
-                }
-            }
-        } catch (error: Throwable) {
-            GB.error("FeaturesViewModel: cache read failed", error)
-            this.delegate.featuresFetchFailed(GBError(error), false)
-        }
-        handleFetchFeaturesWithRemoteEval(remoteEval, payload)
-    }
-
-    private fun handleFetchFeaturesWithRemoteEval(
-        remoteEval: Boolean,
-        payload: GBRemoteEvalParams?
-    ) {
-        if (remoteEval) {
-            dataSource.fetchRemoteEval(
-                params = payload,
-                success = { responseFeaturesDataModel ->
-                    prepareFeaturesDataForRemoteEval(responseFeaturesDataModel.data)
-                },
-                failure = { error ->
-                    this.delegate.featuresFetchFailed(GBError(error.exception), true)
-                }
-            )
-        } else {
-            dataSource.fetchFeatures(
-                success = { dataModel ->
-                    prepareFeaturesDataForRemoteEval(dataModel)
-                },
-                failure = { error ->
-                    // Call Error Delegate with mention of data not available but its not remote
-                    this.delegate.featuresFetchFailed(GBError(error), true)
-                },
-                onNotModified = {
-                    this.delegate.featuresNotModified()
-                }
-            )
-        }
-    }
-
-    private fun handleFetchFeaturesWithoutRemoteEval(dataModel: FeaturesDataModel) {
-        dataModel.features?.let {
-            this.delegate.featuresFetchedSuccessfully(
-                features = it,
-                isRemote = false
-            )
-        }
-        dataModel.encryptedFeatures?.let { encryptedFeatures: String ->
-            encryptionKey?.let { encryptionKey ->
-                val features = getFeaturesFromEncryptedFeatures(
-                    encryptedString = encryptedFeatures,
-                    encryptionKey = encryptionKey,
-                )
-                features?.let {
-                    this.delegate.featuresFetchedSuccessfully(
-                        features = it,
-                        isRemote = false
-                    )
-                }
-            }
-        }
-    }
-
-    private fun getDataFromCache(): Pair<FeaturesDataModel, Long?>? {
-        val serializable = cachingLayer.getData(
-            cacheKey,
-            SerializableFeaturesDataModel.serializer()
-        ) ?: return null
-        return serializable.gbDeserialize() to serializable.cachedAt
-    }
-
-    /**
-     * Supportive method for automatically refresh features
-     */
+    /** Opens an SSE connection and streams feature updates as a [Flow]. */
     fun autoRefreshFeatures(): Flow<Resource<GBFeatures?>> {
         sseController.start()
-        return dataSource.autoRefresh(success = { dataModel ->
-            prepareFeaturesDataForRemoteEval(dataModel = dataModel)
-        }, failure = { error ->
-            // Call Error Delegate with mention of data not available but its not remote
-            this.delegate.featuresFetchFailed(GBError(error), true)
-        })
+        return dataSource.autoRefresh(
+            success = { handleNetworkModel(it) },
+            failure = { delegate.featuresFetchFailed(GBError(it), isRemote = true) }
+        )
     }
 
     /**
-     * Cache API Response and push success event
+     * @param remoteEval evaluate features remotely via POST instead of a regular GET.
+     * @param payload attributes/forced features sent with the remote-eval request;
+     *   used only when [remoteEval] is true, ignored otherwise.
+     * @param policy whether a fresh cache may satisfy this fetch or the network
+     *   must always be hit; see [FetchPolicy].
      */
-    private fun prepareFeaturesDataForRemoteEval(dataModel: FeaturesDataModel?) {
-        var features = dataModel?.features
-        var savedGroups = dataModel?.savedGroups
-        val encryptedFeatures = dataModel?.encryptedFeatures
-        val encryptedSavedGroups = dataModel?.encryptedSavedGroups
+    fun fetchFeatures(
+        remoteEval: Boolean = false,
+        payload: GBRemoteEvalParams? = null,
+        policy: FetchPolicy = FetchPolicy.CacheFirst
+    ) {
+        if (serveCache(remoteEval, policy)) return // fresh cache -> authoritative, skip network
+        fetchFromNetwork(remoteEval, payload)
+    }
 
-        try {
-            if (dataModel != null) {
-                delegate.featuresAPIModelSuccessfully(dataModel)
-                if (cachingEnabled) {
-                    try {
-                        putDataToCache(dataModel)
-                    } catch (e: Throwable) {
-                        GB.error("FeaturesViewModel: cache write failed, features still applied", e)
-                    }
-                }
-                if (!features.isNullOrEmpty()) {
-                    this.delegate.featuresFetchedSuccessfully(
-                        features = features,
-                        isRemote = true
-                    )
-                    return
-                } else {
-                    if (encryptedFeatures != null && encryptionKey != null) {
-                        if (encryptionKey.isNotEmpty()) {
-                            val crypto = DefaultCrypto()
-                            features =
-                                getFeaturesFromEncryptedFeatures(
-                                    encryptedString = encryptedFeatures,
-                                    encryptionKey = encryptionKey,
-                                    subtleCrypto = crypto
-                                ) ?: return
+    private fun serveCache(remoteEval: Boolean, policy: FetchPolicy): Boolean {
+        val entry = runCatching { readCache() }.getOrElse {
+            GB.error("FeaturesViewModel: cache read failed", it)
+            delegate.featuresFetchFailed(error = GBError(it), isRemote = false)
+            return false
+        } ?: return false
 
-                            this.delegate.featuresFetchedSuccessfully(
-                                features = features,
-                                isRemote = true
-                            )
-                            return
-                        } else {
-                            features?.let {
-                                this.delegate.featuresFetchedSuccessfully(
-                                    features = features,
-                                    isRemote = true
-                                )
-                                return
-                            }
-                        }
-                    } else {
-                        this.delegate.featuresFetchFailed(
-                            error = GBError(Exception()),
-                            isRemote = true
-                        )
-                        return
-                    }
-                }
+        val (model, cachedAt) = entry
+        val fresh = policy == FetchPolicy.CacheFirst && !remoteEval && cacheMaxAge != null
+            && cachedAt != null
+            && Clock.System.now().toEpochMilliseconds() - cachedAt < cacheMaxAge
 
-                if (!savedGroups.isNullOrEmpty()) {
-                    this.delegate.savedGroupsFetchedSuccessfully(
-                        savedGroups = savedGroups,
-                        isRemote = true
-                    )
-                } else {
-                    if (encryptedSavedGroups != null && encryptionKey != null) {
-                        if (encryptionKey.isNotEmpty()) {
-                            val crypto = DefaultCrypto()
-                            savedGroups =
-                                getSavedGroupFromEncryptedSavedGroup(
-                                    encryptedString = encryptedSavedGroups,
-                                    encryptionKey = encryptionKey,
-                                    subtleCrypto = crypto
-                                ) ?: return
+        dispatch(
+            outcome = FetchOutcome.Ready(
+                payload = decoder.decode(m = model),
+                source = Source.CACHE,
+                authoritative = fresh
+            )
+        )
+        return fresh
+    }
 
-                            this.delegate.savedGroupsFetchedSuccessfully(
-                                savedGroups = savedGroups,
-                                isRemote = true
-                            )
-                            return
-                        } else {
-                            savedGroups?.let {
-                                this.delegate.savedGroupsFetchedSuccessfully(
-                                    savedGroups = savedGroups,
-                                    isRemote = true
-                                )
-                                return
-                            }
-                        }
-                    } else {
-                        this.delegate.savedGroupsFetchFailed(
-                            error = GBError(Exception()),
-                            isRemote = true
-                        )
-                        return
-                    }
-                }
+    private fun fetchFromNetwork(remoteEval: Boolean, payload: GBRemoteEvalParams?) {
+        if (remoteEval) dataSource.fetchRemoteEval(
+            params = payload,
+            success = { handleNetworkModel(it.data) },
+            failure = {
+                delegate.featuresFetchFailed(
+                    error = GBError(it.exception),
+                    isRemote = true
+                )
             }
+        ) else dataSource.fetchFeatures(
+            success = { handleNetworkModel(it) },
+            failure = { delegate.featuresFetchFailed(error = GBError(it), isRemote = true) },
+            onNotModified = { dispatch(outcome = FetchOutcome.NotModified) }
+        )
+    }
+
+    private fun handleNetworkModel(model: FeaturesDataModel) {
+        try {
+            delegate.featuresAPIModelSuccessfully(model)
+            if (cachingEnabled) {
+                runCatching { writeCache(model) }
+                    .onFailure {
+                        GB.error(
+                            errorMessage = "FeaturesViewModel: cache write failed, features still applied",
+                            throwable = it
+                        )
+                    }
+            }
+
+            dispatch(
+                outcome = outcomeOf(
+                    payload = decoder.decode(model),
+                    source = Source.NETWORK
+                )
+            )
         } catch (error: Throwable) {
-            GB.error("FeaturesViewModel: failed to process remote features payload", error)
-            this.delegate.featuresFetchFailed(error = GBError(error), isRemote = true)
-            return
+            GB.error(
+                errorMessage = "FeaturesViewModel: failed to process remote features payload",
+                throwable = error
+            )
+
+            delegate.featuresFetchFailed(error = GBError(error), isRemote = true)
         }
     }
 
-    private fun putDataToCache(dataModel: FeaturesDataModel) {
-        cachingLayer.putData(
-            fileName = cacheKey,
-            content = dataModel.gbSerialize().copy(cachedAt = Clock.System.now().toEpochMilliseconds()),
-            serializer = SerializableFeaturesDataModel.serializer()
-        )
+    private fun outcomeOf(payload: DecodedPayload, source: Source): FetchOutcome =
+        if (payload.features == null && payload.savedGroups == null)
+            FetchOutcome.Failed(GBError(Exception()), source)
+        else FetchOutcome.Ready(payload, source, authoritative = true)
+
+    private fun dispatch(outcome: FetchOutcome) = when (outcome) {
+        is FetchOutcome.Ready -> {
+            outcome.payload.features?.let {
+                delegate.featuresFetchedSuccessfully(
+                    features = it,
+                    isRemote = outcome.authoritative
+                )
+            }
+            outcome.payload.savedGroups?.let {
+                delegate.savedGroupsFetchedSuccessfully(
+                    savedGroups = it,
+                    isRemote = outcome.authoritative
+                )
+            }
+        }
+
+        is FetchOutcome.Failed -> {
+            delegate.featuresFetchFailed(
+                error = outcome.error,
+                isRemote = outcome.source == Source.NETWORK
+            )
+        }
+
+        is FetchOutcome.NotModified -> {
+            delegate.featuresNotModified()
+        }
     }
+
+    private fun readCache(): Pair<FeaturesDataModel, Long?>? {
+        val s = cachingLayer
+            .getData(
+                fileName = cacheKey,
+                serializer = SerializableFeaturesDataModel.serializer()
+            ) ?: return null
+        return s.gbDeserialize() to s.cachedAt
+    }
+
+    private fun writeCache(model: FeaturesDataModel) = cachingLayer.putData(
+        fileName = cacheKey,
+        content = model.gbSerialize().copy(cachedAt = Clock.System.now().toEpochMilliseconds()),
+        serializer = SerializableFeaturesDataModel.serializer()
+    )
 }
