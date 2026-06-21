@@ -8,6 +8,7 @@ import com.sdk.growthbook.utils.GBError
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
+import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.model.GBFeatureSource
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBString
@@ -654,6 +655,88 @@ class GrowthBookSDKBuilderTests {
 //
 //    }
 //
+    @Test
+    fun testSetInitialFeaturesAvailableImmediatelyWithoutNetwork() {
+        val bundledFeatures: GBFeatures = mapOf("bundled-feature" to GBFeature())
+
+        val sdkInstance = GBSDKBuilder(
+            testApiKey,
+            testHostURL,
+            attributes = testAttributes,
+            encryptionKey = null,
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
+            networkDispatcher = MockNetworkClient(null, Throwable("no network")),
+        )
+            .setInitialFeatures(bundledFeatures)
+            .initialize()
+
+        assertTrue(
+            sdkInstance.getFeatures().containsKey("bundled-feature"),
+            "Initial features should be available immediately even when network is unavailable"
+        )
+    }
+
+    @Test
+    fun testSetInitialFeaturesOverwrittenByNetworkRefresh() {
+        val bundledFeatures: GBFeatures = mapOf("bundled-feature" to GBFeature())
+        var refreshCalled = false
+
+        val sdkInstance = GBSDKBuilder(
+            testApiKey,
+            testHostURL,
+            attributes = testAttributes,
+            encryptionKey = null,
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
+            networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
+        )
+            .setInitialFeatures(bundledFeatures)
+            .setRefreshHandler { success, _ -> refreshCalled = success }
+            .initialize()
+
+        assertTrue(refreshCalled, "Network refresh should still run when initialFeatures is set")
+        assertTrue(
+            sdkInstance.getFeatures().containsKey("onboarding"),
+            "Network features should overwrite the seed"
+        )
+    }
+
+    @Test
+    fun testSetInitialFeaturesTreats304AsSuccess() {
+        val bundledFeatures: GBFeatures = mapOf("bundled-feature" to GBFeature())
+        var refreshCalled = false
+        var refreshSuccess: Boolean? = null
+
+        val sdkInstance = GBSDKBuilder(
+            testApiKey,
+            testHostURL,
+            attributes = testAttributes,
+            encryptionKey = null,
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
+            networkDispatcher = MockNetworkClient(
+                successResponse = null,
+                error = null,
+                notModified = true
+            ),
+        )
+            .setInitialFeatures(bundledFeatures)
+            .setRefreshHandler { success, _ ->
+                refreshCalled = true
+                refreshSuccess = success
+            }
+            .initialize()
+
+        assertTrue(refreshCalled, "Refresh handler should be invoked on a 304 response")
+        assertEquals(
+            true, refreshSuccess,
+            "A 304 must be treated as success when bundled initial features are present, " +
+                "preserving offline-first behavior"
+        )
+        assertTrue(
+            sdkInstance.getFeatures().containsKey("bundled-feature"),
+            "Bundled initial features should remain available after a 304"
+        )
+    }
+
 //    @Test
 //    fun testSDKFeaturesDataJAVA() {
 //
