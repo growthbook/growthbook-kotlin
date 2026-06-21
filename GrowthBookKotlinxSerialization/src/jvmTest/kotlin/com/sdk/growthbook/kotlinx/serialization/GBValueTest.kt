@@ -8,6 +8,7 @@ import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBValue
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -194,6 +195,35 @@ class GBValueTest {
         val result = GBValue.from(serialized)    // JsonObject → GBJson
 
         assertEquals(original, result)
+    }
+
+    @Test
+    fun `decodeAs ignores unknown keys by default`() {
+        val gbJson = GBJson(
+            mapOf(
+                "price" to GBNumber(99),
+                "label" to GBString("Pro"),
+                "unknownField" to GBString("added by a newer backend")
+            )
+        )
+
+        val result = gbJson.decodeAs<TestConfig>()
+        assertEquals(TestConfig(price = 99, label = "Pro"), result)
+    }
+
+    @Test
+    fun `decodeAs returns null on unknown keys with a strict Json`() {
+        val gbJson = GBJson(
+            mapOf(
+                "price" to GBNumber(99),
+                "label" to GBString("Pro"),
+                "unknownField" to GBString("added by a newer backend")
+            )
+        )
+
+        val strictJson = Json { ignoreUnknownKeys = false }
+        val result = gbJson.decodeAs<TestConfig>(strictJson)
+        assertNull(result)
     }
 }
 

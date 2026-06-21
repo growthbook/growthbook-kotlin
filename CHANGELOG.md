@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [7.3.0] - 2026-06-21
+
+### Added
+- `decodeAs<T>()` extension on `GBValue` (in `GrowthBookKotlinxSerialization`) to decode feature values into typed models via kotlinx.serialization. The default `Json` is tolerant of unknown keys, so feature config objects carrying fields the caller's model does not declare yet still decode successfully. Pass a custom `Json` to override (e.g. `Json { ignoreUnknownKeys = false }` for strict decoding).
+
+### Fixed
+- `GBArray` now implements value-based `equals`/`hashCode` (converted to a `data class`), so arrays with equal contents compare as equal.
+
+---
+
 ## [7.2.0] - 2026-06-12
 
 ### Added

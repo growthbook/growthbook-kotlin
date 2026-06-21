@@ -116,7 +116,7 @@ publishing {
             artifact(javadocJar)
             pom {
                 name.set("kotlin")
-                description.set("Core module of GrowthBook Kotlin SDK")
+                description.set("Serialization module of GrowthBook Kotlin SDK")
                 licenses {
                     license {
                         name.set("MIT")

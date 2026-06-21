@@ -42,7 +42,15 @@ fun GBJson.gbSerialize() = JsonObject(
     this.mapValues { it.value.gbSerialize() }
 )
 
-inline fun <reified T> GBValue.decodeAs(json: Json = Json): T? {
+/**
+ * Default [Json] used by [decodeAs]. Tolerant of unknown keys so that feature
+ * config objects containing fields the caller's model does not declare yet still
+ * decode successfully (forward compatibility). Pass a custom [Json] to override.
+ */
+@PublishedApi
+internal val defaultDecodeJson: Json = Json { ignoreUnknownKeys = true }
+
+inline fun <reified T> GBValue.decodeAs(json: Json = defaultDecodeJson): T? {
     val jsonElement = this.gbSerialize()
     return try {
         json.decodeFromJsonElement(jsonElement)
