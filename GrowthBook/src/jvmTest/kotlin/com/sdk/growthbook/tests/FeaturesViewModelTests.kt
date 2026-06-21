@@ -386,6 +386,29 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     }
 
     @Test
+    fun testCacheWriteFailureDoesNotDiscardFetchedFeatures() {
+        isSuccess = false
+        isError = false
+        val cacheLayer = MockCachingLayer(throwOnPut = true)
+        val viewModel = FeaturesViewModel(
+            delegate = this,
+            dataSource = FeaturesDataSource(
+                MockNetworkClient(MockResponse.successResponse, null),
+                gbContext, testGbOptions,
+            ),
+            encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
+            cachingEnabled = true,
+            cachingLayer = cacheLayer,
+        )
+
+        viewModel.fetchFeatures()
+
+        assertTrue(isSuccess, "Features should be applied even when cache write fails")
+        assertTrue(!isError, "A cache write failure should not be reported as a fetch failure")
+        assertTrue(hasFeatures)
+    }
+
+    @Test
     fun testAutoRefreshFeaturesReturnsFlow() {
         val viewModel = FeaturesViewModel(
             delegate = this,
