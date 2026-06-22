@@ -11,8 +11,14 @@ import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBOptions
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -424,6 +430,76 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         val flow = viewModel.autoRefreshFeatures()
 
         assertNotNull(flow)
+    }
+
+    /**
+     * Proves the race-condition fix: features are applied to context only AFTER the sticky-bucket
+     * refresh (onPayloadReady) has fully completed — verified under a NON-immediate dispatcher so
+     * the ordering is enforced by code, not masked by Dispatchers.Unconfined running everything inline.
+     */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun testFeaturesAppliedOnlyAfterStickyRefreshCompletes() = runTest {
+        val events = mutableListOf<String>()
+
+        // A delegate whose onPayloadReady actually suspends, mimicking sticky-bucket IO that
+        // does not complete synchronously (real GBStickyBucketService reads from storage).
+        val orderingDelegate = object : FeaturesFlowDelegate {
+            override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
+                events += "featuresApplied"
+            }
+
+            override suspend fun onPayloadReady(model: FeaturesDataModel) {
+                events += "stickyRefreshStart"
+                delay(100) // suspends — refresh is in flight
+                events += "stickyRefreshDone"
+            }
+
+            override fun featuresFetchFailed(error: GBError, isRemote: Boolean) {
+                events += "fetchFailed"
+            }
+
+            override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) = Unit
+            override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) = Unit
+            override fun featuresNotModified() = Unit
+        }
+
+        val viewModel = FeaturesViewModel(
+            delegate = orderingDelegate,
+            dataSource = FeaturesDataSource(
+                MockNetworkClient(MockResponse.successResponse, null),
+                gbContext, testGbOptions,
+            ),
+            encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
+            cachingEnabled = false,
+            // Non-immediate: launched work is queued on the scheduler, not run inline.
+            coroutineContext = StandardTestDispatcher(testScheduler),
+        )
+
+        viewModel.fetchFeatures()
+
+        // With a non-immediate dispatcher nothing has run yet — proves the work is now async,
+        // unlike the old synchronous fire-and-forget that applied results inside fetchFeatures().
+        assertTrue(
+            events.isEmpty(),
+            "Payload processing must be queued, not executed inline, on a non-immediate dispatcher"
+        )
+
+        // Run up to the first suspension point: refresh has started but NOT finished.
+        runCurrent()
+        assertEquals(
+            listOf("stickyRefreshStart"),
+            events,
+            "Features must not be applied while the sticky-bucket refresh is still suspended"
+        )
+
+        // Let the refresh's suspension resolve.
+        advanceUntilIdle()
+        assertEquals(
+            listOf("stickyRefreshStart", "stickyRefreshDone", "featuresApplied"),
+            events,
+            "featuresFetchedSuccessfully must fire strictly after onPayloadReady completes"
+        )
     }
 
     override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {

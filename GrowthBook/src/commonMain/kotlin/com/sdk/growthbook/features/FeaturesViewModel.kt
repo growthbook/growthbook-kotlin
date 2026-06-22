@@ -22,7 +22,6 @@ import kotlinx.coroutines.SupervisorJob
 import com.sdk.growthbook.logger.GB
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
 
 /**
