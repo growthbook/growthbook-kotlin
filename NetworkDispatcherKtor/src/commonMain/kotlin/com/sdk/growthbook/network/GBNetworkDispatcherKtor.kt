@@ -352,14 +352,18 @@ class GBNetworkDispatcherKtor(
     ) {
         CoroutineScope(PlatformDependentIODispatcher).launch {
             try {
+                // Honour the caller's Content-Type (the tracking plugin sends text/plain, matching
+                // JS/Python); default to application/json when none is supplied.
+                val contentTypeValue = headers["Content-Type"] ?: ContentType.Application.Json.toString()
                 val response = client.post(url) {
                     headers {
-                        append("Content-Type", "application/json")
                         append("Accept", "application/json")
-                        headers.forEach { append(it.key, it.value) }
+                        headers.forEach { (key, value) ->
+                            if (!key.equals("Content-Type", ignoreCase = true)) append(key, value)
+                        }
                     }
-                    contentType(ContentType.Application.Json)
-                    setBody(body)
+                    contentType(ContentType.parse(contentTypeValue))
+                    setBody(body.toString())
                     if (enableLogging) {
                         println("body = $body")
                     }

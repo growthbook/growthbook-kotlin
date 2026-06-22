@@ -1,12 +1,10 @@
 package com.sdk.growthbook.plugin.tracking
 
 import com.sdk.growthbook.PlatformDependentIODispatcher
-import com.sdk.growthbook.kotlinx.serialization.gbSerialize
 import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeatureResult
-import com.sdk.growthbook.model.GBJson
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.plugin.TrackingEvent
 import com.sdk.growthbook.plugin.TrackingPluginConfig
@@ -17,8 +15,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.JsonArray
 import kotlin.concurrent.Volatile
 
 /**
@@ -30,6 +27,10 @@ import kotlin.concurrent.Volatile
  *
  * If [com.sdk.growthbook.plugin.TrackingPluginConfig.clientKey] is null/empty the plugin becomes a no-op: event methods
  * return immediately, no HTTP traffic occurs, and [close] still completes cleanly.
+ *
+ * Limitation: this version auto-tracks feature and experiment evaluations only. Unlike the JS/Python
+ * SDKs it does not yet route custom events (`logEvent`/`log_event`) through this pipeline; that is
+ * tracked as a follow-up.
  */
 class GrowthBookTrackingPlugin(
     private val config: TrackingPluginConfig,
@@ -39,6 +40,9 @@ class GrowthBookTrackingPlugin(
     private val disabled = config.clientKey.isNullOrEmpty()
     private val mutex = Mutex()
     private val buffer = mutableListOf<TrackingEvent>()
+
+    /** LRU of recently-seen [TrackingEvent.dedupeKey]s; mirrors the JS plugin's de-dupe cache. */
+    private val dedupeCache = LinkedHashSet<String>()
     private var pendingFlush: Job? = null
 
     @Volatile
@@ -58,12 +62,7 @@ class GrowthBookTrackingPlugin(
         if (closed || disabled) {
             return
         }
-        enqueue(
-            TrackingEvent.Companion.forExperiment(
-                experiment,
-                result,
-                attributes?.let { GBJson(it).gbSerialize() })
-        )
+        enqueue(TrackingEvent.forExperiment(experiment, result, attributes))
     }
 
     override fun onFeatureEvaluated(
@@ -74,12 +73,7 @@ class GrowthBookTrackingPlugin(
         if (disabled || closed) {
             return
         }
-        enqueue(
-            TrackingEvent.Companion.forFeature(
-                featureKey,
-                result,
-                attributes?.let { GBJson(it).gbSerialize() })
-        )
+        enqueue(TrackingEvent.forFeature(featureKey, result, attributes))
     }
 
     override fun close() {
@@ -99,6 +93,18 @@ class GrowthBookTrackingPlugin(
     private fun enqueue(event: TrackingEvent) {
         coroutineScope.launch {
             val toFlush = mutex.withLock {
+                // De-dupe "Feature Evaluated"/"Experiment Viewed" by (event_name, properties_json),
+                // LRU-bounded like the JS plugin. Custom events (null key) are never de-duplicated.
+                event.dedupeKey?.let { key ->
+                    if (dedupeCache.remove(key)) {
+                        dedupeCache.add(key)     // refresh recency
+                        return@withLock null     // duplicate → skip
+                    }
+                    dedupeCache.add(key)
+                    if (dedupeCache.size > config.resolvedDedupeCacheSize()) {
+                        dedupeCache.remove(dedupeCache.iterator().next())  // evict eldest
+                    }
+                }
                 buffer.add(event)
                 if (buffer.size >= config.resolvedBatchSize()) {
                     pendingFlush?.cancel()
@@ -135,9 +141,12 @@ class GrowthBookTrackingPlugin(
     private fun flushBatch(events: List<TrackingEvent>) {
         if (events.isEmpty() || disabled) return
         val dispatcher = config.networkDispatcher ?: return
-        val eventsJson = Json.encodeToJsonElement(events)
+        val eventsJson = JsonArray(events.map { it.payload })
         val headers = mutableMapOf<String, String>()
         headers["User-Agent"] = SdkMetadata.USER_AGENT
+        // Match the JS/Python tracking plugins: the JSON array is posted as text/plain.
+        // (Accept: application/json is added by the dispatcher.)
+        headers["Content-Type"] = "text/plain"
         dispatcher.consumePOSTRequest(
             url = "${config.resolvedIngestorHost()}/track?client_key=${config.clientKey}",
             headers = headers,

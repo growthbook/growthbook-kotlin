@@ -22,6 +22,12 @@ data class TrackingPluginConfig(
     val batchTimeout: Duration? = null,
     /** Network dispatcher used to POST tracking events. */
     val networkDispatcher: TrackingNetworkDispatcher? = null,
+    /**
+     * Max number of recently-seen "Feature Evaluated"/"Experiment Viewed" events kept for
+     * de-duplication. Repeated events with identical properties within this LRU window are dropped
+     * before enqueueing (mirrors the JS tracking plugin). Defaults to [DEFAULT_DEDUPE_CACHE_SIZE].
+     */
+    val dedupeCacheSize: Int? = null,
 ) {
     fun resolvedIngestorHost(): String {
         if (ingestorHost.isNullOrEmpty()) {
@@ -46,9 +52,18 @@ data class TrackingPluginConfig(
         }
     }
 
+    fun resolvedDedupeCacheSize(): Int {
+        return if (dedupeCacheSize == null || dedupeCacheSize <= 0) {
+            DEFAULT_DEDUPE_CACHE_SIZE
+        } else {
+            dedupeCacheSize
+        }
+    }
+
     companion object {
         const val DEFAULT_INGESTOR_HOST = "https://us1.gb-ingest.com"
         const val DEFAULT_BATCH_SIZE = 100
+        const val DEFAULT_DEDUPE_CACHE_SIZE = 1000
         val DEFAULT_BATCH_TIMEOUT: Duration = 10.seconds
 
         private fun stripTrailingSlash(str: String) = str.removeSuffix("/")

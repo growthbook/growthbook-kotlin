@@ -331,13 +331,19 @@ class GBNetworkDispatcherOkHttp(
         onError: (Throwable) -> Unit
     ) {
         CoroutineScope(PlatformDependentIODispatcher).launch {
-            val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
+            // Honour the caller's Content-Type (the tracking plugin sends text/plain, matching
+            // JS/Python); default to application/json when none is supplied.
+            val contentTypeValue = headers["Content-Type"] ?: "application/json; charset=utf-8"
+            val mediaType = contentTypeValue.toMediaTypeOrNull()
             val requestBody: RequestBody = body.toString().toRequestBody(mediaType)
             val postRequest = Request.Builder()
                 .url(url)
-                .addHeader("Content-Type", "application/json")
                 .addHeader("Accept", "application/json")
-                .apply { headers.forEach { (key, value) -> addHeader(key, value) } }
+                .apply {
+                    headers.forEach { (key, value) ->
+                        if (!key.equals("Content-Type", ignoreCase = true)) addHeader(key, value)
+                    }
+                }
                 .post(requestBody)
                 .build()
             client.newCall(postRequest).enqueue(object : Callback {

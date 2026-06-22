@@ -86,7 +86,7 @@ class GrowthBookTrackingPluginTest {
         assertEquals(2, events.size)
 
         val experimentIds = events.map {
-            it.jsonObject["properties"]?.jsonObject?.get("experimentId")?.jsonPrimitive?.content
+            it.jsonObject["properties_json"]?.jsonObject?.get("experimentId")?.jsonPrimitive?.content
         }
         assertTrue("exp1" in experimentIds)
         assertTrue("exp2" in experimentIds)
@@ -108,7 +108,7 @@ class GrowthBookTrackingPluginTest {
         assertNotNull(events, "timer-based flush should fire within 3s")
         assertEquals(1, events.size)
         assertEquals("Feature Evaluated", events[0].jsonObject["event_name"]?.jsonPrimitive?.content)
-        assertEquals("flag1", events[0].jsonObject["properties"]?.jsonObject?.get("feature")?.jsonPrimitive?.content)
+        assertEquals("flag1", events[0].jsonObject["properties_json"]?.jsonObject?.get("feature")?.jsonPrimitive?.content)
 
         plugin.close()
     }
@@ -206,7 +206,7 @@ class GrowthBookTrackingPluginTest {
     }
 
     @Test
-    fun attributesAreIncludedInEvent() {
+    fun identityAttributesArePromotedAndRestGoToContext() {
         val dispatcher = CapturingDispatcher()
         val plugin = GrowthBookTrackingPlugin(
             config(dispatcher).copy(batchSize = 1)
@@ -219,16 +219,20 @@ class GrowthBookTrackingPluginTest {
         val events = dispatcher.waitForPost()
         assertNotNull(events)
         val event = events[0].jsonObject
-        val attrs = event["attributes"]?.jsonObject
-        assertNotNull(attrs, "attributes should be present in event")
-        assertEquals("u1", attrs["id"]?.jsonPrimitive?.content)
-        assertEquals("pro", attrs["plan"]?.jsonPrimitive?.content)
+        // `id` is promoted to the top-level device_id field (device_id ?: anonymous_id ?: id)
+        assertEquals("u1", event["device_id"]?.jsonPrimitive?.content)
+        // non-identity attributes land in context_json
+        val context = event["context_json"]?.jsonObject
+        assertNotNull(context, "context_json should be present in event")
+        assertEquals("pro", context["plan"]?.jsonPrimitive?.content)
+        // promoted identity keys are not duplicated into context_json
+        assertFalse("id" in context, "promoted keys must not appear in context_json")
 
         plugin.close()
     }
 
     @Test
-    fun sdkAttributesAreMergedIntoEvent() {
+    fun sdkMetadataIsTopLevel() {
         val dispatcher = CapturingDispatcher()
         val plugin = GrowthBookTrackingPlugin(
             config(dispatcher).copy(batchSize = 1)
@@ -238,10 +242,64 @@ class GrowthBookTrackingPluginTest {
 
         val events = dispatcher.waitForPost()
         assertNotNull(events)
-        val attrs = events[0].jsonObject["attributes"]?.jsonObject
-        assertNotNull(attrs)
-        assertEquals(SdkMetadata.LANGUAGE, attrs["sdk_language"]?.jsonPrimitive?.content)
-        assertEquals(SdkMetadata.VERSION, attrs["sdk_version"]?.jsonPrimitive?.content)
+        val event = events[0].jsonObject
+        assertEquals(SdkMetadata.LANGUAGE, event["sdk_language"]?.jsonPrimitive?.content)
+        assertEquals(SdkMetadata.VERSION, event["sdk_version"]?.jsonPrimitive?.content)
+
+        plugin.close()
+    }
+
+    @Test
+    fun dedupesRepeatedFeatureEvaluated() {
+        val dispatcher = CapturingDispatcher()
+        val plugin = GrowthBookTrackingPlugin(
+            config(dispatcher).copy(batchSize = 100, batchTimeout = 200.milliseconds)
+        )
+        plugin.init()
+
+        plugin.onFeatureEvaluated("flag", featureResult())
+        plugin.onFeatureEvaluated("flag", featureResult())   // duplicate → skipped
+        plugin.onFeatureEvaluated("other", featureResult())
+
+        val events = dispatcher.waitForPost(timeoutSeconds = 3)
+        assertNotNull(events)
+        assertEquals(2, events.size, "identical repeated feature events must be de-duplicated")
+
+        plugin.close()
+    }
+
+    @Test
+    fun differentFeatureValueIsNotDeduped() {
+        val dispatcher = CapturingDispatcher()
+        val plugin = GrowthBookTrackingPlugin(
+            config(dispatcher).copy(batchSize = 100, batchTimeout = 200.milliseconds)
+        )
+        plugin.init()
+
+        plugin.onFeatureEvaluated("flag", GBFeatureResult(gbValue = GBString("a"), source = GBFeatureSource.defaultValue))
+        plugin.onFeatureEvaluated("flag", GBFeatureResult(gbValue = GBString("b"), source = GBFeatureSource.defaultValue))
+
+        val events = dispatcher.waitForPost(timeoutSeconds = 3)
+        assertNotNull(events)
+        assertEquals(2, events.size, "a changed feature value must produce a new event")
+
+        plugin.close()
+    }
+
+    @Test
+    fun dedupesRepeatedExperimentViewed() {
+        val dispatcher = CapturingDispatcher()
+        val plugin = GrowthBookTrackingPlugin(
+            config(dispatcher).copy(batchSize = 100, batchTimeout = 200.milliseconds)
+        )
+        plugin.init()
+
+        plugin.onExperimentViewed(experiment("exp"), experimentResult(0))
+        plugin.onExperimentViewed(experiment("exp"), experimentResult(0))   // duplicate → skipped
+
+        val events = dispatcher.waitForPost(timeoutSeconds = 3)
+        assertNotNull(events)
+        assertEquals(1, events.size, "identical repeated experiment events must be de-duplicated")
 
         plugin.close()
     }
@@ -288,6 +346,31 @@ class GrowthBookTrackingPluginTest {
 
         latch.await(5, TimeUnit.SECONDS)
         assertEquals("https://ingest.example.com/track?client_key=k", capturedUrl.get())
+        plugin.close()
+    }
+
+    @Test
+    fun postSendsTextPlainContentType() {
+        val capturedHeaders = AtomicReference<Map<String, String>>()
+        val latch = CountDownLatch(1)
+        val dispatcher = object : TrackingNetworkDispatcher {
+            override fun consumePOSTRequest(url: String, headers: Map<String, String>,
+                body: JsonElement, onSuccess: (String) -> Unit, onError: (Throwable) -> Unit) {
+                capturedHeaders.set(headers)
+                latch.countDown()
+                onSuccess("{}")
+            }
+        }
+
+        val plugin = GrowthBookTrackingPlugin(
+            TrackingPluginConfig(clientKey = "k", networkDispatcher = dispatcher, batchSize = 1)
+        )
+        plugin.init()
+        plugin.onFeatureEvaluated("flag", featureResult())
+
+        latch.await(5, TimeUnit.SECONDS)
+        // Mirrors JS/Python: tracking JSON is posted as text/plain.
+        assertEquals("text/plain", capturedHeaders.get()?.get("Content-Type"))
         plugin.close()
     }
 }
