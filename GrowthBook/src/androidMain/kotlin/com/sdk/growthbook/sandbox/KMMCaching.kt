@@ -1,18 +1,19 @@
 package com.sdk.growthbook.sandbox
 
 import android.content.Context
+import com.sdk.growthbook.logger.GB
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Actual Implementation for Caching in Android - As expected in KMM
  */
 internal actual object CachingImpl {
-    actual fun getLayer(): CachingLayer {
-        return CachingAndroid()
-    }
+    actual fun getLayer(): CachingLayer = CachingAndroid.instance
 }
 
 /**
@@ -33,11 +34,21 @@ class CachingAndroid : CachingLayer {
     override fun saveContent(fileName: String, content: JsonElement) {
         synchronized(getLock(fileName)) {
             val file = getTargetFile(fileName) ?: return
-            val tempFile = File(file.parent, "${file.name}.tmp")
             val jsonContents = json.encodeToString(JsonElement.serializer(), content)
+            // Unique temp file per write: the per-file lock only serializes writers within
+            // a single process, so a fixed temp name could still be interleaved by another
+            // process (or a separately-constructed instance) writing the same cache file.
+            // A unique temp keeps each write self-contained; rename is then last-writer-wins
+            // of a complete payload, never a corrupt one.
+            val tempFile = File.createTempFile(file.name, ".tmp", file.parentFile)
             try {
-                tempFile.writeText(jsonContents)
-                tempFile.renameTo(file)
+                FileOutputStream(tempFile).use { out ->
+                    out.write(jsonContents.toByteArray())
+                    out.fd.sync()
+                }
+                if (!tempFile.renameTo(file)) {
+                    throw IOException("Failed to rename ${tempFile.name} to ${file.name}")
+                }
             } catch (e: Exception) {
                 tempFile.delete()
                 throw e
@@ -53,14 +64,18 @@ class CachingAndroid : CachingLayer {
         synchronized(getLock(fileName)) {
             val file = getTargetFile(fileName) ?: return null
 
+            if (!file.exists()) {
+                migrateLegacyCache(newFile = file)
+            }
+
             if (!file.exists()) return null
 
             // Read File Contents
             return try {
                 val inputAsString = file.readText()
                 json.decodeFromString(JsonElement.serializer(), inputAsString)
-            } catch (_: Exception) {
-                // Corrupt cache — delete and return null
+            } catch (e: Exception) {
+                GB.error("CachingAndroid: corrupt cache file '$fileName', deleting", e)
                 file.delete()
                 null
             }
@@ -85,11 +100,23 @@ class CachingAndroid : CachingLayer {
         return File(letDirectory, "$targetFileName.txt")
     }
 
+    private fun migrateLegacyCache(newFile: File) {
+        if (!newFile.name.startsWith("FeatureCache")) return
+        val legacyFile = getTargetFile("FeatureCache") ?: return
+        if (!legacyFile.exists()) return
+        if (!legacyFile.renameTo(newFile)) {
+            GB.warning("CachingAndroid: failed to migrate legacy cache to " +
+                "${newFile.name}, will retry on next launch")
+        }
+    }
+
     private fun getLock(fileName: String): Any {
         return fileLock.getOrPut(fileName) { Any() }
     }
 
     companion object {
+        internal val instance: CachingAndroid = CachingAndroid()
+
         internal var filesDir: File? = null
 
         /**

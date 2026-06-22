@@ -11,6 +11,7 @@ import com.sdk.growthbook.sandbox.CachingImpl
 import com.sdk.growthbook.stickybucket.GBStickyBucketService
 import com.sdk.growthbook.stickybucket.GBStickyBucketServiceImp
 import com.sdk.growthbook.utils.GBCacheRefreshHandler
+import com.sdk.growthbook.utils.GBFeatures
 
 /**
  * SDKBuilder - Root Class for SDK Initializers for GrowthBook SDK
@@ -105,12 +106,24 @@ class GBSDKBuilder(
     private var stickyBucketService: GBStickyBucketService? = null
     private var featureUsageCallback: GBFeatureUsageCallback? = null
     private var plugins: List<GrowthBookPlugin>? = null
+    private var initialFeatures: GBFeatures? = null
 
     /**
      * Set Refresh Handler - Will be called when cache is refreshed
      */
     fun setRefreshHandler(refreshHandler: GBCacheRefreshHandler): GBSDKBuilder {
         this.refreshHandler = refreshHandler
+        return this
+    }
+
+    /**
+     * Seed the SDK with a bundled fallback payload (e.g. snapshotted at build time).
+     * Features are applied immediately so flags are available from the first millisecond,
+     * and the normal cache/network refresh still runs on top — overwriting the seed as
+     * fresher data arrives. Effective precedence: network > disk cache > seed > code defaults.
+     */
+    fun setInitialFeatures(features: GBFeatures): GBSDKBuilder {
+        this.initialFeatures = features
         return this
     }
 
@@ -197,6 +210,8 @@ class GBSDKBuilder(
             )
         }
 
+        initialFeatures?.let { gbContext.features = it }
+
         val gbOptions = GBOptions(apiHost, streamingHost)
 
         return GrowthBookSDK(
@@ -249,6 +264,8 @@ class GBSDKBuilder(
                 handleWaitForCallCallback = null
                 growthBookSDK = null
             }
+            initialFeatures?.let { gbContext.features = it }
+
             val gbOptions = GBOptions(apiHost, streamingHost)
             growthBookSDK = GrowthBookSDK(
                 gbContext,
