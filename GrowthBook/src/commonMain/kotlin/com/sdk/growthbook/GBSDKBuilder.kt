@@ -126,6 +126,9 @@ class GBSDKBuilder(
         return this
     }
 
+    /**
+    * Method for enable  default sticky bucket service
+    */
     fun setStickyBucketService(coroutineScope: CoroutineScope): GBSDKBuilder {
         return setStickyBucketService(
             GBStickyBucketServiceImp(
@@ -179,6 +182,8 @@ class GBSDKBuilder(
      * result. Once the cache is older, the SDK refetches from the network.
      * This is a cache-staleness gate evaluated on the next fetch, not a
      * background polling mechanism. When unset, the SDK always refetches.
+     * To force a network refresh regardless of this window, call
+     * [GrowthBookSDK.refreshCache].
      *
      * @param cacheMaxAge freshness window in milliseconds.
      */

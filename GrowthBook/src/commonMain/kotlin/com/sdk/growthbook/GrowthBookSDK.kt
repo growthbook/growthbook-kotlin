@@ -21,7 +21,6 @@ import com.sdk.growthbook.features.FeaturesDataModel
 import com.sdk.growthbook.features.FeaturesDataSource
 import com.sdk.growthbook.features.FeaturesFlowDelegate
 import com.sdk.growthbook.features.FeaturesViewModel
-import com.sdk.growthbook.features.FetchPolicy
 import com.sdk.growthbook.model.GBJson
 import com.sdk.growthbook.model.GBNull
 import com.sdk.growthbook.model.GBArray
@@ -119,7 +118,7 @@ class GrowthBookSDK(
         if (gbContext.remoteEval) {
             refreshForRemoteEval()
         } else {
-            featuresViewModel.fetchFeatures(policy = FetchPolicy.ForceNetwork)
+            featuresViewModel.revalidate()
         }
     }
 
@@ -271,7 +270,7 @@ class GrowthBookSDK(
 
                 FeaturesFetchResult.Failed -> {
                     if (attempt >= MAX_RETRY_ATTEMPTS) return feature(id)
-                    featuresViewModel.fetchFeatures(policy = FetchPolicy.ForceNetwork)
+                    featuresViewModel.awaitRefresh()
                     if (gbContext.enableLogging) {
                         GB.log("GrowthBookSDK: suspendFeature: retry attempt ${attempt + 1}/$MAX_RETRY_ATTEMPTS, waiting ${delaysMs}ms")
                     }

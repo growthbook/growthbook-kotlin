@@ -13,8 +13,18 @@ import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.utils.GBRemoteEvalParams
 import com.sdk.growthbook.utils.Resource
 import com.sdk.growthbook.utils.SSEConnectionController
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonObject
+import kotlin.coroutines.resume
 import kotlin.time.Clock
 
 /**
@@ -35,14 +45,61 @@ internal interface FeaturesFlowDelegate {
  * Pipeline: source (cache|network|SSE) -> decode -> FetchOutcome -> dispatch.
  */
 internal class FeaturesViewModel(
+    /**
+     * Receiver of fetch outcomes. Every cache/network/SSE result is reported here
+     * (success, failure, 304-not-modified, saved groups) so the owning SDK can
+     * apply the features to its context and fire the refresh handler.
+     */
     private val delegate: FeaturesFlowDelegate,
+    /**
+     * Performs the actual fetches, independent of caching: network GET (with
+     * 304 handling), remote-eval POST, and the SSE stream. This view model adds
+     * the cache and coalescing logic on top of it.
+     */
     private val dataSource: FeaturesDataSource,
+    /**
+     * Key used to decrypt encrypted payloads; null when features arrive in
+     * plaintext. Also seeds the default [decoder].
+     */
     private val encryptionKey: String? = null,
+    /**
+     * Gates cache *writes* only: when true, a successful network payload is
+     * persisted to [cachingLayer]. Cache *reads* (see [serveCache]) happen
+     * regardless, so bundled/previously cached data can still be served.
+     */
     private val cachingEnabled: Boolean,
+    /**
+     * Filename under which the payload is stored in [cachingLayer]. The caller
+     * namespaces it per API key to keep multiple SDK instances isolated.
+     */
     private val cacheKey: String = Constants.FEATURE_CACHE,
+    /**
+     * Storage backend for the cached payload: read in [serveCache], written in
+     * [handleNetworkModel]. Defaults to the platform's shared caching layer.
+     */
     private val cachingLayer: CachingLayer = CachingImpl.getLayer(),
+    /**
+     * Cache freshness window in milliseconds. While the cached payload is younger
+     * than this, a [FetchPolicy.CacheFirst] fetch is served from cache and the
+     * network is skipped; once older, the SDK refetches. null means always refetch.
+     * Mirrors [com.sdk.growthbook.GBSDKBuilder.setCacheMaxAge].
+     */
     private val cacheMaxAge: Long? = null,
-    private val decoder: FeaturePayloadDecoder = FeaturePayloadDecoder(encryptionKey)
+    /**
+     * Turns a raw [FeaturesDataModel] into a [DecodedPayload] (features + saved
+     * groups), decrypting with [encryptionKey] when needed. Injectable for tests.
+     */
+    private val decoder: FeaturePayloadDecoder = FeaturePayloadDecoder(encryptionKey),
+    /**
+     * Scope that owns the coalesced refresh started by [awaitRefresh] (used by
+     * suspendFeature() retries and [revalidate]). It must outlive any single
+     * caller, so cancelling one caller never tears down a refresh shared with
+     * others ([SupervisorJob] isolates failures too). Only lightweight coordination
+     * runs here (mutex bookkeeping, continuation resumption); the actual HTTP runs
+     * on the network dispatcher's own IO scope. Injectable so tests can supply a
+     * deterministic dispatcher.
+     */
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) {
 
     /**
@@ -50,6 +107,21 @@ internal class FeaturesViewModel(
      */
     val sseController: SSEConnectionController
         get() = dataSource.sseController
+
+    /**
+     * Guards reads and writes of [inFlight] so the check-or-start decision in
+     * [awaitRefresh] is atomic across concurrent callers. Held only for that brief
+     * bookkeeping, never for the duration of the network call.
+     */
+    private val refreshMutex = Mutex()
+
+    /**
+     * The currently running coalesced refresh, or null when none is in flight.
+     * Concurrent [awaitRefresh] callers await this same [Deferred] instead of each
+     * starting their own request; it is cleared once the request completes (in a
+     * `finally`, before the result is observable), so the next round starts fresh.
+     */
+    private var inFlight: Deferred<FetchResult>? = null
 
     /** Opens an SSE connection and streams feature updates as a [Flow]. */
     fun autoRefreshFeatures(): Flow<Resource<GBFeatures?>> {
@@ -75,6 +147,63 @@ internal class FeaturesViewModel(
         if (serveCache(remoteEval, policy)) return // fresh cache -> authoritative, skip network
         fetchFromNetwork(remoteEval, payload)
     }
+
+    /**
+     * Coalesced network refresh: concurrent callers share a single in-flight
+     * GET instead of each firing their own. The first caller starts the request
+     * and stores its [Deferred] in [inFlight]; callers arriving while it runs
+     * await the same result. The slot is cleared once the request completes, so
+     * the next round (e.g. a backoff retry) starts a fresh request.
+     *
+     * This is the network primitive beneath the cache-aware [fetchFeatures];
+     * it always hits the network (GET only) and carries no [FetchPolicy].
+     */
+    suspend fun awaitRefresh(): FetchResult {
+        val deferred = refreshMutex.withLock {
+            inFlight ?: scope.async {
+                try {
+                    runNetworkGet()
+                } finally {
+                    refreshMutex.withLock { inFlight = null }
+                }
+            }.also { inFlight = it }
+        }
+        return deferred.await()
+    }
+
+    /**
+     * Stale-while-revalidate refresh backing [com.sdk.growthbook.GrowthBookSDK.refreshCache].
+     * Serves any cached payload immediately as non-authoritative, then triggers a
+     * coalesced network revalidation that joins an in-flight [awaitRefresh] instead
+     * of starting a duplicate request. Always bypasses cache freshness (see
+     * [FetchPolicy.ForceNetwork]).
+     *
+     * Fire-and-forget: the network round runs on [scope]; observe completion via
+     * the refresh handler rather than expecting features to be ready on return.
+     */
+    fun revalidate() {
+        serveCache(remoteEval = false, policy = FetchPolicy.ForceNetwork)
+        scope.launch { awaitRefresh() }
+    }
+
+    /** Bridges the callback-based GET into a suspend result for [awaitRefresh]. */
+    private suspend fun runNetworkGet(): FetchResult =
+        suspendCancellableCoroutine { cont ->
+            dataSource.fetchFeatures(
+                success = {
+                    handleNetworkModel(it)
+                    cont.resume(FetchResult.Success)
+                },
+                failure = {
+                    dispatch(FetchOutcome.Failed(GBError(it), source = Source.NETWORK))
+                    cont.resume(FetchResult.Failed)
+                },
+                onNotModified = {
+                    dispatch(FetchOutcome.NotModified)
+                    cont.resume(FetchResult.NotModified)
+                }
+            )
+        }
 
     private fun serveCache(remoteEval: Boolean, policy: FetchPolicy): Boolean {
         val entry = runCatching { readCache() }.getOrElse {

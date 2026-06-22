@@ -6,8 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [7.3.0] - 2026-06-00
 
-## [7.2.0] - 2026-06-12
+### Added
+- `GBSDKBuilder.setCacheMaxAge()` — configurable cache freshness window; while the
+  cache is younger than the given age, the next fetch is served from cache and the
+  network call is skipped. `refreshCache()` always bypasses this window.
+
+### Changed
+- `suspendFeature()` now retries failed fetches with exponential backoff (capped)
+  instead of an unbounded recursive loop, preventing DNS request flooding when the
+  network is unavailable (#236).
+- Concurrent feature refreshes are now coalesced into a single shared in-flight
+  request, so N parallel `suspendFeature()` callers no longer trigger N network
+  fetches.
+
+---
+
+## [7.2.0] - 2026-06-119
 
 ### Added
 - `GBSDKBuilder.setInitialFeatures()` — seed the SDK with a bundled fallback payload; features are applied immediately and the normal cache/network refresh still runs on top (network > disk cache > seed > code defaults)

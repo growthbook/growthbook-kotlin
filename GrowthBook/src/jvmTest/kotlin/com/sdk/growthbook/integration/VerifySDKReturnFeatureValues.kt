@@ -11,7 +11,7 @@ import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.toGbNumber
 import com.sdk.growthbook.utils.GBError
 import io.mockk.mockk
-import io.mockk.every
+import io.mockk.coEvery
 import io.mockk.coVerify
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -20,7 +20,7 @@ import org.intellij.lang.annotations.Language
 import org.junit.Test
 import kotlin.test.assertEquals
 import com.sdk.growthbook.features.FeaturesViewModel
-import com.sdk.growthbook.features.FetchPolicy
+import com.sdk.growthbook.features.FetchResult
 import com.sdk.growthbook.kotlinx.serialization.gbSerialize
 
 internal class VerifySDKReturnFeatureValues {
@@ -166,7 +166,7 @@ internal class VerifySDKReturnFeatureValues {
         // fetchFeature() triggers featuresFetchFailed()
 
         val mockedFeaturesViewModel: FeaturesViewModel = mockk {
-            every { fetchFeatures(any(), any(), any()) } returns Unit
+            coEvery { awaitRefresh() } returns FetchResult.Failed
         }
         gbSdk.featuresViewModel = mockedFeaturesViewModel
 
@@ -176,14 +176,14 @@ internal class VerifySDKReturnFeatureValues {
             }
 
             // it is not mandatory here but just to emphasize that
-            // if call failed, then suspendFeature() method calls fetchFeatures()
+            // if call failed, then suspendFeature() retries via the coalesced awaitRefresh()
             gbSdk.featuresFetchFailed(GBError(null), true)
 
             delay(100) // cancel only after 100 millis of waiting
             job.cancel()
             // or gbSdk.featuresFetchedSuccessfully(emptyMap(), true)
 
-            coVerify { mockedFeaturesViewModel.fetchFeatures(policy = FetchPolicy.ForceNetwork) }
+            coVerify { mockedFeaturesViewModel.awaitRefresh() }
         }
     }
 
