@@ -155,6 +155,16 @@ class GrowthBookSDK(
     }
 
     /**
+     * Releases resources held by this SDK instance: stops any active SSE auto-refresh connection and
+     * cancels the background coroutine scope used to process fetched payloads. Call this when the
+     * instance is no longer needed (e.g. on logout, or before creating a replacement instance) to
+     * avoid leaking coroutines and threads. The instance must not be used after [close].
+     */
+    fun close() {
+        featuresViewModel.close()
+    }
+
+    /**
      * Get Cached Features
      */
     fun getFeatures(): GBFeatures {

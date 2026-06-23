@@ -436,6 +436,31 @@ class GrowthBookSDKBuilderTests {
     }
 
     @Test
+    fun test_close_cancelsScope_soSubsequentRemoteFetchDoesNotRun() = runTest {
+        var handlerCallCount = 0
+        val sdk = buildSdkWithHandler(refreshHandler = { _, _ -> handlerCallCount++ })
+        // initialize() ran one successful remote fetch, so the handler fired at least once.
+        val countAfterInit = handlerCallCount
+        assertTrue(countAfterInit > 0)
+
+        sdk.close()
+
+        // After close() the background scope is cancelled, so the payload-processing coroutine
+        // launched by a remote fetch never runs and the (isRemote=true) handler is not invoked again.
+        sdk.refreshCache()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(countAfterInit, handlerCallCount)
+    }
+
+    @Test
+    fun test_close_isIdempotent() = runTest {
+        val sdk = buildSdkWithHandler()
+        sdk.close()
+        sdk.close() // must not throw
+    }
+
+    @Test
     fun test_savedGroupsFetchFailed_passesErrorToHandler() = runTest {
         val expectedError = GBError(error = RuntimeException("network failure"))
         var receivedError: GBError? = null

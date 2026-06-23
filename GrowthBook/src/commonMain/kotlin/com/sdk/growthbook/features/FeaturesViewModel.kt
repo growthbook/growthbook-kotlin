@@ -18,6 +18,7 @@ import com.sdk.growthbook.utils.SSEConnectionController
 import com.sdk.growthbook.utils.getSavedGroupFromEncryptedSavedGroup
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import com.sdk.growthbook.logger.GB
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
@@ -137,6 +138,16 @@ internal class FeaturesViewModel(
             SerializableFeaturesDataModel.serializer()
         )
         return dataModel?.gbDeserialize()
+    }
+
+    /**
+     * Releases resources held by this view model: stops any active SSE connection and cancels the
+     * coroutine scope used to process fetched payloads, so in-flight background work does not outlive
+     * the owning SDK instance. Safe to call more than once.
+     */
+    fun close() {
+        sseController.stop()
+        coroutineScope.cancel()
     }
 
     /**
