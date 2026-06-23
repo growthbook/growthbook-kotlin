@@ -388,13 +388,19 @@ internal class GBExperimentEvaluator(
 
             if (changed) {
                 /**
-                 * update local docs
+                 * update local docs — keeps this evaluation pass consistent (e.g. nested /
+                 * prerequisite evaluations) before the shared context is updated
                  */
                 evaluationContext.userContext.stickyBucketAssignmentDocs =
                     (stickyBucketAssignmentDocs ?: emptyMap()).toMutableMap().apply {
                         this[key] = doc
                     }
-                
+
+                // Merge the single changed assignment back into the shared context atomically,
+                // so the next feature()/run() sees it without a whole-map write-back that could
+                // clobber a concurrent background refresh.
+                evaluationContext.onStickyAssignmentChanged?.invoke(key, doc)
+
                 // Save async to storage (fire and forget)
                 evaluationContext.stickyBucketService.coroutineScope.launch {
                     GBUtils.saveStickyBucketAssignment(

@@ -289,7 +289,8 @@ class GrowthBookSDK(
         val evalContext = createEvaluationContext()
         val evaluator = GBFeatureEvaluator(evalContext, this.forcedFeatures)
         val result = evaluator.evaluateFeature(featureKey = id, attributeOverrides = attributeOverrides)
-        gbContext.stickyBucketAssignmentDocs = evalContext.userContext.stickyBucketAssignmentDocs
+        // Newly-generated sticky assignments are merged into the context per-key during evaluation
+        // (see EvaluationContext.onStickyAssignmentChanged) — no whole-map write-back needed here.
         return result
     }
 
@@ -343,7 +344,8 @@ class GrowthBookSDK(
             attributeOverrides = attributeOverrides
         )
 
-        gbContext.stickyBucketAssignmentDocs = evalContext.userContext.stickyBucketAssignmentDocs
+        // Newly-generated sticky assignments are merged into the context per-key during evaluation
+        // (see EvaluationContext.onStickyAssignmentChanged) — no whole-map write-back needed here.
 
         fireSubscriptions(experiment, result)
         return result
@@ -575,6 +577,12 @@ class GrowthBookSDK(
                     attributes = snapshot.attributes,
                     stickyBucketAssignmentDocs = snapshot.stickyBucketAssignmentDocs,
                 ),
+                // Merge each newly-generated sticky assignment back into the shared context by its
+                // single key, atomically — instead of writing the whole docs map back after
+                // evaluation (which could clobber a concurrent background refresh).
+                onStickyAssignmentChanged = { key, doc ->
+                    gbContext.mergeStickyAssignmentDoc(key, doc)
+                },
                 stackContext = StackContext(null, mutableSetOf())
             )
         }

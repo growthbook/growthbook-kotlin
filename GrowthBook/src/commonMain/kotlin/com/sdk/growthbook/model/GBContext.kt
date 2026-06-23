@@ -155,6 +155,23 @@ class GBContext(
         set(value) = mutate { it.copy(stickyBucketAssignmentDocs = value) }
 
     /**
+     * Atomically merge a single freshly-generated sticky-bucket assignment doc into the current
+     * docs, keyed by its attribute. Unlike assigning [stickyBucketAssignmentDocs] wholesale, this
+     * only adds/replaces the one [key], so it composes with a concurrent background refresh that
+     * replaces the whole map: the CAS loop re-reads the latest state, so neither write clobbers the
+     * other's unrelated keys. Mirrors the TypeScript SDK, which mutates the live docs object by a
+     * single key at the point of generation.
+     */
+    internal fun mergeStickyAssignmentDoc(
+        key: GBStickyAttributeKey,
+        doc: GBStickyAssignmentsDocument,
+    ) = mutate {
+        it.copy(
+            stickyBucketAssignmentDocs = (it.stickyBucketAssignmentDocs ?: emptyMap()) + (key to doc)
+        )
+    }
+
+    /**
      * List of user's attributes keys
      */
     var stickyBucketIdentifierAttributes: List<String>?
