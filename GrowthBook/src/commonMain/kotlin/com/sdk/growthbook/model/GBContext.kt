@@ -172,6 +172,15 @@ class GBContext(
     }
 
     /**
+     * Atomically replace the user [attributes] and clear the sticky-bucket docs in a single update.
+     * Done as one swap (not two separate writes) so a concurrent reader never observes the new
+     * attributes paired with the previous user's stale sticky docs.
+     */
+    internal fun setAttributesClearingStickyDocs(attributes: Map<String, GBValue>) = mutate {
+        it.copy(attributes = attributes, stickyBucketAssignmentDocs = null)
+    }
+
+    /**
      * List of user's attributes keys
      */
     var stickyBucketIdentifierAttributes: List<String>?

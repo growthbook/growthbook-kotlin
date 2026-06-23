@@ -359,8 +359,9 @@ class GrowthBookSDK(
      * after setting attributes, use [setAttributesSync] instead.
      */
     fun setAttributes(attributes: Map<String, GBValue>) {
-        gbContext.attributes = attributes
-        gbContext.stickyBucketAssignmentDocs = null
+        // Single atomic update so a concurrent feature()/run() never sees the new attributes paired
+        // with the previous user's stale sticky docs (the docs are repopulated by the refresh below).
+        gbContext.setAttributesClearingStickyDocs(attributes)
         refreshStickyBucketService()
     }
 
