@@ -6,8 +6,10 @@ import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.tests.MockNetworkClient
 import com.sdk.growthbook.network.NetworkDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 
-internal fun buildSDK(
+internal fun TestScope.buildSDK(
     json: String,
     attributes: Map<String, GBValue> = emptyMap(),
     networkDispatcher: NetworkDispatcher = MockNetworkClient(
@@ -23,5 +25,9 @@ internal fun buildSDK(
         encryptionKey = "",
         trackingCallback = trackingCallback,
         networkDispatcher = networkDispatcher,
-    ).initialize()
+    )
+        // Synchronous mock network + Unconfined => payload is applied inline, so feature() reads
+        // right after initialize() are deterministic. Production uses PlatformDependentIODispatcher.
+        .setCoroutineContext(UnconfinedTestDispatcher(testScheduler))
+        .initialize()
 }

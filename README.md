@@ -74,6 +74,8 @@ var sdkInstance: GrowthBookSDK = GBSDKBuilder(
 ```
 If you are accessing features the first time there will be no features right after `initialize()` method call because features are not got from Backend yet. If you need to access features as soon as possible, you need to use `GBCacheRefreshHandler`. You can pass your implementation of `GBCacheRefreshHandler` through `setRefreshHandler()` method.
 
+> **Threading:** the fetched payload is processed on a background dispatcher, so `GBCacheRefreshHandler` is invoked off the main thread. Marshal back to your UI thread yourself if the callback touches UI state. `feature()`/`run()` are safe to call from any thread and always evaluate against a single consistent snapshot of the loaded state.
+
 #### There are additional properties which can be setup at the time of initialization
 
 ```kotlin

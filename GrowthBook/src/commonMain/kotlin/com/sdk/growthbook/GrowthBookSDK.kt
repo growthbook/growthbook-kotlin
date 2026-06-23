@@ -40,6 +40,8 @@ import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBuckets
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.coroutineContext
 import kotlin.experimental.ExperimentalObjCRefinement
 import kotlin.native.HiddenFromObjC
 
@@ -60,9 +62,12 @@ class GrowthBookSDK(
     features: GBFeatures? = null,
     savedGroups: Map<String, GBValue>? = null,
     cachingEnabled: Boolean,
+    // Dispatcher on which the fetched payload is processed (sticky-bucket refresh + feature
+    // application + refreshHandler invocation). Defaults to the platform IO dispatcher so that work
+    // runs on a defined background context rather than an arbitrary thread. Overridable (e.g. with a
+    // test dispatcher) so tests can drive the async pipeline deterministically.
+    coroutineContext: CoroutineContext = PlatformDependentIODispatcher,
 ) : FeaturesFlowDelegate {
-
-    private var savedGroups: Map<String, GBValue>? = emptyMap()
     private var forcedFeatures: Map<String, GBValue> = emptyMap()
     private var attributeOverrides: Map<String, GBValue> = emptyMap()
     private var remoteSourceFeaturesFetchResult: FeaturesFetchResult =
@@ -88,7 +93,8 @@ class GrowthBookSDK(
         ),
         encryptionKey = gbContext.encryptionKey,
         cachingEnabled = cachingEnabled,
-        cacheKey = "${Constants.FEATURE_CACHE}_${gbContext.apiKey}"
+        cacheKey = "${Constants.FEATURE_CACHE}_${gbContext.apiKey}",
+        coroutineContext = coroutineContext,
     )
 
     init {
@@ -98,7 +104,7 @@ class GrowthBookSDK(
         } else {
             refreshCache()
         }
-        this.savedGroups = savedGroups
+        gbContext.savedGroups = savedGroups
         refreshStickyBucketService()
     }
 
@@ -272,6 +278,12 @@ class GrowthBookSDK(
      * The feature method takes a single string argument,
      * which is the unique identifier for the feature and
      * @returns a [GBFeatureResult] object
+     *
+     * Best-effort, synchronous read of the currently loaded state: it evaluates against whatever
+     * features are in the context at call time. A remote payload is applied asynchronously (on the
+     * SDK's coroutineContext, IO by default), so a call made immediately after construction — before
+     * the first fetch completes — returns default/unknown values. To guarantee the fetched payload
+     * (and sticky-bucket assignments) are loaded before evaluating, use [suspendFeature] instead.
      */
     fun feature(id: String): GBFeatureResult {
         val evalContext = createEvaluationContext()
@@ -543,23 +555,28 @@ class GrowthBookSDK(
         private fun createEvaluationContext(
             gbContext: GBContext,
             gbExperimentHelper: GBExperimentHelper,
-        ) =
-            EvaluationContext(
+        ): EvaluationContext {
+            // One atomic read of the whole shared state: features, savedGroups, attributes and the
+            // sticky-bucket docs come from the SAME snapshot, so the evaluation can never observe a
+            // torn mix (e.g. new features with stale sticky docs).
+            val snapshot = gbContext.evalSnapshot()
+            return EvaluationContext(
                 enabled = gbContext.enabled,
-                features = gbContext.features,
-                savedGroups = gbContext.savedGroups,
+                features = snapshot.features,
+                savedGroups = snapshot.savedGroups,
                 gbExperimentHelper = gbExperimentHelper,
                 loggingEnabled = gbContext.enableLogging,
                 onFeatureUsage = gbContext.onFeatureUsage,
-                forcedVariations = gbContext.forcedVariations,
+                forcedVariations = snapshot.forcedVariations,
                 trackingCallback = gbContext.trackingCallback,
                 stickyBucketService = gbContext.stickyBucketService,
                 userContext = UserContext(
                     qaMode = gbContext.qaMode,
-                    attributes = gbContext.attributes,
-                    stickyBucketAssignmentDocs = gbContext.stickyBucketAssignmentDocs,
+                    attributes = snapshot.attributes,
+                    stickyBucketAssignmentDocs = snapshot.stickyBucketAssignmentDocs,
                 ),
                 stackContext = StackContext(null, mutableSetOf())
             )
+        }
     }
 }

@@ -17,7 +17,6 @@ import com.sdk.growthbook.serializable_model.gbDeserialize
 import com.sdk.growthbook.utils.SSEConnectionController
 import com.sdk.growthbook.utils.getSavedGroupFromEncryptedSavedGroup
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import com.sdk.growthbook.logger.GB
 import kotlinx.coroutines.flow.Flow
@@ -46,7 +45,7 @@ internal class FeaturesViewModel(
     private val cachingEnabled: Boolean,
     private val cacheKey: String = Constants.FEATURE_CACHE,
     private val cachingLayer: CachingLayer = CachingImpl.getLayer(),
-    coroutineContext: CoroutineContext = Dispatchers.Unconfined,
+    coroutineContext: CoroutineContext
 ) {
 
     /**

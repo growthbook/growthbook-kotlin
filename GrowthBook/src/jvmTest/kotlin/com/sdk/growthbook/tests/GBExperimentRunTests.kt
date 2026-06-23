@@ -7,6 +7,7 @@ import kotlin.test.assertEquals
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonObject
 import com.sdk.growthbook.integration.buildSDK
+import kotlinx.coroutines.test.runTest
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.serializable_model.gbDeserialize
@@ -175,7 +176,7 @@ class GBExperimentRunTests {
     }
 
     @Test
-    fun `forcing example`() {
+    fun `forcing example`() = runTest {
         val gb = buildSDK(
             json = "",
             attributes = mapOf("id" to 1.toGbNumber())
