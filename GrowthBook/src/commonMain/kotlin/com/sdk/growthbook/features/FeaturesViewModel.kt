@@ -17,6 +17,7 @@ import com.sdk.growthbook.utils.SSEConnectionController
 import com.sdk.growthbook.utils.getSavedGroupFromEncryptedSavedGroup
 import com.sdk.growthbook.logger.GB
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.transform
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -48,6 +49,8 @@ internal class FeaturesViewModel(
      */
     val sseController: SSEConnectionController
         get() = dataSource.sseController
+
+    val decoder: FeaturePayloadDecoder = FeaturePayloadDecoder(encryptionKey)
 
     /**
      * Fetch Features
@@ -133,12 +136,24 @@ internal class FeaturesViewModel(
      */
     fun autoRefreshFeatures(): Flow<Resource<GBFeatures?>> {
         sseController.start()
-        return dataSource.autoRefresh(success = { dataModel ->
-            prepareFeaturesDataForRemoteEval(dataModel = dataModel)
-        }, failure = { error ->
-            // Call Error Delegate with mention of data not available but its not remote
-            this.delegate.featuresFetchFailed(GBError(error), true)
-        })
+        return dataSource.autoRefreshRaw().transform { resource ->
+            when (resource) {
+                is Resource.Error -> {
+                    emit(resource)
+                    delegate.featuresFetchFailed(GBError(resource.exception), true)
+                }
+
+                is Resource.Success -> {
+                    val model = resource.data
+                    val result = decoder.decodeToResult(model)
+                    apply(model, result)
+                    when (result) {
+                        is FeaturesResult.Applied -> emit(Resource.Success(result.features))
+                        is FeaturesResult.Failed -> emit(Resource.Error(Exception(result.error.errorMessage)))
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -252,5 +267,31 @@ internal class FeaturesViewModel(
             content = dataModel.gbSerialize(),
             serializer = SerializableFeaturesDataModel.serializer()
         )
+    }
+
+    private fun apply(model: FeaturesDataModel, result: FeaturesResult) {
+        when (result) {
+            is FeaturesResult.Applied -> {
+                delegate.featuresAPIModelSuccessfully(model)
+                if (cachingEnabled) {
+                    try {
+                        putDataToCache(model)
+                    } catch (e: Throwable) {
+                        GB.error("FeaturesViewModel: cache write failed, features still applied", e)
+                    }
+                }
+
+                this.delegate.featuresFetchedSuccessfully(
+                    features = result.features,
+                    isRemote = true)
+                result.savedGroups?.let {
+                    delegate.savedGroupsFetchedSuccessfully(it, isRemote = true)
+                }
+            }
+
+            is FeaturesResult.Failed -> {
+                delegate.featuresFetchFailed(result.error, isRemote = true)
+            }
+        }
     }
 }

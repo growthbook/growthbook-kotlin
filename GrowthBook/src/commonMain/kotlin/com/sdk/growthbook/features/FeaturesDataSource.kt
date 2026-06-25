@@ -49,7 +49,8 @@ internal class FeaturesDataSource(
         onNotModified: (() -> Unit)
     ) {
         if (dispatcher is NetworkDispatcherWithNotModified) {
-            dispatcher.consumeGETRequestWithNotModified(request = getEndpoint(),
+            dispatcher.consumeGETRequestWithNotModified(
+                request = getEndpoint(),
                 onSuccess = { rawContent ->
                     val result = jsonParser.decodeFromString(
                         deserializer = SerializableFeaturesDataModel.serializer(),
@@ -81,25 +82,25 @@ internal class FeaturesDataSource(
     /**
      * Supportive method for automatically refresh features
      */
-    fun autoRefresh(
-        success: (FeaturesDataModel) -> Unit, failure: (Throwable?) -> Unit
-    ): Flow<Resource<GBFeatures?>> = dispatcher.consumeSSEConnection(
-        url = getEndpoint(FeatureRefreshStrategy.SERVER_SENT_EVENTS),sseController = sseController
-    ).transform { resource ->
-        if (resource is Resource.Success) {
-            val serializableFeaturesDataModel = jsonParser.decodeFromString(
-                SerializableFeaturesDataModel.serializer(), resource.data
-            )
-            val featuresDataModel = serializableFeaturesDataModel.gbDeserialize()
-
-            val gbFeatures = featuresDataModel.features
-            emit(Resource.Success(gbFeatures))
-            featuresDataModel.also(success)
-        } else if (resource is Resource.Error) {
-            emit(resource)
-            resource.exception.also(failure)
+    fun autoRefreshRaw(): Flow<Resource<FeaturesDataModel>> =
+        dispatcher.consumeSSEConnection(
+            url = getEndpoint(FeatureRefreshStrategy.SERVER_SENT_EVENTS),
+            sseController = sseController
+        ).transform { resource ->
+            when (resource) {
+                is Resource.Success -> {
+                    val model = jsonParser.decodeFromString(
+                        SerializableFeaturesDataModel.serializer(),
+                        resource.data
+                    )
+                    val featuresDataModel = model.gbDeserialize()
+                    emit(Resource.Success(featuresDataModel))
+                }
+                is Resource.Error -> {
+                    emit(resource)
+                }
+            }
         }
-    }
 
     /**
      * Method that make POST request to server for evaluate feature remotely
