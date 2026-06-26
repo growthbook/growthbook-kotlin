@@ -183,6 +183,18 @@ and returns a feature value typed with specified type.
   fun stopAutoRefreshFeatures(): Flow<Resource<GBFeatures?>>{}
   ```
 
+- set a handler to be notified about only the feature flags that changed on a refresh
+  (SSE / network), instead of reacting to the whole feature set — useful to avoid
+  invalidating an external cache for unrelated flags. The handler fires after features
+  are applied, only when something changed; the first call after init reports the whole
+  payload as `added`.
+
+  ```kotlin
+  fun setFeaturesChangeHandler(handler: GBFeaturesChangeHandler): GBSDKBuilder
+  // GBFeaturesChangeHandler = (GBFeaturesDiff) -> Unit
+  // GBFeaturesDiff(added, removed, changed) + hasChanges / changedKeys
+  ```
+
 - Delegate that set to Context successfully fetched features
 
   ```kotlin
