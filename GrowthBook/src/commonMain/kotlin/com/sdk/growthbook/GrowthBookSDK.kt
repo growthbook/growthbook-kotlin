@@ -36,6 +36,8 @@ import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.kotlinx.serialization.from
 import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.StackContext
+import com.sdk.growthbook.model.diffFeatures
+import com.sdk.growthbook.utils.GBFeaturesChangeHandler
 import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBucketsSync
 import kotlinx.coroutines.launch
 import kotlin.experimental.ExperimentalObjCRefinement
@@ -58,8 +60,8 @@ class GrowthBookSDK(
     features: GBFeatures? = null,
     savedGroups: Map<String, GBValue>? = null,
     cachingEnabled: Boolean,
-) : FeaturesFlowDelegate {
-
+    private val featuresChangeHandler: GBFeaturesChangeHandler? = null,
+    ) : FeaturesFlowDelegate {
     private var savedGroups: Map<String, GBValue>? = emptyMap()
     private var forcedFeatures: Map<String, GBValue> = emptyMap()
     private var attributeOverrides: Map<String, GBValue> = emptyMap()
@@ -157,12 +159,16 @@ class GrowthBookSDK(
      * Delegate that set to Context successfully fetched features
      */
     override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
+        val diff = featuresChangeHandler?.let { diffFeatures(gbContext.features, features) }
+
         gbContext.features = features
         hasFeaturesPayload = true
         if (isRemote) {
             remoteSourceFeaturesFetchResult = FeaturesFetchResult.Success
             this.refreshHandler?.invoke(true, null)
         }
+
+        diff?.takeIf { it.hasChanges }?.let { featuresChangeHandler?.invoke(it) }
     }
 
     /**

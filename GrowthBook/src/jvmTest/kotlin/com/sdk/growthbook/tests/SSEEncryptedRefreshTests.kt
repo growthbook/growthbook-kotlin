@@ -1,6 +1,7 @@
 package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.GBSDKBuilder
+import com.sdk.growthbook.model.GBFeaturesDiff
 import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.utils.Resource
 import com.sdk.growthbook.utils.SSEConnectionController
@@ -55,7 +56,7 @@ class SSEEncryptedRefreshTests {
 
     @Test
     fun sseEncrypted_emitsDecryptedFeaturesToFlow() = runTest {
-        val sseDispatcher = object: MockNetworkClient(null, null) {
+        val sseDispatcher = object : MockNetworkClient(null, null) {
             override fun consumeSSEConnection(
                 url: String,
                 sseConnectionController: SSEConnectionController?
@@ -80,5 +81,59 @@ class SSEEncryptedRefreshTests {
         assertTrue(sdk.getFeatures().contains("testfeature1"))
         assertNotNull(first.data, "Flow should emit decrypted feature, not null")
         assertTrue(first.data!!.contains("testfeature1"))
+    }
+
+    @Test
+    fun sseEncrypted_invokeFeaturesChangeHandlerWithDiff() = runTest {
+        val sseDispatcher = object : MockNetworkClient(null, null) {
+            override fun consumeSSEConnection(
+                url: String,
+                sseConnectionController: SSEConnectionController?
+            ): Flow<Resource<String>> = flowOf(Resource.Success(encPayload))
+        }
+
+        var captured: GBFeaturesDiff? = null
+
+        val sdk = GBSDKBuilder(
+            apiKey,
+            host,
+            encryptionKey = encKey,
+            attributes = attrs,
+            trackingCallback = { _, _ -> },
+            networkDispatcher = sseDispatcher,
+            remoteEval = false
+        )
+            .setFeaturesChangeHandler { diff -> captured = diff }
+            .initialize()
+
+        sdk.startAutoRefreshFeatures().toList()
+
+        assertNotNull(captured, "change handler should fire on SSE update")
+        assertTrue(captured!!.changedKeys.contains("testfeature1"))
+        assertTrue(captured!!.hasChanges)
+    }
+
+    @Test
+    fun sseEmptyFeatures_appliesEmptyMapNotError() = runTest {
+        val emptyPayload = """{"status":200,"features":{}}"""
+        val sseDispatcher = object : MockNetworkClient(null, null) {
+            override fun consumeSSEConnection(
+                url: String, sseConnectionController: SSEConnectionController?
+            ): Flow<Resource<String>> = flowOf(Resource.Success(emptyPayload))
+        }
+
+        val sdk = GBSDKBuilder(
+            apiKey, host,
+            encryptionKey = null,
+            attributes = attrs,
+            trackingCallback = { _, _ -> },
+            networkDispatcher = sseDispatcher,
+            remoteEval = false
+        ).initialize()
+
+        val emissions = sdk.startAutoRefreshFeatures().toList()
+
+        assertTrue(emissions.first() is Resource.Success)   // Empty features is not Error
+        assertTrue(sdk.getFeatures().isEmpty())             // empty, but applied
     }
 }

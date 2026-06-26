@@ -11,6 +11,7 @@ import com.sdk.growthbook.stickybucket.GBStickyBucketService
 import com.sdk.growthbook.stickybucket.GBStickyBucketServiceImp
 import com.sdk.growthbook.utils.GBCacheRefreshHandler
 import com.sdk.growthbook.utils.GBFeatures
+import com.sdk.growthbook.utils.GBFeaturesChangeHandler
 
 /**
  * SDKBuilder - Root Class for SDK Initializers for GrowthBook SDK
@@ -102,6 +103,7 @@ class GBSDKBuilder(
 ) {
 
     private var refreshHandler: GBCacheRefreshHandler? = null
+    private var featuresChangeHandler: GBFeaturesChangeHandler? = null
     private var stickyBucketService: GBStickyBucketService? = null
     private var featureUsageCallback: GBFeatureUsageCallback? = null
     private var initialFeatures: GBFeatures? = null
@@ -111,6 +113,11 @@ class GBSDKBuilder(
      */
     fun setRefreshHandler(refreshHandler: GBCacheRefreshHandler): GBSDKBuilder {
         this.refreshHandler = refreshHandler
+        return this
+    }
+
+    fun setFeaturesChangeHandler(featuresChangeHandler: GBFeaturesChangeHandler): GBSDKBuilder {
+        this.featuresChangeHandler = featuresChangeHandler
         return this
     }
 
@@ -209,6 +216,7 @@ class GBSDKBuilder(
             refreshHandler,
             networkDispatcher,
             cachingEnabled = cachingEnabled,
+            featuresChangeHandler = featuresChangeHandler
         )
     }
 
@@ -261,6 +269,7 @@ class GBSDKBuilder(
                 internalRefreshHandler,
                 networkDispatcher,
                 cachingEnabled = cachingEnabled,
+                featuresChangeHandler = featuresChangeHandler,
             )
         }
     }

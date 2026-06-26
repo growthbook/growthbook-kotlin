@@ -146,7 +146,7 @@ internal class FeaturesViewModel(
                 is Resource.Success -> {
                     val model = resource.data
                     val result = decoder.decodeToResult(model)
-                    apply(model, result)
+                    cacheAndNotify(model, result)
                     when (result) {
                         is FeaturesResult.Applied -> emit(Resource.Success(result.features))
                         is FeaturesResult.Failed -> emit(Resource.Error(Exception(result.error.errorMessage)))
@@ -269,7 +269,7 @@ internal class FeaturesViewModel(
         )
     }
 
-    private fun apply(model: FeaturesDataModel, result: FeaturesResult) {
+    private fun cacheAndNotify(model: FeaturesDataModel, result: FeaturesResult) {
         when (result) {
             is FeaturesResult.Applied -> {
                 delegate.featuresAPIModelSuccessfully(model)
