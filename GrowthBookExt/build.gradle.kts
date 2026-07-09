@@ -105,8 +105,10 @@ publishing {
     repositories {
         maven {
             name = "kotlin"
-            val releasesRepoUrl = uri("https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/")
-            val snapshotsRepoUrl = uri("https://ossrh-staging-api.central.sonatype.com/content/repositories/snapshots/")
+            val releasesRepoUrl =
+                uri("https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/")
+            val snapshotsRepoUrl =
+                uri("https://ossrh-staging-api.central.sonatype.com/content/repositories/snapshots/")
             url = if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl
             credentials {
                 username = sonatypeUsername
@@ -120,7 +122,11 @@ publishing {
             artifact(javadocJar)
             pom {
                 name.set("kotlin")
-                description.set("Core module of GrowthBook Kotlin SDK")
+                description.set(
+                    "Pure-Kotlin DX extensions for the GrowthBook Kotlin SDK: " +
+                        "typed feature value helpers, fallback strategies, typed Flag<T>, " +
+                        "and attributes/config DSLs."
+                )
                 licenses {
                     license {
                         name.set("MIT")

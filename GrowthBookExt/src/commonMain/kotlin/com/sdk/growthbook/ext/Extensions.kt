@@ -15,6 +15,33 @@ fun GrowthBookSDK.isEnabled(id: String): Boolean =
     isOn(id)
 
 /**
+ * Returns whether the feature [id] is enabled (on), applying [fallback] only when the feature
+ * is unknown (missing from the loaded config / empty cache).
+ *
+ * Unlike [isOn], this distinguishes "feature unknown" from "feature known but off":
+ * a known feature always returns its real evaluated value, and [fallback] decides only the unknown case.
+ *
+ * This is the ad-hoc, string-id counterpart to the declared-flag style: for a typed
+ * flag carrying its own per-feature default see [Flag] with [value]/[isOn]. Note the
+ * semantics differ — [fallback] fires only for an unknown feature, whereas a flag's
+ * default also covers a present-but-wrong-typed value.
+ *
+ * @param id unique feature identifier
+ * @param fallback strategy for the unknown-feature case
+ */
+fun GrowthBookSDK.isEnabled(id: String, fallback: FallbackStrategy): Boolean {
+    val result = feature(id)
+    return if (result.source == GBFeatureSource.unknownFeature) {
+        when (fallback) {
+            FallbackStrategy.FAIL_OPEN -> true
+            FallbackStrategy.FAIL_CLOSED -> false
+        }
+    } else {
+        result.on
+    }
+}
+
+/**
  * Returns whether the feature [id] is disabled — the negation of [isEnabled].
  *
  * @param id unique feature identifier
@@ -256,3 +283,15 @@ fun GrowthBookSDK.getDoubleOrElse(id: String, default: () -> Double): Double =
  */
 fun GrowthBookSDK.getJson(id: String): GBJson? =
     featureValue<GBJson>(id)
+
+/**
+ * Strategy for [isEnabled] when a feature is unknown (missing / empty cache).
+ */
+enum class FallbackStrategy {
+
+    /** Unknown feature is treated as enabled (`true`) — permissive. */
+    FAIL_OPEN,
+
+    /** Unknown feature is treated as disabled (`false`) — restrictive. */
+    FAIL_CLOSED
+}

@@ -432,4 +432,28 @@ class ExtensionsTest {
         val sdk = sdkWith(mapOf("theme" to GBFeature(GBString("dark"))))
         assertNull(sdk.getJson("theme"))
     }
+
+    @Test
+    fun `isEnabled with FAIL_OPEN returns true for unknown feature`() {
+        val sdk = sdkWith(emptyMap())
+        assertTrue(sdk.isEnabled("missing", FallbackStrategy.FAIL_OPEN))
+    }
+
+    @Test
+    fun `isEnabled with FAIL_CLOSED returns false for unknown feature`() {
+        val sdk = sdkWith(emptyMap())
+        assertFalse(sdk.isEnabled("missing", FallbackStrategy.FAIL_CLOSED))
+    }
+
+    @Test
+    fun `isEnabled ignores fallback for a known but disabled feature`() {
+        val sdk = sdkWith(mapOf("flag" to GBFeature(GBBoolean(false))))
+        assertFalse(sdk.isEnabled("flag", FallbackStrategy.FAIL_OPEN))
+    }
+
+    @Test
+    fun `isEnabled ignores fallback for a known and enabled feature`() {
+        val sdk = sdkWith(mapOf("flag" to GBFeature(GBBoolean(true))))
+        assertTrue(sdk.isEnabled("flag", FallbackStrategy.FAIL_CLOSED))
+    }
 }
