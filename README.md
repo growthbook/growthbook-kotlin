@@ -255,6 +255,106 @@ and returns a feature value typed with specified type.
   fun featuresAPIModelSuccessfully(model: FeaturesDataModel) {}
   ```
 
+## Extensions (GrowthBookExt)
+
+`GrowthBookExt` is a pure-Kotlin companion module with quality-of-life helpers
+over the core SDK — no extra runtime dependencies, all Kotlin Multiplatform
+targets. It adds typed feature accessors, fallback strategies, a typed `Flag<T>`
+API, and DSLs for attributes and SDK configuration.
+
+```groovy
+implementation 'io.growthbook.sdk:GrowthBookExt:1.0.0'
+```
+
+### Typed feature accessors
+
+Read a feature value with a type and a default instead of unwrapping `GBValue`:
+
+```kotlin
+val theme: String  = sdk.getString("theme", default = "light")
+val maxItems: Int  = sdk.getInt("max-items", default = 10)
+val ratio: Double? = sdk.getDoubleOrNull("ratio")
+val payload: GBJson? = sdk.getJson("payload")
+```
+
+Each type (`String`/`Boolean`/`Int`/`Long`/`Float`/`Double`) has three variants:
+
+- `getX(id, default)` — value or a constant default
+- `getXOrNull(id)` — value or `null`
+- `getXOrElse(id) { ... }` — value or a lazily computed default
+
+Boolean helpers: `isEnabled(id)`, `isDisabled(id)`, and `isFeatureKnown(id)`
+(distinguishes "missing" from "present but off").
+
+### Fallback strategies
+
+When a feature is *unknown* (missing config / empty cache), choose fail-open vs
+fail-closed explicitly at the call site:
+
+```kotlin
+if (sdk.isEnabled("new-checkout", FallbackStrategy.FAIL_CLOSED)) { ... }
+```
+
+The strategy applies **only** to an unknown feature — a known-but-off feature
+still returns its real evaluated value.
+
+### Typed flags — `Flag<T>`
+
+Declare flags once (key + type + per-feature default) to remove magic strings:
+
+```kotlin
+object Flags {
+    val DARK_MODE = Flag("dark-mode", default = false) // Flag<Boolean>
+    val MAX_ITEMS = Flag("max-items", default = 10)     // Flag<Int>
+}
+
+val dark  = sdk.isOn(Flags.DARK_MODE)  // Boolean
+val items = sdk.value(Flags.MAX_ITEMS) // Int, falls back to 10
+```
+
+`Flag.default` covers both a missing feature and a present-but-wrong-typed value.
+Supported types: `Boolean`/`String`/`Int`/`Long`/`Float`/`Double` (decode custom
+`@Serializable` types via the `GrowthBookKotlinxSerialization` module instead).
+
+### Attributes DSL
+
+Set targeting attributes with plain Kotlin values, hiding the `GBValue` wrappers:
+
+```kotlin
+sdk.setAttributes {
+    "id" to "user-123"
+    "premium" to true
+    "age" to 42
+    "tags" to listOf("a", "b")
+    "address" to obj {
+        "city" to "Kyiv"
+    }
+}
+```
+
+Or build a reusable map: `val attrs = buildAttributes { "id" to "user-123" }`.
+
+### Configuration DSL
+
+Assemble and initialize the SDK declaratively:
+
+```kotlin
+val sdk = growthBook {
+    apiKey = "sdk-abc"
+    apiHost = "https://cdn.growthbook.io"
+    networkDispatcher = GBNetworkDispatcherKtor() // from NetworkDispatcherKtor
+
+    enableLogging = true
+    attributes {
+        "id" to "user-123"
+        "premium" to true
+    }
+}
+```
+
+`apiKey`, `apiHost` and `networkDispatcher` are required (missing →
+`IllegalArgumentException`); every other field falls back to the SDK default.
+
 ## Models
 
 This SDK operates with such models as `GBContext`, `GBFeature`, `GBFeatureRule`, `GBFeatureSource`, `GBFeatureResult`, `GBExperiment`, `GBExperimentResult`, etc.
