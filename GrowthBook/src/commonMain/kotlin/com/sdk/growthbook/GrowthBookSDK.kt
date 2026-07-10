@@ -58,7 +58,7 @@ class GrowthBookSDK(
     features: GBFeatures? = null,
     savedGroups: Map<String, GBValue>? = null,
     cachingEnabled: Boolean,
-) : FeaturesFlowDelegate {
+) : FeaturesFlowDelegate, IGrowthBookSDK {
 
     private var savedGroups: Map<String, GBValue>? = emptyMap()
     private var forcedFeatures: Map<String, GBValue> = emptyMap()
@@ -247,7 +247,7 @@ class GrowthBookSDK(
      *
      * @returns a [GBFeatureResult] object
      */
-    suspend fun suspendFeature(id: String): GBFeatureResult {
+    override suspend fun suspendFeature(id: String): GBFeatureResult {
         return when (remoteSourceFeaturesFetchResult) {
             FeaturesFetchResult.Success -> {
                 feature(id)
@@ -271,7 +271,7 @@ class GrowthBookSDK(
      * which is the unique identifier for the feature and
      * @returns a [GBFeatureResult] object
      */
-    fun feature(id: String): GBFeatureResult {
+    override fun feature(id: String): GBFeatureResult {
         val evaluator = GBFeatureEvaluator(
             createEvaluationContext(), this.forcedFeatures,
         )
@@ -314,14 +314,14 @@ class GrowthBookSDK(
      * The isOn method takes a single string argument,
      * which is the unique identifier for the feature and returns the feature state on/off
      */
-    fun isOn(featureId: String): Boolean {
+    override fun isOn(featureId: String): Boolean {
         return feature(id = featureId).on
     }
 
     /**
      * The run method takes an Experiment object and returns an ExperimentResult
      */
-    fun run(experiment: GBExperiment): GBExperimentResult {
+    override fun run(experiment: GBExperiment): GBExperimentResult {
         val evaluator = GBExperimentEvaluator(
             createEvaluationContext()
         )
@@ -338,7 +338,7 @@ class GrowthBookSDK(
      * The setAttributes method replaces the Map of user attributes
      * that are used to assign variations
      */
-    fun setAttributes(attributes: Map<String, GBValue>) {
+    override fun setAttributes(attributes: Map<String, GBValue>) {
         gbContext.attributes = attributes
         refreshStickyBucketService()
     }
@@ -361,7 +361,7 @@ class GrowthBookSDK(
      *
      * @param attributes The user attributes map
      */
-    suspend fun setAttributesSync(attributes: Map<String, GBValue>) {
+    override suspend fun setAttributesSync(attributes: Map<String, GBValue>) {
         gbContext.attributes = attributes
 
         if (gbContext.stickyBucketService != null) {
