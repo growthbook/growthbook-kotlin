@@ -9,7 +9,9 @@ import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBFeatureSource
 import com.sdk.growthbook.model.GBJson
+import com.sdk.growthbook.model.GBNull
 import com.sdk.growthbook.model.GBNumber
+import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.utils.Constants
 import com.sdk.growthbook.utils.GBTrackData
@@ -355,16 +357,20 @@ internal class GBFeatureEvaluator(
         experimentResult: GBExperimentResult? = null
     ): GBFeatureResult {
 
-        val gate2 = (gbValue is GBBoolean && !gbValue.value)
-        val gate3 = (gbValue is GBNumber && (gbValue.value == 0))
-        val isFalse = gbValue == null || gate2 || gate3
+        // Truthiness matches the reference (TypeScript) SDK's `off = !value`:
+        // null, JSON null, false, 0, and the empty string are all "off".
+        val isNullValue = gbValue == null || gbValue is GBNull
+        val isFalseValue = (gbValue is GBBoolean && !gbValue.value)
+        val isZeroValue = (gbValue is GBNumber && (gbValue.value == 0))
+        val isEmptyStringValue = (gbValue is GBString && gbValue.value.isEmpty())
+        val isOff = isNullValue || isFalseValue || isZeroValue || isEmptyStringValue
 
         //val castResult = gbValue as? V
         val gbFeatureResult = GBFeatureResult(
             ruleId = ruleId,
             gbValue = gbValue,
-            on = !isFalse,
-            off = isFalse,
+            on = !isOff,
+            off = isOff,
             source = source,
             experiment = experiment,
             experimentResult = experimentResult
