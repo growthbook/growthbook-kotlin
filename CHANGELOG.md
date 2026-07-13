@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [7.3.0] - 2026-07-13
 
 ### Added
 - `IGrowthBookSDK` interface extracted from `GrowthBookSDK` (`isOn`, `feature`, `suspendFeature`, `run`, `setAttributes`, `setAttributesSync`), so app code can depend on the abstraction and swap in a test double
