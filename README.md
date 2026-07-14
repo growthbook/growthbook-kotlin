@@ -107,7 +107,7 @@ var sdkInstance: GrowthBookSDK = GBSDKBuilder(
 
 The seeded features are applied immediately. The normal cache/network refresh still runs on top and overwrites the seed as fresher data arrives. Effective precedence: **network > disk cache > seed > code defaults**.
 
-> **Upgrading from 6.x:** Persistent caching is implemented on Android and Apple (iOS/macOS); JVM/JS/wasm do not cache features to disk, so this upgrade note does not apply to them
+> **Upgrading from 6.x:** Persistent caching is implemented on Android, Apple (iOS/macOS) and the JVM; JS/wasm do not cache features to disk, so this upgrade note does not apply to them.
 
 ## Usage
 
