@@ -107,7 +107,7 @@ var sdkInstance: GrowthBookSDK = GBSDKBuilder(
 
 The seeded features are applied immediately. The normal cache/network refresh still runs on top and overwrites the seed as fresher data arrives. Effective precedence: **network > disk cache > seed > code defaults**.
 
-> **Upgrading from 6.x (Android):** Persistent caching is only implemented on Android; other platforms do not cache features to disk, so this upgrade note does not apply to them. On Android the cache file is automatically migrated from `FeatureCache.txt` to the new scoped `FeatureCache_<clientKey>.txt` on first launch. Single-instance apps migrate transparently with no cold start. Apps that use multiple SDK instances with different `clientKey`s may see one cold start without cache on the first launch after upgrade — features self-correct after the first successful fetch.
+> **Upgrading from 6.x:** Persistent caching is implemented on Android and Apple (iOS/macOS); JVM/JS/wasm do not cache features to disk, so this upgrade note does not apply to them
 
 ## Usage
 

@@ -39,6 +39,7 @@ kotlin {
     iosX64()
     iosArm64()
     iosSimulatorArm64()
+    macosArm64()
 
     //noinspection UseTomlInstead
     sourceSets {
@@ -94,6 +95,27 @@ kotlin {
                 implementation(libs.cryptography.provider.webcrypto)
             }
         }
+        val appleMain by creating {
+            dependsOn(commonMain)
+        }
+        val iosX64Main by getting {
+            dependsOn(appleMain)
+        }
+        val iosArm64Main by getting {
+            dependsOn(appleMain)
+        }
+        val iosSimulatorArm64Main by getting {
+            dependsOn(appleMain)
+        }
+        val macosArm64Main by getting { dependsOn(appleMain) }
+        val commonTest by getting
+        val appleTest by creating {
+            dependsOn(commonTest)
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
+        val macosArm64Test by getting { dependsOn(appleTest) }
     }
 }
 
