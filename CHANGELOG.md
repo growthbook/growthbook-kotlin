@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [7.3.0] - 2026-07-15
+
+### Added
+- Persistent feature-definition cache is now implemented on **Apple (iOS/macOS)**, the **JVM**, and **JS (browser)** — previously only Android persisted a cache and the other targets were no-ops. Apple writes to `<Application Support>/GrowthBook-KMM/` via `NSFileManager`, the JVM to `<user.home>/.growthbook/GrowthBook-KMM/` (fallback `<java.io.tmpdir>`) via `java.io` — both atomic (temp file + rename) and self-healing on corrupt data — and JS to the browser `localStorage` under the `GrowthBook-KMM/` key namespace. `wasmJs` remains non-persistent
+- New `macosArm64` target for the `GrowthBook`, `Core`, and `GrowthBookKotlinxSerialization` artifacts
+
+---
+
 ## [7.2.0] - 2026-06-12
 
 ### Added

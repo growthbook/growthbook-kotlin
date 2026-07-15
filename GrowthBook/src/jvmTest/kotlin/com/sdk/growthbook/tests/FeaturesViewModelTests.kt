@@ -10,7 +10,10 @@ import com.sdk.growthbook.features.FeaturesViewModel
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBOptions
+import com.sdk.growthbook.sandbox.CachingJvm
 import kotlinx.serialization.json.JsonObject
+import java.nio.file.Files.createTempDirectory
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -36,6 +39,11 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         remoteEval = false,
     )
     private val testGbOptions = GBOptions("https://example.com", null)
+
+    @BeforeTest
+    fun setUp() {
+        CachingJvm.baseDir = createTempDirectory("gb-test").toFile()
+    }
 
     @Test
     fun testSuccess() {

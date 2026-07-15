@@ -14,11 +14,13 @@ import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.toGbBoolean
+import com.sdk.growthbook.sandbox.CachingJvm
 import com.sdk.growthbook.stickybucket.GBStickyBucketServiceImp
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import java.nio.file.Files.createTempDirectory
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -36,10 +38,11 @@ class GrowthBookSDKBuilderTests {
 
     @BeforeTest
     fun setUp() {
+        CachingJvm.baseDir = createTempDirectory("gb-test").toFile()
     }
 
     @Test
-    fun testSDKInitilizationDefault() {
+    fun testSDKInitializationDefault() {
 
         val sdkInstance = GBSDKBuilder(
             testApiKey,
