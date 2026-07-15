@@ -31,7 +31,13 @@ kotlin {
 
     jvm()
     wasmJs {
-        nodejs()
+        browser {
+            testTask {
+                useKarma {
+                    useChromeHeadless()
+                }
+            }
+        }
     }
     iosX64()
     iosArm64()
@@ -96,6 +102,12 @@ kotlin {
         val wasmJsMain by getting {
             dependencies {
                 implementation(libs.cryptography.provider.webcrypto)
+                implementation("org.jetbrains.kotlinx:kotlinx-browser:0.5.0")
+            }
+        }
+        val wasmJsTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
             }
         }
         val appleMain by creating {

@@ -7,7 +7,7 @@
 # GrowthBook - Kotlin SDK
 
 - **Lightweight and fast**
-- **Kotlin Multiplatform (Android, iOS, JVM, JS, Wasm)**
+- **Kotlin Multiplatform (Android, iOS, macOS (Apple Silicon), JVM, JS, Wasm)**
     - **Android version 21 & above**
     - **JDK 17 & Above**
     - **iOS (iosX64, iosArm64, iosSimulatorArm64)**
@@ -31,7 +31,7 @@ dependencies {
     implementation 'io.growthbook.sdk:GrowthBook:7.2.0'
 
     // Add Network Dispatcher you prefer:
-    // 1) NetworkDispatcherKtor — supports Android, iOS, JVM, JS, Wasm
+    // 1) NetworkDispatcherKtor — supports Android, iOS, macOS (Apple Silicon), JVM, JS, Wasm
     implementation 'io.growthbook.sdk:NetworkDispatcherKtor:1.0.12'
     // 2) NetworkDispatcherOkHttp — supports Android and JVM only
     implementation 'io.growthbook.sdk:NetworkDispatcherOkHttp:1.0.7'
@@ -107,7 +107,7 @@ var sdkInstance: GrowthBookSDK = GBSDKBuilder(
 
 The seeded features are applied immediately. The normal cache/network refresh still runs on top and overwrites the seed as fresher data arrives. Effective precedence: **network > disk cache > seed > code defaults**.
 
-> **Upgrading from 6.x:** Persistent caching is implemented on Android, Apple (iOS/macOS) and the JVM (on disk), and on JS (browser `localStorage`); only `wasmJs` does not persist a cache. The legacy `FeatureCache.txt` → `FeatureCache_<clientKey>.txt` migration applies to Android only, so this upgrade note does not apply to the other targets.
+> **Upgrading from 6.x:** Persistent caching is now implemented on every target — Android, Apple (iOS/macOS) and the JVM (on disk), and JS and wasmJs (browser `localStorage`). The legacy `FeatureCache.txt` → `FeatureCache_<clientKey>.txt` migration applies to Android only, so this upgrade note does not apply to the other targets.
 
 ## Usage
 
