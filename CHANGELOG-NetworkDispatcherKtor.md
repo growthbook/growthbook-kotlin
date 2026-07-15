@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.0] - 2026-07-15
+
+### Added
+- New `macosArm64` target, so the Ktor dispatcher covers the same Apple platforms as the core SDK (the shared Apple source set now uses `ktor-client-darwin` for iOS and macOS)
+
+---
+
 ## [1.0.14] - 2026-04-30
 
 ### Added
