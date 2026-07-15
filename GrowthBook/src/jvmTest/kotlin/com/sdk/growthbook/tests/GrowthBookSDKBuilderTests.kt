@@ -15,9 +15,12 @@ import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.toGbBoolean
 import com.sdk.growthbook.sandbox.CachingJvm
+import com.sdk.growthbook.sandbox.GBCachingLayer
+import com.sdk.growthbook.serializable_model.SerializableFeaturesDataModel
 import com.sdk.growthbook.stickybucket.GBStickyBucketServiceImp
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import org.junit.Rule
@@ -746,6 +749,60 @@ class GrowthBookSDKBuilderTests {
         )
     }
 
+    @Test
+    fun testSetCachingLayerPersistsFeaturesThroughCustomLayer() {
+        val customLayer = FakeCachingLayer()
+        GBSDKBuilder(
+            testApiKey,
+            testHostURL,
+            attributes = testAttributes,
+            encryptionKey = null,
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
+            networkDispatcher = MockNetworkClient(
+                successResponse = MockResponse.successResponse,
+                error = null,
+                notModified = false
+            ),
+        )
+            .setCachingLayer(customLayer)
+            .initialize()
+
+        assertTrue(customLayer.store.containsKey("FeatureCache_$testApiKey"))
+    }
+
+    @Test
+    fun testSetCachingLayerReadsCachedFeaturesFromCustomLayer() {
+        val customLayer = FakeCachingLayer()
+
+        // Seed the custom layer with a valid SerializableFeaturesDataModel payload:
+        // a top-level object with a "features" map (no "status" wrapper — that key is
+        // unknown to the model and the strict cache decoder would reject it).
+        customLayer.store["FeatureCache_$testApiKey"] = """
+            {
+              "features": {
+                "onboarding": { "defaultValue": "top" }
+              }
+            }
+        """.trimIndent()
+
+        // Network fails, so features can only come from the custom cache layer.
+        val sdkInstance = GBSDKBuilder(
+            testApiKey,
+            testHostURL,
+            attributes = testAttributes,
+            encryptionKey = null,
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
+            networkDispatcher = MockNetworkClient(
+                successResponse = null,
+                error = Throwable("no network"),
+            ),
+        )
+            .setCachingLayer(customLayer)
+            .initialize()
+
+        assertTrue(sdkInstance.getFeatures().isNotEmpty())
+    }
+
 //    @Test
 //    fun testSDKFeaturesDataJAVA() {
 //
@@ -763,4 +820,16 @@ class GrowthBookSDKBuilderTests {
 //
 //    }
 
+}
+
+class FakeCachingLayer: GBCachingLayer {
+    val store = mutableMapOf<String, String>()
+
+    override fun getContent(fileName: String): String? {
+        return store[fileName]
+    }
+
+    override fun saveContent(fileName: String, content: String) {
+        store[fileName] = content
+    }
 }

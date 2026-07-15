@@ -109,6 +109,29 @@ The seeded features are applied immediately. The normal cache/network refresh st
 
 > **Upgrading from 6.x:** Persistent caching is now implemented on every target — Android, Apple (iOS/macOS) and the JVM (on disk), and JS and wasmJs (browser `localStorage`). The legacy `FeatureCache.txt` → `FeatureCache_<clientKey>.txt` migration applies to Android only, so this upgrade note does not apply to the other targets.
 
+#### Custom cache layer (`setCachingLayer`)
+
+By default the SDK caches feature definitions in the built-in per-platform storage described above. To make GrowthBook persist through **your own** storage instead — a shared KMP key/value store, encrypted storage, or one place to clear/reset all cached state — provide a `GBCachingLayer`:
+
+```kotlin
+class MyCachingLayer : GBCachingLayer {
+    override fun saveContent(fileName: String, content: String) = myKvStore.put(fileName, content)
+    override fun getContent(fileName: String): String? = myKvStore.get(fileName)
+}
+
+var sdkInstance: GrowthBookSDK = GBSDKBuilder(
+    apiKey = <API_KEY>,
+    hostURL = <GrowthBook_URL>,
+    attributes = hashMapOf(),
+    trackingCallback = { _, _ -> },
+    networkDispatcher = GBNetworkDispatcherKtor(),
+)
+    .setCachingLayer(MyCachingLayer()) // call before the sticky-bucket setters to route those too
+    .initialize()
+```
+
+Values are opaque JSON strings keyed by filename — persist and return them verbatim. When set, the custom layer replaces the built-in cache for feature definitions (and for sticky-bucket storage, if `setCachingLayer` is called before the sticky-bucket setters).
+
 ## Usage
 
 - Initialization returns SDK instance - GrowthBookSDK

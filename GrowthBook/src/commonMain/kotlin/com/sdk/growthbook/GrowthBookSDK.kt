@@ -36,6 +36,9 @@ import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.kotlinx.serialization.from
 import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.StackContext
+import com.sdk.growthbook.sandbox.CachingImpl
+import com.sdk.growthbook.sandbox.GBCachingLayer
+import com.sdk.growthbook.sandbox.GBCachingLayerAdapter
 import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBucketsSync
 import kotlinx.coroutines.launch
 import kotlin.experimental.ExperimentalObjCRefinement
@@ -58,6 +61,7 @@ class GrowthBookSDK(
     features: GBFeatures? = null,
     savedGroups: Map<String, GBValue>? = null,
     cachingEnabled: Boolean,
+    cachingLayer: GBCachingLayer? = null
 ) : FeaturesFlowDelegate {
 
     private var savedGroups: Map<String, GBValue>? = emptyMap()
@@ -86,6 +90,7 @@ class GrowthBookSDK(
         ),
         encryptionKey = gbContext.encryptionKey,
         cachingEnabled = cachingEnabled,
+        cachingLayer = cachingLayer?.let { GBCachingLayerAdapter(it) } ?: CachingImpl.getLayer(),
         cacheKey = "${Constants.FEATURE_CACHE}_${gbContext.apiKey}",
     )
 

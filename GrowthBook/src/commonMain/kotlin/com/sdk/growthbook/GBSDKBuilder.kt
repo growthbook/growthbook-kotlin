@@ -7,6 +7,9 @@ import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBOptions
 import com.sdk.growthbook.network.NetworkDispatcher
 import com.sdk.growthbook.sandbox.CachingImpl
+import com.sdk.growthbook.sandbox.CachingLayer
+import com.sdk.growthbook.sandbox.GBCachingLayer
+import com.sdk.growthbook.sandbox.GBCachingLayerAdapter
 import com.sdk.growthbook.stickybucket.GBStickyBucketService
 import com.sdk.growthbook.stickybucket.GBStickyBucketServiceImp
 import com.sdk.growthbook.utils.GBCacheRefreshHandler
@@ -105,6 +108,7 @@ class GBSDKBuilder(
     private var stickyBucketService: GBStickyBucketService? = null
     private var featureUsageCallback: GBFeatureUsageCallback? = null
     private var initialFeatures: GBFeatures? = null
+    private var customCachingLayer: GBCachingLayer? = null
 
     /**
      * Set Refresh Handler - Will be called when cache is refreshed
@@ -130,7 +134,7 @@ class GBSDKBuilder(
             GBStickyBucketServiceImp(
                 coroutineScope = coroutineScope,
                 prefix = "gbStickyBuckets__${apiKey}_",
-                localStorage = CachingImpl.getLayer(),
+                localStorage = resolveCachingLayer(),
             )
         )
     }
@@ -156,7 +160,7 @@ class GBSDKBuilder(
         prefix: String = "gbStickyBuckets__${apiKey}_"
     ): GBSDKBuilder {
         this.stickyBucketService = GBStickyBucketServiceImp(
-            coroutineScope, prefix, CachingImpl.getLayer()
+            coroutineScope, prefix, resolveCachingLayer()
         )
         return this
     }
@@ -167,6 +171,16 @@ class GBSDKBuilder(
      */
     fun setFeatureUsageCallback(featureUsageCallback: GBFeatureUsageCallback): GBSDKBuilder {
         this.featureUsageCallback = featureUsageCallback
+        return this
+    }
+
+    /**
+     * per-platform cache.
+     * Replaces the feature-definition cache. NOTE: to also route sticky-bucket storage
+     * through it call this BEFORE the sticky-bucket setter.
+     */
+    fun setCachingLayer(cachingLayer: GBCachingLayer): GBSDKBuilder {
+        this.customCachingLayer = cachingLayer
         return this
     }
 
@@ -209,6 +223,7 @@ class GBSDKBuilder(
             refreshHandler,
             networkDispatcher,
             cachingEnabled = cachingEnabled,
+            cachingLayer = customCachingLayer
         )
     }
 
@@ -261,7 +276,11 @@ class GBSDKBuilder(
                 internalRefreshHandler,
                 networkDispatcher,
                 cachingEnabled = cachingEnabled,
+                cachingLayer = customCachingLayer
             )
         }
     }
+
+    private fun resolveCachingLayer(): CachingLayer =
+        customCachingLayer?.let { GBCachingLayerAdapter(it) } ?: CachingImpl.getLayer()
 }
