@@ -12,6 +12,8 @@ import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBOptions
 import com.sdk.growthbook.sandbox.CachingJvm
 import kotlinx.serialization.json.JsonObject
+import org.junit.Rule
+import org.junit.rules.TemporaryFolder
 import java.nio.file.Files.createTempDirectory
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -40,9 +42,13 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     )
     private val testGbOptions = GBOptions("https://example.com", null)
 
+    @Rule
+    @JvmField
+    var tempFolder = TemporaryFolder()
+
     @BeforeTest
     fun setUp() {
-        CachingJvm.baseDir = createTempDirectory("gb-test").toFile()
+        CachingJvm.baseDir = tempFolder.newFolder()
     }
 
     @Test

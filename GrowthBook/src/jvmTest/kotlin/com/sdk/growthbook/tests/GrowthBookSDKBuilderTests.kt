@@ -20,6 +20,8 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import org.junit.Rule
+import org.junit.rules.TemporaryFolder
 import java.nio.file.Files.createTempDirectory
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -36,9 +38,13 @@ class GrowthBookSDKBuilderTests {
     val testKeyString = "3tfeoyW0wlo47bDnbWDkxg=="
     val testAttributes: HashMap<String, GBValue> = HashMap()
 
+    @Rule
+    @JvmField
+    var tempFolder = TemporaryFolder()
+
     @BeforeTest
     fun setUp() {
-        CachingJvm.baseDir = createTempDirectory("gb-test").toFile()
+        CachingJvm.baseDir = tempFolder.newFolder()
     }
 
     @Test

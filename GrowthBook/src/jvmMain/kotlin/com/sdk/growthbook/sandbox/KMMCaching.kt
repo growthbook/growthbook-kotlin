@@ -85,17 +85,16 @@ internal class CachingJvm : CachingLayer {
         /**
          * Base directory for the on-disk cache. Overridable (primarily for tests),
          * mirroring Android's `CachingAndroid.filesDir`. There is no framework-provided app
-         * directory on the JVM, so it self-discovers `<user.home>/.growthbook`, falling back
-         * to `<java.io.tmpdir>/.growthbook`
+         * directory on the JVM, so it defaults to `<user.home>/.growthbook` (or
+         * `<java.io.tmpdir>/.growthbook` when no home directory is set). The directory itself is
+         * created lazily on the first write by [getTargetFile], not when this class loads.
          */
         internal var baseDir: File = defaultBaseDir()
 
         private fun defaultBaseDir(): File {
             val home = System.getProperty("user.home")
             val primary = if (!home.isNullOrBlank()) File(home, ".growthbook") else null
-            val chosen = primary?.takeIf { it.mkdirs() || it.isDirectory }
-                ?: File(System.getProperty("java.io.tmpdir"), ".growthbook")
-            return chosen.apply { mkdirs() }
+            return primary ?: File(System.getProperty("java.io.tmpdir"), ".growthbook")
         }
     }
 }
