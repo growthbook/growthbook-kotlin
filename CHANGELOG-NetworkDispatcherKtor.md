@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - New `macosArm64` target, so the Ktor dispatcher covers the same Apple platforms as the core SDK (the shared Apple source set now uses `ktor-client-darwin` for iOS and macOS)
 
+### Fixed
+- `handleGetRequest`: catch `Throwable` (not just `Exception`) so a Ktor fetch failure on Kotlin/JS and Kotlin/Wasm — which surfaces as a `Throwable` that is not a `kotlin.Exception` (e.g. "Failed to fetch") — is routed to `onError` instead of escaping as an uncaught coroutine error
+
 ---
 
 ## [1.0.14] - 2026-04-30
