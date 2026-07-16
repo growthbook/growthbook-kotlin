@@ -53,7 +53,7 @@ typealias GBExperimentRunCallback = (GBExperiment, GBExperimentResult) -> Unit
  * that takes a Context object in the constructor.
  * It exposes two main methods: feature and run.
  */
-class GrowthBookSDK(
+class GrowthBookSDK internal constructor(
     private val gbContext: GBContext,
     gbOptions: GBOptions,
     private val refreshHandler: GBCacheRefreshHandler?,
@@ -61,8 +61,34 @@ class GrowthBookSDK(
     features: GBFeatures? = null,
     savedGroups: Map<String, GBValue>? = null,
     cachingEnabled: Boolean,
-    cachingLayer: GBCachingLayer? = null
+    // Internal seam only: the public way to plug a cache is GBSDKBuilder.setCachingLayer().
+    // Adding this to the public constructor would break binary compatibility,
+    // so the public constructor below preserves the pre-7.3.0 signature and delegates here.
+    cachingLayer: GBCachingLayer?
 ) : FeaturesFlowDelegate {
+
+    /**
+     * Public constructor, kept binary-compatible with pre-7.3.0 releases. To route caching
+     * through a custom store, use [com.sdk.growthbook.GBSDKBuilder.setCachingLayer] instead.
+     */
+    constructor(
+        gbContext: GBContext,
+        gbOptions: GBOptions,
+        refreshHandler: GBCacheRefreshHandler?,
+        networkDispatcher: NetworkDispatcher,
+        features: GBFeatures? = null,
+        savedGroups: Map<String, GBValue>? = null,
+        cachingEnabled: Boolean,
+    ) : this(
+        gbContext = gbContext,
+        gbOptions = gbOptions,
+        refreshHandler = refreshHandler,
+        networkDispatcher = networkDispatcher,
+        features = features,
+        savedGroups = savedGroups,
+        cachingEnabled = cachingEnabled,
+        cachingLayer = null,
+    )
 
     private var savedGroups: Map<String, GBValue>? = emptyMap()
     private var forcedFeatures: Map<String, GBValue> = emptyMap()

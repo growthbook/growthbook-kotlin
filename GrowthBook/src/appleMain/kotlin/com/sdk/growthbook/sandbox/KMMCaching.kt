@@ -32,7 +32,7 @@ internal class CachingIOS : CachingLayer {
 
     /** Persist [content] atomically to the cache file for [fileName]. */
     override fun saveContent(fileName: String, content: JsonElement) {
-        val path = getTargetFilePath(fileName) ?: return
+        val path = getTargetFilePath(fileName, createDirectory = true) ?: return
         val jsonContents = json.encodeToString(JsonElement.serializer(), content)
 
         // writeToFile(atomically = true) writes to a temp file and atomically renames it,
@@ -47,7 +47,9 @@ internal class CachingIOS : CachingLayer {
 
     /** Read cached content for [fileName]; null if absent, and self-heals (deletes) a corrupt file. */
     override fun getContent(fileName: String): JsonElement? {
-        val path = getTargetFilePath(fileName) ?: return null
+        // Reads never need the directory, so skip createDirectory to keep the initialize()
+        // cache-lookup path free of redundant filesystem calls.
+        val path = getTargetFilePath(fileName, createDirectory = false) ?: return null
         val fileManager = NSFileManager.defaultManager
         if (!fileManager.fileExistsAtPath(path)) return null
         val inputString = NSString.stringWithContentsOfFile(
@@ -66,11 +68,12 @@ internal class CachingIOS : CachingLayer {
     }
 
     /**
-     * Resolves <Application Support>/GrowthBook-KMM/<name>.txt, creating the directory if needed.
+     * Resolves <Application Support>/GrowthBook-KMM/<name>.txt. When [createDirectory] is true the
+     * containing directory is created (write path); reads pass false to avoid the extra syscall.
      * Application Support is app-managed persistent storage (not purged by the OS), matching the
      * durability of Android's filesDir. The `.txt` suffix is normalised so callers may pass it or not.
      */
-    private fun getTargetFilePath(fileName: String): String? {
+    private fun getTargetFilePath(fileName: String, createDirectory: Boolean): String? {
         val caches = NSSearchPathForDirectoriesInDomains(
             NSApplicationSupportDirectory,
             NSUserDomainMask,
@@ -78,12 +81,14 @@ internal class CachingIOS : CachingLayer {
         ).firstOrNull() as? String ?: return null
 
         val directory = (caches as NSString).stringByAppendingPathComponent("GrowthBook-KMM")
-        NSFileManager.defaultManager.createDirectoryAtPath(
-            directory,
-            withIntermediateDirectories = true,
-            attributes = null,
-            error = null
-        )
+        if (createDirectory) {
+            NSFileManager.defaultManager.createDirectoryAtPath(
+                directory,
+                withIntermediateDirectories = true,
+                attributes = null,
+                error = null
+            )
+        }
 
         val base = if (fileName.endsWith(".txt", true)) fileName.removeSuffix(".txt") else fileName
         return (directory as NSString).stringByAppendingPathComponent("$base.txt")

@@ -106,6 +106,10 @@ class GBSDKBuilder(
 
     private var refreshHandler: GBCacheRefreshHandler? = null
     private var stickyBucketService: GBStickyBucketService? = null
+    // Deferred builder for the default sticky-bucket service. The caching layer is resolved
+    // lazily at initialize() time (via resolveCachingLayer()) rather than when the setter is
+    // called, so setCachingLayer() and the sticky-bucket setters can be called in any order.
+    private var stickyBucketServiceFactory: ((CachingLayer) -> GBStickyBucketService)? = null
     private var featureUsageCallback: GBFeatureUsageCallback? = null
     private var initialFeatures: GBFeatures? = null
     private var customCachingLayer: GBCachingLayer? = null
@@ -130,13 +134,15 @@ class GBSDKBuilder(
     }
 
     fun setStickyBucketService(coroutineScope: CoroutineScope): GBSDKBuilder {
-        return setStickyBucketService(
+        this.stickyBucketService = null
+        this.stickyBucketServiceFactory = { localStorage ->
             GBStickyBucketServiceImp(
                 coroutineScope = coroutineScope,
                 prefix = "gbStickyBuckets__${apiKey}_",
-                localStorage = resolveCachingLayer(),
+                localStorage = localStorage,
             )
-        )
+        }
+        return this
     }
 
     /**
@@ -146,6 +152,7 @@ class GBSDKBuilder(
         stickyBucketService: GBStickyBucketService
     ): GBSDKBuilder {
         this.stickyBucketService = stickyBucketService
+        this.stickyBucketServiceFactory = null
         return this
     }
 
@@ -159,9 +166,10 @@ class GBSDKBuilder(
         coroutineScope: CoroutineScope,
         prefix: String = "gbStickyBuckets__${apiKey}_"
     ): GBSDKBuilder {
-        this.stickyBucketService = GBStickyBucketServiceImp(
-            coroutineScope, prefix, resolveCachingLayer()
-        )
+        this.stickyBucketService = null
+        this.stickyBucketServiceFactory = { localStorage ->
+            GBStickyBucketServiceImp(coroutineScope, prefix, localStorage)
+        }
         return this
     }
 
@@ -175,9 +183,9 @@ class GBSDKBuilder(
     }
 
     /**
-     * per-platform cache.
-     * Replaces the feature-definition cache. NOTE: to also route sticky-bucket storage
-     * through it call this BEFORE the sticky-bucket setter.
+     * Provide a custom cache implementation, replacing the built-in per-platform cache.
+     * Replaces the feature-definition cache and also routes sticky-bucket storage through it.
+     * May be called in any order relative to the sticky-bucket setters.
      */
     fun setCachingLayer(cachingLayer: GBCachingLayer): GBSDKBuilder {
         this.customCachingLayer = cachingLayer
@@ -239,7 +247,10 @@ class GBSDKBuilder(
             encryptionKey = encryptionKey,
             remoteEval = remoteEval,
             enableLogging = enableLogging,
-            stickyBucketService = stickyBucketService,
+            // Resolve the caching layer now, so a custom layer set via setCachingLayer() is
+            // honoured regardless of whether it was set before or after the sticky-bucket setter.
+            stickyBucketService = stickyBucketService
+                ?: stickyBucketServiceFactory?.invoke(resolveCachingLayer()),
         )
 
     private inner class WaitForCallCaseHelper(

@@ -53,7 +53,9 @@ internal class CachingJvm : CachingLayer {
      */
     override fun getContent(fileName: String): JsonElement? {
         synchronized(getLock(fileName)) {
-            val file = getTargetFile(fileName)
+            // Reads never need to create the directory, so resolve the path without mkdirs()
+            // to keep the initialize() cache-lookup path free of redundant filesystem calls.
+            val file = resolveFile(fileName)
             if (!file.exists()) return null
             return try {
                 val inputAsString = file.readText()
@@ -67,11 +69,15 @@ internal class CachingJvm : CachingLayer {
     }
 
     /**
-     * Resolve `<baseDir>/GrowthBook-KMM/<name>.txt`, creating the directory. `.txt` is normalized
+     * Resolve `<baseDir>/GrowthBook-KMM/<name>.txt`, creating the directory. `.txt` is normalized.
+     * Use this on the write path; reads should use [resolveFile] to avoid creating the directory.
      */
-    fun getTargetFile(fileName: String): File {
+    fun getTargetFile(fileName: String): File =
+        resolveFile(fileName).also { it.parentFile.mkdirs() }
+
+    /** Resolve the cache file path for [fileName] without touching the filesystem. */
+    private fun resolveFile(fileName: String): File {
         val letDirectory = File(baseDir, "GrowthBook-KMM")
-        letDirectory.mkdirs()
         val targetFileName =
             if (fileName.endsWith(".txt", true)) fileName.removeSuffix(".txt") else fileName
         return File(letDirectory, "$targetFileName.txt")

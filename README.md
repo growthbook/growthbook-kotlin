@@ -126,11 +126,11 @@ var sdkInstance: GrowthBookSDK = GBSDKBuilder(
     trackingCallback = { _, _ -> },
     networkDispatcher = GBNetworkDispatcherKtor(),
 )
-    .setCachingLayer(MyCachingLayer()) // call before the sticky-bucket setters to route those too
+    .setCachingLayer(MyCachingLayer()) // routes both feature and sticky-bucket storage
     .initialize()
 ```
 
-Values are opaque JSON strings keyed by filename — persist and return them verbatim. When set, the custom layer replaces the built-in cache for feature definitions (and for sticky-bucket storage, if `setCachingLayer` is called before the sticky-bucket setters).
+Values are opaque JSON strings keyed by filename — persist and return them verbatim. When set, the custom layer replaces the built-in cache for both feature definitions and sticky-bucket storage. It may be called in any order relative to the sticky-bucket setters.
 
 ## Usage
 
