@@ -7,6 +7,7 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runTest
 import org.intellij.lang.annotations.Language
 import com.sdk.growthbook.utils.Resource
 import com.sdk.growthbook.tests.MockNetworkClient
@@ -15,7 +16,7 @@ import com.sdk.growthbook.utils.SSEConnectionController
 class IntegrationTests {
 
     @Test
-    fun verifyIsInTheListRule() {
+    fun verifyIsInTheListRule() = runTest {
         // User attributes for targeting and assigning users to experiment variations
         val attrs = HashMap<String, GBValue>()
         attrs["appBuildNumber"] = 3432.toGbNumber()
@@ -53,7 +54,7 @@ class IntegrationTests {
     }
 
     @Test
-    fun `gBExperimentResult name should not be null`() {
+    fun `gBExperimentResult name should not be null`() = runTest {
         @Language("json")
         val json = """
 {
@@ -101,16 +102,16 @@ class IntegrationTests {
     }
 
     @Test
-    fun `autoRefreshFeatures() method usage example`() {
+    fun `autoRefreshFeatures() method usage example`() = runTest {
         val growthBookSdk = buildSDK("")
 
         growthBookSdk
-            .autoRefreshFeatures()
+            .startAutoRefreshFeatures()
             .launchIn(TestScope())
     }
 
     @Test
-    fun `autoRefreshFeatures() method triggers consumeSSEConnection()`() {
+    fun `autoRefreshFeatures() method triggers consumeSSEConnection()`() = runTest {
         var wasMethodCalled = false
 
         val networkDispatcher = object: MockNetworkClient("", null) {
@@ -126,7 +127,7 @@ class IntegrationTests {
             networkDispatcher = networkDispatcher,
         )
 
-        growthBookSdk.autoRefreshFeatures()
+        growthBookSdk.startAutoRefreshFeatures()
 
         assertTrue(wasMethodCalled)
     }

@@ -15,24 +15,33 @@ import com.sdk.growthbook.utils.Resource
 import com.sdk.growthbook.utils.SSEConnectionController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
+import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.resume
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
+
+// Upper bound on a single network round in [FeaturesViewModel.runNetworkGet]. Both recommended
+// dispatchers (Ktor/OkHttp) default to an INFINITE read timeout so a server that accepts the
+// connection then never responds would otherwise leave awaitRefresh()/suspendFeature() hanging
+// forever. Kept dispatcher-agnostic here so custom NetworkDispatcher impls are bounded too.
+private const val NETWORK_ROUND_TIMEOUT_MILLIS = 30_000L
 
 /**
  * Interface for Feature API Completion Events
  */
 internal interface FeaturesFlowDelegate {
     fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean)
-    fun featuresAPIModelSuccessfully(model: FeaturesDataModel)
+    suspend fun onPayloadReady(model: FeaturesDataModel)
     fun featuresFetchFailed(error: GBError, isRemote: Boolean)
     fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean)
     fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean)
@@ -91,15 +100,15 @@ internal class FeaturesViewModel(
      */
     private val decoder: FeaturePayloadDecoder = FeaturePayloadDecoder(encryptionKey),
     /**
-     * Scope that owns the coalesced refresh started by [awaitRefresh] (used by
-     * suspendFeature() retries and [revalidate]). It must outlive any single
-     * caller, so cancelling one caller never tears down a refresh shared with
-     * others ([SupervisorJob] isolates failures too). Only lightweight coordination
-     * runs here (mutex bookkeeping, continuation resumption); the actual HTTP runs
-     * on the network dispatcher's own IO scope. Injectable so tests can supply a
+     * Context on which fetched payloads are processed (decode + sticky-bucket
+     * refresh + feature application) and on which the coalesced refresh started by
+     * [awaitRefresh] (used by suspendFeature() retries and [revalidate]) runs. It
+     * must outlive any single caller, so cancelling one caller never tears down a
+     * refresh shared with others; it is wrapped in a [SupervisorJob] so one failed
+     * refresh never tears down the shared scope. Injectable so tests can supply a
      * deterministic dispatcher.
      */
-    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+    coroutineContext: CoroutineContext
 ) {
 
     /**
@@ -107,6 +116,8 @@ internal class FeaturesViewModel(
      */
     val sseController: SSEConnectionController
         get() = dataSource.sseController
+
+    private val coroutineScope: CoroutineScope = CoroutineScope(coroutineContext + SupervisorJob())
 
     /**
      * Guards reads and writes of [inFlight] so the check-or-start decision in
@@ -127,7 +138,7 @@ internal class FeaturesViewModel(
     fun autoRefreshFeatures(): Flow<Resource<GBFeatures?>> {
         sseController.start()
         return dataSource.autoRefresh(
-            success = { handleNetworkModel(it) },
+            success = { coroutineScope.launch { handleNetworkModel(it) } },
             failure = { delegate.featuresFetchFailed(GBError(it), isRemote = true) }
         )
     }
@@ -160,7 +171,7 @@ internal class FeaturesViewModel(
      */
     suspend fun awaitRefresh(): FetchResult {
         val deferred = refreshMutex.withLock {
-            inFlight ?: scope.async {
+            inFlight ?: coroutineScope.async {
                 try {
                     runNetworkGet()
                 } finally {
@@ -178,31 +189,54 @@ internal class FeaturesViewModel(
      * of starting a duplicate request. Always bypasses cache freshness (see
      * [FetchPolicy.ForceNetwork]).
      *
-     * Fire-and-forget: the network round runs on [scope]; observe completion via
-     * the refresh handler rather than expecting features to be ready on return.
+     * Fire-and-forget: the network round runs on [coroutineScope]; observe completion
+     * via the refresh handler rather than expecting features to be ready on return.
      */
     fun revalidate() {
         serveCache(remoteEval = false, policy = FetchPolicy.ForceNetwork)
-        scope.launch { awaitRefresh() }
+        coroutineScope.launch { awaitRefresh() }
+    }
+
+    /**
+     * Releases resources held by this view model: stops any active SSE connection and cancels the
+     * coroutine scope used to process fetched payloads, so in-flight background work does not outlive
+     * the owning SDK instance. Safe to call more than once.
+     */
+    fun close() {
+        sseController.stop()
+        coroutineScope.cancel()
     }
 
     /** Bridges the callback-based GET into a suspend result for [awaitRefresh]. */
     private suspend fun runNetworkGet(): FetchResult =
-        suspendCancellableCoroutine { cont ->
-            dataSource.fetchFeatures(
-                success = {
-                    handleNetworkModel(it)
-                    cont.resume(FetchResult.Success)
-                },
-                failure = {
-                    dispatch(FetchOutcome.Failed(GBError(it), source = Source.NETWORK))
-                    cont.resume(FetchResult.Failed)
-                },
-                onNotModified = {
-                    dispatch(FetchOutcome.NotModified)
-                    cont.resume(FetchResult.NotModified)
-                }
-            )
+        withTimeoutOrNull(NETWORK_ROUND_TIMEOUT_MILLIS.milliseconds) {
+            suspendCancellableCoroutine { cont ->
+                dataSource.fetchFeatures(
+                    success = {
+                        // Resume only after the payload is fully applied (incl. the
+                        // suspend sticky-bucket refresh in onPayloadReady), so awaitRefresh()
+                        // callers observe a completed refresh, not just a completed HTTP round.
+                        coroutineScope.launch {
+                            handleNetworkModel(it)
+                            cont.resume(FetchResult.Success)
+                        }
+                    },
+                    failure = {
+                        dispatch(FetchOutcome.Failed(GBError(it), source = Source.NETWORK))
+                        cont.resume(FetchResult.Failed)
+                    },
+                    onNotModified = {
+                        dispatch(FetchOutcome.NotModified)
+                        cont.resume(FetchResult.NotModified)
+                    }
+                )
+            }
+        } ?: run {
+            // Timed out: the dispatcher accepted the request but never invoked any callback.
+            // Surface it as a network failure so remoteSourceFeaturesFetchResult leaves NoResultYet
+            // and suspendFeature()'s bounded-retry path can escape instead of hanging forever.
+            dispatch(FetchOutcome.Failed(GBError(Exception("Feature fetch timed out")), source = Source.NETWORK))
+            FetchResult.Failed
         }
 
     private fun serveCache(remoteEval: Boolean, policy: FetchPolicy): Boolean {
@@ -217,20 +251,21 @@ internal class FeaturesViewModel(
             && cachedAt != null
             && Clock.System.now().toEpochMilliseconds() - cachedAt < cacheMaxAge
 
-        dispatch(
-            outcome = FetchOutcome.Ready(
-                payload = decoder.decode(m = model),
-                source = Source.CACHE,
-                authoritative = fresh
-            )
-        )
-        return fresh
+        val outcome = outcomeOf(payload = decoder.decode(m = model), source = Source.CACHE, authoritative = fresh)
+        dispatch(outcome = outcome)
+
+        // Only treat the cache as authoritative (and skip the network) when it actually
+        // yielded a usable payload. A fresh-but-undecodable/empty cache degrades to
+        // FetchOutcome.Failed above (both features and savedGroups null) — returning false
+        // then lets fetchFeatures() fall through to the network instead of silently serving
+        // nothing for the whole freshness window.
+        return fresh && outcome is FetchOutcome.Ready
     }
 
     private fun fetchFromNetwork(remoteEval: Boolean, payload: GBRemoteEvalParams?) {
         if (remoteEval) dataSource.fetchRemoteEval(
             params = payload,
-            success = { handleNetworkModel(it.data) },
+            success = { coroutineScope.launch { handleNetworkModel(it.data) }},
             failure = {
                 delegate.featuresFetchFailed(
                     error = GBError(it.exception),
@@ -238,15 +273,28 @@ internal class FeaturesViewModel(
                 )
             }
         ) else dataSource.fetchFeatures(
-            success = { handleNetworkModel(it) },
+            success = { coroutineScope.launch { handleNetworkModel(it) } },
             failure = { delegate.featuresFetchFailed(error = GBError(it), isRemote = true) },
             onNotModified = { dispatch(outcome = FetchOutcome.NotModified) }
         )
     }
 
-    private fun handleNetworkModel(model: FeaturesDataModel) {
+    private suspend fun handleNetworkModel(model: FeaturesDataModel) {
         try {
-            delegate.featuresAPIModelSuccessfully(model)
+            // Decode/decrypt the payload BEFORE the sticky-bucket refresh, mirroring the reference
+            // TS SDK (decryptPayload -> refreshStickyBuckets). For an encrypted payload the raw
+            // model has features == null, so deriveStickyBucketIdentifierAttributes would fall back
+            // to the context features — empty on a cold start — and derive sticky identifiers from
+            // nothing, re-bucketing the user. Handing onPayloadReady the decoded payload fixes that.
+            val decoded = decoder.decode(model)
+            delegate.onPayloadReady(
+                model.copy(
+                    features = decoded.features,
+                    encryptedFeatures = null,
+                    savedGroups = decoded.savedGroups,
+                    encryptedSavedGroups = null,
+                )
+            )
             if (cachingEnabled) {
                 runCatching { writeCache(model) }
                     .onFailure {
@@ -259,7 +307,7 @@ internal class FeaturesViewModel(
 
             dispatch(
                 outcome = outcomeOf(
-                    payload = decoder.decode(model),
+                    payload = decoded,
                     source = Source.NETWORK
                 )
             )
@@ -273,10 +321,10 @@ internal class FeaturesViewModel(
         }
     }
 
-    private fun outcomeOf(payload: DecodedPayload, source: Source): FetchOutcome =
+    private fun outcomeOf(payload: DecodedPayload, source: Source, authoritative: Boolean = true): FetchOutcome =
         if (payload.features == null && payload.savedGroups == null)
             FetchOutcome.Failed(GBError(Exception()), source)
-        else FetchOutcome.Ready(payload, source, authoritative = true)
+        else FetchOutcome.Ready(payload, source, authoritative = authoritative)
 
     private fun dispatch(outcome: FetchOutcome) = when (outcome) {
         is FetchOutcome.Ready -> {

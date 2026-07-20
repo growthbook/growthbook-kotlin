@@ -1,5 +1,6 @@
 package com.sdk.growthbook
 
+import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
 import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.GBValue
@@ -107,8 +108,26 @@ class GBSDKBuilder(
     private var initialFeatures: GBFeatures? = null
     private var cacheMaxAge: Long? = null
 
+    // Dispatcher used to process fetched payloads. Defaults to the platform IO dispatcher in
+    // production; tests inject a deterministic dispatcher (e.g. Dispatchers.Unconfined or a
+    // StandardTestDispatcher) to drive the async pipeline synchronously.
+    private var coroutineContext: CoroutineContext = PlatformDependentIODispatcher
+
     /**
-     * Set Refresh Handler - Will be called when cache is refreshed
+     * Override the dispatcher used to process fetched payloads. Intended for tests that need
+     * deterministic, synchronous application of mocked network responses.
+     */
+    internal fun setCoroutineContext(context: CoroutineContext): GBSDKBuilder {
+        this.coroutineContext = context
+        return this
+    }
+
+    /**
+     * Set Refresh Handler - Will be called when cache is refreshed.
+     *
+     * Note: the handler is invoked from the SDK's payload-processing dispatcher (the platform IO
+     * dispatcher by default), i.e. on a background thread — not necessarily the main thread.
+     * Marshal back to your UI thread yourself if the callback touches UI state.
      */
     fun setRefreshHandler(refreshHandler: GBCacheRefreshHandler): GBSDKBuilder {
         this.refreshHandler = refreshHandler
@@ -232,6 +251,7 @@ class GBSDKBuilder(
             networkDispatcher,
             cachingEnabled = cachingEnabled,
             cacheMaxAge = cacheMaxAge,
+            coroutineContext = coroutineContext,
         )
     }
 
@@ -284,7 +304,8 @@ class GBSDKBuilder(
                 internalRefreshHandler,
                 networkDispatcher,
                 cachingEnabled = cachingEnabled,
-                cacheMaxAge = cacheMaxAge
+                cacheMaxAge = cacheMaxAge,
+                coroutineContext = coroutineContext,
             )
         }
     }

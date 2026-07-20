@@ -7,11 +7,23 @@ import com.sdk.growthbook.features.FeaturesDataModel
 import com.sdk.growthbook.features.FeaturesDataSource
 import com.sdk.growthbook.features.FeaturesFlowDelegate
 import com.sdk.growthbook.features.FeaturesViewModel
+import com.sdk.growthbook.features.FetchResult
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBOptions
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import com.sdk.growthbook.model.GBString
+import com.sdk.growthbook.stickybucket.GBStickyBucketService
+import com.sdk.growthbook.utils.GBStickyAssignmentsDocument
+import com.sdk.growthbook.utils.GBUtils
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
@@ -44,17 +56,18 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     private val testGbOptions = GBOptions("https://example.com", null)
 
     @Test
-    fun testSuccess() {
+    fun testSuccess() = runTest {
         isSuccess = false
         isError = true
         val viewModel = FeaturesViewModel(
-            this,
+            this@FeaturesViewModelTests,
             FeaturesDataSource(
                 MockNetworkClient(MockResponse.successResponse, null),
                 gbContext,
                 testGbOptions
             ),
             "3tfeoyW0wlo47bDnbWDkxg==", false,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
         )
 
         viewModel.fetchFeatures()
@@ -65,11 +78,11 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     }
 
     @Test
-    fun testSuccessForEncryptedFeatures() {
+    fun testSuccessForEncryptedFeatures() = runTest {
         isSuccess = false
         isError = true
         val viewModel = FeaturesViewModel(
-            this,
+            this@FeaturesViewModelTests,
             FeaturesDataSource(
                 MockNetworkClient(
                     MockResponse.successResponseEncryptedFeatures, null
@@ -77,6 +90,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 gbContext, testGbOptions,
             ),
             "3tfeoyW0wlo47bDnbWDkxg==", false,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
         )
 
         viewModel.fetchFeatures()
@@ -87,12 +101,12 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     }
 
     @Test
-    fun testError() {
+    fun testError() = runTest {
 
         isSuccess = false
         isError = true
         val viewModel = FeaturesViewModel(
-            delegate = this,
+            delegate = this@FeaturesViewModelTests,
             dataSource = FeaturesDataSource(
                 MockNetworkClient(
                     null, Throwable("UNKNOWN", null)
@@ -100,6 +114,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 gbContext, testGbOptions,
             ),
             cachingEnabled = false,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
         )
 
         viewModel.fetchFeatures()
@@ -110,12 +125,12 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     }
 
     @Test
-    fun testInvalid() {
+    fun testInvalid() = runTest {
 
         isSuccess = false
         isError = true
         val viewModel = FeaturesViewModel(
-            delegate = this,
+            delegate = this@FeaturesViewModelTests,
             dataSource = FeaturesDataSource(
                 MockNetworkClient(
                     MockResponse.ERROR_RESPONSE, null
@@ -124,6 +139,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             ),
             encryptionKey = "",
             cachingEnabled = false,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
         )
         viewModel.fetchFeatures()
 
@@ -133,12 +149,12 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     }
 
     @Test
-    fun testForRemoteEvalSuccess() {
+    fun testForRemoteEvalSuccess() = runTest {
         isSuccess = false
         isError = true
 
         val viewModel = FeaturesViewModel(
-            delegate = this,
+            delegate = this@FeaturesViewModelTests,
             dataSource =
                 FeaturesDataSource(
                     dispatcher = MockNetworkClient(
@@ -149,6 +165,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 ),
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = false,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
         )
         val forcedFeature = mapOf("feature" to GBNumber(123))
         val forcedVariation = mapOf("feature" to 123)
@@ -166,12 +183,12 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     }
 
     @Test
-    fun testForRemoteEvalFailed() {
+    fun testForRemoteEvalFailed() = runTest {
         isSuccess = false
         isError = true
 
         val viewModel = FeaturesViewModel(
-            delegate = this,
+            delegate = this@FeaturesViewModelTests,
             dataSource =
                 FeaturesDataSource(
                     dispatcher = MockNetworkClient(
@@ -182,6 +199,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 ),
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = false,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
         )
         val forcedFeature = mapOf("feature" to GBNumber(123))
         val forcedVariation = mapOf("feature" to 123)
@@ -200,18 +218,19 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     }
 
     @Test
-    fun testNotModified() {
+    fun testNotModified() = runTest {
         isSuccess = false
         isError = false
         isNotModified = false
 
         val viewModel = FeaturesViewModel(
-            delegate = this,
+            delegate = this@FeaturesViewModelTests,
             dataSource = FeaturesDataSource(
                 MockNetworkClient(successResponse = null, error = null, notModified = true),
                 gbContext, testGbOptions,
             ),
             cachingEnabled = false,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
         )
 
         viewModel.fetchFeatures()
@@ -222,11 +241,11 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     }
 
     @Test
-    fun testSuccessWithCachingEnabled() {
+    fun testSuccessWithCachingEnabled() = runTest {
         isSuccess = false
         isError = true
         val viewModel = FeaturesViewModel(
-            this,
+            this@FeaturesViewModelTests,
             FeaturesDataSource(
                 MockNetworkClient(MockResponse.successResponse, null),
                 gbContext,
@@ -234,6 +253,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             ),
             "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = true,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
         )
 
         viewModel.fetchFeatures()
@@ -244,10 +264,10 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     }
 
     @Test
-    fun testFeaturesAPIModelSuccessfullyCalled() {
+    fun testFeaturesAPIModelSuccessfullyCalled() = runTest {
         featuresAPIModelCalled = false
         val viewModel = FeaturesViewModel(
-            this,
+            this@FeaturesViewModelTests,
             FeaturesDataSource(
                 MockNetworkClient(MockResponse.successResponse, null),
                 gbContext,
@@ -255,6 +275,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             ),
             "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = false,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
         )
 
         viewModel.fetchFeatures()
@@ -263,18 +284,19 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     }
 
     @Test
-    fun testSavedGroupsFetchedSuccessfully() {
+    fun testSavedGroupsFetchedSuccessfully() = runTest {
         isSuccess = false
         isError = true
 
         val viewModel = FeaturesViewModel(
-            delegate = this,
+            delegate = this@FeaturesViewModelTests,
             dataSource = FeaturesDataSource(
                 MockNetworkClient(MockResponse.successResponseWithSavedGroups, null),
                 gbContext, testGbOptions,
             ),
             encryptionKey = "",
             cachingEnabled = false,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
         )
 
         viewModel.fetchFeatures()
@@ -284,17 +306,18 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     }
 
     @Test
-    fun testSavedGroupsFetchFailed() {
+    fun testSavedGroupsFetchFailed() = runTest {
         isSuccess = false
         isError = true
         val viewModel = FeaturesViewModel(
-            delegate = this,
+            delegate = this@FeaturesViewModelTests,
             dataSource = FeaturesDataSource(
                 MockNetworkClient(MockResponse.successResponseWithEncryptedFeaturesOnly, null),
                 gbContext, testGbOptions,
             ),
             encryptionKey = "",
             cachingEnabled = false,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
         )
 
         viewModel.fetchFeatures()
@@ -304,11 +327,11 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     }
 
     @Test
-    fun testApplyCachedFeaturesForPlainFeatures() {
+    fun testApplyCachedFeaturesForPlainFeatures() = runTest {
         receivedFromCache = false
         val cacheLayer = MockCachingLayer.fromApiResponse(MockResponse.successResponse)
         val viewModel = FeaturesViewModel(
-            delegate = this,
+            delegate = this@FeaturesViewModelTests,
             dataSource = FeaturesDataSource(
                 MockNetworkClient(MockResponse.successResponse, null),
                 gbContext, testGbOptions,
@@ -316,6 +339,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = false,
             cachingLayer = cacheLayer,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
         )
 
         viewModel.fetchFeatures()
@@ -328,12 +352,12 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     }
 
     @Test
-    fun testApplyCachedFeaturesForEncryptedFeatures() {
+    fun testApplyCachedFeaturesForEncryptedFeatures()= runTest {
         receivedFromCache = false
         val cacheLayer =
             MockCachingLayer.fromApiResponse(MockResponse.successResponseEncryptedFeatures)
         val viewModel = FeaturesViewModel(
-            delegate = this,
+            delegate = this@FeaturesViewModelTests,
             dataSource = FeaturesDataSource(
                 MockNetworkClient(MockResponse.successResponseEncryptedFeatures, null),
                 gbContext, testGbOptions,
@@ -341,6 +365,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = false,
             cachingLayer = cacheLayer,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
         )
 
         viewModel.fetchFeatures()
@@ -353,17 +378,18 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     }
 
     @Test
-    fun testFetchFeaturesWithCacheException() {
+    fun testFetchFeaturesWithCacheException() = runTest {
         receivedCacheError = false
         val cacheLayer = MockCachingLayer(throwOnGet = true)
         val viewModel = FeaturesViewModel(
-            delegate = this,
+            delegate = this@FeaturesViewModelTests,
             dataSource = FeaturesDataSource(
                 MockNetworkClient(null, Throwable("Network error")),
                 gbContext, testGbOptions,
             ),
             cachingEnabled = false,
             cachingLayer = cacheLayer,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
         )
 
         viewModel.fetchFeatures()
@@ -377,12 +403,12 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     }
 
     @Test
-    fun testCacheWriteFailureDoesNotDiscardFetchedFeatures() {
+    fun testCacheWriteFailureDoesNotDiscardFetchedFeatures() = runTest {
         isSuccess = false
         isError = false
         val cacheLayer = MockCachingLayer(throwOnPut = true)
         val viewModel = FeaturesViewModel(
-            delegate = this,
+            delegate = this@FeaturesViewModelTests,
             dataSource = FeaturesDataSource(
                 MockNetworkClient(MockResponse.successResponse, null),
                 gbContext, testGbOptions,
@@ -390,6 +416,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = true,
             cachingLayer = cacheLayer,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler)
         )
 
         viewModel.fetchFeatures()
@@ -400,15 +427,16 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     }
 
     @Test
-    fun testAutoRefreshFeaturesReturnsFlow() {
+    fun testAutoRefreshFeaturesReturnsFlow() = runTest {
         val viewModel = FeaturesViewModel(
-            delegate = this,
+            delegate = this@FeaturesViewModelTests,
             dataSource = FeaturesDataSource(
                 MockNetworkClient(MockResponse.successResponse, null),
                 gbContext, testGbOptions,
             ),
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = false,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
         )
 
         val flow = viewModel.autoRefreshFeatures()
@@ -417,7 +445,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     }
 
     @Test
-    fun testSkipsNetworkWhenCacheIsFresh() {
+    fun testSkipsNetworkWhenCacheIsFresh() =runTest {
         var networkCallCount = 0
         val mockClient = object : MockNetworkClient(MockResponse.successResponse, null) {
             override fun consumeGETRequestWithNotModified(
@@ -435,12 +463,13 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             cachedAt = Clock.System.now().toEpochMilliseconds()
         )
         val viewModel = FeaturesViewModel(
-            delegate = this,
+            delegate = this@FeaturesViewModelTests,
             dataSource = FeaturesDataSource(mockClient, gbContext, testGbOptions),
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = false,
             cachingLayer = cacheLayer,
             cacheMaxAge = 48 * 60 * 60 * 1000L,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler)
         )
 
         viewModel.fetchFeatures()
@@ -449,7 +478,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     }
 
     @Test
-    fun testFetchesNetworkWhenCacheIsStale() {
+    fun testFetchesNetworkWhenCacheIsStale() = runTest {
         var networkCallCount = 0
         val mockClient = object : MockNetworkClient(MockResponse.successResponse, null) {
             override fun consumeGETRequestWithNotModified(
@@ -468,17 +497,136 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             cachedAt = staleTime
         )
         val viewModel = FeaturesViewModel(
-            delegate = this,
+            delegate = this@FeaturesViewModelTests,
             dataSource = FeaturesDataSource(mockClient, gbContext, testGbOptions),
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = false,
             cachingLayer = cacheLayer,
             cacheMaxAge = 48 * 60 * 60 * 1000L,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler)
         )
 
         viewModel.fetchFeatures()
 
         assertEquals(1, networkCallCount, "Network should be called when cache is stale")
+    }
+
+    @Test
+    fun testFetchesNetworkWhenFreshCacheIsUndecodable() = runTest {
+        // A fresh (within cacheMaxAge) but undecodable cache: encrypted-only payload with an
+        // empty encryption key, so the decoder yields (features=null, savedGroups=null). Such a
+        // cache must NOT be treated as authoritative — serveCache should fall through to the
+        // network instead of silently serving nothing for the whole freshness window.
+        isSuccess = false
+        var networkCallCount = 0
+        val mockClient = object : MockNetworkClient(MockResponse.successResponse, null) {
+            override fun consumeGETRequestWithNotModified(
+                request: String,
+                onSuccess: (String) -> Unit,
+                onError: (Throwable) -> Unit,
+                onNotModified: (() -> Unit)
+            ): Job {
+                networkCallCount++
+                return super.consumeGETRequestWithNotModified(request, onSuccess, onError, onNotModified)
+            }
+        }
+        val cacheLayer = MockCachingLayer.fromApiResponse(
+            MockResponse.successResponseWithEncryptedFeaturesOnly,
+            cachedAt = Clock.System.now().toEpochMilliseconds()
+        )
+        val viewModel = FeaturesViewModel(
+            delegate = this@FeaturesViewModelTests,
+            dataSource = FeaturesDataSource(mockClient, gbContext, testGbOptions),
+            encryptionKey = "",
+            cachingEnabled = false,
+            cachingLayer = cacheLayer,
+            cacheMaxAge = 48 * 60 * 60 * 1000L,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler)
+        )
+
+        viewModel.fetchFeatures()
+
+        assertEquals(
+            1,
+            networkCallCount,
+            "Network must be called when a fresh cache decodes to nothing usable"
+        )
+        assertTrue(isSuccess, "Network payload must be applied after falling through the broken cache")
+        assertTrue(hasFeatures)
+    }
+
+    @Test
+    fun testOnPayloadReadyReceivesDecodedFeaturesForEncryptedPayload() = runTest {
+        // Regression for the sticky-bucket-on-encrypted-payload bug: onPayloadReady (which drives
+        // the sticky-bucket refresh) must receive the DECODED payload, not the raw encrypted model.
+        // Otherwise model.features == null, deriveStickyBucketIdentifierAttributes falls back to the
+        // empty cold-start context, and sticky identifiers are derived from nothing. Mirrors the
+        // reference TS SDK, which decrypts before refreshStickyBuckets.
+        var featuresSeenByPayloadReady: GBFeatures? = null
+        val capturingDelegate = object : FeaturesFlowDelegate {
+            override suspend fun onPayloadReady(model: FeaturesDataModel) {
+                featuresSeenByPayloadReady = model.features
+            }
+
+            override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) = Unit
+            override fun featuresFetchFailed(error: GBError, isRemote: Boolean) = Unit
+            override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) = Unit
+            override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) = Unit
+            override fun featuresNotModified() = Unit
+        }
+        val viewModel = FeaturesViewModel(
+            delegate = capturingDelegate,
+            dataSource = FeaturesDataSource(
+                MockNetworkClient(MockResponse.successResponseEncryptedFeatures, null),
+                gbContext, testGbOptions,
+            ),
+            encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
+            cachingEnabled = false,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
+        )
+
+        viewModel.fetchFeatures()
+
+        assertNotNull(
+            featuresSeenByPayloadReady,
+            "onPayloadReady must receive decoded features for an encrypted payload so sticky-bucket " +
+                "identifier attributes are derived from real features, not the empty raw model"
+        )
+        assertTrue(featuresSeenByPayloadReady!!.isNotEmpty())
+    }
+
+    @Test
+    fun testAwaitRefreshTimesOutWhenDispatcherNeverResponds() = runTest {
+        // A dispatcher that accepts the request but never invokes any callback — mimics a hung
+        // connection (both recommended dispatchers default to an INFINITE read timeout). The
+        // network round must time out to Failed so suspendFeature()'s bounded retry can escape
+        // instead of hanging forever.
+        isError = false
+        val hungClient = object : MockNetworkClient(MockResponse.successResponse, null) {
+            override fun consumeGETRequestWithNotModified(
+                request: String,
+                onSuccess: (String) -> Unit,
+                onError: (Throwable) -> Unit,
+                onNotModified: (() -> Unit)
+            ): Job = Job() // never resumes any callback
+        }
+        val viewModel = FeaturesViewModel(
+            delegate = this@FeaturesViewModelTests,
+            dataSource = FeaturesDataSource(hungClient, gbContext, testGbOptions),
+            encryptionKey = "",
+            cachingEnabled = false,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
+        )
+
+        // runTest auto-advances virtual time, so the 30s withTimeoutOrNull fires deterministically.
+        val result = viewModel.awaitRefresh()
+
+        assertEquals(
+            FetchResult.Failed,
+            result,
+            "A hung network round must time out to Failed, not hang"
+        )
+        assertTrue(isError, "Timeout must be surfaced as a fetch failure")
     }
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -505,7 +653,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             dataSource = FeaturesDataSource(mockClient, gbContext, testGbOptions),
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = false,
-            scope = backgroundScope,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler)
         )
 
         // Five callers race into awaitRefresh() while no request has completed yet.
@@ -530,6 +678,175 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             2,
             networkCallCount,
             "A refresh after the in-flight one completes must start a new request"
+        )
+    }
+
+    /**
+     * Proves the race-condition fix: features are applied to context only AFTER the sticky-bucket
+     * refresh (onPayloadReady) has fully completed — verified under a NON-immediate dispatcher so
+     * the ordering is enforced by code, not masked by UnconfinedTestDispatcher(testScheduler) running everything inline.
+     */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun testFeaturesAppliedOnlyAfterStickyRefreshCompletes() = runTest {
+        val events = mutableListOf<String>()
+
+        // A delegate whose onPayloadReady actually suspends, mimicking sticky-bucket IO that
+        // does not complete synchronously (real GBStickyBucketService reads from storage).
+        val orderingDelegate = object : FeaturesFlowDelegate {
+            override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
+                events += "featuresApplied"
+            }
+
+            override suspend fun onPayloadReady(model: FeaturesDataModel) {
+                events += "stickyRefreshStart"
+                delay(100) // suspends — refresh is in flight
+                events += "stickyRefreshDone"
+            }
+
+            override fun featuresFetchFailed(error: GBError, isRemote: Boolean) {
+                events += "fetchFailed"
+            }
+
+            override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) = Unit
+            override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) = Unit
+            override fun featuresNotModified() = Unit
+        }
+
+        val viewModel = FeaturesViewModel(
+            delegate = orderingDelegate,
+            dataSource = FeaturesDataSource(
+                MockNetworkClient(MockResponse.successResponse, null),
+                gbContext, testGbOptions,
+            ),
+            encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
+            cachingEnabled = false,
+            // Non-immediate: launched work is queued on the scheduler, not run inline.
+            coroutineContext = StandardTestDispatcher(testScheduler),
+        )
+
+        viewModel.fetchFeatures()
+
+        // With a non-immediate dispatcher nothing has run yet — proves the work is now async,
+        // unlike the old synchronous fire-and-forget that applied results inside fetchFeatures().
+        assertTrue(
+            events.isEmpty(),
+            "Payload processing must be queued, not executed inline, on a non-immediate dispatcher"
+        )
+
+        // Run up to the first suspension point: refresh has started but NOT finished.
+        runCurrent()
+        assertEquals(
+            listOf("stickyRefreshStart"),
+            events,
+            "Features must not be applied while the sticky-bucket refresh is still suspended"
+        )
+
+        // Let the refresh's suspension resolve.
+        advanceUntilIdle()
+        assertEquals(
+            listOf("stickyRefreshStart", "stickyRefreshDone", "featuresApplied"),
+            events,
+            "featuresFetchedSuccessfully must fire strictly after onPayloadReady completes"
+        )
+    }
+
+    /**
+     * Integration-level companion to [testFeaturesAppliedOnlyAfterStickyRefreshCompletes]: instead of a
+     * fake onPayloadReady that merely delays, this drives the REAL [GBUtils.refreshStickyBuckets] over the
+     * actual payload (mirroring GrowthBookSDK.onPayloadReady) and asserts that, by the time features are
+     * applied, the user's sticky-bucket docs are already written into the context. Only the storage leaf
+     * (getAllAssignments) is faked — and it suspends on the test scheduler, so the ordering is enforced by
+     * the production code under a NON-immediate dispatcher, not masked by UnconfinedTestDispatcher(testScheduler).
+     */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun testStickyDocsPopulatedBeforeFeaturesAppliedWithRealRefresh() = runTest {
+        // Fake only the storage IO. It suspends (delay) on the test scheduler to mimic a read that does
+        // not complete synchronously, and returns a doc for whichever identifier attributes the real
+        // refresh derived from the payload.
+        val service = object : GBStickyBucketService {
+            override val coroutineScope = TestScope(testScheduler)
+            override suspend fun getAssignments(
+                attributeName: String,
+                attributeValue: String
+            ): GBStickyAssignmentsDocument? = null
+
+            override suspend fun saveAssignments(doc: GBStickyAssignmentsDocument) = Unit
+
+            override suspend fun getAllAssignments(
+                attributes: Map<String, String>
+            ): Map<String, GBStickyAssignmentsDocument> {
+                delay(100) // storage read in flight — refresh has NOT completed yet
+                return attributes.entries.associate { (name, value) ->
+                    "$name||$value" to GBStickyAssignmentsDocument(
+                        attributeName = name,
+                        attributeValue = value,
+                        assignments = mapOf("exp__0" to "control"),
+                    )
+                }
+            }
+        }
+
+        val ctx = GBContext(
+            apiKey = "Key",
+            enabled = true,
+            attributes = mapOf("id" to GBString("u1")),
+            forcedVariations = emptyMap(),
+            qaMode = false,
+            trackingCallback = { _, _ -> },
+            encryptionKey = null,
+            stickyBucketService = service,
+        )
+
+        // Snapshot of the context's sticky docs at the exact moment features are applied.
+        var docsAtApplyTime: Map<String, GBStickyAssignmentsDocument>? = null
+
+        val delegate = object : FeaturesFlowDelegate {
+            // Mirrors GrowthBookSDK.onPayloadReady: real refresh against the freshly fetched payload.
+            override suspend fun onPayloadReady(model: FeaturesDataModel) {
+                GBUtils.refreshStickyBuckets(
+                    context = ctx,
+                    data = model,
+                    attributeOverrides = emptyMap(),
+                )
+            }
+
+            override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
+                docsAtApplyTime = ctx.stickyBucketAssignmentDocs
+            }
+
+            override fun featuresFetchFailed(error: GBError, isRemote: Boolean) = Unit
+            override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) = Unit
+            override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) = Unit
+            override fun featuresNotModified() = Unit
+        }
+
+        val viewModel = FeaturesViewModel(
+            delegate = delegate,
+            dataSource = FeaturesDataSource(
+                MockNetworkClient(MockResponse.successResponse, null),
+                ctx, testGbOptions,
+            ),
+            cachingEnabled = false,
+            coroutineContext = StandardTestDispatcher(testScheduler),
+        )
+
+        viewModel.fetchFeatures()
+
+        // Queued, not run: features have not been applied while the refresh is still pending.
+        assertEquals(null, docsAtApplyTime)
+
+        advanceUntilIdle()
+
+        // featuresFetchedSuccessfully fired only after the real refresh wrote the current user's docs.
+        assertNotNull(
+            docsAtApplyTime,
+            "stickyBucketAssignmentDocs must be populated before features are applied",
+        )
+        assertTrue(
+            docsAtApplyTime!!.containsKey("id||u1"),
+            "Refresh must have loaded the current user's assignment doc before features applied",
         )
     }
 
@@ -561,7 +878,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         isError = false
     }
 
-    override fun featuresAPIModelSuccessfully(model: FeaturesDataModel) {
+    override suspend fun onPayloadReady(model: FeaturesDataModel) {
         isSuccess = true
         isError = false
         hasFeatures = !model.features.isNullOrEmpty()

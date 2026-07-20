@@ -1,8 +1,10 @@
 package com.sdk.growthbook.stickybucket
 
+import com.sdk.growthbook.PlatformDependentIODispatcher
 import kotlinx.coroutines.CoroutineScope
 import com.sdk.growthbook.utils.GBStickyAssignmentsDocument
 import com.sdk.growthbook.sandbox.CachingLayer
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -23,17 +25,17 @@ internal class GBStickyBucketServiceImp(
     ): GBStickyAssignmentsDocument? {
         val key = "$attributeName||$attributeValue"
 
-        localStorage?.let { localStorage ->
-            localStorage.getContent("$prefix$key")?.let { data ->
-                return try {
-                    Json.decodeFromJsonElement<GBStickyAssignmentsDocument>(data)
-                } catch (e: Exception) {
-                    null
+        return withContext(PlatformDependentIODispatcher) {
+            localStorage?.let { localStorage ->
+                localStorage.getContent("$prefix$key")?.let { data ->
+                    try {
+                        Json.decodeFromJsonElement<GBStickyAssignmentsDocument>(data)
+                    } catch (e: Exception) {
+                        null
+                    }
                 }
             }
         }
-
-        return null
     }
 
     /**
@@ -42,13 +44,15 @@ internal class GBStickyBucketServiceImp(
     override suspend fun saveAssignments(doc: GBStickyAssignmentsDocument) {
         val key = "${doc.attributeName}||${doc.attributeValue}"
 
-        localStorage?.let { localStorage ->
-            try {
-                val docDataString = Json.encodeToString(doc)
-                val jsonElement: JsonElement = Json.parseToJsonElement(docDataString)
-                localStorage.saveContent("$prefix$key", jsonElement)
-            } catch (e: Exception) {
-                // Handle JSON serialization error
+        withContext(PlatformDependentIODispatcher) {
+            localStorage?.let { localStorage ->
+                try {
+                    val docDataString = Json.encodeToString(doc)
+                    val jsonElement: JsonElement = Json.parseToJsonElement(docDataString)
+                    localStorage.saveContent("$prefix$key", jsonElement)
+                } catch (e: Exception) {
+                    // Handle JSON serialization error
+                }
             }
         }
     }

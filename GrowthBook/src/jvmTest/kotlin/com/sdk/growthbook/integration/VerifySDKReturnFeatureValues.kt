@@ -26,7 +26,7 @@ import com.sdk.growthbook.kotlinx.serialization.gbSerialize
 internal class VerifySDKReturnFeatureValues {
 
     @Test
-    fun verifySDKReturnFeatureDefaultValue() {
+    fun verifySDKReturnFeatureDefaultValue() = runTest {
         @Language("json")
         val json = """
             {
@@ -64,7 +64,7 @@ internal class VerifySDKReturnFeatureValues {
     }
 
     @Test
-    fun verifySDKReturnFeatureValueByConditionIfAttributeDoesNotExist() {
+    fun verifySDKReturnFeatureValueByConditionIfAttributeDoesNotExist() = runTest {
         @Language("json")
         val json = """
             {
@@ -103,7 +103,7 @@ internal class VerifySDKReturnFeatureValues {
     }
 
     @Test
-    fun verifySDKAttributesCastingTypes() {
+    fun verifySDKAttributesCastingTypes() = runTest {
         @Language("json")
         val json = """
 {
@@ -160,7 +160,7 @@ internal class VerifySDKReturnFeatureValues {
     }
 
     @Test
-    fun `if features fetch fails, suspendFeature() method calls fetchFeature() again`() {
+    fun `if features fetch fails, suspendFeature() method retries via awaitRefresh()`() = runTest {
         val gbSdk = buildSDK(json = "{}", attributes = emptyMap()) // buildSDK() calls refreshCache(),
         // refreshCache() calls fetchFeature()
         // fetchFeature() triggers featuresFetchFailed()
@@ -170,21 +170,19 @@ internal class VerifySDKReturnFeatureValues {
         }
         gbSdk.featuresViewModel = mockedFeaturesViewModel
 
-        runTest {
-            val job = launch {
-                gbSdk.suspendFeature("some-feature-id")
-            }
+        val job = launch {
+            gbSdk.suspendFeature("some-feature-id")
+        }
 
             // it is not mandatory here but just to emphasize that
             // if call failed, then suspendFeature() retries via the coalesced awaitRefresh()
             gbSdk.featuresFetchFailed(GBError(null), true)
 
-            delay(100) // cancel only after 100 millis of waiting
-            job.cancel()
-            // or gbSdk.featuresFetchedSuccessfully(emptyMap(), true)
+        delay(100) // cancel only after 100 millis of waiting
+        job.cancel()
+        // or gbSdk.featuresFetchedSuccessfully(emptyMap(), true)
 
-            coVerify { mockedFeaturesViewModel.awaitRefresh() }
-        }
+        coVerify { mockedFeaturesViewModel.awaitRefresh() }
     }
 
 /*
