@@ -81,6 +81,7 @@ If you are accessing features the first time there will be no features right aft
     .setQAMode(true) // Enable / Disable QA Mode
     .setForcedVariations(<HashMap>) // Pass Forced Variations
     .setInitialFeatures(<GBFeatures>) // Seed bundled fallback features (see below)
+    .setCacheMaxAge(<Long>) // Cache freshness window in ms (see below)
 .initialize()
 ```
 
@@ -109,6 +110,24 @@ The seeded features are applied immediately. The normal cache/network refresh st
 
 > **Upgrading from 6.x (Android):** Persistent caching is only implemented on Android; other platforms do not cache features to disk, so this upgrade note does not apply to them. On Android the cache file is automatically migrated from `FeatureCache.txt` to the new scoped `FeatureCache_<clientKey>.txt` on first launch. Single-instance apps migrate transparently with no cold start. Apps that use multiple SDK instances with different `clientKey`s may see one cold start without cache on the first launch after upgrade — features self-correct after the first successful fetch.
 
+#### Cache freshness window (`setCacheMaxAge`)
+
+By default the SDK refetches features from the network on every `initialize()`. Pass `setCacheMaxAge(<ms>)` to define a freshness window: while the cached features are younger than that window, the network call on the next fetch is skipped and the cache is served as the authoritative result. Once the cache is older, the SDK refetches. This is a staleness gate evaluated on the next fetch, not a background polling mechanism.
+
+```kotlin
+var sdkInstance: GrowthBookSDK = GBSDKBuilder(
+    apiKey = <API_KEY>,
+    hostURL = <GrowthBook_URL>,
+    attributes = hashMapOf(),
+    trackingCallback = { _, _ -> },
+    networkDispatcher = GBNetworkDispatcherKtor(),
+)
+    .setCacheMaxAge(60 * 60 * 1000) // serve cache for up to 1 hour, then refetch
+    .initialize()
+```
+
+An explicit `refreshCache()` call always bypasses this window and hits the network regardless of how fresh the cache is.
+
 ## Usage
 
 - Initialization returns SDK instance - GrowthBookSDK
@@ -129,8 +148,9 @@ and returns a feature value typed with specified type.
   inline fun <reified V>featureValue(id: String): V?
     ```
 
-- If you changed, added or removed any features, you can call the refreshCache method to clear the cache and download
-  the latest feature definitions.
+- If you changed, added or removed any features, you can call the refreshCache method to fetch the latest feature
+  definitions from the network. It always bypasses the `setCacheMaxAge` freshness window, so it refetches even when the
+  cache is still fresh.
 
   ```kotlin
   fun refreshCache()

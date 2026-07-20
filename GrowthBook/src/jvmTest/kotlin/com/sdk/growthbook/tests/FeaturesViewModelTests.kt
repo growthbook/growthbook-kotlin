@@ -10,10 +10,16 @@ import com.sdk.growthbook.features.FeaturesViewModel
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBOptions
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Clock
 
 class FeaturesViewModelTests : FeaturesFlowDelegate {
 
@@ -298,7 +304,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     }
 
     @Test
-    fun testHandleFetchFeaturesWithoutRemoteEvalPlainFeatures() {
+    fun testApplyCachedFeaturesForPlainFeatures() {
         receivedFromCache = false
         val cacheLayer = MockCachingLayer.fromApiResponse(MockResponse.successResponse)
         val viewModel = FeaturesViewModel(
@@ -322,7 +328,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     }
 
     @Test
-    fun testHandleFetchFeaturesWithoutRemoteEvalEncryptedFeatures() {
+    fun testApplyCachedFeaturesForEncryptedFeatures() {
         receivedFromCache = false
         val cacheLayer =
             MockCachingLayer.fromApiResponse(MockResponse.successResponseEncryptedFeatures)
@@ -408,6 +414,123 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         val flow = viewModel.autoRefreshFeatures()
 
         assertNotNull(flow)
+    }
+
+    @Test
+    fun testSkipsNetworkWhenCacheIsFresh() {
+        var networkCallCount = 0
+        val mockClient = object : MockNetworkClient(MockResponse.successResponse, null) {
+            override fun consumeGETRequestWithNotModified(
+                request: String,
+                onSuccess: (String) -> Unit,
+                onError: (Throwable) -> Unit,
+                onNotModified: (() -> Unit)
+            ): Job {
+                networkCallCount++
+                return super.consumeGETRequestWithNotModified(request, onSuccess, onError, onNotModified)
+            }
+        }
+        val cacheLayer = MockCachingLayer.fromApiResponse(
+            MockResponse.successResponse,
+            cachedAt = Clock.System.now().toEpochMilliseconds()
+        )
+        val viewModel = FeaturesViewModel(
+            delegate = this,
+            dataSource = FeaturesDataSource(mockClient, gbContext, testGbOptions),
+            encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
+            cachingEnabled = false,
+            cachingLayer = cacheLayer,
+            cacheMaxAge = 48 * 60 * 60 * 1000L,
+        )
+
+        viewModel.fetchFeatures()
+
+        assertEquals(0, networkCallCount, "Network should not be called when cache is fresh")
+    }
+
+    @Test
+    fun testFetchesNetworkWhenCacheIsStale() {
+        var networkCallCount = 0
+        val mockClient = object : MockNetworkClient(MockResponse.successResponse, null) {
+            override fun consumeGETRequestWithNotModified(
+                request: String,
+                onSuccess: (String) -> Unit,
+                onError: (Throwable) -> Unit,
+                onNotModified: (() -> Unit)
+            ): Job {
+                networkCallCount++
+                return super.consumeGETRequestWithNotModified(request, onSuccess, onError, onNotModified)
+            }
+        }
+        val staleTime = Clock.System.now().toEpochMilliseconds() - (49 * 60 * 60 * 1000L)
+        val cacheLayer = MockCachingLayer.fromApiResponse(
+            MockResponse.successResponse,
+            cachedAt = staleTime
+        )
+        val viewModel = FeaturesViewModel(
+            delegate = this,
+            dataSource = FeaturesDataSource(mockClient, gbContext, testGbOptions),
+            encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
+            cachingEnabled = false,
+            cachingLayer = cacheLayer,
+            cacheMaxAge = 48 * 60 * 60 * 1000L,
+        )
+
+        viewModel.fetchFeatures()
+
+        assertEquals(1, networkCallCount, "Network should be called when cache is stale")
+    }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun testConcurrentAwaitRefreshSharesSingleNetworkCall() = runTest {
+        var networkCallCount = 0
+        val pending = mutableListOf<(String) -> Unit>()
+        // Captures the request callback instead of resolving it, so the refresh
+        // stays "in flight" while all callers arrive.
+        val mockClient = object : MockNetworkClient(MockResponse.successResponse, null) {
+            override fun consumeGETRequestWithNotModified(
+                request: String,
+                onSuccess: (String) -> Unit,
+                onError: (Throwable) -> Unit,
+                onNotModified: (() -> Unit)
+            ): Job {
+                networkCallCount++
+                pending.add(onSuccess)
+                return Job()
+            }
+        }
+        val viewModel = FeaturesViewModel(
+            delegate = this@FeaturesViewModelTests,
+            dataSource = FeaturesDataSource(mockClient, gbContext, testGbOptions),
+            encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
+            cachingEnabled = false,
+            scope = backgroundScope,
+        )
+
+        // Five callers race into awaitRefresh() while no request has completed yet.
+        repeat(5) { backgroundScope.launch { viewModel.awaitRefresh() } }
+        runCurrent()
+
+        assertEquals(
+            1,
+            networkCallCount,
+            "Concurrent awaitRefresh() callers must share a single in-flight network request"
+        )
+
+        // Complete the shared request, freeing the slot.
+        pending.forEach { it(MockResponse.successResponse) }
+        runCurrent()
+        assertTrue(isSuccess)
+
+        // A fresh refresh after completion starts a new request (slot was cleared).
+        backgroundScope.launch { viewModel.awaitRefresh() }
+        runCurrent()
+        assertEquals(
+            2,
+            networkCallCount,
+            "A refresh after the in-flight one completes must start a new request"
+        )
     }
 
     override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
