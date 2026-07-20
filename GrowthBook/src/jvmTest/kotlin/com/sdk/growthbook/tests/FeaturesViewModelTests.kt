@@ -444,7 +444,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     }
 
     @Test
-    fun testSkipsNetworkWhenCacheIsFresh() {
+    fun testSkipsNetworkWhenCacheIsFresh() =runTest {
         var networkCallCount = 0
         val mockClient = object : MockNetworkClient(MockResponse.successResponse, null) {
             override fun consumeGETRequestWithNotModified(
@@ -462,12 +462,13 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             cachedAt = Clock.System.now().toEpochMilliseconds()
         )
         val viewModel = FeaturesViewModel(
-            delegate = this,
+            delegate = this@FeaturesViewModelTests,
             dataSource = FeaturesDataSource(mockClient, gbContext, testGbOptions),
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = false,
             cachingLayer = cacheLayer,
             cacheMaxAge = 48 * 60 * 60 * 1000L,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler)
         )
 
         viewModel.fetchFeatures()
@@ -476,7 +477,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     }
 
     @Test
-    fun testFetchesNetworkWhenCacheIsStale() {
+    fun testFetchesNetworkWhenCacheIsStale() = runTest {
         var networkCallCount = 0
         val mockClient = object : MockNetworkClient(MockResponse.successResponse, null) {
             override fun consumeGETRequestWithNotModified(
@@ -495,12 +496,13 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             cachedAt = staleTime
         )
         val viewModel = FeaturesViewModel(
-            delegate = this,
+            delegate = this@FeaturesViewModelTests,
             dataSource = FeaturesDataSource(mockClient, gbContext, testGbOptions),
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = false,
             cachingLayer = cacheLayer,
             cacheMaxAge = 48 * 60 * 60 * 1000L,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler)
         )
 
         viewModel.fetchFeatures()
@@ -532,7 +534,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             dataSource = FeaturesDataSource(mockClient, gbContext, testGbOptions),
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = false,
-            scope = backgroundScope,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler)
         )
 
         // Five callers race into awaitRefresh() while no request has completed yet.

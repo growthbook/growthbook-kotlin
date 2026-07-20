@@ -160,7 +160,7 @@ internal class VerifySDKReturnFeatureValues {
     }
 
     @Test
-    fun `if features fetch fails, suspendFeature() method calls fetchFeature() again`() = runTest {
+    fun `if features fetch fails, suspendFeature() method retries via awaitRefresh()`() = runTest {
         val gbSdk = buildSDK(json = "{}", attributes = emptyMap()) // buildSDK() calls refreshCache(),
         // refreshCache() calls fetchFeature()
         // fetchFeature() triggers featuresFetchFailed()
@@ -182,7 +182,7 @@ internal class VerifySDKReturnFeatureValues {
         job.cancel()
         // or gbSdk.featuresFetchedSuccessfully(emptyMap(), true)
 
-        coVerify { mockedFeaturesViewModel.fetchFeatures() }
+        coVerify { mockedFeaturesViewModel.awaitRefresh() }
     }
 
 /*

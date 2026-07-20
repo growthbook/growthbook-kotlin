@@ -304,7 +304,7 @@ class GBSDKBuilder(
                 internalRefreshHandler,
                 networkDispatcher,
                 cachingEnabled = cachingEnabled,
-                cacheMaxAge = cacheMaxAge
+                cacheMaxAge = cacheMaxAge,
                 coroutineContext = coroutineContext,
             )
         }

@@ -15,15 +15,16 @@ import com.sdk.growthbook.utils.Resource
 import com.sdk.growthbook.utils.SSEConnectionController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonObject
+import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.resume
 import kotlin.time.Clock
 
@@ -32,7 +33,7 @@ import kotlin.time.Clock
  */
 internal interface FeaturesFlowDelegate {
     fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean)
-    fun featuresAPIModelSuccessfully(model: FeaturesDataModel)
+    suspend fun onPayloadReady(model: FeaturesDataModel)
     fun featuresFetchFailed(error: GBError, isRemote: Boolean)
     fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean)
     fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean)
@@ -91,15 +92,15 @@ internal class FeaturesViewModel(
      */
     private val decoder: FeaturePayloadDecoder = FeaturePayloadDecoder(encryptionKey),
     /**
-     * Scope that owns the coalesced refresh started by [awaitRefresh] (used by
-     * suspendFeature() retries and [revalidate]). It must outlive any single
-     * caller, so cancelling one caller never tears down a refresh shared with
-     * others ([SupervisorJob] isolates failures too). Only lightweight coordination
-     * runs here (mutex bookkeeping, continuation resumption); the actual HTTP runs
-     * on the network dispatcher's own IO scope. Injectable so tests can supply a
+     * Context on which fetched payloads are processed (decode + sticky-bucket
+     * refresh + feature application) and on which the coalesced refresh started by
+     * [awaitRefresh] (used by suspendFeature() retries and [revalidate]) runs. It
+     * must outlive any single caller, so cancelling one caller never tears down a
+     * refresh shared with others; it is wrapped in a [SupervisorJob] so one failed
+     * refresh never tears down the shared scope. Injectable so tests can supply a
      * deterministic dispatcher.
      */
-    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+    coroutineContext: CoroutineContext
 ) {
 
     /**
@@ -107,6 +108,8 @@ internal class FeaturesViewModel(
      */
     val sseController: SSEConnectionController
         get() = dataSource.sseController
+
+    private val coroutineScope: CoroutineScope = CoroutineScope(coroutineContext + SupervisorJob())
 
     /**
      * Guards reads and writes of [inFlight] so the check-or-start decision in
@@ -127,7 +130,7 @@ internal class FeaturesViewModel(
     fun autoRefreshFeatures(): Flow<Resource<GBFeatures?>> {
         sseController.start()
         return dataSource.autoRefresh(
-            success = { handleNetworkModel(it) },
+            success = { coroutineScope.launch { handleNetworkModel(it) } },
             failure = { delegate.featuresFetchFailed(GBError(it), isRemote = true) }
         )
     }
@@ -160,7 +163,7 @@ internal class FeaturesViewModel(
      */
     suspend fun awaitRefresh(): FetchResult {
         val deferred = refreshMutex.withLock {
-            inFlight ?: scope.async {
+            inFlight ?: coroutineScope.async {
                 try {
                     runNetworkGet()
                 } finally {
@@ -178,12 +181,22 @@ internal class FeaturesViewModel(
      * of starting a duplicate request. Always bypasses cache freshness (see
      * [FetchPolicy.ForceNetwork]).
      *
-     * Fire-and-forget: the network round runs on [scope]; observe completion via
-     * the refresh handler rather than expecting features to be ready on return.
+     * Fire-and-forget: the network round runs on [coroutineScope]; observe completion
+     * via the refresh handler rather than expecting features to be ready on return.
      */
     fun revalidate() {
         serveCache(remoteEval = false, policy = FetchPolicy.ForceNetwork)
-        scope.launch { awaitRefresh() }
+        coroutineScope.launch { awaitRefresh() }
+    }
+
+    /**
+     * Releases resources held by this view model: stops any active SSE connection and cancels the
+     * coroutine scope used to process fetched payloads, so in-flight background work does not outlive
+     * the owning SDK instance. Safe to call more than once.
+     */
+    fun close() {
+        sseController.stop()
+        coroutineScope.cancel()
     }
 
     /** Bridges the callback-based GET into a suspend result for [awaitRefresh]. */
@@ -191,8 +204,13 @@ internal class FeaturesViewModel(
         suspendCancellableCoroutine { cont ->
             dataSource.fetchFeatures(
                 success = {
-                    handleNetworkModel(it)
-                    cont.resume(FetchResult.Success)
+                    // Resume only after the payload is fully applied (incl. the
+                    // suspend sticky-bucket refresh in onPayloadReady), so awaitRefresh()
+                    // callers observe a completed refresh, not just a completed HTTP round.
+                    coroutineScope.launch {
+                        handleNetworkModel(it)
+                        cont.resume(FetchResult.Success)
+                    }
                 },
                 failure = {
                     dispatch(FetchOutcome.Failed(GBError(it), source = Source.NETWORK))
@@ -230,7 +248,7 @@ internal class FeaturesViewModel(
     private fun fetchFromNetwork(remoteEval: Boolean, payload: GBRemoteEvalParams?) {
         if (remoteEval) dataSource.fetchRemoteEval(
             params = payload,
-            success = { handleNetworkModel(it.data) },
+            success = { coroutineScope.launch { handleNetworkModel(it.data) }},
             failure = {
                 delegate.featuresFetchFailed(
                     error = GBError(it.exception),
@@ -238,15 +256,15 @@ internal class FeaturesViewModel(
                 )
             }
         ) else dataSource.fetchFeatures(
-            success = { handleNetworkModel(it) },
+            success = { coroutineScope.launch { handleNetworkModel(it) } },
             failure = { delegate.featuresFetchFailed(error = GBError(it), isRemote = true) },
             onNotModified = { dispatch(outcome = FetchOutcome.NotModified) }
         )
     }
 
-    private fun handleNetworkModel(model: FeaturesDataModel) {
+    private suspend fun handleNetworkModel(model: FeaturesDataModel) {
         try {
-            delegate.featuresAPIModelSuccessfully(model)
+            delegate.onPayloadReady(model)
             if (cachingEnabled) {
                 runCatching { writeCache(model) }
                     .onFailure {
