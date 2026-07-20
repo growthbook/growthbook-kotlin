@@ -37,11 +37,8 @@ import com.sdk.growthbook.kotlinx.serialization.from
 import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.StackContext
 import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBuckets
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.coroutineContext
 import kotlin.experimental.ExperimentalObjCRefinement
 import kotlin.native.HiddenFromObjC
 import kotlin.time.Duration.Companion.milliseconds
@@ -55,7 +52,7 @@ typealias GBExperimentRunCallback = (GBExperiment, GBExperimentResult) -> Unit
  * that takes a Context object in the constructor.
  * It exposes two main methods: feature and run.
  */
-class GrowthBookSDK(
+class GrowthBookSDK internal constructor(
     private val gbContext: GBContext,
     gbOptions: GBOptions,
     private val refreshHandler: GBCacheRefreshHandler?,
@@ -63,13 +60,41 @@ class GrowthBookSDK(
     features: GBFeatures? = null,
     savedGroups: Map<String, GBValue>? = null,
     cachingEnabled: Boolean,
-    private val cacheMaxAge: Long? = null,
+    // Internal seam only: the public way to set a cache freshness window is
+    // GBSDKBuilder.setCacheMaxAge(). Adding these to the public constructor would break binary
+    // compatibility, so the public constructor below preserves the pre-7.3.0 signature and
+    // delegates here.
+    private val cacheMaxAge: Long?,
     // Dispatcher on which the fetched payload is processed (sticky-bucket refresh + feature
     // application + refreshHandler invocation). Defaults to the platform IO dispatcher so that work
     // runs on a defined background context rather than an arbitrary thread. Overridable (e.g. with a
     // test dispatcher) so tests can drive the async pipeline deterministically.
-    coroutineContext: CoroutineContext = PlatformDependentIODispatcher,
+    coroutineContext: CoroutineContext,
 ) : FeaturesFlowDelegate {
+
+    /**
+     * Public constructor, kept binary-compatible with pre-7.3.0 releases. To set a cache
+     * freshness window, use [com.sdk.growthbook.GBSDKBuilder.setCacheMaxAge] instead.
+     */
+    constructor(
+        gbContext: GBContext,
+        gbOptions: GBOptions,
+        refreshHandler: GBCacheRefreshHandler?,
+        networkDispatcher: NetworkDispatcher,
+        features: GBFeatures? = null,
+        savedGroups: Map<String, GBValue>? = null,
+        cachingEnabled: Boolean,
+    ) : this(
+        gbContext = gbContext,
+        gbOptions = gbOptions,
+        refreshHandler = refreshHandler,
+        networkDispatcher = networkDispatcher,
+        features = features,
+        savedGroups = savedGroups,
+        cachingEnabled = cachingEnabled,
+        cacheMaxAge = null,
+        coroutineContext = PlatformDependentIODispatcher,
+    )
     private var forcedFeatures: Map<String, GBValue> = emptyMap()
     private var attributeOverrides: Map<String, GBValue> = emptyMap()
     private var remoteSourceFeaturesFetchResult: FeaturesFetchResult =
