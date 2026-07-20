@@ -7,6 +7,7 @@ import com.sdk.growthbook.features.FeaturesDataModel
 import com.sdk.growthbook.features.FeaturesDataSource
 import com.sdk.growthbook.features.FeaturesFlowDelegate
 import com.sdk.growthbook.features.FeaturesViewModel
+import com.sdk.growthbook.features.FetchResult
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBOptions
@@ -552,6 +553,80 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         )
         assertTrue(isSuccess, "Network payload must be applied after falling through the broken cache")
         assertTrue(hasFeatures)
+    }
+
+    @Test
+    fun testOnPayloadReadyReceivesDecodedFeaturesForEncryptedPayload() = runTest {
+        // Regression for the sticky-bucket-on-encrypted-payload bug: onPayloadReady (which drives
+        // the sticky-bucket refresh) must receive the DECODED payload, not the raw encrypted model.
+        // Otherwise model.features == null, deriveStickyBucketIdentifierAttributes falls back to the
+        // empty cold-start context, and sticky identifiers are derived from nothing. Mirrors the
+        // reference TS SDK, which decrypts before refreshStickyBuckets.
+        var featuresSeenByPayloadReady: GBFeatures? = null
+        val capturingDelegate = object : FeaturesFlowDelegate {
+            override suspend fun onPayloadReady(model: FeaturesDataModel) {
+                featuresSeenByPayloadReady = model.features
+            }
+
+            override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) = Unit
+            override fun featuresFetchFailed(error: GBError, isRemote: Boolean) = Unit
+            override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) = Unit
+            override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) = Unit
+            override fun featuresNotModified() = Unit
+        }
+        val viewModel = FeaturesViewModel(
+            delegate = capturingDelegate,
+            dataSource = FeaturesDataSource(
+                MockNetworkClient(MockResponse.successResponseEncryptedFeatures, null),
+                gbContext, testGbOptions,
+            ),
+            encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
+            cachingEnabled = false,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
+        )
+
+        viewModel.fetchFeatures()
+
+        assertNotNull(
+            featuresSeenByPayloadReady,
+            "onPayloadReady must receive decoded features for an encrypted payload so sticky-bucket " +
+                "identifier attributes are derived from real features, not the empty raw model"
+        )
+        assertTrue(featuresSeenByPayloadReady!!.isNotEmpty())
+    }
+
+    @Test
+    fun testAwaitRefreshTimesOutWhenDispatcherNeverResponds() = runTest {
+        // A dispatcher that accepts the request but never invokes any callback — mimics a hung
+        // connection (both recommended dispatchers default to an INFINITE read timeout). The
+        // network round must time out to Failed so suspendFeature()'s bounded retry can escape
+        // instead of hanging forever.
+        isError = false
+        val hungClient = object : MockNetworkClient(MockResponse.successResponse, null) {
+            override fun consumeGETRequestWithNotModified(
+                request: String,
+                onSuccess: (String) -> Unit,
+                onError: (Throwable) -> Unit,
+                onNotModified: (() -> Unit)
+            ): Job = Job() // never resumes any callback
+        }
+        val viewModel = FeaturesViewModel(
+            delegate = this@FeaturesViewModelTests,
+            dataSource = FeaturesDataSource(hungClient, gbContext, testGbOptions),
+            encryptionKey = "",
+            cachingEnabled = false,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
+        )
+
+        // runTest auto-advances virtual time, so the 30s withTimeoutOrNull fires deterministically.
+        val result = viewModel.awaitRefresh()
+
+        assertEquals(
+            FetchResult.Failed,
+            result,
+            "A hung network round must time out to Failed, not hang"
+        )
+        assertTrue(isError, "Timeout must be surfaced as a fetch failure")
     }
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)

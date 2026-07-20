@@ -300,6 +300,13 @@ class GrowthBookSDK internal constructor(
      * If a call is in progress, it waits for the result. If network
      * call failed, it tries to call again.
      *
+     * Known limitation (remote-eval): the internal retry uses the coalesced GET refresh
+     * ([FeaturesViewModel.awaitRefresh]), not the remote-eval POST. In remote-eval mode, if this is
+     * called while the initial remote-eval POST is still in flight or has failed, the retry issues a
+     * plain GET, so a GET that lands first can momentarily surface non-personalized (unevaluated)
+     * feature definitions until the POST completes and overwrites them. Routing the retry through the
+     * remote-eval path is deferred to a later release.
+     *
      * @returns a [GBFeatureResult] object
      */
     suspend fun suspendFeature(id: String): GBFeatureResult {

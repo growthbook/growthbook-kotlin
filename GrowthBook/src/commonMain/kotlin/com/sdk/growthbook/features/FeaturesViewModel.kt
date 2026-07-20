@@ -23,10 +23,18 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.resume
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
+
+// Upper bound on a single network round in [FeaturesViewModel.runNetworkGet]. Both recommended
+// dispatchers (Ktor/OkHttp) default to an INFINITE read timeout so a server that accepts the
+// connection then never responds would otherwise leave awaitRefresh()/suspendFeature() hanging
+// forever. Kept dispatcher-agnostic here so custom NetworkDispatcher impls are bounded too.
+private const val NETWORK_ROUND_TIMEOUT_MILLIS = 30_000L
 
 /**
  * Interface for Feature API Completion Events
@@ -201,26 +209,34 @@ internal class FeaturesViewModel(
 
     /** Bridges the callback-based GET into a suspend result for [awaitRefresh]. */
     private suspend fun runNetworkGet(): FetchResult =
-        suspendCancellableCoroutine { cont ->
-            dataSource.fetchFeatures(
-                success = {
-                    // Resume only after the payload is fully applied (incl. the
-                    // suspend sticky-bucket refresh in onPayloadReady), so awaitRefresh()
-                    // callers observe a completed refresh, not just a completed HTTP round.
-                    coroutineScope.launch {
-                        handleNetworkModel(it)
-                        cont.resume(FetchResult.Success)
+        withTimeoutOrNull(NETWORK_ROUND_TIMEOUT_MILLIS.milliseconds) {
+            suspendCancellableCoroutine { cont ->
+                dataSource.fetchFeatures(
+                    success = {
+                        // Resume only after the payload is fully applied (incl. the
+                        // suspend sticky-bucket refresh in onPayloadReady), so awaitRefresh()
+                        // callers observe a completed refresh, not just a completed HTTP round.
+                        coroutineScope.launch {
+                            handleNetworkModel(it)
+                            cont.resume(FetchResult.Success)
+                        }
+                    },
+                    failure = {
+                        dispatch(FetchOutcome.Failed(GBError(it), source = Source.NETWORK))
+                        cont.resume(FetchResult.Failed)
+                    },
+                    onNotModified = {
+                        dispatch(FetchOutcome.NotModified)
+                        cont.resume(FetchResult.NotModified)
                     }
-                },
-                failure = {
-                    dispatch(FetchOutcome.Failed(GBError(it), source = Source.NETWORK))
-                    cont.resume(FetchResult.Failed)
-                },
-                onNotModified = {
-                    dispatch(FetchOutcome.NotModified)
-                    cont.resume(FetchResult.NotModified)
-                }
-            )
+                )
+            }
+        } ?: run {
+            // Timed out: the dispatcher accepted the request but never invoked any callback.
+            // Surface it as a network failure so remoteSourceFeaturesFetchResult leaves NoResultYet
+            // and suspendFeature()'s bounded-retry path can escape instead of hanging forever.
+            dispatch(FetchOutcome.Failed(GBError(Exception("Feature fetch timed out")), source = Source.NETWORK))
+            FetchResult.Failed
         }
 
     private fun serveCache(remoteEval: Boolean, policy: FetchPolicy): Boolean {
@@ -265,7 +281,20 @@ internal class FeaturesViewModel(
 
     private suspend fun handleNetworkModel(model: FeaturesDataModel) {
         try {
-            delegate.onPayloadReady(model)
+            // Decode/decrypt the payload BEFORE the sticky-bucket refresh, mirroring the reference
+            // TS SDK (decryptPayload -> refreshStickyBuckets). For an encrypted payload the raw
+            // model has features == null, so deriveStickyBucketIdentifierAttributes would fall back
+            // to the context features — empty on a cold start — and derive sticky identifiers from
+            // nothing, re-bucketing the user. Handing onPayloadReady the decoded payload fixes that.
+            val decoded = decoder.decode(model)
+            delegate.onPayloadReady(
+                model.copy(
+                    features = decoded.features,
+                    encryptedFeatures = null,
+                    savedGroups = decoded.savedGroups,
+                    encryptedSavedGroups = null,
+                )
+            )
             if (cachingEnabled) {
                 runCatching { writeCache(model) }
                     .onFailure {
@@ -278,7 +307,7 @@ internal class FeaturesViewModel(
 
             dispatch(
                 outcome = outcomeOf(
-                    payload = decoder.decode(model),
+                    payload = decoded,
                     source = Source.NETWORK
                 )
             )
