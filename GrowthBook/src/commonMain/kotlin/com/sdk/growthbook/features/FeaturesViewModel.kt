@@ -235,14 +235,15 @@ internal class FeaturesViewModel(
             && cachedAt != null
             && Clock.System.now().toEpochMilliseconds() - cachedAt < cacheMaxAge
 
-        dispatch(
-            outcome = FetchOutcome.Ready(
-                payload = decoder.decode(m = model),
-                source = Source.CACHE,
-                authoritative = fresh
-            )
-        )
-        return fresh
+        val outcome = outcomeOf(payload = decoder.decode(m = model), source = Source.CACHE, authoritative = fresh)
+        dispatch(outcome = outcome)
+
+        // Only treat the cache as authoritative (and skip the network) when it actually
+        // yielded a usable payload. A fresh-but-undecodable/empty cache degrades to
+        // FetchOutcome.Failed above (both features and savedGroups null) — returning false
+        // then lets fetchFeatures() fall through to the network instead of silently serving
+        // nothing for the whole freshness window.
+        return fresh && outcome is FetchOutcome.Ready
     }
 
     private fun fetchFromNetwork(remoteEval: Boolean, payload: GBRemoteEvalParams?) {
@@ -291,10 +292,10 @@ internal class FeaturesViewModel(
         }
     }
 
-    private fun outcomeOf(payload: DecodedPayload, source: Source): FetchOutcome =
+    private fun outcomeOf(payload: DecodedPayload, source: Source, authoritative: Boolean = true): FetchOutcome =
         if (payload.features == null && payload.savedGroups == null)
             FetchOutcome.Failed(GBError(Exception()), source)
-        else FetchOutcome.Ready(payload, source, authoritative = true)
+        else FetchOutcome.Ready(payload, source, authoritative = authoritative)
 
     private fun dispatch(outcome: FetchOutcome) = when (outcome) {
         is FetchOutcome.Ready -> {

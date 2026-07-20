@@ -44,6 +44,7 @@ import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.coroutineContext
 import kotlin.experimental.ExperimentalObjCRefinement
 import kotlin.native.HiddenFromObjC
+import kotlin.time.Duration.Companion.milliseconds
 
 typealias GBTrackingCallback = (GBExperiment, GBExperimentResult) -> Unit
 typealias GBFeatureUsageCallback = (featureKey: String, gbFeatureResult: GBFeatureResult) -> Unit
@@ -110,7 +111,7 @@ class GrowthBookSDK(
                 featuresViewModel.fetchFeatures()
             }
         }
-        gbContext.savedGroups = savedGroups
+        savedGroups?.let { gbContext.savedGroups = it }
         refreshStickyBucketService()
     }
 
@@ -284,15 +285,20 @@ class GrowthBookSDK(
             when (remoteSourceFeaturesFetchResult) {
                 FeaturesFetchResult.Success -> return feature(id)
 
-                FeaturesFetchResult.NoResultYet -> delay(TIME_FOR_CALL_WAIT_MILLIS)
+                FeaturesFetchResult.NoResultYet -> {
+                    delay(TIME_FOR_CALL_WAIT_MILLIS.milliseconds)
+                    featuresViewModel.awaitRefresh()
+                }
 
                 FeaturesFetchResult.Failed -> {
                     if (attempt >= MAX_RETRY_ATTEMPTS) return feature(id)
                     featuresViewModel.awaitRefresh()
+
+                    if (remoteSourceFeaturesFetchResult != FeaturesFetchResult.Failed) continue
                     if (gbContext.enableLogging) {
                         GB.log("GrowthBookSDK: suspendFeature: retry attempt ${attempt + 1}/$MAX_RETRY_ATTEMPTS, waiting ${delaysMs}ms")
                     }
-                    delay(delaysMs)
+                    delay(delaysMs.milliseconds)
                     delaysMs = minOf(delaysMs * 2, MAX_RETRY_DELAY_MILLIS)
                     attempt++
                 }

@@ -510,6 +510,50 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         assertEquals(1, networkCallCount, "Network should be called when cache is stale")
     }
 
+    @Test
+    fun testFetchesNetworkWhenFreshCacheIsUndecodable() = runTest {
+        // A fresh (within cacheMaxAge) but undecodable cache: encrypted-only payload with an
+        // empty encryption key, so the decoder yields (features=null, savedGroups=null). Such a
+        // cache must NOT be treated as authoritative — serveCache should fall through to the
+        // network instead of silently serving nothing for the whole freshness window.
+        isSuccess = false
+        var networkCallCount = 0
+        val mockClient = object : MockNetworkClient(MockResponse.successResponse, null) {
+            override fun consumeGETRequestWithNotModified(
+                request: String,
+                onSuccess: (String) -> Unit,
+                onError: (Throwable) -> Unit,
+                onNotModified: (() -> Unit)
+            ): Job {
+                networkCallCount++
+                return super.consumeGETRequestWithNotModified(request, onSuccess, onError, onNotModified)
+            }
+        }
+        val cacheLayer = MockCachingLayer.fromApiResponse(
+            MockResponse.successResponseWithEncryptedFeaturesOnly,
+            cachedAt = Clock.System.now().toEpochMilliseconds()
+        )
+        val viewModel = FeaturesViewModel(
+            delegate = this@FeaturesViewModelTests,
+            dataSource = FeaturesDataSource(mockClient, gbContext, testGbOptions),
+            encryptionKey = "",
+            cachingEnabled = false,
+            cachingLayer = cacheLayer,
+            cacheMaxAge = 48 * 60 * 60 * 1000L,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler)
+        )
+
+        viewModel.fetchFeatures()
+
+        assertEquals(
+            1,
+            networkCallCount,
+            "Network must be called when a fresh cache decodes to nothing usable"
+        )
+        assertTrue(isSuccess, "Network payload must be applied after falling through the broken cache")
+        assertTrue(hasFeatures)
+    }
+
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     @Test
     fun testConcurrentAwaitRefreshSharesSingleNetworkCall() = runTest {
