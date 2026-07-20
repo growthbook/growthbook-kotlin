@@ -62,6 +62,7 @@ class GrowthBookSDK(
     features: GBFeatures? = null,
     savedGroups: Map<String, GBValue>? = null,
     cachingEnabled: Boolean,
+    private val cacheMaxAge: Long? = null,
     // Dispatcher on which the fetched payload is processed (sticky-bucket refresh + feature
     // application + refreshHandler invocation). Defaults to the platform IO dispatcher so that work
     // runs on a defined background context rather than an arbitrary thread. Overridable (e.g. with a
@@ -93,6 +94,7 @@ class GrowthBookSDK(
         ),
         encryptionKey = gbContext.encryptionKey,
         cachingEnabled = cachingEnabled,
+        cacheMaxAge = cacheMaxAge,
         cacheKey = "${Constants.FEATURE_CACHE}_${gbContext.apiKey}",
         coroutineContext = coroutineContext,
     )
@@ -102,20 +104,29 @@ class GrowthBookSDK(
             gbContext.features = features
             hasFeaturesPayload = true
         } else {
-            refreshCache()
+            if (gbContext.remoteEval) {
+                refreshForRemoteEval()
+            } else {
+                featuresViewModel.fetchFeatures()
+            }
         }
         gbContext.savedGroups = savedGroups
         refreshStickyBucketService()
     }
 
     /**
-     * Manually Refresh Cache
+     * Manually refreshes features from the network.
+     *
+     * This is an explicit refresh and always bypasses the cache freshness
+     * window set via [GBSDKBuilder.setCacheMaxAge]: it hits the network even
+     * if the cached features are still within their max age. In remote-eval
+     * mode it re-runs the remote evaluation instead.
      */
     fun refreshCache() {
         if (gbContext.remoteEval) {
             refreshForRemoteEval()
         } else {
-            featuresViewModel.fetchFeatures()
+            featuresViewModel.revalidate()
         }
     }
 
@@ -266,20 +277,25 @@ class GrowthBookSDK(
      * @returns a [GBFeatureResult] object
      */
     suspend fun suspendFeature(id: String): GBFeatureResult {
-        return when (remoteSourceFeaturesFetchResult) {
-            FeaturesFetchResult.Success -> {
-                feature(id)
-            }
+        var attempt = 0
+        var delaysMs = INITIAL_RETRY_DELAY_MILLIS
 
-            FeaturesFetchResult.NoResultYet -> {
-                delay(TIME_FOR_CALL_WAIT_MILLIS)
-                suspendFeature(id)
-            }
+        while (true) {
+            when (remoteSourceFeaturesFetchResult) {
+                FeaturesFetchResult.Success -> return feature(id)
 
-            FeaturesFetchResult.Failed -> {
-                featuresViewModel.fetchFeatures()
-                delay(TIME_FOR_CALL_WAIT_MILLIS)
-                suspendFeature(id)
+                FeaturesFetchResult.NoResultYet -> delay(TIME_FOR_CALL_WAIT_MILLIS)
+
+                FeaturesFetchResult.Failed -> {
+                    if (attempt >= MAX_RETRY_ATTEMPTS) return feature(id)
+                    featuresViewModel.awaitRefresh()
+                    if (gbContext.enableLogging) {
+                        GB.log("GrowthBookSDK: suspendFeature: retry attempt ${attempt + 1}/$MAX_RETRY_ATTEMPTS, waiting ${delaysMs}ms")
+                    }
+                    delay(delaysMs)
+                    delaysMs = minOf(delaysMs * 2, MAX_RETRY_DELAY_MILLIS)
+                    attempt++
+                }
             }
         }
     }
@@ -564,6 +580,9 @@ class GrowthBookSDK(
 
         // After this period of time a call status is checked again
         private const val TIME_FOR_CALL_WAIT_MILLIS = 1000L
+        private const val INITIAL_RETRY_DELAY_MILLIS = 1000L
+        private const val MAX_RETRY_DELAY_MILLIS = 60_000L
+        private const val MAX_RETRY_ATTEMPTS = 5
 
         private fun createEvaluationContext(
             gbContext: GBContext,

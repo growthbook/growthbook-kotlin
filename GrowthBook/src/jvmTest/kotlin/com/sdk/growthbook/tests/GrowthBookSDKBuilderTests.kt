@@ -21,6 +21,8 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -129,6 +131,10 @@ class GrowthBookSDKBuilderTests {
     fun testSDKRefreshHandler() = runTest {
 
         var isRefreshed = false
+        // refreshCache() revalidates on a background scope, so wait on the
+        // refresh handler signal (deterministic, no sleeps) rather than reading
+        // the flag synchronously.
+        var refreshLatch = CountDownLatch(1)
 
         val sdkInstance = GBSDKBuilder(
             testApiKey,
@@ -140,14 +146,17 @@ class GrowthBookSDKBuilderTests {
             remoteEval = false
         ).setCoroutineContext(UnconfinedTestDispatcher(testScheduler)).setRefreshHandler { _, gbError ->
             isRefreshed = true
+            refreshLatch.countDown()
         }.initialize()
 
+        assertTrue(refreshLatch.await(2, TimeUnit.SECONDS), "refresh handler should fire on init")
         assertTrue(isRefreshed)
 
         isRefreshed = false
+        refreshLatch = CountDownLatch(1)
 
         sdkInstance.refreshCache()
-
+        assertTrue(refreshLatch.await(2, TimeUnit.SECONDS), "refresh handler should fire on refreshCache")
         assertTrue(isRefreshed)
     }
 
@@ -155,6 +164,7 @@ class GrowthBookSDKBuilderTests {
     fun testSDKRefreshHandlerCalledOn304NotModified() {
         var refreshCalled = false
         var refreshSuccess: Boolean? = null
+        var refreshLatch = CountDownLatch(1)
 
         val growthBookSDK = GBSDKBuilder(
             testApiKey,
@@ -171,10 +181,17 @@ class GrowthBookSDKBuilderTests {
         ).setRefreshHandler { isRefreshed, _ ->
             refreshCalled = true
             refreshSuccess = isRefreshed
+            refreshLatch.countDown()
         }.initialize()
+
+        // Reset so the assertion specifically captures the refreshCache() round,
+        // not the init round (which also fires the handler).
+        refreshCalled = false
+        refreshLatch = CountDownLatch(1)
 
         growthBookSDK.refreshCache()
 
+        assertTrue(refreshLatch.await(2, TimeUnit.SECONDS), "refresh handler should fire on refreshCache")
         assertTrue(refreshCalled)
     }
 
