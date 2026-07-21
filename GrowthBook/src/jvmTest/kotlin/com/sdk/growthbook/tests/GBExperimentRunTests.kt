@@ -4,9 +4,14 @@ import kotlin.test.Test
 import kotlin.test.BeforeTest
 import kotlin.test.assertTrue
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonObject
+import com.sdk.growthbook.GBSDKBuilder
 import com.sdk.growthbook.integration.buildSDK
+import com.sdk.growthbook.stickybucket.GBStickyBucketServiceImp
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.serializable_model.gbDeserialize
@@ -175,7 +180,7 @@ class GBExperimentRunTests {
     }
 
     @Test
-    fun `forcing example`() {
+    fun `forcing example`() = runTest {
         val gb = buildSDK(
             json = "",
             attributes = mapOf("id" to 1.toGbNumber())
@@ -199,5 +204,49 @@ class GBExperimentRunTests {
         assertTrue(result2.inExperiment)
         assertEquals(result2.hashUsed, false)
         assertEquals(result2.value, GBNumber(0))
+    }
+
+    /**
+     * End-to-end check that a sticky assignment generated during run() is merged back into the
+     * shared context via [com.sdk.growthbook.evaluators.EvaluationContext.onStickyAssignmentChanged]
+     * — i.e. the production callback wiring works, not just the merge primitive in isolation. Guards
+     * against a regression where removing the old whole-map write-back would silently stop sticky
+     * assignments from persisting to the context.
+     */
+    @Test
+    fun stickyAssignmentGeneratedDuringRunIsMergedIntoContext() = runTest {
+        val service = GBStickyBucketServiceImp(
+            coroutineScope = this,
+            localStorage = MapCachingLayer(),
+        )
+        val gb = GBSDKBuilder(
+            "some_key",
+            "http://host.com",
+            attributes = mapOf("id" to 1.toGbNumber()),
+            remoteEval = false,
+            encryptionKey = "",
+            trackingCallback = { _, _ -> },
+            networkDispatcher = MockNetworkClient("", null),
+        )
+            .setStickyBucketService(service)
+            .setCoroutineContext(UnconfinedTestDispatcher(testScheduler))
+            .initialize()
+
+        // Nothing assigned before the first evaluation.
+        assertTrue(gb.getGBContext().stickyBucketAssignmentDocs.isNullOrEmpty())
+
+        val experiment = GBExperiment(
+            key = "key-576",
+            variations = listOf(GBNumber(0), GBNumber(1)),
+        )
+        val result = gb.run(experiment)
+        assertTrue(result.inExperiment)
+
+        // The assignment must now live in the shared context (merged per-key by the callback).
+        val docs = gb.getGBContext().stickyBucketAssignmentDocs
+        assertNotNull(docs)
+        val doc = docs["id||1"]
+        assertNotNull(doc)
+        assertTrue(doc.assignments.containsKey("key-576__0"))
     }
 }

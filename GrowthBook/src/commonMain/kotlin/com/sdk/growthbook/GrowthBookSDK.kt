@@ -36,10 +36,12 @@ import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.kotlinx.serialization.from
 import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.StackContext
-import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBucketsSync
+import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBuckets
 import kotlinx.coroutines.launch
+import kotlin.coroutines.CoroutineContext
 import kotlin.experimental.ExperimentalObjCRefinement
 import kotlin.native.HiddenFromObjC
+import kotlin.time.Duration.Companion.milliseconds
 
 typealias GBTrackingCallback = (GBExperiment, GBExperimentResult) -> Unit
 typealias GBFeatureUsageCallback = (featureKey: String, gbFeatureResult: GBFeatureResult) -> Unit
@@ -50,7 +52,7 @@ typealias GBExperimentRunCallback = (GBExperiment, GBExperimentResult) -> Unit
  * that takes a Context object in the constructor.
  * It exposes two main methods: feature and run.
  */
-class GrowthBookSDK(
+class GrowthBookSDK internal constructor(
     private val gbContext: GBContext,
     gbOptions: GBOptions,
     private val refreshHandler: GBCacheRefreshHandler?,
@@ -58,9 +60,41 @@ class GrowthBookSDK(
     features: GBFeatures? = null,
     savedGroups: Map<String, GBValue>? = null,
     cachingEnabled: Boolean,
+    // Internal seam only: the public way to set a cache freshness window is
+    // GBSDKBuilder.setCacheMaxAge(). Adding these to the public constructor would break binary
+    // compatibility, so the public constructor below preserves the pre-7.3.0 signature and
+    // delegates here.
+    private val cacheMaxAge: Long?,
+    // Dispatcher on which the fetched payload is processed (sticky-bucket refresh + feature
+    // application + refreshHandler invocation). Defaults to the platform IO dispatcher so that work
+    // runs on a defined background context rather than an arbitrary thread. Overridable (e.g. with a
+    // test dispatcher) so tests can drive the async pipeline deterministically.
+    coroutineContext: CoroutineContext,
 ) : FeaturesFlowDelegate, IGrowthBookSDK {
 
-    private var savedGroups: Map<String, GBValue>? = emptyMap()
+    /**
+     * Public constructor, kept binary-compatible with pre-7.3.0 releases. To set a cache
+     * freshness window, use [com.sdk.growthbook.GBSDKBuilder.setCacheMaxAge] instead.
+     */
+    constructor(
+        gbContext: GBContext,
+        gbOptions: GBOptions,
+        refreshHandler: GBCacheRefreshHandler?,
+        networkDispatcher: NetworkDispatcher,
+        features: GBFeatures? = null,
+        savedGroups: Map<String, GBValue>? = null,
+        cachingEnabled: Boolean,
+    ) : this(
+        gbContext = gbContext,
+        gbOptions = gbOptions,
+        refreshHandler = refreshHandler,
+        networkDispatcher = networkDispatcher,
+        features = features,
+        savedGroups = savedGroups,
+        cachingEnabled = cachingEnabled,
+        cacheMaxAge = null,
+        coroutineContext = PlatformDependentIODispatcher,
+    )
     private var forcedFeatures: Map<String, GBValue> = emptyMap()
     private var attributeOverrides: Map<String, GBValue> = emptyMap()
     private var remoteSourceFeaturesFetchResult: FeaturesFetchResult =
@@ -86,7 +120,9 @@ class GrowthBookSDK(
         ),
         encryptionKey = gbContext.encryptionKey,
         cachingEnabled = cachingEnabled,
+        cacheMaxAge = cacheMaxAge,
         cacheKey = "${Constants.FEATURE_CACHE}_${gbContext.apiKey}",
+        coroutineContext = coroutineContext,
     )
 
     init {
@@ -94,20 +130,29 @@ class GrowthBookSDK(
             gbContext.features = features
             hasFeaturesPayload = true
         } else {
-            refreshCache()
+            if (gbContext.remoteEval) {
+                refreshForRemoteEval()
+            } else {
+                featuresViewModel.fetchFeatures()
+            }
         }
-        this.savedGroups = savedGroups
+        savedGroups?.let { gbContext.savedGroups = it }
         refreshStickyBucketService()
     }
 
     /**
-     * Manually Refresh Cache
+     * Manually refreshes features from the network.
+     *
+     * This is an explicit refresh and always bypasses the cache freshness
+     * window set via [GBSDKBuilder.setCacheMaxAge]: it hits the network even
+     * if the cached features are still within their max age. In remote-eval
+     * mode it re-runs the remote evaluation instead.
      */
     fun refreshCache() {
         if (gbContext.remoteEval) {
             refreshForRemoteEval()
         } else {
-            featuresViewModel.fetchFeatures()
+            featuresViewModel.revalidate()
         }
     }
 
@@ -144,6 +189,16 @@ class GrowthBookSDK(
     /** Fully stops the SSE connection. */
     fun stopAutoRefreshFeatures() {
         featuresViewModel.sseController.stop()
+    }
+
+    /**
+     * Releases resources held by this SDK instance: stops any active SSE auto-refresh connection and
+     * cancels the background coroutine scope used to process fetched payloads. Call this when the
+     * instance is no longer needed (e.g. on logout, or before creating a replacement instance) to
+     * avoid leaking coroutines and threads. The instance must not be used after [close].
+     */
+    fun close() {
+        featuresViewModel.close()
     }
 
     /**
@@ -245,23 +300,40 @@ class GrowthBookSDK(
      * If a call is in progress, it waits for the result. If network
      * call failed, it tries to call again.
      *
+     * Known limitation (remote-eval): the internal retry uses the coalesced GET refresh
+     * ([FeaturesViewModel.awaitRefresh]), not the remote-eval POST. In remote-eval mode, if this is
+     * called while the initial remote-eval POST is still in flight or has failed, the retry issues a
+     * plain GET, so a GET that lands first can momentarily surface non-personalized (unevaluated)
+     * feature definitions until the POST completes and overwrites them. Routing the retry through the
+     * remote-eval path is deferred to a later release.
+     *
      * @returns a [GBFeatureResult] object
      */
     override suspend fun suspendFeature(id: String): GBFeatureResult {
-        return when (remoteSourceFeaturesFetchResult) {
-            FeaturesFetchResult.Success -> {
-                feature(id)
-            }
+        var attempt = 0
+        var delaysMs = INITIAL_RETRY_DELAY_MILLIS
 
-            FeaturesFetchResult.NoResultYet -> {
-                delay(TIME_FOR_CALL_WAIT_MILLIS)
-                suspendFeature(id)
-            }
+        while (true) {
+            when (remoteSourceFeaturesFetchResult) {
+                FeaturesFetchResult.Success -> return feature(id)
 
-            FeaturesFetchResult.Failed -> {
-                featuresViewModel.fetchFeatures()
-                delay(TIME_FOR_CALL_WAIT_MILLIS)
-                suspendFeature(id)
+                FeaturesFetchResult.NoResultYet -> {
+                    delay(TIME_FOR_CALL_WAIT_MILLIS.milliseconds)
+                    featuresViewModel.awaitRefresh()
+                }
+
+                FeaturesFetchResult.Failed -> {
+                    if (attempt >= MAX_RETRY_ATTEMPTS) return feature(id)
+                    featuresViewModel.awaitRefresh()
+
+                    if (remoteSourceFeaturesFetchResult != FeaturesFetchResult.Failed) continue
+                    if (gbContext.enableLogging) {
+                        GB.log("GrowthBookSDK: suspendFeature: retry attempt ${attempt + 1}/$MAX_RETRY_ATTEMPTS, waiting ${delaysMs}ms")
+                    }
+                    delay(delaysMs.milliseconds)
+                    delaysMs = minOf(delaysMs * 2, MAX_RETRY_DELAY_MILLIS)
+                    attempt++
+                }
             }
         }
     }
@@ -270,15 +342,20 @@ class GrowthBookSDK(
      * The feature method takes a single string argument,
      * which is the unique identifier for the feature and
      * @returns a [GBFeatureResult] object
+     *
+     * Best-effort, synchronous read of the currently loaded state: it evaluates against whatever
+     * features are in the context at call time. A remote payload is applied asynchronously (on the
+     * SDK's coroutineContext, IO by default), so a call made immediately after construction — before
+     * the first fetch completes — returns default/unknown values. To guarantee the fetched payload
+     * (and sticky-bucket assignments) are loaded before evaluating, use [suspendFeature] instead.
      */
     override fun feature(id: String): GBFeatureResult {
-        val evaluator = GBFeatureEvaluator(
-            createEvaluationContext(), this.forcedFeatures,
-        )
-        return evaluator.evaluateFeature(
-            featureKey = id,
-            attributeOverrides = attributeOverrides,
-        )
+        val evalContext = createEvaluationContext()
+        val evaluator = GBFeatureEvaluator(evalContext, this.forcedFeatures)
+        val result = evaluator.evaluateFeature(featureKey = id, attributeOverrides = attributeOverrides)
+        // Newly-generated sticky assignments are merged into the context per-key during evaluation
+        // (see EvaluationContext.onStickyAssignmentChanged) — no whole-map write-back needed here.
+        return result
     }
 
     /**
@@ -322,50 +399,56 @@ class GrowthBookSDK(
      * The run method takes an Experiment object and returns an ExperimentResult
      */
     override fun run(experiment: GBExperiment): GBExperimentResult {
+        val evalContext = createEvaluationContext()
         val evaluator = GBExperimentEvaluator(
-            createEvaluationContext()
+            evalContext
         )
         val result = evaluator.evaluateExperiment(
             experiment = experiment,
             attributeOverrides = attributeOverrides
         )
 
+        // Newly-generated sticky assignments are merged into the context per-key during evaluation
+        // (see EvaluationContext.onStickyAssignmentChanged) — no whole-map write-back needed here.
+
         fireSubscriptions(experiment, result)
         return result
     }
 
     /**
-     * The setAttributes method replaces the Map of user attributes
-     * that are used to assign variations
+     * Replaces the Map of user attributes used to assign variations.
+     *
+     * Sticky bucket refresh runs in the background (fire-and-forget).
+     * If you use Sticky Bucketing and need to evaluate experiments immediately
+     * after setting attributes, use [setAttributesSync] instead.
      */
     override fun setAttributes(attributes: Map<String, GBValue>) {
-        gbContext.attributes = attributes
+        // Single atomic update so a concurrent feature()/run() never sees the new attributes paired
+        // with the previous user's stale sticky docs (the docs are repopulated by the refresh below).
+        gbContext.setAttributesClearingStickyDocs(attributes)
         refreshStickyBucketService()
     }
 
     /**
-     * Synchronous version of setAttributes that waits for sticky buckets to load.
+     * Coroutine version of [setAttributes] that awaits sticky bucket refresh before returning.
      *
-     * Use this method when switching users, during login/logout, or any scenario
-     * where you need to ensure sticky bucket assignments are loaded before
-     * evaluating experiments.
+     * Note: despite the "Sync" suffix this is a suspend function — it does not block the thread.
+     * Use this when you use Sticky Bucketing and need to guarantee that assignments are loaded
+     * before evaluating experiments (e.g. after login or user switch).
      *
      * Example:
      * ```kotlin
      * lifecycleScope.launch {
      *     sdk.setAttributesSync(loginAttributes)
-     *     // Sticky buckets guaranteed to be loaded here
-     *     val result = sdk.feature("my-experiment")
+     *     val result = sdk.feature("my-experiment") // sticky buckets guaranteed
      * }
      * ```
-     *
-     * @param attributes The user attributes map
      */
     override suspend fun setAttributesSync(attributes: Map<String, GBValue>) {
         gbContext.attributes = attributes
 
         if (gbContext.stickyBucketService != null) {
-            refreshStickyBucketsSync(
+            refreshStickyBuckets(
                 context = gbContext,
                 data = null,
                 attributeOverrides = attributeOverrides
@@ -374,27 +457,31 @@ class GrowthBookSDK(
     }
 
     /**
-     * The setAttributeOverrides method replaces the Map of user overrides attribute
-     * that are used for Sticky Bucketing
+     * Replaces the Map of attribute overrides used for Sticky Bucketing.
+     *
+     * Sticky bucket refresh runs in the background (fire-and-forget).
+     * If you need to guarantee assignments are loaded before evaluating experiments,
+     * use [setAttributeOverridesSync] instead.
      */
     fun setAttributeOverrides(overrides: Map<String, GBValue>) {
         attributeOverrides = overrides
         if (gbContext.stickyBucketService != null) {
+            gbContext.stickyBucketAssignmentDocs = null
             refreshStickyBucketService()
         }
         refreshForRemoteEval()
     }
 
     /**
-     * Synchronous version of setAttributeOverrides that waits for sticky buckets to load.
+     * Coroutine version of [setAttributeOverrides] that awaits sticky bucket refresh before returning.
      *
-     * @param overrides The attribute overrides map
+     * Note: despite the "Sync" suffix this is a suspend function — it does not block the thread.
      */
     suspend fun setAttributeOverridesSync(overrides: Map<String, GBValue>) {
         attributeOverrides = overrides
 
         if (gbContext.stickyBucketService != null) {
-            refreshStickyBucketsSync(
+            refreshStickyBuckets(
                 context = gbContext,
                 data = null,
                 attributeOverrides = attributeOverrides
@@ -423,23 +510,36 @@ class GrowthBookSDK(
     }
 
     /**
-     * Delegate that call refresh Sticky Bucket Service
-     * after success fetched features
+     * Called after the full API payload is received, before features are applied to context.
+     * Awaits sticky bucket refresh so that context is consistent when featuresFetchedSuccessfully fires.
      */
-    override fun featuresAPIModelSuccessfully(model: FeaturesDataModel) {
-        refreshStickyBucketService(dataModel = model)
-    }
-
-    /**
-     * Method for update latest attributes
-     */
-    private fun refreshStickyBucketService(dataModel: FeaturesDataModel? = null) {
-        gbContext.stickyBucketService?.coroutineScope?.launch {
-            refreshStickyBucketsSync(
+    override suspend fun onPayloadReady(model: FeaturesDataModel) {
+        try {
+            refreshStickyBuckets(
                 context = gbContext,
-                data = dataModel,
+                data = model,
                 attributeOverrides = attributeOverrides
             )
+        } catch (e: Exception) {
+            if (gbContext.enableLogging) {
+                GB.error("GrowthBook: Failed to refresh sticky buckets on payload ready: ${e.message}", e)
+            }
+        }
+    }
+
+    private fun refreshStickyBucketService(dataModel: FeaturesDataModel? = null) {
+        gbContext.stickyBucketService?.coroutineScope?.launch {
+            try {
+                refreshStickyBuckets(
+                    context = gbContext,
+                    data = dataModel,
+                    attributeOverrides = attributeOverrides
+                )
+            } catch (e: Exception) {
+                if (gbContext.enableLogging) {
+                    GB.error("GrowthBook: Failed to refresh sticky bucket assignments: ${e.message}", e)
+                }
+            }
         }
     }
 
@@ -518,27 +618,41 @@ class GrowthBookSDK(
 
         // After this period of time a call status is checked again
         private const val TIME_FOR_CALL_WAIT_MILLIS = 1000L
+        private const val INITIAL_RETRY_DELAY_MILLIS = 1000L
+        private const val MAX_RETRY_DELAY_MILLIS = 60_000L
+        private const val MAX_RETRY_ATTEMPTS = 5
 
         private fun createEvaluationContext(
             gbContext: GBContext,
             gbExperimentHelper: GBExperimentHelper,
-        ) =
-            EvaluationContext(
+        ): EvaluationContext {
+            // One atomic read of the whole shared state: features, savedGroups, attributes and the
+            // sticky-bucket docs come from the SAME snapshot, so the evaluation can never observe a
+            // torn mix (e.g. new features with stale sticky docs).
+            val snapshot = gbContext.evalSnapshot()
+            return EvaluationContext(
                 enabled = gbContext.enabled,
-                features = gbContext.features,
-                savedGroups = gbContext.savedGroups,
+                features = snapshot.features,
+                savedGroups = snapshot.savedGroups,
                 gbExperimentHelper = gbExperimentHelper,
                 loggingEnabled = gbContext.enableLogging,
                 onFeatureUsage = gbContext.onFeatureUsage,
-                forcedVariations = gbContext.forcedVariations,
+                forcedVariations = snapshot.forcedVariations,
                 trackingCallback = gbContext.trackingCallback,
                 stickyBucketService = gbContext.stickyBucketService,
                 userContext = UserContext(
                     qaMode = gbContext.qaMode,
-                    attributes = gbContext.attributes,
-                    stickyBucketAssignmentDocs = gbContext.stickyBucketAssignmentDocs,
+                    attributes = snapshot.attributes,
+                    stickyBucketAssignmentDocs = snapshot.stickyBucketAssignmentDocs,
                 ),
+                // Merge each newly-generated sticky assignment back into the shared context by its
+                // single key, atomically — instead of writing the whole docs map back after
+                // evaluation (which could clobber a concurrent background refresh).
+                onStickyAssignmentChanged = { key, doc ->
+                    gbContext.mergeStickyAssignmentDoc(key, doc)
+                },
                 stackContext = StackContext(null, mutableSetOf())
             )
+        }
     }
 }
