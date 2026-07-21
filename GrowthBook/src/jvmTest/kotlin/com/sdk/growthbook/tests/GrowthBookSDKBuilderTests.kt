@@ -797,7 +797,7 @@ class GrowthBookSDKBuilderTests {
     }
 
     @Test
-    fun testSetCachingLayerPersistsFeaturesThroughCustomLayer() {
+    fun testSetCachingLayerPersistsFeaturesThroughCustomLayer() = runTest {
         val customLayer = FakeCachingLayer()
         GBSDKBuilder(
             testApiKey,
@@ -811,8 +811,11 @@ class GrowthBookSDKBuilderTests {
                 notModified = false
             ),
         )
+            .setCoroutineContext(UnconfinedTestDispatcher(testScheduler))
             .setCachingLayer(customLayer)
             .initialize()
+
+        testScheduler.advanceUntilIdle()
 
         assertTrue(customLayer.store.containsKey("FeatureCache_$testApiKey"))
     }

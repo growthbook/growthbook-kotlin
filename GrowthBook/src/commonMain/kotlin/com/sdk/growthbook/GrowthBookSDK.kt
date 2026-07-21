@@ -39,7 +39,6 @@ import com.sdk.growthbook.model.StackContext
 import com.sdk.growthbook.sandbox.CachingImpl
 import com.sdk.growthbook.sandbox.GBCachingLayer
 import com.sdk.growthbook.sandbox.GBCachingLayerAdapter
-import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBucketsSync
 import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBuckets
 import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
@@ -76,7 +75,7 @@ class GrowthBookSDK internal constructor(
     coroutineContext: CoroutineContext,
     // Internal seam only: the public way to plug a cache is GBSDKBuilder.setCachingLayer().
     // Adding this to the public constructor would break binary compatibility,
-    // so the public constructor below preserves the pre-7.3.0 signature and delegates here.
+    // so the public constructor below preserves the pre-7.4.0 signature and delegates here.
     cachingLayer: GBCachingLayer?
 ) : FeaturesFlowDelegate {
 
