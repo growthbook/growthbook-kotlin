@@ -8,6 +8,7 @@ import com.sdk.growthbook.utils.SSEConnectionController
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import kotlin.test.assertNotNull
@@ -23,7 +24,7 @@ class SSEEncryptedRefreshTests {
     private val attrs = mapOf("id" to GBString("user-1"))
 
     @Test
-    fun plainFetch_appliesFeatures() {
+    fun plainFetch_appliesFeatures() = runTest {
         val sdk = GBSDKBuilder(
             apiKey,
             host,
@@ -34,13 +35,13 @@ class SSEEncryptedRefreshTests {
                 MockResponse.successResponse, null
             ),
             remoteEval = false
-        ).initialize()
+        ).setCoroutineContext(UnconfinedTestDispatcher(testScheduler)).initialize()
 
         assertTrue(sdk.getFeatures().contains("onboarding"))
     }
 
     @Test
-    fun encryptedFetch_appliesDecryptedFeatures() {
+    fun encryptedFetch_appliesDecryptedFeatures() = runTest {
         val sdk = GBSDKBuilder(
             apiKey,
             host,
@@ -49,7 +50,7 @@ class SSEEncryptedRefreshTests {
             trackingCallback = { _, _ -> },
             networkDispatcher = MockNetworkClient(encPayload, null),
             remoteEval = false
-        ).initialize()
+        ).setCoroutineContext(UnconfinedTestDispatcher(testScheduler)).initialize()
 
         assertTrue(sdk.getFeatures().contains("testfeature1"))
     }

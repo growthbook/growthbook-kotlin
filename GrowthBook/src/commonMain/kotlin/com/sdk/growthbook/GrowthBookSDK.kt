@@ -39,8 +39,6 @@ import com.sdk.growthbook.model.StackContext
 import com.sdk.growthbook.utils.GBFeaturesChangeHandler
 import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBuckets
 import com.sdk.growthbook.model.diffFeatures
-import com.sdk.growthbook.utils.GBFeaturesChangeHandler
-import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBucketsSync
 import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
 import kotlin.experimental.ExperimentalObjCRefinement

@@ -19,6 +19,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
@@ -137,10 +138,22 @@ internal class FeaturesViewModel(
     /** Opens an SSE connection and streams feature updates as a [Flow]. */
     fun autoRefreshFeatures(): Flow<Resource<GBFeatures?>> {
         sseController.start()
-        return dataSource.autoRefresh(
-            success = { coroutineScope.launch { handleNetworkModel(it) } },
-            failure = { delegate.featuresFetchFailed(GBError(it), isRemote = true) }
-        )
+        return dataSource.autoRefreshRaw().transform { resource ->
+            when (resource) {
+                is Resource.Error -> {
+                    emit(resource)
+                    delegate.featuresFetchFailed(GBError(resource.exception), true)
+                }
+                is Resource.Success -> {
+                    // Emit from the same FetchOutcome the pipeline already dispatched to the
+                    // delegate, so the flow never re-derives success/failure or decodes twice.
+                    when (val outcome = handleNetworkModel(resource.data)) {
+                        is FetchOutcome.Ready -> emit(Resource.Success(outcome.payload.features))
+                        else -> emit(Resource.Error(Exception("Failed to decode features payload")))
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -279,8 +292,14 @@ internal class FeaturesViewModel(
         )
     }
 
-    private suspend fun handleNetworkModel(model: FeaturesDataModel) {
-        try {
+    /**
+     * Applies a freshly fetched payload: decode/decrypt, refresh sticky buckets, persist to cache,
+     * then dispatch the resulting [FetchOutcome] to [delegate]. Returns that same outcome so the
+     * SSE [autoRefreshFeatures] flow can emit from the single authoritative verdict instead of
+     * decoding a second time or re-deriving success/failure of its own.
+     */
+    private suspend fun handleNetworkModel(model: FeaturesDataModel): FetchOutcome {
+        return try {
             // Decode/decrypt the payload BEFORE the sticky-bucket refresh, mirroring the reference
             // TS SDK (decryptPayload -> refreshStickyBuckets). For an encrypted payload the raw
             // model has features == null, so deriveStickyBucketIdentifierAttributes would fall back
@@ -305,19 +324,14 @@ internal class FeaturesViewModel(
                     }
             }
 
-            dispatch(
-                outcome = outcomeOf(
-                    payload = decoded,
-                    source = Source.NETWORK
-                )
-            )
+            outcomeOf(payload = decoded, source = Source.NETWORK).also { dispatch(it) }
         } catch (error: Throwable) {
             GB.error(
                 errorMessage = "FeaturesViewModel: failed to process remote features payload",
                 throwable = error
             )
 
-            delegate.featuresFetchFailed(error = GBError(error), isRemote = true)
+            FetchOutcome.Failed(GBError(error), source = Source.NETWORK).also { dispatch(it) }
         }
     }
 
