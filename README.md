@@ -202,31 +202,20 @@ and returns a feature value typed with specified type.
 - stop receiving Features automatically during SSE connection
 
   ```kotlin
-  fun stopAutoRefreshFeatures(): Flow<Resource<GBFeatures?>>{}
+  fun stopAutoRefreshFeatures() {}
   ```
 
 - set a handler to be notified about only the feature flags that changed on a refresh
   (SSE / network), instead of reacting to the whole feature set — useful to avoid
   invalidating an external cache for unrelated flags. The handler fires after features
-  are applied, only when something changed; the first call after init reports the whole
-  payload as `added`.
+  are applied, only on an authoritative result and only when something changed; it does
+  not fire for the non-authoritative cached payload served before a network refresh. When
+  no features were applied yet, the first call reports the whole set as `added`.
 
   ```kotlin
   fun setFeaturesChangeHandler(handler: GBFeaturesChangeHandler): GBSDKBuilder
   // GBFeaturesChangeHandler = (GBFeaturesDiff) -> Unit
   // GBFeaturesDiff(added, removed, changed) + hasChanges / changedKeys
-  ```
-
-- Delegate that set to Context successfully fetched features
-
-  ```kotlin
-  fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {}
-  ```
-
-- Delegate which inform that fetching features failed
-
-  ```kotlin
-  fun featuresFetchFailed(error: GBError, isRemote: Boolean) {}
   ```
 
 - The isOn method takes a single string argument, which is the unique identifier for the feature and returns the feature

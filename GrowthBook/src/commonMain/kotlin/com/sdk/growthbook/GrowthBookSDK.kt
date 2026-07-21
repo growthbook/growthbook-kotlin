@@ -215,7 +215,13 @@ class GrowthBookSDK internal constructor(
      * Delegate that set to Context successfully fetched features
      */
     override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
-        val diff = featuresChangeHandler?.let { diffFeatures(gbContext.features, features) }
+        // Compute the diff only for authoritative results (network / SSE / fresh cache), against the
+        // features currently applied. The non-authoritative cache pre-load that precedes a network
+        // refresh must not notify, otherwise the handler double-fires on a warm start (cache, then
+        // network); the subsequent authoritative result reports the real delta.
+        val diff = if (isRemote) {
+            featuresChangeHandler?.let { diffFeatures(gbContext.features, features) }
+        } else null
 
         gbContext.features = features
         hasFeaturesPayload = true

@@ -145,9 +145,13 @@ internal class FeaturesViewModel(
                     delegate.featuresFetchFailed(GBError(resource.exception), true)
                 }
                 is Resource.Success -> {
-                    // Emit from the same FetchOutcome the pipeline already dispatched to the
-                    // delegate, so the flow never re-derives success/failure or decodes twice.
-                    when (val outcome = handleNetworkModel(resource.data)) {
+                    // Process the payload on coroutineScope (platform IO) like the network GET /
+                    // remote-eval paths, so decode + sticky-bucket refresh + feature application
+                    // never run on the collector's thread (e.g. Dispatchers.Main) and are torn down
+                    // by close(). await() resumes on the collector coroutine, so emit stays
+                    // flow-safe, and we still emit the same FetchOutcome the pipeline dispatched.
+                    val outcome = coroutineScope.async { handleNetworkModel(resource.data) }.await()
+                    when (outcome) {
                         is FetchOutcome.Ready -> emit(Resource.Success(outcome.payload.features))
                         else -> emit(Resource.Error(Exception("Failed to decode features payload")))
                     }
