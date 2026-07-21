@@ -8,6 +8,7 @@ import com.sdk.growthbook.features.FeaturesDataSource
 import com.sdk.growthbook.features.FeaturesFlowDelegate
 import com.sdk.growthbook.features.FeaturesViewModel
 import com.sdk.growthbook.features.FetchResult
+import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBOptions
@@ -26,7 +27,9 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -165,6 +168,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 ),
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = false,
+            remoteEval = true,
             coroutineContext = UnconfinedTestDispatcher(testScheduler),
         )
         val forcedFeature = mapOf("feature" to GBNumber(123))
@@ -176,7 +180,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             forcedVariations = forcedVariation,
         )
 
-        viewModel.fetchFeatures(remoteEval = true, payload = payload)
+        viewModel.fetchFeatures(payload = payload)
         assertTrue(isSuccess)
         assertTrue(!isError)
         assertTrue(hasFeatures)
@@ -199,6 +203,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 ),
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = false,
+            remoteEval = true,
             coroutineContext = UnconfinedTestDispatcher(testScheduler),
         )
         val forcedFeature = mapOf("feature" to GBNumber(123))
@@ -210,11 +215,170 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             forcedVariations = forcedVariation
         )
 
-        viewModel.fetchFeatures(remoteEval = true, payload = payload)
+        viewModel.fetchFeatures(payload = payload)
 
         assertTrue(!isSuccess)
         assertTrue(isError)
         assertTrue(!hasFeatures)
+    }
+
+    @Test
+    fun testRemoteEvalPostBodyEncodesNativeValuesAndForcedFeaturesArray() = runTest {
+        // Regression: the remote-eval POST body must carry real JSON, not GBValue.toString().
+        //   - attributes: GBNumber(8490047) -> 8490047 (NOT the string "GBNumber(value=8490047)")
+        //   - forcedFeatures: an array of [key, value] pairs (mirroring sdk-js), NOT a JSON object,
+        //     otherwise the GrowthBook proxy rejects the request with 400 Bad Request.
+        val client = CapturingPostNetworkClient(MockResponse.successResponse)
+        val payload = GBRemoteEvalParams(
+            attributes = mapOf(
+                "user_id" to GBNumber(8490047),
+                "os_platform" to GBString("Android"),
+            ),
+            forcedFeatures = mapOf("demo-forced-flag" to GBBoolean(true)),
+            forcedVariations = emptyMap(),
+        )
+        val viewModel = FeaturesViewModel(
+            delegate = this@FeaturesViewModelTests,
+            dataSource = FeaturesDataSource(client, gbContext, testGbOptions),
+            cachingEnabled = false,
+            remoteEval = true,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
+        )
+
+        viewModel.fetchFeatures(payload = payload)
+
+        val body = assertNotNull(client.lastBodyParams)
+
+        @Suppress("UNCHECKED_CAST")
+        val attrs = body["attributes"] as Map<String, Any?>
+        // Real JSON primitives — never the GBValue.toString() fallback.
+        assertEquals(JsonPrimitive(8490047), attrs["user_id"])
+        assertEquals(JsonPrimitive("Android"), attrs["os_platform"])
+
+        val forced = body["forcedFeatures"]
+        assertTrue(forced is JsonArray, "forcedFeatures must be a JsonArray, was ${forced?.let { it::class }}")
+        assertEquals(1, forced.size)
+        val pair = forced[0]
+        assertTrue(pair is JsonArray, "each forcedFeatures entry must be a [key, value] JsonArray")
+        assertEquals(JsonPrimitive("demo-forced-flag"), pair[0])
+        assertEquals(JsonPrimitive(true), pair[1])
+    }
+
+    @Test
+    fun testAwaitRefreshUsesRemoteEvalPostWhenRemoteEval() = runTest {
+        // #8: in remote-eval mode the coalesced retry (awaitRefresh, driven by suspendFeature)
+        // must issue a remote-eval POST, never a bare GET that could surface unevaluated features.
+        val client = CountingPostNetworkClient(MockResponse.successResponse)
+        val payload = GBRemoteEvalParams(
+            attributes = mapOf("id" to "1"),
+            forcedFeatures = emptyMap(),
+            forcedVariations = emptyMap(),
+        )
+        val viewModel = FeaturesViewModel(
+            delegate = this@FeaturesViewModelTests,
+            dataSource = FeaturesDataSource(client, gbContext, testGbOptions),
+            cachingEnabled = false,
+            remoteEval = true,
+            remoteEvalPayloadProvider = { payload },
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
+        )
+
+        val result = viewModel.awaitRefresh()
+
+        assertEquals(FetchResult.Success, result)
+        assertEquals(1, client.postCount)
+        assertEquals(0, client.getCount)
+        assertTrue(isSuccess)
+        assertTrue(hasFeatures)
+    }
+
+    @Test
+    fun testAwaitRefreshUsesGetWhenNotRemoteEval() = runTest {
+        val client = CountingPostNetworkClient(MockResponse.successResponse)
+        val viewModel = FeaturesViewModel(
+            delegate = this@FeaturesViewModelTests,
+            dataSource = FeaturesDataSource(client, gbContext, testGbOptions),
+            cachingEnabled = false,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
+        )
+
+        val result = viewModel.awaitRefresh()
+
+        assertEquals(FetchResult.Success, result)
+        assertEquals(0, client.postCount)
+        assertEquals(1, client.getCount)
+    }
+
+    @Test
+    fun testRemoteEvalOutOfOrderResponseIsDiscarded() = runTest {
+        // #2: two remote-eval POSTs are in flight; the OLDER one completing last must NOT overwrite
+        // the newer one's evaluated features (generation guard).
+        val client = DeferredPostNetworkClient()
+        var appliedFeatures: GBFeatures? = null
+        val delegate = object : FeaturesFlowDelegate {
+            override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
+                appliedFeatures = features
+            }
+            override suspend fun onPayloadReady(model: FeaturesDataModel) = Unit
+            override fun featuresFetchFailed(error: GBError, isRemote: Boolean) = Unit
+            override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) = Unit
+            override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) = Unit
+            override fun featuresNotModified() = Unit
+        }
+        val viewModel = FeaturesViewModel(
+            delegate = delegate,
+            dataSource = FeaturesDataSource(client, gbContext, testGbOptions),
+            cachingEnabled = false,
+            remoteEval = true,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
+        )
+        val respOld = """{"status":200,"features":{"old_feature":{"defaultValue":true}}}"""
+        val respNew = """{"status":200,"features":{"new_feature":{"defaultValue":true}}}"""
+
+        viewModel.fetchFeatures() // generation 1 (older)
+        viewModel.fetchFeatures() // generation 2 (newer)
+        assertEquals(2, client.pendingPosts.size)
+
+        // Respond newest first, then the stale older one arrives late.
+        client.pendingPosts[1](respNew)
+        client.pendingPosts[0](respOld)
+
+        assertNotNull(appliedFeatures)
+        assertTrue(
+            appliedFeatures!!.containsKey("new_feature"),
+            "the newest remote-eval response must be applied"
+        )
+        assertTrue(
+            !appliedFeatures!!.containsKey("old_feature"),
+            "a stale older remote-eval response must be discarded, not applied last"
+        )
+    }
+
+    @Test
+    fun testSynchronousDispatcherThrowIsReportedAsFailure() = runTest {
+        // #3: a dispatcher that throws synchronously while enqueuing must be reported as a fetch
+        // failure — not swallowed by the coroutine machinery, and not rethrown into the caller.
+        var failed = false
+        val delegate = object : FeaturesFlowDelegate {
+            override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) = Unit
+            override suspend fun onPayloadReady(model: FeaturesDataModel) = Unit
+            override fun featuresFetchFailed(error: GBError, isRemote: Boolean) { failed = true }
+            override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) = Unit
+            override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) = Unit
+            override fun featuresNotModified() = Unit
+        }
+        val viewModel = FeaturesViewModel(
+            delegate = delegate,
+            dataSource = FeaturesDataSource(SynchronouslyThrowingNetworkClient(), gbContext, testGbOptions),
+            cachingEnabled = false,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
+        )
+
+        // Must return (not throw) and surface the error through the delegate.
+        val result = viewModel.awaitRefresh()
+
+        assertEquals(FetchResult.Failed, result)
+        assertTrue(failed, "a synchronous dispatcher throw must be reported via featuresFetchFailed")
     }
 
     @Test

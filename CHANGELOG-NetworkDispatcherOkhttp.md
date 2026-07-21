@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.9] - Unreleased
+
+### Fixed
+- `Map`/`List.toJsonElement()` now pass an already-serialized `JsonElement` through
+  untouched (branch added before `Map`/`List`, since `JsonObject`/`JsonArray` are
+  themselves `Map`/`List`), so pre-encoded POST-body values are no longer re-stringified
+  and double-quoted.
+
+---
+
 ## [1.0.8] - 2026-04-23
 
 ### Add

@@ -26,7 +26,6 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.ByteReadChannel
-import io.ktor.utils.io.core.use
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.awaitClose
@@ -314,35 +313,36 @@ class GBNetworkDispatcherKtor(
         onError: (Throwable) -> Unit
     ) {
         CoroutineScope(PlatformDependentIODispatcher).launch {
-            client.use { okHttpClient ->
-                try {
-                    val response = okHttpClient.post(url) {
-                        headers {
-                            append("Content-Type", "application/json")
-                            append("Accept", "application/json")
-                        }
-                        contentType(ContentType.Application.Json)
-                        setBody(bodyParams.toJsonElement())
-                        if (enableLogging) {
-                            println("body = $body")
-                        }
+            // Do NOT wrap in `client.use { }`: `client` is the shared, long-lived instance reused
+            // for every GET/POST/SSE. `.use` closes it after the first POST, breaking all later
+            // requests and the SSE stream. Matches the GET path, which also reuses `client`.
+            try {
+                val response = client.post(url) {
+                    headers {
+                        append("Content-Type", "application/json")
+                        append("Accept", "application/json")
                     }
-                    if (response.status.value in 200..299) {
-                        onSuccess(response.body())
-                    } else {
-                        onError(
-                            Exception(
-                                "Response not successful status code is : ${response.status.value} " +
-                                    "and description : ${response.status.description}"
-                            )
-                        )
-                    }
-                } catch (e: Exception) {
+                    contentType(ContentType.Application.Json)
+                    setBody(bodyParams.toJsonElement())
                     if (enableLogging) {
-                        println("exception $e")
+                        println("body = $body")
                     }
-                    onError(e)
                 }
+                if (response.status.value in 200..299) {
+                    onSuccess(response.body())
+                } else {
+                    onError(
+                        Exception(
+                            "Response not successful status code is : ${response.status.value} " +
+                                "and description : ${response.status.description}"
+                        )
+                    )
+                }
+            } catch (e: Exception) {
+                if (enableLogging) {
+                    println("exception $e")
+                }
+                onError(e)
             }
         }
     }
@@ -368,6 +368,10 @@ internal fun Map<*, *>.toJsonElement(): JsonElement {
         val key = it.key as? String ?: return@forEach
         val value = it.value ?: return@forEach
         map[key] = when (value) {
+            // Pass already-serialized JsonElement through untouched. Must precede the Map/List
+            // branches: JsonObject is a Map and JsonArray is a List, so those branches would
+            // otherwise re-encode their JsonPrimitive contents via toString() and double-quote them.
+            is JsonElement -> value
             is Map<*, *> -> (value).toJsonElement()
             is List<*> -> value.toJsonElement()
             is Boolean -> JsonPrimitive(value)
@@ -383,6 +387,7 @@ internal fun List<*>.toJsonElement(): JsonElement {
     this.forEach {
         val value = it ?: return@forEach
         when (value) {
+            is JsonElement -> list.add(value)
             is Map<*, *> -> list.add((value).toJsonElement())
             is List<*> -> list.add(value.toJsonElement())
             is Boolean -> list.add(JsonPrimitive(value))
