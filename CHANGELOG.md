@@ -6,6 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [7.3.0] - 2026-07-20
+
+### Added
+- `GBSDKBuilder.setCacheMaxAge()` — configurable cache freshness window; while the
+  cache is younger than the given age, the next fetch is served from cache and the
+  network call is skipped, provided the cached payload actually decodes to usable
+  features/savedGroups — a fresh but empty/undecodable cache falls through to the
+  network instead. `refreshCache()` always bypasses this window.
+- `GrowthBookSDK.close()` — releases the instance's resources (stops any active SSE connection and cancels the background coroutine scope that processes fetched payloads). Call it when the SDK instance is no longer needed (e.g. on logout or before replacing it) to avoid leaking coroutines across repeated initializations
+
+### Fixed
+- Sticky-bucket race condition: evaluation could observe a torn mix of state (e.g. freshly fetched features together with stale sticky-bucket assignment docs) when a background refresh ran concurrently with `feature()`/`run()`. All cross-thread evaluation inputs (`features`, `attributes`, `forcedVariations`, `stickyBucketAssignmentDocs`, `stickyBucketIdentifierAttributes`, `savedGroups`) are now published together as a single immutable snapshot behind an atomic reference, so every evaluation reads one consistent view
+- Sticky-bucket assignments generated during evaluation are now merged back into the context one key at a time (atomically) instead of writing the whole docs map back after `feature()`/`run()`. The previous whole-map write-back could overwrite assignments produced by a concurrent background refresh
+- `savedGroups` passed to the `GrowthBookSDK` constructor were written to an unused private field and never reached evaluation; they are now stored on the context
+- Encrypted feature payloads now decode before the sticky-bucket refresh, so sticky-bucket identifier attributes derive from the real features instead of an empty set on the first fetch (which could re-bucket users)
+
+### Changed
+- `suspendFeature()` now retries failed fetches with exponential backoff (capped)
+  instead of an unbounded recursive loop, preventing DNS request flooding when the
+  network is unavailable (#236). A hung network round (a dispatcher that connects but
+  never responds) now times out after 30s and is treated as a failed attempt, so
+  `suspendFeature()` can no longer hang indefinitely.
+- Concurrent feature refreshes are now coalesced into a single shared in-flight
+  request, so N parallel `suspendFeature()` callers no longer trigger N network
+  fetches.
+- The fetched payload (sticky-bucket refresh + feature application + `refreshHandler` invocation) is now processed on a defined background dispatcher (platform IO) instead of an arbitrary continuation thread. The `refreshHandler` callback is therefore invoked on a background thread — marshal back to your UI thread yourself if it touches UI state
+
+### Breaking
+- `GBContext` is no longer a `data class`. The compiler-generated `copy()`, `equals()`, `hashCode()` and `componentN()` (destructuring) members are no longer available. The primary constructor signature and all property accessors are unchanged, so normal construction and field access are unaffected
+
+---
 
 ## [7.3.0] - 2026-07-15
 
