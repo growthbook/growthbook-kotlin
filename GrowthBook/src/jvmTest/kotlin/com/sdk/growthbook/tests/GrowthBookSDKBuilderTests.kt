@@ -15,10 +15,14 @@ import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.toGbBoolean
 import com.sdk.growthbook.stickybucket.GBStickyBucketServiceImp
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -100,7 +104,7 @@ class GrowthBookSDKBuilderTests {
     }
 
     @Test
-    fun testSDKInitilizationData() {
+    fun testSDKInitilizationData() = runTest {
 
         val variations: HashMap<String, Int> = HashMap()
 
@@ -112,7 +116,7 @@ class GrowthBookSDKBuilderTests {
             trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = false
-        ).setRefreshHandler { isRefreshed, gbError ->
+        ).setCoroutineContext(UnconfinedTestDispatcher(testScheduler)).setRefreshHandler { isRefreshed, gbError ->
 
         }
             .setEnabled(false).setForcedVariations(variations).setQAMode(true).initialize()
@@ -124,9 +128,13 @@ class GrowthBookSDKBuilderTests {
     }
 
     @Test
-    fun testSDKRefreshHandler() {
+    fun testSDKRefreshHandler() = runTest {
 
         var isRefreshed = false
+        // refreshCache() revalidates on a background scope, so wait on the
+        // refresh handler signal (deterministic, no sleeps) rather than reading
+        // the flag synchronously.
+        var refreshLatch = CountDownLatch(1)
 
         val sdkInstance = GBSDKBuilder(
             testApiKey,
@@ -136,16 +144,19 @@ class GrowthBookSDKBuilderTests {
             trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = false
-        ).setRefreshHandler { _, gbError ->
+        ).setCoroutineContext(UnconfinedTestDispatcher(testScheduler)).setRefreshHandler { _, gbError ->
             isRefreshed = true
+            refreshLatch.countDown()
         }.initialize()
 
+        assertTrue(refreshLatch.await(2, TimeUnit.SECONDS), "refresh handler should fire on init")
         assertTrue(isRefreshed)
 
         isRefreshed = false
+        refreshLatch = CountDownLatch(1)
 
         sdkInstance.refreshCache()
-
+        assertTrue(refreshLatch.await(2, TimeUnit.SECONDS), "refresh handler should fire on refreshCache")
         assertTrue(isRefreshed)
     }
 
@@ -153,6 +164,7 @@ class GrowthBookSDKBuilderTests {
     fun testSDKRefreshHandlerCalledOn304NotModified() {
         var refreshCalled = false
         var refreshSuccess: Boolean? = null
+        var refreshLatch = CountDownLatch(1)
 
         val growthBookSDK = GBSDKBuilder(
             testApiKey,
@@ -169,15 +181,22 @@ class GrowthBookSDKBuilderTests {
         ).setRefreshHandler { isRefreshed, _ ->
             refreshCalled = true
             refreshSuccess = isRefreshed
+            refreshLatch.countDown()
         }.initialize()
+
+        // Reset so the assertion specifically captures the refreshCache() round,
+        // not the init round (which also fires the handler).
+        refreshCalled = false
+        refreshLatch = CountDownLatch(1)
 
         growthBookSDK.refreshCache()
 
+        assertTrue(refreshLatch.await(2, TimeUnit.SECONDS), "refresh handler should fire on refreshCache")
         assertTrue(refreshCalled)
     }
 
     @Test
-    fun testSDKFeaturesData() {
+    fun testSDKFeaturesData() = runTest {
 
         var isRefreshed = false
         val gbError = GBError(error = null)
@@ -191,7 +210,7 @@ class GrowthBookSDKBuilderTests {
             trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = false
-        ).setRefreshHandler { _, gbError ->
+        ).setCoroutineContext(UnconfinedTestDispatcher(testScheduler)).setRefreshHandler { _, gbError ->
             isRefreshed = true
         }.initialize()
 
@@ -202,7 +221,7 @@ class GrowthBookSDKBuilderTests {
     }
 
     @Test
-    fun testSDKRunMethods() {
+    fun testSDKRunMethods() = runTest {
 
         val sdkInstance = GBSDKBuilder(
             testApiKey,
@@ -212,7 +231,7 @@ class GrowthBookSDKBuilderTests {
             trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = false
-        ).setRefreshHandler { isRefreshed, gbError ->
+        ).setCoroutineContext(UnconfinedTestDispatcher(testScheduler)).setRefreshHandler { isRefreshed, gbError ->
         }.initialize()
 
         val featureValue = sdkInstance.feature("fwrfewrfe")
@@ -223,7 +242,7 @@ class GrowthBookSDKBuilderTests {
     }
 
     @Test
-    fun testSDKInitializationDataWithEncrypted() {
+    fun testSDKInitializationDataWithEncrypted() = runTest {
         // val viewModel: FeaturesViewModel()
         val variations: HashMap<String, Int> = HashMap()
 
@@ -238,7 +257,7 @@ class GrowthBookSDKBuilderTests {
     }
 
     @Test
-    fun test_setPrefixForStickyBucketCachedDirectory_Ok() {
+    fun test_setPrefixForStickyBucketCachedDirectory_Ok() = runTest {
         val sdkInstance = GBSDKBuilder(
             testApiKey,
             testHostURL,
@@ -247,7 +266,7 @@ class GrowthBookSDKBuilderTests {
             trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = false
-        ).setPrefixForStickyBucketCachedDirectory(
+        ).setCoroutineContext(UnconfinedTestDispatcher(testScheduler)).setPrefixForStickyBucketCachedDirectory(
             coroutineScope = TestScope(), prefix = "test_prefix",
         ).initialize()
 
@@ -256,7 +275,7 @@ class GrowthBookSDKBuilderTests {
     }
 
     @Test
-    fun test_setStickyBucketService_Ok() {
+    fun test_setStickyBucketService_Ok() = runTest {
         val sdkInstance = GBSDKBuilder(
             testApiKey,
             testHostURL,
@@ -265,7 +284,7 @@ class GrowthBookSDKBuilderTests {
             trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = false
-        ).setStickyBucketService(TestScope())
+        ).setCoroutineContext(UnconfinedTestDispatcher(testScheduler)).setStickyBucketService(TestScope())
             .initialize()
 
         assertTrue { sdkInstance.getGBContext().stickyBucketService != null }
@@ -273,7 +292,7 @@ class GrowthBookSDKBuilderTests {
     }
 
     @Test
-    fun test_setForcedVariations_Ok() {
+    fun test_setForcedVariations_Ok() = runTest {
         val expectedForcedVariation = mapOf("user" to 1234)
         val sdkInstance = GBSDKBuilder(
             testApiKey,
@@ -283,7 +302,7 @@ class GrowthBookSDKBuilderTests {
             trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = false
-        ).setForcedVariations(expectedForcedVariation)
+        ).setCoroutineContext(UnconfinedTestDispatcher(testScheduler)).setForcedVariations(expectedForcedVariation)
             .initialize()
 
         val actualForcedVariation = sdkInstance.getGBContext().forcedVariations
@@ -293,7 +312,7 @@ class GrowthBookSDKBuilderTests {
     }
 
     @Test
-    fun test_setForcedVariationsWithRemoteEval_Ok() {
+    fun test_setForcedVariationsWithRemoteEval_Ok() = runTest {
         val expectedForcedVariation = mapOf("user" to 1234)
         val sdkInstance = GBSDKBuilder(
             testApiKey,
@@ -303,7 +322,7 @@ class GrowthBookSDKBuilderTests {
             trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = true
-        ).setForcedVariations(expectedForcedVariation)
+        ).setCoroutineContext(UnconfinedTestDispatcher(testScheduler)).setForcedVariations(expectedForcedVariation)
             .initialize()
         sdkInstance.setForcedFeatures(
             mapOf("featureForce" to GBNumber(112))
@@ -317,7 +336,7 @@ class GrowthBookSDKBuilderTests {
     }
 
     @Test
-    fun test_setAttributesOverrides_Ok() {
+    fun test_setAttributesOverrides_Ok() = runTest {
         val expectedAttributes = mapOf("user" to false.toGbBoolean())
         val sdkInstance = GBSDKBuilder(
             testApiKey,
@@ -328,6 +347,7 @@ class GrowthBookSDKBuilderTests {
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = false
         )
+            .setCoroutineContext(UnconfinedTestDispatcher(testScheduler))
             .initialize()
 
         sdkInstance.setAttributeOverrides(expectedAttributes)
@@ -339,7 +359,7 @@ class GrowthBookSDKBuilderTests {
     }
 
     @Test
-    fun test_setAttributesOverridesWithStickyBucketing_Ok() {
+    fun test_setAttributesOverridesWithStickyBucketing_Ok() = runTest {
         val expectedAttributes = mapOf("user" to GBBoolean(false))
         val sdkInstance = GBSDKBuilder(
             testApiKey,
@@ -349,7 +369,7 @@ class GrowthBookSDKBuilderTests {
             trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = true
-        ).setStickyBucketService(GBStickyBucketServiceImp(TestScope()))
+        ).setCoroutineContext(UnconfinedTestDispatcher(testScheduler)).setStickyBucketService(GBStickyBucketServiceImp(TestScope()))
             .initialize()
 
         sdkInstance.setAttributeOverrides(expectedAttributes)
@@ -412,7 +432,7 @@ class GrowthBookSDKBuilderTests {
         }
 
     @Test
-    fun test_savedGroupsFetchFailed_isRemoteTrue_callsRefreshHandlerWithFalse() {
+    fun test_savedGroupsFetchFailed_isRemoteTrue_callsRefreshHandlerWithFalse() = runTest {
         var handlerSuccess: Boolean? = null
         val sdk = buildSdkWithHandler(refreshHandler = { success, _ -> handlerSuccess = success })
 
@@ -422,7 +442,7 @@ class GrowthBookSDKBuilderTests {
     }
 
     @Test
-    fun test_savedGroupsFetchFailed_isRemoteFalse_doesNotCallRefreshHandler() {
+    fun test_savedGroupsFetchFailed_isRemoteFalse_doesNotCallRefreshHandler() = runTest {
         var handlerCallCount = 0
         val sdk = buildSdkWithHandler(refreshHandler = { _, _ -> handlerCallCount++ })
         val countAfterInit = handlerCallCount
@@ -433,7 +453,32 @@ class GrowthBookSDKBuilderTests {
     }
 
     @Test
-    fun test_savedGroupsFetchFailed_passesErrorToHandler() {
+    fun test_close_cancelsScope_soSubsequentRemoteFetchDoesNotRun() = runTest {
+        var handlerCallCount = 0
+        val sdk = buildSdkWithHandler(refreshHandler = { _, _ -> handlerCallCount++ })
+        // initialize() ran one successful remote fetch, so the handler fired at least once.
+        val countAfterInit = handlerCallCount
+        assertTrue(countAfterInit > 0)
+
+        sdk.close()
+
+        // After close() the background scope is cancelled, so the payload-processing coroutine
+        // launched by a remote fetch never runs and the (isRemote=true) handler is not invoked again.
+        sdk.refreshCache()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(countAfterInit, handlerCallCount)
+    }
+
+    @Test
+    fun test_close_isIdempotent() = runTest {
+        val sdk = buildSdkWithHandler()
+        sdk.close()
+        sdk.close() // must not throw
+    }
+
+    @Test
+    fun test_savedGroupsFetchFailed_passesErrorToHandler() = runTest {
         val expectedError = GBError(error = RuntimeException("network failure"))
         var receivedError: GBError? = null
         val sdk = buildSdkWithHandler(refreshHandler = { _, error -> receivedError = error })
@@ -444,7 +489,7 @@ class GrowthBookSDKBuilderTests {
     }
 
     @Test
-    fun test_savedGroupsFetchedSuccessfully_updatesSavedGroups() {
+    fun test_savedGroupsFetchedSuccessfully_updatesSavedGroups() = runTest {
         val sdk = buildSdkWithHandler()
         val jsonGroups = buildJsonObject {
             put("premium", JsonPrimitive(true))
@@ -460,7 +505,7 @@ class GrowthBookSDKBuilderTests {
     }
 
     @Test
-    fun test_savedGroupsFetchedSuccessfully_isRemoteTrue_callsRefreshHandlerWithTrue() {
+    fun test_savedGroupsFetchedSuccessfully_isRemoteTrue_callsRefreshHandlerWithTrue() = runTest {
         var handlerSuccess: Boolean? = null
         var handlerError: GBError? = GBError(null)
         val sdk = buildSdkWithHandler(refreshHandler = { success, error ->
@@ -478,7 +523,7 @@ class GrowthBookSDKBuilderTests {
     }
 
     @Test
-    fun test_savedGroupsFetchedSuccessfully_isRemoteFalse_doesNotCallRefreshHandler() {
+    fun test_savedGroupsFetchedSuccessfully_isRemoteFalse_doesNotCallRefreshHandler() = runTest {
         var handlerCallCount = 0
         val sdk = buildSdkWithHandler(refreshHandler = { _, _ -> handlerCallCount++ })
         val countAfterInit = handlerCallCount
@@ -492,7 +537,7 @@ class GrowthBookSDKBuilderTests {
     }
 
     @Test
-    fun test_savedGroupsFetchedSuccessfully_withEmptyJson_setEmptySavedGroups() {
+    fun test_savedGroupsFetchedSuccessfully_withEmptyJson_setEmptySavedGroups() = runTest {
         val sdk = buildSdkWithHandler()
 
         sdk.savedGroupsFetchedSuccessfully(buildJsonObject { }, isRemote = false)
@@ -575,7 +620,7 @@ class GrowthBookSDKBuilderTests {
                 trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
                 networkDispatcher = networkClient,
                 remoteEval = true,
-            ).initialize()
+            ).setCoroutineContext(UnconfinedTestDispatcher(testScheduler)).initialize()
             val countBeforeCall = postCount
 
             sdk.setAttributeOverridesSync(mapOf("plan" to GBString("pro")))
@@ -584,7 +629,7 @@ class GrowthBookSDKBuilderTests {
         }
 
     @Test
-    fun test_refreshStickyBucketService_withoutService_contextHasNoStickyBucketService() {
+    fun test_refreshStickyBucketService_withoutService_contextHasNoStickyBucketService() = runTest {
         val sdk = buildSdkWithHandler(withStickyBucket = false)
 
         sdk.setAttributes(mapOf("id" to GBString("user-1")))
@@ -593,7 +638,7 @@ class GrowthBookSDKBuilderTests {
     }
 
     @Test
-    fun test_refreshStickyBucketService_withService_stickyBucketServicePresentInContext() {
+    fun test_refreshStickyBucketService_withService_stickyBucketServicePresentInContext() = runTest {
         val sdk = buildSdkWithHandler(withStickyBucket = true)
 
         sdk.setAttributes(mapOf("id" to GBString("user-1")))
@@ -602,7 +647,7 @@ class GrowthBookSDKBuilderTests {
         assertTrue(sdk.getGBContext().stickyBucketService is GBStickyBucketServiceImp)
     }
 
-    private fun buildSDK(
+    private fun TestScope.buildSDK(
         json: String,
         attributes: Map<String, GBValue> = mapOf(),
         encryptionKey: String?
@@ -615,10 +660,10 @@ class GrowthBookSDKBuilderTests {
             trackingCallback = { _, _ -> },
             networkDispatcher = MockNetworkClient(json, null),
             remoteEval = false
-        ).initialize()
+        ).setCoroutineContext(UnconfinedTestDispatcher(testScheduler)).initialize()
     }
 
-    private fun buildSdkWithHandler(
+    private fun TestScope.buildSdkWithHandler(
         remoteEval: Boolean = false,
         withStickyBucket: Boolean = false,
         networkResponse: String? = MockResponse.successResponse,
@@ -636,6 +681,7 @@ class GrowthBookSDKBuilderTests {
         )
         if (refreshHandler != null) builder.setRefreshHandler(refreshHandler)
         if (withStickyBucket) builder.setStickyBucketService(testScope)
+        builder.setCoroutineContext(UnconfinedTestDispatcher(testScheduler))
         return builder.initialize()
     }
 
@@ -677,7 +723,7 @@ class GrowthBookSDKBuilderTests {
     }
 
     @Test
-    fun testSetInitialFeaturesOverwrittenByNetworkRefresh() {
+    fun testSetInitialFeaturesOverwrittenByNetworkRefresh() = runTest {
         val bundledFeatures: GBFeatures = mapOf("bundled-feature" to GBFeature())
         var refreshCalled = false
 
@@ -689,6 +735,7 @@ class GrowthBookSDKBuilderTests {
             trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
         )
+            .setCoroutineContext(UnconfinedTestDispatcher(testScheduler))
             .setInitialFeatures(bundledFeatures)
             .setRefreshHandler { success, _ -> refreshCalled = success }
             .initialize()

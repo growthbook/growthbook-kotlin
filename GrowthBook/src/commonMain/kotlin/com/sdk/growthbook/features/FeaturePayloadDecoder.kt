@@ -2,6 +2,7 @@ package com.sdk.growthbook.features
 
 import com.sdk.growthbook.utils.Crypto
 import com.sdk.growthbook.utils.DefaultCrypto
+import com.sdk.growthbook.utils.GBError
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.utils.getFeaturesFromEncryptedFeatures
 import com.sdk.growthbook.utils.getSavedGroupFromEncryptedSavedGroup
