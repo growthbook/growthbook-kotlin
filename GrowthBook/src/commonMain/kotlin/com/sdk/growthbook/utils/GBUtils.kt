@@ -273,9 +273,12 @@ internal class GBUtils {
             return filters.any { filter: GBFilter ->
                 val hashAttribute: String = filter.attribute ?: "id"
 
-                val hashValueElement: GBValue =
-                    evaluationContext.userContext
-                        .attributes.getValue(hashAttribute)
+                val merged = getAttributes(
+                    evaluationContext.userContext.attributes,
+                    attributeOverrides
+                )
+
+                val hashValueElement: GBValue = merged.getValue(hashAttribute)
 
                 if (hashValueElement is GBValue.Unknown) return@any true
                 if (hashValueElement.gbSerialize() !is JsonPrimitive) return@any true
@@ -298,6 +301,15 @@ internal class GBUtils {
                     )
                 }
             }
+        }
+
+        /**
+         * The method that merge together attributes of Context and override attribute
+         */
+        fun getAttributes(
+            attributes: Map<String, GBValue>, attributeOverrides: Map<String, GBValue>,
+        ): Map<String, GBValue> {
+            return attributes + attributeOverrides
         }
 
         /**
@@ -338,29 +350,6 @@ internal class GBUtils {
             }
         }
 
-        /**
-         * Method that get cached assignments
-         * and set it to Context's Sticky Bucket Assignments documents
-         */
-        fun refreshStickyBuckets(
-            context: GBContext,
-            data: FeaturesDataModel?,
-            attributeOverrides: Map<String, GBValue>
-        ) {
-            val stickyBucketService = context.stickyBucketService ?: return
-
-            stickyBucketService.coroutineScope.launch {
-                try {
-                    refreshStickyBucketsSync(context, data, attributeOverrides)
-                } catch (e: Exception) {
-                    if (context.enableLogging) {
-                        GB.error("GrowthBook: Failed to refresh sticky bucket assignments: ${e.message}", e)
-                    }
-                }
-
-            }
-        }
-
         suspend fun saveStickyBucketAssignment(
             stickyBucketService: GBStickyBucketService,
             doc: GBStickyAssignmentsDocument
@@ -371,11 +360,10 @@ internal class GBUtils {
         }
 
         /**
-         * Synchronous method that get cached assignments
-         * and set it to Context's Sticky Bucket Assignments documents that waits for completion.
-         * Use this when you need guarantees that sticky buckets are loaded.
+         * Fetches all sticky bucket assignments for the current user and stores them in context.
+         * Awaits completion — callers in a suspend context get the guarantee that docs are ready.
          */
-        suspend fun refreshStickyBucketsSync(
+        suspend fun refreshStickyBuckets(
             context: GBContext,
             data: FeaturesDataModel?,
             attributeOverrides: Map<String, GBValue>
@@ -388,7 +376,6 @@ internal class GBUtils {
                 attributeOverrides = attributeOverrides
             )
 
-            // Directly call and wait for completion
             stickyBucketMutex.withLock {
                 context.stickyBucketAssignmentDocs =
                     stickyBucketService.getAllAssignments(attributes)
@@ -469,37 +456,14 @@ internal class GBUtils {
             val hashKey = "$hashAttribute||$hashValue"
 
             val (fallbackAttribute, fallbackValue) = getHashAttribute(
-                attr = null,
-                fallback = expFallBackAttribute,
+                attr = expFallBackAttribute,
+                fallback = null,
                 attributes = attributes,
                 attributeOverrides = attributeOverrides
             )
 
             val fallbackKey = if (fallbackValue.isEmpty()) null
             else "$fallbackAttribute||$fallbackValue"
-
-            val userFallbackAttribute = userContext.attributes[expFallBackAttribute]
-            if (userFallbackAttribute != null) {
-                val leftOperand =
-                    if (stickyBucketAssignmentDocs[expFallBackAttribute + "||" + userFallbackAttribute.toHashValue()] == null
-                    ) {
-                        null
-                    } else {
-                        stickyBucketAssignmentDocs[expFallBackAttribute + "||" + userFallbackAttribute.toHashValue()]?.attributeValue
-                    }
-
-                if (leftOperand != userFallbackAttribute.toHashValue()) {
-                    userContext.stickyBucketAssignmentDocs = emptyMap()
-                }
-            }
-
-            if (userContext.stickyBucketAssignmentDocs != null) {
-                userContext.stickyBucketAssignmentDocs!!.values.forEach { docs ->
-                    mergedAssignments.putAll(
-                        docs.assignments
-                    )
-                }
-            }
 
             fallbackKey?.let { fallback ->
                 stickyBucketAssignmentDocs[fallback]?.let { fallbackAssignments ->

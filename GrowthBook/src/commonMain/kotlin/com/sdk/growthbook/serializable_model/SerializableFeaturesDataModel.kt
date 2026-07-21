@@ -12,7 +12,8 @@ internal data class SerializableFeaturesDataModel(
     val features: Map<String, SerializableGBFeature>? = null,
     val encryptedFeatures: String? = null,
     val savedGroups: JsonObject? = null,
-    val encryptedSavedGroups: String? = null
+    val encryptedSavedGroups: String? = null,
+    val cachedAt: Long? = null
 )
 
 internal fun SerializableFeaturesDataModel.gbDeserialize() =
