@@ -37,7 +37,6 @@ import com.sdk.growthbook.kotlinx.serialization.from
 import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.plugin.tracking.PluginRegistry
 import com.sdk.growthbook.model.StackContext
-import com.sdk.growthbook.plugin.tracking.PluginRegistry
 import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBuckets
 import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
@@ -197,12 +196,15 @@ class GrowthBookSDK internal constructor(
     }
 
     /**
-     * Releases resources held by this SDK instance: stops any active SSE auto-refresh connection and
-     * cancels the background coroutine scope used to process fetched payloads. Call this when the
-     * instance is no longer needed (e.g. on logout, or before creating a replacement instance) to
-     * avoid leaking coroutines and threads. The instance must not be used after [close].
+     * Releases resources held by this SDK instance: flushes registered plugins (including the
+     * built-in tracking plugin) so any buffered events are sent, stops any active SSE auto-refresh
+     * connection, and cancels the background coroutine scope used to process fetched payloads. Call
+     * this when the instance is no longer needed (e.g. on logout, or before creating a replacement
+     * instance) to avoid leaking coroutines and threads. Safe to call multiple times. The instance
+     * must not be used after [close].
      */
     fun close() {
+        pluginRegistry?.closeAll()
         featuresViewModel.close()
     }
 
@@ -609,15 +611,6 @@ class GrowthBookSDK internal constructor(
                 }
             }
         }
-    }
-
-    /**
-     * Flushes registered plugins (including the built-in tracking plugin)
-     * so any buffered events are sent before the instance is discarded.
-     * Safe to call multiple times.
-     */
-    fun close() {
-        pluginRegistry?.closeAll()
     }
 
     private enum class FeaturesFetchResult {
