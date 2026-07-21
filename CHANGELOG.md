@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+
+## [7.4.0] - Unreleased
+
+### Added
+- `IGrowthBookSDK` interface extracted from `GrowthBookSDK` (`isOn`, `feature`, `suspendFeature`, `run`, `setAttributes`, `setAttributesSync`), so app code can depend on the abstraction and swap in a test double
+- New `GrowthBookTest` module providing `FakeGrowthBook`, a deterministic in-memory `IGrowthBookSDK` for unit tests (no network or cache). Supports:
+    - Feature overrides — `enable`/`disable`/`setValue`
+    - Fixtures & scenarios — `setFeatures(Map)`, `copy()` to fork a base fixture per test, and `FakeGrowthBook.fromFeaturesJson(...)` to load a real dashboard export
+    - Deterministic experiments — `setForcedVariation(key, index)`
+    - Interaction assertions — `wasQueried(id)`, `queriedFeatures()`
+
+### Fixed
+- Feature truthiness now matches the reference (TypeScript) SDK: a feature whose value is JSON `null` or the empty string (`""`) now evaluates as **off** (`on = false`). Previously both were reported as `on`
+
+### Changed
+- **Behavioral change:** because of the truthiness fix above, `isOn()` / `GBFeatureResult.on` now return `false` for features whose resolved value is JSON `null` or `""`. Code relying on the previous (spec-divergent) behavior will observe the flip
+
+---
+
 ## [7.3.0] - 2026-07-20
 
 ### Added
@@ -35,24 +54,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 - `GBContext` is no longer a `data class`. The compiler-generated `copy()`, `equals()`, `hashCode()` and `componentN()` (destructuring) members are no longer available. The primary constructor signature and all property accessors are unchanged, so normal construction and field access are unaffected
-
----
-
-## [7.3.0] - 2026-07-13
-
-### Added
-- `IGrowthBookSDK` interface extracted from `GrowthBookSDK` (`isOn`, `feature`, `suspendFeature`, `run`, `setAttributes`, `setAttributesSync`), so app code can depend on the abstraction and swap in a test double
-- New `GrowthBookTest` module providing `FakeGrowthBook`, a deterministic in-memory `IGrowthBookSDK` for unit tests (no network or cache). Supports:
-  - Feature overrides — `enable`/`disable`/`setValue`
-  - Fixtures & scenarios — `setFeatures(Map)`, `copy()` to fork a base fixture per test, and `FakeGrowthBook.fromFeaturesJson(...)` to load a real dashboard export
-  - Deterministic experiments — `setForcedVariation(key, index)`
-  - Interaction assertions — `wasQueried(id)`, `queriedFeatures()`
-
-### Fixed
-- Feature truthiness now matches the reference (TypeScript) SDK: a feature whose value is JSON `null` or the empty string (`""`) now evaluates as **off** (`on = false`). Previously both were reported as `on`
-
-### Changed
-- **Behavioral change:** because of the truthiness fix above, `isOn()` / `GBFeatureResult.on` now return `false` for features whose resolved value is JSON `null` or `""`. Code relying on the previous (spec-divergent) behavior will observe the flip
 
 ---
 
