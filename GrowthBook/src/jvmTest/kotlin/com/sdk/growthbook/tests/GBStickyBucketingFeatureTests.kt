@@ -1,13 +1,16 @@
 package com.sdk.growthbook.tests
 
-import kotlinx.coroutines.test.TestScope
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
+import com.sdk.growthbook.kotlinx.serialization.from
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.serializable_model.gbDeserialize
 import com.sdk.growthbook.stickybucket.GBStickyBucketServiceImp
 import com.sdk.growthbook.utils.GBStickyAssignmentsDocument
 import com.sdk.growthbook.utils.GBStickyAttributeKey
+import com.sdk.growthbook.utils.GBUtils
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.TestScope
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
@@ -17,16 +20,13 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Before
 import org.junit.Test
 import kotlin.test.assertTrue
-import com.sdk.growthbook.kotlinx.serialization.from
 
 class GBStickyBucketingFeatureTests {
     private lateinit var evalConditions: JsonArray
-    private lateinit var service: GBStickyBucketServiceImp
 
     @Before
     fun setUp() {
         evalConditions = GBTestHelper.getStickyBucketingData()
-        service = GBStickyBucketServiceImp(TestScope())
     }
 
     @Test
@@ -46,15 +46,18 @@ class GBStickyBucketingFeatureTests {
                     .attributes.jsonObject
                     .mapValues { GBValue.from(it.value) }
 
+                val service = GBStickyBucketServiceImp(
+                    coroutineScope = TestScope(),
+                    localStorage = MapCachingLayer()
+                )
+
                 val gbContext = GBContext(
                     apiKey = "",
                     enabled = true,
                     attributes = attributes,
                     forcedVariations = emptyMap(),
                     qaMode = false,
-                    trackingCallback = { _, _ ->
-
-                    },
+                    trackingCallback = { _, _ -> },
                     encryptionKey = "",
                     stickyBucketService = service
                 )
@@ -64,20 +67,24 @@ class GBStickyBucketingFeatureTests {
                         .mapValues { it.value.gbDeserialize() }
                 }
 
-                val listActualStickyAssignmentsDoc =
-                    mutableListOf<GBStickyAssignmentsDocument>()
-
-                item[2].jsonArray.forEach {
-                    listActualStickyAssignmentsDoc.add(
-                        Json.decodeFromJsonElement(GBStickyAssignmentsDocument.serializer(), it)
-                    )
+                // Seed the service with the input docs, then let getAllAssignments filter
+                // to only the docs that belong to the current user — same as TypeScript.
+                val inputDocs = item[2].jsonArray.map {
+                    Json.decodeFromJsonElement(GBStickyAssignmentsDocument.serializer(), it)
                 }
 
-                val mapOfDocForContext =
-                    mutableMapOf<String, GBStickyAssignmentsDocument>()
-                for (doc in listActualStickyAssignmentsDoc) {
-                    val key = "${doc.attributeName}||${doc.attributeValue}"
-                    mapOfDocForContext[key] = doc
+                val attributesAsStrings = attributes.keys.associateWith { key ->
+                    GBUtils.getHashAttribute(
+                        attr = key,
+                        fallback = null,
+                        attributes = attributes,
+                        attributeOverrides = attributes,
+                    ).second
+                }
+
+                val mapOfDocForContext = runBlocking {
+                    inputDocs.forEach { service.saveAssignments(it) }
+                    service.getAllAssignments(attributesAsStrings)
                 }
 
                 gbContext.stickyBucketAssignmentDocs = mapOfDocForContext
@@ -95,7 +102,10 @@ class GBStickyBucketingFeatureTests {
                     mutableMapOf<GBStickyAttributeKey, GBStickyAssignmentsDocument>()
                 for (doc in item[5].jsonObject) {
                     expectedStickyAssignmentDocs[doc.key] =
-                        Json.decodeFromJsonElement(GBStickyAssignmentsDocument.serializer(), doc.value)
+                        Json.decodeFromJsonElement(
+                            GBStickyAssignmentsDocument.serializer(),
+                            doc.value
+                        )
                 }
 
                 val testScopeEvalContext =

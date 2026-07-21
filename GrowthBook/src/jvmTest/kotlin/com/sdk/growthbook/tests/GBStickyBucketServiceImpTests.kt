@@ -16,7 +16,7 @@ import kotlin.test.assertNull
  * CachingLayer fake that stores and retrieves content by file name,
  * so multiple keys can coexist in the same test.
  */
-private class MapCachingLayer : CachingLayer {
+internal class MapCachingLayer : CachingLayer {
     val store = mutableMapOf<String, JsonElement>()
 
     override fun getContent(fileName: String): JsonElement? = store[fileName]

@@ -8,6 +8,8 @@ import com.sdk.growthbook.plugin.tracking.PluginRegistry
 import com.sdk.growthbook.model.StackContext
 import com.sdk.growthbook.model.StickyBucketAssignmentDocsType
 import com.sdk.growthbook.stickybucket.GBStickyBucketService
+import com.sdk.growthbook.utils.GBStickyAssignmentsDocument
+import com.sdk.growthbook.utils.GBStickyAttributeKey
 
 internal data class EvaluationContext(
     val enabled: Boolean,
@@ -20,6 +22,11 @@ internal data class EvaluationContext(
     val gbExperimentHelper: GBExperimentHelper,
     val stickyBucketService: GBStickyBucketService?,
     val onFeatureUsage: ((String, GBFeatureResult) -> Unit)?,
+    // Invoked at the point a new sticky-bucket assignment doc is generated during evaluation, so the
+    // single changed key can be merged back into the shared context atomically (see
+    // GBContext.mergeStickyAssignmentDoc). Replaces the previous wholesale write-back of the whole
+    // docs map after evaluation, which could clobber a concurrent background refresh.
+    val onStickyAssignmentChanged: ((GBStickyAttributeKey, GBStickyAssignmentsDocument) -> Unit)? = null,
     val stackContext: StackContext,
     val pluginRegistry: PluginRegistry?
 )

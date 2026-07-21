@@ -14,6 +14,7 @@ import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.utils.Constants
 import com.sdk.growthbook.utils.GBTrackData
 import com.sdk.growthbook.utils.GBUtils
+import com.sdk.growthbook.utils.GBUtils.Companion.getAttributes
 import com.sdk.growthbook.utils.GBUtils.Companion.toHashValue
 
 /**
@@ -149,7 +150,7 @@ internal class GBFeatureEvaluator(
                         if (GBUtils.isFilteredOut(
                                 filters = rule.filters,
                                 evaluationContext = evaluationContext,
-                                attributeOverrides = evaluationContext.userContext.attributes,
+                                attributeOverrides = attributeOverrides,
                             )
                         ) {
                             /**
@@ -245,7 +246,11 @@ internal class GBFeatureEvaluator(
                             if (rule.coverage != null) {
                                 val key = rule.hashAttribute ?: Constants.ID_ATTRIBUTE_KEY
                                 val attributeValue =
-                                    evaluationContext.userContext.attributes[key].toHashValue()
+                                    getAttributes(
+                                        attributeOverrides = attributeOverrides,
+                                        attributes = evaluationContext.userContext.attributes
+                                    )[key]
+                                        .toHashValue()
 
                                 if (attributeValue.isNullOrEmpty()) {
                                     continue@ruleLoop
@@ -387,15 +392,5 @@ internal class GBFeatureEvaluator(
         }
 
         return gbFeatureResult
-    }
-
-    /**
-     * The method that merge together attributes of Context and override attribute
-     */
-    private fun getAttributes(
-        attributes: Map<String, GBValue>, attributeOverrides: Map<String, GBValue>,
-    ): Map<String, GBValue> {
-        attributes.toMutableMap().putAll(attributeOverrides)
-        return attributes
     }
 }
