@@ -1,9 +1,18 @@
-# Changelog — NetworkDispatcherKtor
+# Changelog — NetworkDispatcherOkhttp
 
 All notable changes to the `NetworkDispatcherOkhttp` artifact will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [1.1.0] - 2026-07-22
+
+### Fixed
+- Pinned the JVM toolchain to JDK 17 (`jvmToolchain(17)`) so the published `-jvm`
+  artifact always contains Java 17 bytecode (class file 61) regardless of the JDK used
+  to build it (#250).
 
 ---
 
