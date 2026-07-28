@@ -107,6 +107,9 @@ class GBSDKBuilder(
     private var featureUsageCallback: GBFeatureUsageCallback? = null
     private var initialFeatures: GBFeatures? = null
     private var cacheMaxAge: Long? = null
+    private var refreshInterval: Long? = null
+    private var staleTtl: Long? = null
+    private var serveStaleOnError: Boolean = false
 
     // Dispatcher used to process fetched payloads. Defaults to the platform IO dispatcher in
     // production; tests inject a deterministic dispatcher (e.g. Dispatchers.Unconfined or a
@@ -212,6 +215,65 @@ class GBSDKBuilder(
     }
 
     /**
+     * Opt-in background polling interval in milliseconds.
+     *
+     * When set, [GrowthBookSDK.startPolling] launches a coroutine on the SDK's background scope
+     * that revalidates features from the network every [intervalMs]. It is a suspend loop, not a
+     * dedicated thread, so it is cheap while idle. Mutually exclusive with SSE auto-refresh, and SSE
+     * wins: starting SSE stops any running poller, while [GrowthBookSDK.startPolling] is a no-op while
+     * SSE is active. Disabled (null) by default.
+     *
+     * Mobile note: the SDK cannot observe app lifecycle, so tie [GrowthBookSDK.startPolling] /
+     * [GrowthBookSDK.stopPolling] to your foreground/background transitions to avoid draining the
+     * radio in the background. On mobile prefer SSE or the pull-on-access cache window
+     * ([setCacheMaxAge]); polling is intended mainly for long-lived JVM/backend usage.
+     */
+    fun setRefreshInterval(intervalMs: Long): GBSDKBuilder {
+        require(intervalMs > 0) { "refreshInterval must be positive, was $intervalMs" }
+        this.refreshInterval = intervalMs
+        return this
+    }
+
+    /**
+     * When true, an expired cache (older than [setCacheMaxAge], with [setStaleTtl] set) is served as
+     * a last-resort fallback if the revalidating network round fails — HTTP `stale-if-error`
+     * semantics, useful for offline resilience on mobile. Default false fails closed: past the
+     * ceiling nothing stale is served and the SDK falls back to code defaults. Only has an effect
+     * together with [setStaleTtl] + [setCacheMaxAge].
+     *
+     * Observability note: when the stale fallback is served after a failed refresh, it is applied as a
+     * non-authoritative payload and the refresh handler ([GBCacheRefreshHandler]) is **not** invoked —
+     * neither as success nor as failure. The handler's `(Boolean, GBError?)` contract cannot express
+     * "stale fallback served", so signalling either would mislead; treat `serveStaleOnError` as a
+     * best-effort offline safety net rather than a signal you can observe through the handler.
+     */
+    fun setServeStaleOnError(enabled: Boolean): GBSDKBuilder {
+        this.serveStaleOnError = enabled
+        return this
+    }
+
+    /**
+     * Inner "fresh" window (ms) that turns [setCacheMaxAge] into a full three-tier
+     * stale-while-revalidate policy:
+     *  - age < staleTtl                -> fresh: served from cache, network skipped
+     *  - staleTtl <= age < cacheMaxAge -> stale: served immediately while a background refresh runs
+     *  - age >= cacheMaxAge            -> expired: NOT served, refetched from the network (cache miss)
+     *
+     * Use `staleTtl` when you need both a low revalidation cadence AND a hard staleness ceiling
+     * (e.g. "revalidate at most once a minute, but never serve data older than 24h"). Pair it with
+     * [setCacheMaxAge] as the outer ceiling; when both are set `ttlMs` must be `< cacheMaxAge`
+     * (enforced at construction). Set on its own (without [setCacheMaxAge]) `staleTtl` is just the
+     * inner "fresh" window with no hard cutoff — a cache past it is served while revalidating.
+     * When `staleTtl` is unset, [setCacheMaxAge] alone governs the skip-network window with NO hard
+     * cutoff (it keeps serving stale beyond the window while revalidating) — the pre-existing
+     * behaviour.
+     */
+    fun setStaleTtl(ttlMs: Long): GBSDKBuilder {
+        this.staleTtl = ttlMs
+        return this
+    }
+
+    /**
      * Initialize the Kotlin SDK and provide it when ready
      */
     fun initialize(onResult: (GrowthBookSDK) -> Unit) {
@@ -251,6 +313,9 @@ class GBSDKBuilder(
             networkDispatcher,
             cachingEnabled = cachingEnabled,
             cacheMaxAge = cacheMaxAge,
+            refreshInterval = refreshInterval,
+            staleTtl = staleTtl,
+            serveStaleOnError = serveStaleOnError,
             coroutineContext = coroutineContext,
         )
     }
@@ -305,6 +370,9 @@ class GBSDKBuilder(
                 networkDispatcher,
                 cachingEnabled = cachingEnabled,
                 cacheMaxAge = cacheMaxAge,
+                refreshInterval = refreshInterval,
+                staleTtl = staleTtl,
+                serveStaleOnError = serveStaleOnError,
                 coroutineContext = coroutineContext,
             )
         }

@@ -16,6 +16,7 @@ import com.sdk.growthbook.utils.GBRemoteEvalParams
 import com.sdk.growthbook.utils.Resource
 import com.sdk.growthbook.utils.SSEConnectionController
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.SupervisorJob
@@ -29,6 +30,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
 import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.coroutines.CoroutineContext
@@ -101,6 +103,25 @@ internal class FeaturesViewModel(
      */
     private val cacheMaxAge: Long? = null,
     /**
+     * Inner "fresh" window in milliseconds that arms the three-tier stale-while-revalidate model in
+     * [serveCache] together with [cacheMaxAge]:
+     *   - age < staleTtl                -> fresh: served from cache, network skipped
+     *   - staleTtl <= age < cacheMaxAge -> stale: served immediately + revalidated over the network
+     *   - age >= cacheMaxAge            -> expired: NOT served, refetched (cache miss)
+     * When null the outer cutoff is disarmed and [cacheMaxAge] alone governs the skip-network window
+     * (single-threshold 7.3.0 behaviour, unchanged for existing consumers). Mirrors
+     * [com.sdk.growthbook.GBSDKBuilder.setStaleTtl].
+     */
+    private val staleTtl: Long? = null,
+    /**
+     * HTTP `stale-if-error` toggle for the expired (third) tier. When true, a cache older than
+     * [cacheMaxAge] (with [staleTtl] set) is served as a last resort — but only after the
+     * revalidating network round fails, so evaluation never sees data past its freshness ceiling
+     * while the network is reachable. Default false fails closed. Handled inside [cachePolicy].
+     * Mirrors [com.sdk.growthbook.GBSDKBuilder.setServeStaleOnError].
+     */
+    private val serveStaleOnError: Boolean = false,
+    /**
      * Turns a raw [FeaturesDataModel] into a [DecodedPayload] (features + saved
      * groups), decrypting with [encryptionKey] when needed. Injectable for tests.
      */
@@ -137,7 +158,25 @@ internal class FeaturesViewModel(
     val sseController: SSEConnectionController
         get() = dataSource.sseController
 
-    private val coroutineScope: CoroutineScope = CoroutineScope(coroutineContext + SupervisorJob())
+    // Last-resort guard for fire-and-forget children (the payload-processing launch in
+    // performNetworkRound / fetchFromNetwork): an exception escaping one of them — e.g. a consumer
+    // refreshHandler that throws while a payload is applied — must not reach the platform default
+    // handler, which on Android crashes the app. It is logged here instead; the failed round is
+    // already reported to the delegate. (The SupervisorJob keeps one failed child from tearing down
+    // the shared scope; the handler keeps its exception from propagating past the scope.)
+    private val uncaughtHandler = CoroutineExceptionHandler { _, throwable ->
+        GB.error("FeaturesViewModel: uncaught error in background scope", throwable)
+    }
+
+    /**
+     * Long-lived scope for all background work: payload processing, the coalesced refresh
+     * ([awaitRefresh]) and the poll loop ([poller]). Built from the injected [coroutineContext] plus
+     * a [SupervisorJob] (one failed child never tears down the others or the scope) and
+     * [uncaughtHandler] (an exception escaping a child is logged, not crashed on). Cancelled in
+     * [close], so background work never outlives the owning SDK.
+     */
+    private val coroutineScope: CoroutineScope =
+        CoroutineScope(coroutineContext + SupervisorJob() + uncaughtHandler)
 
     /**
      * Guards reads and writes of [inFlight] so the check-or-start decision in
@@ -175,13 +214,68 @@ internal class FeaturesViewModel(
      */
     private val applyMutex = Mutex()
 
+    // Background polling loop + its backoff/CAS lifecycle live in Poller, not this view model. Jitter
+    // spreads the post-failure backoff so many instances that failed together (e.g. after a server
+    // outage) do not all re-poll in lockstep.
+    private val poller = Poller(coroutineScope, jitterFactor = 0.5)
+
+    // All cache-freshness decisions (zone classification + stale-if-error) live in one place; the
+    // require on staleTtl < cacheMaxAge fires from CachePolicy's init during construction.
+    private val cachePolicy = CachePolicy(staleTtl, cacheMaxAge, serveStaleOnError)
+
+    /**
+     * The single active auto-refresh mechanism. SSE and polling are mutually exclusive; this atomic
+     * is the arbiter that makes the transition race-free even when [autoRefreshFeatures] and
+     * [startPolling] are called concurrently from different threads (see those methods).
+     */
+    private enum class RefreshMode { NONE, POLLING, SSE }
+
+    private val refreshMode = AtomicReference(RefreshMode.NONE)
+
     /** Opens an SSE connection and streams feature updates as a [Flow]. */
     fun autoRefreshFeatures(): Flow<Resource<GBFeatures?>> {
+        // SSE supersedes polling and always wins a concurrent race: claim the mode FIRST, then tear
+        // down any poller. Ordering matters — a startPolling() racing this either observes SSE already
+        // claimed and bails, or its post-start re-check (below) sees SSE and stops the poller it just
+        // started, so the two can never end up both active.
+        refreshMode.store(RefreshMode.SSE)
+        poller.stop()
         sseController.start()
         return dataSource.autoRefresh(
             success = { coroutineScope.launch { handleNetworkModel(it) } },
             failure = { delegate.featuresFetchFailed(GBError(it), isRemote = true) }
         )
+    }
+
+    /**
+     * Starts background polling every [intervalMs]. No-op (returns false) when SSE is active — the
+     * two are mutually exclusive — or when a poll loop is already running. Each round goes through the
+     * coalesced [awaitRefresh], so polling honours the same remote-eval/GET mode as everything else.
+     */
+    fun startPolling(intervalMs: Long): Boolean {
+        // Never poll under SSE. Claim POLLING from NONE (a no-op CAS when we already hold it).
+        if (refreshMode.load() == RefreshMode.SSE) return false
+        refreshMode.compareAndSet(RefreshMode.NONE, RefreshMode.POLLING)
+        val started = poller.start(intervalMs) { awaitRefresh() }
+        // Close the race window: if autoRefreshFeatures() switched us to SSE while we were starting,
+        // undo the poller we just launched so SSE stays the sole active mechanism.
+        if (refreshMode.load() == RefreshMode.SSE) {
+            poller.stop()
+            return false
+        }
+        return started
+    }
+
+    /** Stops the background poll loop and releases the polling mode. Safe to call when not polling. */
+    fun stopPolling() {
+        poller.stop()
+        refreshMode.compareAndSet(RefreshMode.POLLING, RefreshMode.NONE)
+    }
+
+    /** Stops the SSE connection and releases the auto-refresh mode so polling can be started again. */
+    fun stopAutoRefresh() {
+        sseController.stop()
+        refreshMode.compareAndSet(RefreshMode.SSE, RefreshMode.NONE)
     }
 
     /**
@@ -197,8 +291,11 @@ internal class FeaturesViewModel(
         payload: GBRemoteEvalParams? = null,
         policy: FetchPolicy = FetchPolicy.CacheFirst
     ) {
-        if (serveCache(policy)) return // fresh cache -> authoritative, skip network
-        fetchFromNetwork(payload)
+        when (val result = serveCache(policy)) {
+            is CacheOutcome.Expired -> fetchFromNetwork(payload = payload, onErrorFallback = result.stale)
+            CacheOutcome.ServedFresh -> return
+            CacheOutcome.ServedStaleOrMiss -> fetchFromNetwork(payload = payload, onErrorFallback = null)
+        }
     }
 
     /**
@@ -246,7 +343,8 @@ internal class FeaturesViewModel(
      * the owning SDK instance. Safe to call more than once.
      */
     fun close() {
-        sseController.stop()
+        stopPolling()
+        stopAutoRefresh()
         coroutineScope.cancel()
     }
 
@@ -262,7 +360,8 @@ internal class FeaturesViewModel(
      */
     private suspend fun performNetworkRound(
         payload: GBRemoteEvalParams?,
-        generation: Long
+        generation: Long,
+        onErrorFallback: DecodedPayload? = null
     ): FetchResult = suspendCancellableCoroutine { cont ->
         // Resume the continuation at most once: the synchronous catch below and an async data-source
         // callback could otherwise both resume it (e.g. a misbehaving dispatcher that invokes a
@@ -317,7 +416,18 @@ internal class FeaturesViewModel(
                         }
                     },
                     failure = {
-                        dispatch(FetchOutcome.Failed(GBError(it), source = Source.NETWORK))
+                        if (cachePolicy.serveStaleOnError && onErrorFallback != null) {
+                            // stale-if-error: serve the expired cache as a NON-authoritative payload.
+                            // Intentionally silent to the refresh handler — a non-authoritative Ready
+                            // fires neither the success nor the failure delegate path. The handler's
+                            // (Boolean, GBError?) contract cannot express "stale fallback served", so
+                            // signalling either side would mislead. Documented on
+                            // GBSDKBuilder.setServeStaleOnError; revisit if the handler ever grows a
+                            // dedicated stale signal.
+                            dispatch(FetchOutcome.Ready(onErrorFallback, source = Source.CACHE, authoritative = false))
+                        } else {
+                            dispatch(FetchOutcome.Failed(GBError(it), source = Source.NETWORK))
+                        }
                         resumeOnce(FetchResult.Failed)
                     },
                     onNotModified = {
@@ -359,27 +469,34 @@ internal class FeaturesViewModel(
             FetchResult.Failed
         }
 
-    private fun serveCache(policy: FetchPolicy): Boolean {
+    private fun serveCache(policy: FetchPolicy): CacheOutcome {
         val entry = runCatching { readCache() }.getOrElse {
             GB.error("FeaturesViewModel: cache read failed", it)
             delegate.featuresFetchFailed(error = GBError(it), isRemote = false)
-            return false
-        } ?: return false
+            return CacheOutcome.ServedStaleOrMiss
+        } ?: return CacheOutcome.ServedStaleOrMiss
 
         val (model, cachedAt) = entry
-        val fresh = policy == FetchPolicy.CacheFirst && !remoteEval && cacheMaxAge != null
-            && cachedAt != null
-            && Clock.System.now().toEpochMilliseconds() - cachedAt < cacheMaxAge
+        val decoded = decoder.decode(model)
 
-        val outcome = outcomeOf(payload = decoder.decode(m = model), source = Source.CACHE, authoritative = fresh)
+        // Freshness gating applies only to plain CacheFirst GETs; remote-eval and ForceNetwork always
+        // refetch, so their cache is treated as (non-authoritative) STALE and revalidated. All zone
+        // logic (inner window, hard ceiling, backward-compat) lives in CachePolicy.
+        val gated = policy == FetchPolicy.CacheFirst && !remoteEval && cachedAt != null
+        val age = cachedAt?.let { Clock.System.now().toEpochMilliseconds() - it }
+        val zone = if (gated && age != null) cachePolicy.classify(age) else CacheZone.STALE
+
+        // EXPIRED (Zone 3): do not surface stale data — carry it only as the on-error fallback so
+        // evaluation never sees data past its freshness ceiling while the network is reachable.
+        if (zone == CacheZone.EXPIRED) return CacheOutcome.Expired(decoded)
+
+        val fresh = zone == CacheZone.FRESH
+        val outcome = outcomeOf(payload = decoded, source = Source.CACHE, authoritative = fresh)
         dispatch(outcome = outcome)
 
-        // Only treat the cache as authoritative (and skip the network) when it actually
-        // yielded a usable payload. A fresh-but-undecodable/empty cache degrades to
-        // FetchOutcome.Failed above (both features and savedGroups null) — returning false
-        // then lets fetchFeatures() fall through to the network instead of silently serving
-        // nothing for the whole freshness window.
-        return fresh && outcome is FetchOutcome.Ready
+        // Skip the network only for a FRESH cache that actually decoded to a usable payload; a
+        // fresh-but-undecodable/empty cache degrades to FetchOutcome.Failed above and falls through.
+        return if (fresh && outcome is FetchOutcome.Ready) CacheOutcome.ServedFresh else CacheOutcome.ServedStaleOrMiss
     }
 
     /**
@@ -389,9 +506,9 @@ internal class FeaturesViewModel(
      * payload) and reports the result through the delegate. Not timeout-bounded (that is
      * [awaitRefresh]/[runNetworkRound]'s job); observe completion via the refresh handler.
      */
-    private fun fetchFromNetwork(payload: GBRemoteEvalParams?) {
+    private fun fetchFromNetwork(payload: GBRemoteEvalParams?, onErrorFallback: DecodedPayload?) {
         val generation = if (remoteEval) remoteEvalGeneration.incrementAndFetch() else 0L
-        coroutineScope.launch { performNetworkRound(payload, generation) }
+        coroutineScope.launch { performNetworkRound(payload, generation, onErrorFallback) }
     }
 
     private suspend fun handleNetworkModel(model: FeaturesDataModel) {

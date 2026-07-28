@@ -1,4 +1,4 @@
-# Changelog — NetworkDispatcherKtor
+# Changelog — NetworkDispatcherOkhttp
 
 All notable changes to the `NetworkDispatcherOkhttp` artifact will be documented in this file.
 
@@ -14,6 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   untouched (branch added before `Map`/`List`, since `JsonObject`/`JsonArray` are
   themselves `Map`/`List`), so pre-encoded POST-body values are no longer re-stringified
   and double-quoted.
+- `OkHttpLruETagCache.get()` is now serialized under the write lock instead of the read
+  lock. The backing `LinkedHashMap` is access-ordered (LRU), so a `get` structurally
+  mutates it (re-links the entry to the tail); under the shared read lock, concurrent
+  `get`s could corrupt that linked list and desync the size/eviction bookkeeping (rarely
+  observable as the entry count exceeding the configured maximum). Reads are now exclusive,
+  so the cache is genuinely thread-safe under concurrent access.
 
 ---
 

@@ -14,6 +14,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keys are added, existing keys overwritten, untouched keys preserved. A `GBNull` value
   keeps the key with a null value (it is not removed); use `setAttributes()` to replace
   the whole map.
+- Background polling auto-refresh engine. `GBSDKBuilder.setRefreshInterval(<ms>)` configures a
+  periodic network revalidation; start/stop it with `GrowthBookSDK.startPolling()` /
+  `stopPolling()`. The poller runs as a coroutine on the SDK's background scope (not a dedicated
+  thread), retries failed rounds with capped exponential backoff plus random jitter (so many
+  instances that fail together do not all retry in lockstep), and is mutually exclusive with SSE —
+  starting SSE stops the poller and `startPolling()` is a no-op while SSE is active; the switch
+  between the two mechanisms is race-free. A round that throws is treated as a failed round (logged +
+  backoff) rather than terminating the loop. Disabled by default; intended mainly for long-lived
+  JVM/backend usage (tie it to app lifecycle on mobile).
+- `GBSDKBuilder.setStaleTtl(<ms>)` — turns `setCacheMaxAge()` into a full three-tier
+  stale-while-revalidate policy: `age < staleTtl` → fresh (served, network skipped);
+  `staleTtl ≤ age < cacheMaxAge` → stale (served immediately + background revalidation);
+  `age ≥ cacheMaxAge` → expired (not served, refetched as a cache miss). The hard ceiling (third
+  tier) is armed only when `staleTtl` is set; `setCacheMaxAge()` used alone keeps its original
+  two-tier behaviour (serve-stale beyond the window, never dropped), so existing consumers are
+  unaffected. Set `staleTtl < cacheMaxAge`.
+- `GBSDKBuilder.setServeStaleOnError(<Boolean>)` — HTTP `stale-if-error` semantics for the expired
+  (third) tier: when enabled, a cache older than `cacheMaxAge` is served as a last resort **only if**
+  the revalidating network round fails, so an offline client keeps its stale flags instead of falling
+  back to code defaults. Default false fails closed (nothing stale served past the ceiling). The
+  freshness ceiling still holds whenever the network is reachable.
 
 ### Fixed
 - Remote evaluation now re-runs when user attributes or forced features change:
@@ -41,6 +62,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   real JSON. Forced features are also sent as an array of `[key, value]` pairs (matching
   the reference SDK) instead of a JSON object, which the GrowthBook proxy rejected with
   `400 Bad Request`.
+
+### Changed
+- Exponential backoff is now centralised in `BackoffPolicy` (`:Core`) and shared by the polling
+  engine and `suspendFeature()`'s retry loop. Behaviour of `suspendFeature()` is unchanged
+  (initial 1s, doubling, 60s cap, 5 attempts).
+- A `GBCacheRefreshHandler` that throws is now caught and logged instead of propagating. The SDK's
+  background payload-processing scope also carries a `CoroutineExceptionHandler`, so an exception
+  escaping a fire-and-forget fetch (e.g. from a consumer handler) is logged rather than reaching the
+  platform's default uncaught-exception handler — which on Android crashes the app. This matters most
+  under polling, where the fetch path runs repeatedly.
 
 ---
 ## [7.3.0] - 2026-07-20
