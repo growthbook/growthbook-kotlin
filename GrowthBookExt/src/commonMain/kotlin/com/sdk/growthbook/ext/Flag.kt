@@ -37,21 +37,34 @@ data class Flag<out T>(val key: String, val default: T)
  * other type throws — decode custom or `@Serializable` types via the
  * `GrowthBookKotlinxSerialization` module instead.
  *
- * @throws IllegalArgumentException if [T] is not one of the supported types
+ * @throws IllegalArgumentException if the flag's value type is not supported
  */
-inline fun <reified T> GrowthBookSDK.value(flag: Flag<T>): T {
-    val raw: Any? = when (T::class) {
-        Boolean::class -> getBooleanOrNull(flag.key)
-        String::class -> getStringOrNull(flag.key)
-        Int::class -> getIntOrNull(flag.key)
-        Long::class -> getLongOrNull(flag.key)
-        Float::class -> getFloatOrNull(flag.key)
-        Double::class -> getDoubleOrNull(flag.key)
+fun <T : Any> GrowthBookSDK.value(flag: Flag<T>): T = resolveFlag(flag)
+
+/**
+ * Shared resolution behind [value] and the `featureFlag(Flag)` property delegate, so both
+ * dispatch identically. Reads the feature keyed on the runtime type of [Flag.default] and
+ * falls back to [Flag.default] when the feature is missing or its stored value cannot be
+ * read as that type.
+ *
+ * Supported types: [Boolean], [String], [Int], [Long], [Float], [Double].
+ *
+ * @throws IllegalArgumentException if the flag's value type is not supported
+ */
+internal fun <T : Any> GrowthBookSDK.resolveFlag(flag: Flag<T>): T {
+    val raw: Any? = when (flag.default) {
+        is Boolean -> getBooleanOrNull(flag.key)
+        is String -> getStringOrNull(flag.key)
+        is Int -> getIntOrNull(flag.key)
+        is Long -> getLongOrNull(flag.key)
+        is Float -> getFloatOrNull(flag.key)
+        is Double -> getDoubleOrNull(flag.key)
         else -> throw IllegalArgumentException(
-            "Unsupported Flag type ${T::class.simpleName}; " +
+            "Unsupported Flag type ${flag.default::class.simpleName}; " +
                 "decode custom types via GrowthBookKotlinxSerialization"
         )
     }
+    @Suppress("UNCHECKED_CAST")
     return (raw as? T) ?: flag.default
 }
 

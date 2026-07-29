@@ -320,6 +320,25 @@ val items = sdk.value(Flags.MAX_ITEMS) // Int, falls back to 10
 Supported types: `Boolean`/`String`/`Int`/`Long`/`Float`/`Double` (decode custom
 `@Serializable` types via the `GrowthBookKotlinxSerialization` module instead).
 
+### Property delegates
+
+Read a flag as a Kotlin property with `by`. The flag is re-evaluated on **every**
+read, so the property always reflects the current config — a refreshed payload is
+picked up without re-declaring the property:
+
+```kotlin
+val newHome by sdk.featureFlag("new-home")                               // Boolean, via isOn
+val betaCheckout by sdk.featureFlag("beta-checkout", FallbackStrategy.FAIL_CLOSED)
+val maxItems by sdk.featureFlag(Flag("max-items", default = 10))         // Int, falls back to 10
+
+if (newHome) renderNewHome() else renderOldHome()
+```
+
+Pure sugar over `isOn` / `isEnabled(id, fallback)` / `value(flag)` — same semantics,
+just a delegate form. Handy when a flag is read in several places or grouped as
+screen/ViewModel config. In a hot loop, snapshot it into a local `val` to avoid
+re-evaluating on each read.
+
 ### Attributes DSL
 
 Set targeting attributes with plain Kotlin values, hiding the `GBValue` wrappers:
