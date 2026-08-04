@@ -240,6 +240,15 @@ internal class FeaturesViewModel(
         }
 
     private fun serveCache(remoteEval: Boolean, policy: FetchPolicy): Boolean {
+        // Remote-eval payloads are evaluated server-side against the CURRENT attributes/forced
+        // variations, but our cache is keyed only by API key (FeatureCache_<apiKey>). Serving that
+        // entry would let a previous user's evaluated payload leak to the next one after a
+        // logout/login on the same key. Unlike JS/Python (which key the remote-eval cache by
+        // selected attributes + forced variations + URL), this single-user KMM client bypasses the
+        // cache entirely in remote-eval mode and always hits the network. See also the write-side
+        // bypass in [handleNetworkModel].
+        if (remoteEval) return false
+
         val entry = runCatching { readCache() }.getOrElse {
             GB.error("FeaturesViewModel: cache read failed", it)
             delegate.featuresFetchFailed(error = GBError(it), isRemote = false)
@@ -247,7 +256,8 @@ internal class FeaturesViewModel(
         } ?: return false
 
         val (model, cachedAt) = entry
-        val fresh = policy == FetchPolicy.CacheFirst && !remoteEval && cacheMaxAge != null
+        // remoteEval already returned above, so this path is local-eval only.
+        val fresh = policy == FetchPolicy.CacheFirst && cacheMaxAge != null
             && cachedAt != null
             && Clock.System.now().toEpochMilliseconds() - cachedAt < cacheMaxAge
 
@@ -265,7 +275,7 @@ internal class FeaturesViewModel(
     private fun fetchFromNetwork(remoteEval: Boolean, payload: GBRemoteEvalParams?) {
         if (remoteEval) dataSource.fetchRemoteEval(
             params = payload,
-            success = { coroutineScope.launch { handleNetworkModel(it.data) }},
+            success = { coroutineScope.launch { handleNetworkModel(it.data, persistToCache = false) }},
             failure = {
                 delegate.featuresFetchFailed(
                     error = GBError(it.exception),
@@ -279,7 +289,13 @@ internal class FeaturesViewModel(
         )
     }
 
-    private suspend fun handleNetworkModel(model: FeaturesDataModel) {
+    /**
+     * @param persistToCache whether a successful payload may be written to [cachingLayer].
+     *   False for remote-eval responses: they are evaluated per current attributes and the
+     *   cache is keyed only by API key, so persisting one would leak it to the next user on the
+     *   same key (see the read-side bypass in [serveCache]).
+     */
+    private suspend fun handleNetworkModel(model: FeaturesDataModel, persistToCache: Boolean = true) {
         try {
             // Decode/decrypt the payload BEFORE the sticky-bucket refresh, mirroring the reference
             // TS SDK (decryptPayload -> refreshStickyBuckets). For an encrypted payload the raw
@@ -295,7 +311,7 @@ internal class FeaturesViewModel(
                     encryptedSavedGroups = null,
                 )
             )
-            if (cachingEnabled) {
+            if (cachingEnabled && persistToCache) {
                 runCatching { writeCache(model) }
                     .onFailure {
                         GB.error(

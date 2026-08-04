@@ -16,11 +16,12 @@ internal class CachingJS : CachingLayer {
     // No prettyPrint: minify to conserve the ~5 MB localStorage quota
     // (the disk targets pretty-print only for human file inspection, which does not apply here).
     override fun saveContent(fileName: String, content: JsonElement) {
-        val jsonContents = json.encodeToString(JsonElement.serializer(), content)
         try {
+            val jsonContents = json.encodeToString(JsonElement.serializer(), content)
             localStorage.setItem(storageKey(fileName), jsonContents)
         } catch (e: Throwable) {
-            // e.g. QuotaExceededError, or SecurityError when storage is disabled (private mode).
+            // setItem: QuotaExceededError, or SecurityError when storage is disabled (private mode).
+            // encodeToString is inside the try too so a persist never throws (best-effort cache).
             GB.warning("CachingJS: failed to persist '$fileName' " + e.message)
         }
     }
@@ -30,13 +31,21 @@ internal class CachingJS : CachingLayer {
      */
     override fun getContent(fileName: String): JsonElement? {
         val key = storageKey(fileName)
-        val stored = localStorage.getItem(key) ?: return null
+        // getItem itself can throw SecurityError when storage is disabled (private mode); treat
+        // an unavailable store as a cache miss rather than an initialization failure.
+        val stored = try {
+            localStorage.getItem(key)
+        } catch (e: Throwable) {
+            GB.warning("CachingJS: localStorage unavailable, treating '$fileName' as a cache miss " + e.message)
+            null
+        } ?: return null
 
         return try {
             json.decodeFromString(JsonElement.serializer(), stored)
         } catch (e: Exception) {
             GB.error("CachingJS: corrupt cache entry '$fileName', deleting", e)
-            localStorage.removeItem(key)
+            // Best-effort self-heal; removeItem can throw in the same storage-disabled contexts.
+            runCatching { localStorage.removeItem(key) }
             null
         }
     }
