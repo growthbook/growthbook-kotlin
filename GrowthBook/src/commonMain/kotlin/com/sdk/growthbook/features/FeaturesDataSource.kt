@@ -89,11 +89,19 @@ internal class FeaturesDataSource(
         ).transform { resource ->
             when (resource) {
                 is Resource.Success -> {
-                    val model = jsonParser.decodeFromString(
-                        SerializableFeaturesDataModel.serializer(),
-                        resource.data
-                    )
-                    val featuresDataModel = model.gbDeserialize()
+                    // Decode + deserialize can throw on a malformed SSE payload. Catch here and
+                    // degrade to Resource.Error so the stream survives and the collector still gets
+                    // featuresFetchFailed, instead of the exception terminating the Flow. emit stays
+                    // outside the catch so a downstream CancellationException is not swallowed.
+                    val featuresDataModel = try {
+                        jsonParser.decodeFromString(
+                            SerializableFeaturesDataModel.serializer(),
+                            resource.data
+                        ).gbDeserialize()
+                    } catch (e: Exception) {
+                        emit(Resource.Error(e))
+                        return@transform
+                    }
                     emit(Resource.Success(featuresDataModel))
                 }
                 is Resource.Error -> {

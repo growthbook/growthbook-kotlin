@@ -115,6 +115,29 @@ class SSEEncryptedRefreshTests {
     }
 
     @Test
+    fun sseMalformedPayload_emitsErrorNotCrash() = runTest {
+        val sseDispatcher = object : MockNetworkClient(null, null) {
+            override fun consumeSSEConnection(
+                url: String, sseConnectionController: SSEConnectionController?
+            ): Flow<Resource<String>> = flowOf(Resource.Success("{ this is not valid json"))
+        }
+
+        val sdk = GBSDKBuilder(
+            apiKey, host,
+            encryptionKey = null,
+            attributes = attrs,
+            trackingCallback = { _, _ -> },
+            networkDispatcher = sseDispatcher,
+            remoteEval = false
+        ).initialize()
+
+        // A malformed payload must degrade to Resource.Error, not throw out of the Flow.
+        val emissions = sdk.startAutoRefreshFeatures().toList()
+
+        assertTrue(emissions.first() is Resource.Error)
+    }
+
+    @Test
     fun sseEmptyFeatures_appliesEmptyMapNotError() = runTest {
         val emptyPayload = """{"status":200,"features":{}}"""
         val sseDispatcher = object : MockNetworkClient(null, null) {
