@@ -1,0 +1,28 @@
+name: Verify targets
+
+# The `test` workflow only exercises the JVM test source sets, so non-JVM
+# targets (JS, Wasm, iOS, Android) are never compiled there. This workflow gates
+# every pull request: it compiles all modules across all KMP targets and
+# validates that each publication artifact is produced (via publishToMavenLocal),
+# so public modules — including the new GrowthBookExt — are checked beyond the
+# JVM test suite. Runs on macOS because the iOS (Kotlin/Native) targets can only
+# be compiled and linked on a macOS host.
+
+on:
+  pull_request
+
+jobs:
+  compile-all-targets:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+    - name: Set up Gradle
+      uses: gradle/actions/setup-gradle@v3
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+    - name: Compile all targets and validate publication
+      run: ./gradlew build publishToMavenLocal
