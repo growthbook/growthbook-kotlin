@@ -43,12 +43,18 @@ fun GBJson.gbSerialize() = JsonObject(
 )
 
 /**
- * Default [Json] used by [decodeAs]. Tolerant of unknown keys so that feature
- * config objects containing fields the caller's model does not declare yet still
- * decode successfully (forward compatibility). Pass a custom [Json] to override.
+ * Default [Json] used by [decodeAs]. Mirrors the JSON configuration the SDK uses
+ * internally (lenient + tolerant of unknown keys) so typed decoding behaves
+ * consistently with the rest of the SDK — feature config objects carrying fields
+ * the caller's model does not declare yet still decode successfully (forward
+ * compatibility). Pass a custom [Json] to override.
  */
 @PublishedApi
-internal val defaultDecodeJson: Json = Json { ignoreUnknownKeys = true }
+internal val defaultDecodeJson: Json = Json {
+    prettyPrint = true
+    isLenient = true
+    ignoreUnknownKeys = true
+}
 
 inline fun <reified T> GBValue.decodeAs(json: Json = defaultDecodeJson): T? {
     val jsonElement = this.gbSerialize()
