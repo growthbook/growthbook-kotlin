@@ -21,6 +21,7 @@ import com.sdk.growthbook.features.FeaturesDataModel
 import com.sdk.growthbook.features.FeaturesDataSource
 import com.sdk.growthbook.features.FeaturesFlowDelegate
 import com.sdk.growthbook.features.FeaturesViewModel
+import com.sdk.growthbook.features.FetchResult
 import com.sdk.growthbook.model.GBJson
 import com.sdk.growthbook.model.GBNull
 import com.sdk.growthbook.model.GBArray
@@ -322,9 +323,12 @@ class GrowthBookSDK internal constructor(
 
                 FeaturesFetchResult.Failed -> {
                     if (attempt >= MAX_RETRY_ATTEMPTS) return feature(id)
-                    featuresViewModel.awaitRefresh()
-
+                    // A superseded round is not a failure (nothing went wrong, its payload was just
+                    // discarded by a newer generation): re-join the latest generation without burning
+                    // a retry attempt or applying backoff.
+                    if (featuresViewModel.awaitRefresh() == FetchResult.Superseded) continue
                     if (remoteSourceFeaturesFetchResult != FeaturesFetchResult.Failed) continue
+
                     if (gbContext.enableLogging) {
                         GB.log("GrowthBookSDK: suspendFeature: retry attempt ${attempt + 1}/$MAX_RETRY_ATTEMPTS, waiting ${delaysMs}ms")
                     }

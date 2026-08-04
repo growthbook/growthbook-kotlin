@@ -354,6 +354,51 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         )
     }
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun testStaleRemoteEvalRoundReportsSupersededNotSuccess() = runTest {
+        // P1 (awaiter contract): a remote-eval round whose response is discarded by the generation
+        // guard must NOT resolve awaitRefresh() as Success — otherwise a suspendFeature() awaiting
+        // the OLD attributes would return a stale evaluation while a newer request is still pending.
+        // It must resolve as Superseded so the caller re-joins the current generation. Companion to
+        // testRemoteEvalOutOfOrderResponseIsDiscarded, which only checks the final applied payload.
+        val client = DeferredPostNetworkClient()
+        val emptyParams = GBRemoteEvalParams(emptyMap(), emptyMap(), emptyMap())
+        val viewModel = FeaturesViewModel(
+            delegate = this@FeaturesViewModelTests,
+            dataSource = FeaturesDataSource(client, gbContext, testGbOptions),
+            cachingEnabled = false,
+            cachingLayer = MockCachingLayer(), // empty store, keeps the test off disk
+            remoteEval = true,
+            remoteEvalPayloadProvider = { emptyParams },
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
+        )
+
+        // Coalesced round for the OLD attributes (generation 1); it suspends awaiting its POST.
+        var awaiterResult: FetchResult? = null
+        backgroundScope.launch { awaiterResult = viewModel.awaitRefresh() }
+        runCurrent()
+
+        // A newer state-change fetch bumps the generation (generation 2), superseding the awaiter.
+        viewModel.fetchFeatures(payload = emptyParams)
+        runCurrent()
+        assertEquals(2, client.pendingPosts.size)
+
+        // The OLD round's response arrives while the newer one is still pending.
+        client.pendingPosts[0]("""{"status":200,"features":{"old_feature":{"defaultValue":true}}}""")
+        runCurrent()
+
+        assertEquals(
+            FetchResult.Superseded,
+            awaiterResult,
+            "a discarded (superseded) remote-eval round must resolve awaitRefresh() as Superseded, not Success",
+        )
+
+        // Complete the still-pending latest round so runTest sees no leaked coroutine.
+        client.pendingPosts[1]("""{"status":200,"features":{"new_feature":{"defaultValue":true}}}""")
+        runCurrent()
+    }
+
     @Test
     fun testSynchronousDispatcherThrowIsReportedAsFailure() = runTest {
         // #3: a dispatcher that throws synchronously while enqueuing must be reported as a fetch

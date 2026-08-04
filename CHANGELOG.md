@@ -25,7 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   non-personalized (unevaluated) feature definitions.
 - Rapid attribute or forced-feature changes in remote-eval mode could apply an
   out-of-order (stale) evaluation when a slower earlier request completed after a newer
-  one; responses from superseded remote-eval requests are now discarded.
+  one; responses from superseded remote-eval requests are now discarded. A caller
+  awaiting such a superseded request is no longer reported a successful refresh, so
+  `suspendFeature()` cannot return the older, stale evaluation — it re-joins the latest
+  generation instead.
 - `setForcedFeatures()` and `setAttributeOverrides()` values are now published atomically
   alongside the other evaluation inputs, so an evaluation running on another thread always
   observes the latest values as part of a single consistent snapshot.

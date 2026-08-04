@@ -263,24 +263,33 @@ internal class FeaturesViewModel(
             if (remoteEval) {
                 // [generation] tags this remote-eval round (assigned by the caller at the ordering
                 // point). Remote-eval POSTs are independent and un-cancelled, so a slower older one
-                // can complete after a newer one; apply/report a response only if it is still the
+                // can complete after a newer one. Apply/report a response only while it is still the
                 // latest generation, otherwise a stale evaluation (e.g. for the previous attributes)
-                // would overwrite the current one.
+                // would overwrite the current one. A superseded round still resumes its continuation
+                // (as FetchResult.Superseded, never Success) so the awaiter re-joins the current
+                // generation instead of hanging or being told a discarded round succeeded.
                 dataSource.fetchRemoteEval(
                     params = payload,
                     success = {
                         coroutineScope.launch {
                             if (generation == remoteEvalGeneration.load()) {
                                 handleNetworkModel(it.data)
+                                resumeOnce(FetchResult.Success)
+                            } else {
+                                // Stale: payload not applied → do not report Success. Always resume
+                                // (no leak / no 30s timeout hang), but with a distinct result.
+                                resumeOnce(FetchResult.Superseded)
                             }
-                            resumeOnce(FetchResult.Success)
                         }
                     },
                     failure = {
                         if (generation == remoteEvalGeneration.load()) {
                             dispatch(FetchOutcome.Failed(GBError(it.exception), source = Source.NETWORK))
+                            resumeOnce(FetchResult.Failed)
+                        } else {
+                            // A stale failure is not the current fetch's failure either.
+                            resumeOnce(FetchResult.Superseded)
                         }
-                        resumeOnce(FetchResult.Failed)
                     }
                 )
             } else {
