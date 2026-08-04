@@ -15,6 +15,19 @@
 - **Use your existing event tracking (GA, Segment, Mixpanel, custom)**
 - **Adjust variation weights and targeting without deploying new code**
 
+## Requirements
+
+Starting with `GrowthBook` 7.4.0 (and `NetworkDispatcherKtor` / `NetworkDispatcherOkHttp` 1.1.0),
+the JVM and Android artifacts are compiled to **Java 17 bytecode (class file 61)** via a pinned JDK
+17 toolchain. **Java 17 is therefore the minimum runtime floor** on the JVM and Android targets —
+consumers must run on a JRE/Android runtime that supports Java 17 or newer. Running these artifacts
+on an older runtime (e.g. Java 11) fails at class load with `UnsupportedClassVersionError`.
+
+- **Android:** `minSdk 21`; desugaring/toolchains that emit Java 17-compatible bytecode.
+- **JVM:** Java 17 or newer.
+- Earlier SDK versions have no guaranteed floor: their bytecode version tracked whatever JDK
+  published them, so upgrade to 7.4.0 / 1.1.0 for a deterministic Java 17 contract.
+
 See [CHANGELOG.md](CHANGELOG.md) for version history.
 
 ## Setup

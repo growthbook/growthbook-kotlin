@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   artifact always contains Java 17 bytecode (class file 61) regardless of the JDK used
   to build it (#250).
 
+### Compatibility
+- **Java 17 is now the explicit minimum runtime floor for the JVM and Android artifacts.**
+  Consumers must run on a Java 17-or-newer runtime; older runtimes fail at class load with
+  `UnsupportedClassVersionError`.
+
 ---
 
 ## [1.0.14] - 2026-04-30

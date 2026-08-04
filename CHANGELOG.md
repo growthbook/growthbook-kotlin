@@ -16,6 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on JDK 21 shipped class file 65 and crashed JDK 17 consumers with
   `UnsupportedClassVersionError` (#250).
 
+### Compatibility
+- **Java 17 is now the explicit minimum runtime floor for the JVM and Android artifacts.**
+  This release makes the bytecode deterministic *and* defines the runtime compatibility
+  contract for consumers: the JVM/Android targets require a Java 17-or-newer runtime.
+  Earlier versions had no guaranteed floor (bytecode tracked the publishing JDK). See the
+  Requirements section of the README.
+
 ---
 ## [7.3.0] - 2026-07-20
 
