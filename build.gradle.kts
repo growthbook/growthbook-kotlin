@@ -53,12 +53,17 @@ subprojects {
     plugins.apply("signing")
     plugins.apply("maven-publish")
     plugins.apply("org.jetbrains.kotlinx.kover")
+    val signingKey = System.getenv("GPG_PRIVATE_KEY")
+    val signingPassword = System.getenv("GPG_PRIVATE_PASSWORD")
     signing {
-        useInMemoryPgpKeys(
-            System.getenv("GPG_PRIVATE_KEY"),
-            System.getenv("GPG_PRIVATE_PASSWORD")
-        )
-        sign(publishing.publications)
+        // Only configure signing when a GPG key is present in the environment
+        // (real releases export it via the shell / CI secrets). On PR runs the key
+        // is absent, so signing is skipped and publishToMavenLocal can succeed
+        // without a configured signatory.
+        if (!signingKey.isNullOrBlank()) {
+            useInMemoryPgpKeys(signingKey, signingPassword)
+            sign(publishing.publications)
+        }
     }
 
     tasks

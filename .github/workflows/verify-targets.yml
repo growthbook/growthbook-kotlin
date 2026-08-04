@@ -11,6 +11,12 @@ name: Verify targets
 on:
   pull_request
 
+# A newer push to the same PR cancels the previous in-progress run so we don't
+# wait behind (or queue up) stale runs of this long macOS build.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   compile-all-targets:
     runs-on: macos-latest
@@ -20,6 +26,14 @@ jobs:
       with:
         distribution: 'temurin'
         java-version: '17'
+    # Cache the Kotlin/Native (Konan) toolchain + LLVM/sysroot dependencies, which
+    # are otherwise re-downloaded (hundreds of MB) on every cold run.
+    - name: Cache Konan
+      uses: actions/cache@v4
+      with:
+        path: ~/.konan
+        key: konan-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml') }}
+        restore-keys: konan-${{ runner.os }}-
     - name: Set up Gradle
       uses: gradle/actions/setup-gradle@v3
     - name: Grant execute permission for gradlew
