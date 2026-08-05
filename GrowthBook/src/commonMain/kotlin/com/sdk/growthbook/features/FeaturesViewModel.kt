@@ -161,8 +161,19 @@ internal class FeaturesViewModel(
      * in-coroutine right before [performNetworkRound]. A remote-eval response is applied/reported
      * only while its captured generation is still the latest, so a slow older POST cannot overwrite
      * the result of a newer one (out-of-order responses after rapid attribute/forced-feature changes).
+     * The generation check and the (suspend) apply are made atomic by [applyMutex]; the check alone is
+     * not enough — see there.
      */
     private val remoteEvalGeneration = AtomicLong(0)
+
+    /**
+     * Serializes the *application* of a remote-eval payload (the generation check + [handleNetworkModel]).
+     * Without it the `generation == remoteEvalGeneration.load()` check and the suspend apply are not
+     * atomic: on a multi-threaded dispatcher an older round whose check passed could finish its slow
+     * sticky-bucket apply *after* a newer round already applied, overwriting the newer personalized
+     * features. Holding this lock across check+apply makes the newest generation win deterministically.
+     */
+    private val applyMutex = Mutex()
 
     /** Opens an SSE connection and streams feature updates as a [Flow]. */
     fun autoRefreshFeatures(): Flow<Resource<GBFeatures?>> {
@@ -272,13 +283,18 @@ internal class FeaturesViewModel(
                     params = payload,
                     success = {
                         coroutineScope.launch {
-                            if (generation == remoteEvalGeneration.load()) {
-                                handleNetworkModel(it.data)
-                                resumeOnce(FetchResult.Success)
-                            } else {
-                                // Stale: payload not applied → do not report Success. Always resume
-                                // (no leak / no 30s timeout hang), but with a distinct result.
-                                resumeOnce(FetchResult.Superseded)
+                            // Check the generation and apply the payload atomically under applyMutex:
+                            // the check must hold until handleNetworkModel finishes, or a newer round
+                            // could apply in between and then be overwritten by this (older) one.
+                            applyMutex.withLock {
+                                if (generation == remoteEvalGeneration.load()) {
+                                    handleNetworkModel(it.data)
+                                    resumeOnce(FetchResult.Success)
+                                } else {
+                                    // Stale: payload not applied → do not report Success. Always resume
+                                    // (no leak / no 30s timeout hang), but with a distinct result.
+                                    resumeOnce(FetchResult.Superseded)
+                                }
                             }
                         }
                     },

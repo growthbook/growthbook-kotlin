@@ -12,6 +12,7 @@ import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBOptions
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
@@ -397,6 +398,69 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         // Complete the still-pending latest round so runTest sees no leaked coroutine.
         client.pendingPosts[1]("""{"status":200,"features":{"new_feature":{"defaultValue":true}}}""")
         runCurrent()
+    }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun testOlderRemoteEvalApplyCannotOverwriteNewerWhileSuspended() = runTest {
+        // #2: the generation check and the (suspend) payload apply must be atomic. Here the OLDER
+        // round passes its generation check and then SUSPENDS mid-apply (inside onPayloadReady) while
+        // the NEWER round completes. Without serializing the apply under applyMutex, the older round
+        // would resume and apply last, overwriting the newer personalized features. The mutex must
+        // make the newest generation win regardless of how the applies interleave.
+        val client = DeferredPostNetworkClient()
+        val oldApplyGate = CompletableDeferred<Unit>()
+        val appliedOrder = mutableListOf<String>()
+        val delegate = object : FeaturesFlowDelegate {
+            override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
+                features.keys.firstOrNull()?.let { appliedOrder.add(it) }
+            }
+            override suspend fun onPayloadReady(model: FeaturesDataModel) {
+                // Hold the OLDER round inside its apply until the test releases the gate.
+                if (model.features?.containsKey("old_feature") == true) oldApplyGate.await()
+            }
+            override fun featuresFetchFailed(error: GBError, isRemote: Boolean) = Unit
+            override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) = Unit
+            override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) = Unit
+            override fun featuresNotModified() = Unit
+        }
+        val viewModel = FeaturesViewModel(
+            delegate = delegate,
+            dataSource = FeaturesDataSource(client, gbContext, testGbOptions),
+            cachingEnabled = false,
+            remoteEval = true,
+            remoteEvalPayloadProvider = { GBRemoteEvalParams(emptyMap(), emptyMap(), emptyMap()) },
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
+        )
+
+        // Older round via the COALESCED path (awaitRefresh), so the fetchFromNetwork job ref does not
+        // cancel it — this isolates the applyMutex behaviour from the fire-and-forget cancellation (#3).
+        backgroundScope.launch { viewModel.awaitRefresh() } // generation 1 (older)
+        runCurrent()
+        assertEquals(1, client.pendingPosts.size)
+        client.pendingPosts[0]("""{"status":200,"features":{"old_feature":{"defaultValue":true}}}""")
+        runCurrent()
+        // Older round now holds applyMutex, suspended inside onPayloadReady on the gate.
+
+        viewModel.fetchFeatures() // generation 2 (newer)
+        runCurrent()
+        assertEquals(2, client.pendingPosts.size)
+        client.pendingPosts[1]("""{"status":200,"features":{"new_feature":{"defaultValue":true}}}""")
+        runCurrent()
+        // Newer round is now blocked on applyMutex behind the older round (it must not have applied yet).
+        assertTrue(
+            "new_feature" !in appliedOrder,
+            "the newer round must wait for the older apply to release the mutex",
+        )
+
+        oldApplyGate.complete(Unit) // release older apply; the newer one applies after it, winning.
+        runCurrent()
+
+        assertEquals(
+            "new_feature",
+            appliedOrder.lastOrNull(),
+            "the newest generation must win even when an older apply was suspended mid-flight",
+        )
     }
 
     @Test
