@@ -10,19 +10,27 @@ import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.model.GBFeatureSource
+import com.sdk.growthbook.model.GBNull
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.toGbBoolean
+import com.sdk.growthbook.sandbox.CachingJvm
+import com.sdk.growthbook.sandbox.GBCachingLayer
+import com.sdk.growthbook.serializable_model.SerializableFeaturesDataModel
 import com.sdk.growthbook.stickybucket.GBStickyBucketServiceImp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import org.junit.Rule
+import org.junit.rules.TemporaryFolder
+import java.nio.file.Files.createTempDirectory
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -38,12 +46,17 @@ class GrowthBookSDKBuilderTests {
     val testKeyString = "3tfeoyW0wlo47bDnbWDkxg=="
     val testAttributes: HashMap<String, GBValue> = HashMap()
 
+    @Rule
+    @JvmField
+    var tempFolder = TemporaryFolder()
+
     @BeforeTest
     fun setUp() {
+        CachingJvm.baseDir = tempFolder.newFolder()
     }
 
     @Test
-    fun testSDKInitilizationDefault() {
+    fun testSDKInitializationDefault() {
 
         val sdkInstance = GBSDKBuilder(
             testApiKey,
@@ -432,6 +445,161 @@ class GrowthBookSDKBuilderTests {
         }
 
     @Test
+    fun test_updateAttributes_mergesNewKeysAndPreservesExisting() = TestScope().runTest {
+        val sdk = buildSdkWithHandler()
+        sdk.setAttributesSync(mapOf("id" to GBString("1")))
+
+        sdk.updateAttributes(mapOf("plan" to GBString("pro")))
+
+        val attrs = sdk.getGBContext().attributes
+        assertEquals("1", (attrs["id"] as? GBString)?.value)
+        assertEquals("pro", (attrs["plan"] as? GBString)?.value)
+    }
+
+    @Test
+    fun test_updateAttributes_overwritesExistingKey() = TestScope().runTest {
+        val sdk = buildSdkWithHandler()
+        sdk.setAttributesSync(mapOf("plan" to GBString("free"), "id" to GBString("1")))
+
+        sdk.updateAttributes(mapOf("plan" to GBString("pro")))
+
+        val attrs = sdk.getGBContext().attributes
+        assertEquals("pro", (attrs["plan"] as? GBString)?.value)
+        assertEquals("1", (attrs["id"] as? GBString)?.value)
+    }
+
+    @Test
+    fun test_updateAttributes_gbNullKeepsKey_matchesTypeScript() = TestScope().runTest {
+        // Parity with the TS reference SDK: a null value keeps the key with a null value,
+        // it does NOT remove the key (removal requires a full setAttributes replace).
+        val sdk = buildSdkWithHandler()
+        sdk.setAttributesSync(mapOf("plan" to GBString("pro")))
+
+        sdk.updateAttributes(mapOf("plan" to GBNull))
+
+        val attrs = sdk.getGBContext().attributes
+        assertTrue(attrs.containsKey("plan"))
+        assertTrue(attrs["plan"] is GBNull)
+    }
+
+    @Test
+    fun test_updateAttributesSync_mergesNewKeysAndPreservesExisting() = TestScope().runTest {
+        val sdk = buildSdkWithHandler()
+        sdk.setAttributesSync(mapOf("id" to GBString("1")))
+
+        sdk.updateAttributesSync(mapOf("plan" to GBString("pro")))
+
+        val attrs = sdk.getGBContext().attributes
+        assertEquals("1", (attrs["id"] as? GBString)?.value)
+        assertEquals("pro", (attrs["plan"] as? GBString)?.value)
+    }
+
+    @Test
+    fun test_updateAttributes_concurrentMergesDoNotLoseKeys() {
+        // Regression for the non-atomic read-modify-write: each thread adds its own disjoint keys
+        // concurrently; with a read-then-setAttributes merge some writes would be lost. The atomic
+        // GBContext.mergeAttributesClearingStickyDocs keeps every key.
+        val sdk = GBSDKBuilder(
+            testApiKey,
+            testHostURL,
+            attributes = emptyMap(),
+            encryptionKey = null,
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
+            networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
+            remoteEval = false,
+        ).initialize()
+
+        val threadCount = 8
+        val perThread = 200
+        val ready = CountDownLatch(threadCount)
+        val start = CountDownLatch(1)
+        val threads = (0 until threadCount).map { t ->
+            Thread {
+                ready.countDown()
+                start.await()
+                repeat(perThread) { i -> sdk.updateAttributes(mapOf("k_${t}_$i" to GBString("v"))) }
+            }
+        }
+        threads.forEach { it.start() }
+        ready.await()
+        start.countDown() // release all threads at once to maximize contention
+        threads.forEach { it.join() }
+
+        assertEquals(
+            threadCount * perThread,
+            sdk.getGBContext().attributes.size,
+            "concurrent updateAttributes must not drop any keys"
+        )
+    }
+
+    @Test
+    fun test_setAttributes_withRemoteEval_triggersRemoteRefresh() = runTest {
+        val client = CountingPostNetworkClient(MockResponse.successResponse)
+        val sdk = GBSDKBuilder(
+            testApiKey,
+            testHostURL,
+            attributes = mapOf("id" to GBString("1")),
+            encryptionKey = null,
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
+            networkDispatcher = client,
+            remoteEval = true,
+        ).setCoroutineContext(UnconfinedTestDispatcher(testScheduler)).initialize()
+
+        val countAfterInit = client.postCount
+        sdk.setAttributes(mapOf("id" to GBString("2")))
+
+        assertTrue(
+            client.postCount > countAfterInit,
+            "Changing attributes in remote-eval mode must trigger a fresh remote evaluation request"
+        )
+    }
+
+    @Test
+    fun test_updateAttributes_withRemoteEval_triggersRemoteRefresh() = runTest {
+        val client = CountingPostNetworkClient(MockResponse.successResponse)
+        val sdk = GBSDKBuilder(
+            testApiKey,
+            testHostURL,
+            attributes = mapOf("id" to GBString("1")),
+            encryptionKey = null,
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
+            networkDispatcher = client,
+            remoteEval = true,
+        ).setCoroutineContext(UnconfinedTestDispatcher(testScheduler)).initialize()
+
+        val countAfterInit = client.postCount
+        sdk.updateAttributes(mapOf("plan" to GBString("pro")))
+
+        assertTrue(
+            client.postCount > countAfterInit,
+            "updateAttributes in remote-eval mode must trigger a fresh remote evaluation request"
+        )
+    }
+
+    @Test
+    fun test_setForcedFeatures_withRemoteEval_triggersRemoteRefresh() = runTest {
+        val client = CountingPostNetworkClient(MockResponse.successResponse)
+        val sdk = GBSDKBuilder(
+            testApiKey,
+            testHostURL,
+            attributes = mapOf("id" to GBString("1")),
+            encryptionKey = null,
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
+            networkDispatcher = client,
+            remoteEval = true,
+        ).setCoroutineContext(UnconfinedTestDispatcher(testScheduler)).initialize()
+
+        val countAfterInit = client.postCount
+        sdk.setForcedFeatures(mapOf("featureForce" to GBNumber(112)))
+
+        assertTrue(
+            client.postCount > countAfterInit,
+            "setForcedFeatures in remote-eval mode must trigger a fresh remote evaluation request " +
+                "(forcedFeatures is part of the remote-eval payload)"
+        )
+    }
+
+    @Test
     fun test_savedGroupsFetchFailed_isRemoteTrue_callsRefreshHandlerWithFalse() = runTest {
         var handlerSuccess: Boolean? = null
         val sdk = buildSdkWithHandler(refreshHandler = { success, _ -> handlerSuccess = success })
@@ -748,7 +916,7 @@ class GrowthBookSDKBuilderTests {
     }
 
     @Test
-    fun testSetInitialFeaturesTreats304AsSuccess() {
+    fun testSetInitialFeaturesTreats304AsSuccess() = runTest {
         val bundledFeatures: GBFeatures = mapOf("bundled-feature" to GBFeature())
         var refreshCalled = false
         var refreshSuccess: Boolean? = null
@@ -770,6 +938,9 @@ class GrowthBookSDKBuilderTests {
                 refreshCalled = true
                 refreshSuccess = success
             }
+            // Deterministic dispatcher: the fetch's 304 callback is applied on the test scheduler,
+            // so the assertions below observe a completed refresh without relying on wall-clock timing.
+            .setCoroutineContext(UnconfinedTestDispatcher(testScheduler))
             .initialize()
 
         assertTrue(refreshCalled, "Refresh handler should be invoked on a 304 response")
@@ -782,6 +953,63 @@ class GrowthBookSDKBuilderTests {
             sdkInstance.getFeatures().containsKey("bundled-feature"),
             "Bundled initial features should remain available after a 304"
         )
+    }
+
+    @Test
+    fun testSetCachingLayerPersistsFeaturesThroughCustomLayer() = runTest {
+        val customLayer = FakeCachingLayer()
+        GBSDKBuilder(
+            testApiKey,
+            testHostURL,
+            attributes = testAttributes,
+            encryptionKey = null,
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
+            networkDispatcher = MockNetworkClient(
+                successResponse = MockResponse.successResponse,
+                error = null,
+                notModified = false
+            ),
+        )
+            .setCoroutineContext(UnconfinedTestDispatcher(testScheduler))
+            .setCachingLayer(customLayer)
+            .initialize()
+
+        testScheduler.advanceUntilIdle()
+
+        assertTrue(customLayer.store.containsKey("FeatureCache_$testApiKey"))
+    }
+
+    @Test
+    fun testSetCachingLayerReadsCachedFeaturesFromCustomLayer() {
+        val customLayer = FakeCachingLayer()
+
+        // Seed the custom layer with a valid SerializableFeaturesDataModel payload:
+        // a top-level object with a "features" map (no "status" wrapper — that key is
+        // unknown to the model and the strict cache decoder would reject it).
+        customLayer.store["FeatureCache_$testApiKey"] = """
+            {
+              "features": {
+                "onboarding": { "defaultValue": "top" }
+              }
+            }
+        """.trimIndent()
+
+        // Network fails, so features can only come from the custom cache layer.
+        val sdkInstance = GBSDKBuilder(
+            testApiKey,
+            testHostURL,
+            attributes = testAttributes,
+            encryptionKey = null,
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
+            networkDispatcher = MockNetworkClient(
+                successResponse = null,
+                error = Throwable("no network"),
+            ),
+        )
+            .setCachingLayer(customLayer)
+            .initialize()
+
+        assertTrue(sdkInstance.getFeatures().isNotEmpty())
     }
 
 //    @Test
@@ -801,4 +1029,16 @@ class GrowthBookSDKBuilderTests {
 //
 //    }
 
+}
+
+class FakeCachingLayer: GBCachingLayer {
+    val store = mutableMapOf<String, String>()
+
+    override fun getContent(fileName: String): String? {
+        return store[fileName]
+    }
+
+    override fun saveContent(fileName: String, content: String) {
+        store[fileName] = content
+    }
 }

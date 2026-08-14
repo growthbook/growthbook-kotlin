@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [1.1.0] - 2026-08-14
+
+### Added
+- New `macosArm64` target, so the Ktor dispatcher covers the same Apple platforms as the core SDK (the shared Apple source set now uses `ktor-client-darwin` for iOS and macOS)
+
+### Fixed
+- `handleGetRequest`: catch `Throwable` (not just `Exception`) so a Ktor fetch failure on Kotlin/JS and Kotlin/Wasm — which surfaces as a `Throwable` that is not a `kotlin.Exception` (e.g. "Failed to fetch") — is routed to `onError` instead of escaping as an uncaught coroutine error
+
+---
+## [1.0.15] - 2026-08-14
+
+### Fixed
+- `consumePOSTRequest()` no longer wraps the request in `client.use { }`, which closed the
+  shared, long-lived `HttpClient` after the first POST and broke every subsequent
+  GET/POST/SSE request. This surfaced in remote-eval mode, where each attribute change
+  issues a POST.
+- `Map`/`List.toJsonElement()` now pass an already-serialized `JsonElement` through
+  untouched (branch added before `Map`/`List`, since `JsonObject`/`JsonArray` are
+  themselves `Map`/`List`), so pre-encoded POST-body values are no longer re-stringified
+  and double-quoted.
+
+---
 
 ## [1.1.0] - 2026-07-22
 

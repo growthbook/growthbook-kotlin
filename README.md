@@ -7,7 +7,7 @@
 # GrowthBook - Kotlin SDK
 
 - **Lightweight and fast**
-- **Kotlin Multiplatform (Android, iOS, JVM, JS, Wasm)**
+- **Kotlin Multiplatform (Android, iOS, macOS (Apple Silicon), JVM, JS, Wasm)**
     - **Android version 21 & above**
     - **JDK 17 & Above**
     - **iOS (iosX64, iosArm64, iosSimulatorArm64)**
@@ -41,7 +41,7 @@ repositories {
 
 dependencies {
     // Add GrowthBook module:
-    implementation 'io.growthbook.sdk:GrowthBook:7.4.0'
+    implementation 'io.growthbook.sdk:GrowthBook:7.7.0'
 
     // Add Network Dispatcher you prefer:
     // 1) NetworkDispatcherKtor — supports Android, iOS, JVM, JS, Wasm
@@ -123,7 +123,30 @@ var sdkInstance: GrowthBookSDK = GBSDKBuilder(
 
 The seeded features are applied immediately. The normal cache/network refresh still runs on top and overwrites the seed as fresher data arrives. Effective precedence: **network > disk cache > seed > code defaults**.
 
-> **Upgrading from 6.x (Android):** Persistent caching is only implemented on Android; other platforms do not cache features to disk, so this upgrade note does not apply to them. On Android the cache file is automatically migrated from `FeatureCache.txt` to the new scoped `FeatureCache_<clientKey>.txt` on first launch. Single-instance apps migrate transparently with no cold start. Apps that use multiple SDK instances with different `clientKey`s may see one cold start without cache on the first launch after upgrade — features self-correct after the first successful fetch.
+> **Upgrading from 6.x:** Persistent caching is now implemented on every target — Android, Apple (iOS/macOS) and the JVM (on disk), and JS and wasmJs (browser `localStorage`). The legacy `FeatureCache.txt` → `FeatureCache_<clientKey>.txt` migration applies to Android only, so this upgrade note does not apply to the other targets.
+
+#### Custom cache layer (`setCachingLayer`)
+
+By default the SDK caches feature definitions in the built-in per-platform storage described above. To make GrowthBook persist through **your own** storage instead — a shared KMP key/value store, encrypted storage, or one place to clear/reset all cached state — provide a `GBCachingLayer`:
+
+```kotlin
+class MyCachingLayer : GBCachingLayer {
+    override fun saveContent(fileName: String, content: String) = myKvStore.put(fileName, content)
+    override fun getContent(fileName: String): String? = myKvStore.get(fileName)
+}
+
+var sdkInstance: GrowthBookSDK = GBSDKBuilder(
+    apiKey = <API_KEY>,
+    hostURL = <GrowthBook_URL>,
+    attributes = hashMapOf(),
+    trackingCallback = { _, _ -> },
+    networkDispatcher = GBNetworkDispatcherKtor(),
+)
+    .setCachingLayer(MyCachingLayer()) // routes both feature and sticky-bucket storage
+    .initialize()
+```
+
+Values are opaque JSON strings keyed by filename — persist and return them verbatim. When set, the custom layer replaces the built-in cache for both feature definitions and sticky-bucket storage. It may be called in any order relative to the sticky-bucket setters.
 
 #### Cache freshness window (`setCacheMaxAge`)
 
@@ -218,6 +241,19 @@ and returns a feature value typed with specified type.
   fun stopAutoRefreshFeatures() {}
   ```
 
+- set a handler to be notified about only the feature flags that changed on a refresh
+  (SSE / network), instead of reacting to the whole feature set — useful to avoid
+  invalidating an external cache for unrelated flags. The handler fires after features
+  are applied, only on an authoritative result and only when something changed; it does
+  not fire for the non-authoritative cached payload served before a network refresh. When
+  no features were applied yet, the first call reports the whole set as `added`.
+
+  ```kotlin
+  fun setFeaturesChangeHandler(handler: GBFeaturesChangeHandler): GBSDKBuilder
+  // GBFeaturesChangeHandler = (GBFeaturesDiff) -> Unit
+  // GBFeaturesDiff(added, removed, changed) + hasChanges / changedKeys
+  ```
+
 - The isOn method takes a single string argument, which is the unique identifier for the feature and returns the feature
   state on/off
 
@@ -243,6 +279,23 @@ and returns a feature value typed with specified type.
   fun setAttributes(attributes: Map<String, GBValue>) {}
   ```
 
+- The updateAttributes method shallow-merges into the current attributes instead of replacing them
+  (parity with the TypeScript SDK's `updateAttributes`): new keys are added, existing keys are
+  overwritten, and untouched keys are preserved. The merge is one level deep — nested `GBJson`/
+  `GBArray` values are replaced wholesale. A key mapped to `GBNull` keeps the key with a null value
+  (it is **not** removed); to remove a key, rebuild the map with `setAttributes`.
+
+  ```kotlin
+  fun updateAttributes(attributes: Map<String, GBValue>) {}
+  ```
+
+  Example:
+  ```kotlin
+  sdk.setAttributes(mapOf("id" to GBString("1")))
+  sdk.updateAttributes(mapOf("plan" to GBString("pro")))
+  // evaluation now sees both "id" and "plan"
+  ```
+
 - The setAttributeOverrides method replaces the Map of attribute overrides used for Sticky Bucketing.
 
   ```kotlin
@@ -254,6 +307,7 @@ and returns a feature value typed with specified type.
 
   ```kotlin
   suspend fun setAttributesSync(attributes: Map<String, GBValue>) {}
+  suspend fun updateAttributesSync(attributes: Map<String, GBValue>) {}
   suspend fun setAttributeOverridesSync(overrides: Map<String, GBValue>) {}
   ```
 
@@ -319,7 +373,8 @@ You must enable Remote Evaluation in your SDK Connection settings. Cloud custome
 GrowthBook Proxy Server or custom remote evaluation backend.
 
 To use Remote Evaluation, set the `remoteEval = true` property to your SDK instance. A new evaluation API call will be
-made any time a user attribute or other dependency changes.
+made any time a user attribute or other dependency changes — specifically on `setAttributes` / `setAttributesSync` /
+`updateAttributes` / `updateAttributesSync`, `setAttributeOverrides`, `setForcedFeatures`, and `setForcedVariations`.
 
 > If you would like to implement Sticky Bucketing while using Remote Evaluation, you must configure your remote evaluation
 > backend to support Sticky Bucketing. You will not need to provide a StickyBucketService instance to the client side SDK.

@@ -16,10 +16,16 @@ internal class FeaturePayloadDecoder(private val encryptionKey: String?) {
     )
 
     private fun <T: Map<*, *>> decode(plain: T?, encrypted: String?, decrypt: (String, String, Crypto?) -> T?) : T? {
-        plain?.takeIf { it.isNotEmpty() }?.let { return it }
-        val e = encrypted ?: return null
-        val key = encryptionKey?.takeIf { it.isNotEmpty() } ?: return null
-        return decrypt(e, key, DefaultCrypto())
+        plain?.takeIf { it.isNotEmpty() }?.let { return it } // return if plain features are present
+        val key = encryptionKey?.takeIf { it.isNotEmpty() }
+        if (encrypted != null && key != null) {
+            return decrypt(
+                encrypted,
+                key,
+                DefaultCrypto()
+            ) // return decrypted features if plain is absent
+        }
+        return plain // otherwise return empty features
     }
 }
 
