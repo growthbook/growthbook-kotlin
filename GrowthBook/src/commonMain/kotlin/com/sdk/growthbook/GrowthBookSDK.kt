@@ -38,7 +38,9 @@ import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.kotlinx.serialization.from
 import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.StackContext
+import com.sdk.growthbook.utils.GBFeaturesChangeHandler
 import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBuckets
+import com.sdk.growthbook.model.diffFeatures
 import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
 import kotlin.experimental.ExperimentalObjCRefinement
@@ -72,7 +74,8 @@ class GrowthBookSDK internal constructor(
     // runs on a defined background context rather than an arbitrary thread. Overridable (e.g. with a
     // test dispatcher) so tests can drive the async pipeline deterministically.
     coroutineContext: CoroutineContext,
-) : FeaturesFlowDelegate {
+    private val featuresChangeHandler: GBFeaturesChangeHandler? = null
+    ) : FeaturesFlowDelegate {
 
     /**
      * Public constructor, kept binary-compatible with pre-7.3.0 releases. To set a cache
@@ -214,12 +217,22 @@ class GrowthBookSDK internal constructor(
      * Delegate that set to Context successfully fetched features
      */
     override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
+        // Compute the diff only for authoritative results (network / SSE / fresh cache), against the
+        // features currently applied. The non-authoritative cache pre-load that precedes a network
+        // refresh must not notify, otherwise the handler double-fires on a warm start (cache, then
+        // network); the subsequent authoritative result reports the real delta.
+        val diff = if (isRemote) {
+            featuresChangeHandler?.let { diffFeatures(gbContext.features, features) }
+        } else null
+
         gbContext.features = features
         hasFeaturesPayload = true
         if (isRemote) {
             remoteSourceFeaturesFetchResult = FeaturesFetchResult.Success
             this.refreshHandler?.invoke(true, null)
         }
+
+        diff?.takeIf { it.hasChanges }?.let { featuresChangeHandler?.invoke(it) }
     }
 
     /**

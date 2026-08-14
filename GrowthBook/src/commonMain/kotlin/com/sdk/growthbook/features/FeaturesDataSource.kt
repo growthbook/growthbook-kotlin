@@ -53,7 +53,8 @@ internal class FeaturesDataSource(
         onNotModified: (() -> Unit)
     ) {
         if (dispatcher is NetworkDispatcherWithNotModified) {
-            dispatcher.consumeGETRequestWithNotModified(request = getEndpoint(),
+            dispatcher.consumeGETRequestWithNotModified(
+                request = getEndpoint(),
                 onSuccess = { rawContent ->
                     val result = jsonParser.decodeFromString(
                         deserializer = SerializableFeaturesDataModel.serializer(),
@@ -85,25 +86,33 @@ internal class FeaturesDataSource(
     /**
      * Supportive method for automatically refresh features
      */
-    fun autoRefresh(
-        success: (FeaturesDataModel) -> Unit, failure: (Throwable?) -> Unit
-    ): Flow<Resource<GBFeatures?>> = dispatcher.consumeSSEConnection(
-        url = getEndpoint(FeatureRefreshStrategy.SERVER_SENT_EVENTS),sseController = sseController
-    ).transform { resource ->
-        if (resource is Resource.Success) {
-            val serializableFeaturesDataModel = jsonParser.decodeFromString(
-                SerializableFeaturesDataModel.serializer(), resource.data
-            )
-            val featuresDataModel = serializableFeaturesDataModel.gbDeserialize()
-
-            val gbFeatures = featuresDataModel.features
-            emit(Resource.Success(gbFeatures))
-            featuresDataModel.also(success)
-        } else if (resource is Resource.Error) {
-            emit(resource)
-            resource.exception.also(failure)
+    fun autoRefreshRaw(): Flow<Resource<FeaturesDataModel>> =
+        dispatcher.consumeSSEConnection(
+            url = getEndpoint(FeatureRefreshStrategy.SERVER_SENT_EVENTS),
+            sseController = sseController
+        ).transform { resource ->
+            when (resource) {
+                is Resource.Success -> {
+                    // Decode + deserialize can throw on a malformed SSE payload. Catch here and
+                    // degrade to Resource.Error so the stream survives and the collector still gets
+                    // featuresFetchFailed, instead of the exception terminating the Flow. emit stays
+                    // outside the catch so a downstream CancellationException is not swallowed.
+                    val featuresDataModel = try {
+                        jsonParser.decodeFromString(
+                            SerializableFeaturesDataModel.serializer(),
+                            resource.data
+                        ).gbDeserialize()
+                    } catch (e: Exception) {
+                        emit(Resource.Error(e))
+                        return@transform
+                    }
+                    emit(Resource.Success(featuresDataModel))
+                }
+                is Resource.Error -> {
+                    emit(resource)
+                }
+            }
         }
-    }
 
     /**
      * Method that make POST request to server for evaluate feature remotely

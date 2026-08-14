@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [7.5.0] - 2026-08-14
+
+### Added
+- `GBSDKBuilder.setFeaturesChangeHandler()` — callback notified with a `GBFeaturesDiff` (added / removed / changed flags) on each refresh, so consumers can react to only the flags that changed instead of the whole feature set. Fires on all update paths (SSE / GET / remote-eval) after features are applied, and only when something changed
+
+### Fixed
+- SSE auto-refresh now emits decrypted features to the `Flow` for encrypted-feature projects, instead of a "success with empty data" event (the raw `features` field is null for encrypted payloads)
+- An empty features payload (e.g. all flags deleted in the admin) is now applied as an empty feature set instead of surfacing a spurious refresh error
+
+---
 ## [7.4.0] - 2026-08-14
 
 ### Added

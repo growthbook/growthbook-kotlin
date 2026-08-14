@@ -28,13 +28,13 @@ repositories {
 
 dependencies {
     // Add GrowthBook module:
-    implementation 'io.growthbook.sdk:GrowthBook:7.2.0'
+    implementation 'io.growthbook.sdk:GrowthBook:7.5.0'
 
     // Add Network Dispatcher you prefer:
     // 1) NetworkDispatcherKtor — supports Android, iOS, JVM, JS, Wasm
-    implementation 'io.growthbook.sdk:NetworkDispatcherKtor:1.0.12'
+    implementation 'io.growthbook.sdk:NetworkDispatcherKtor:1.0.15'
     // 2) NetworkDispatcherOkHttp — supports Android and JVM only
-    implementation 'io.growthbook.sdk:NetworkDispatcherOkHttp:1.0.7'
+    implementation 'io.growthbook.sdk:NetworkDispatcherOkHttp:1.0.9'
 }
 ```
 
@@ -203,6 +203,19 @@ and returns a feature value typed with specified type.
 
   ```kotlin
   fun stopAutoRefreshFeatures() {}
+  ```
+
+- set a handler to be notified about only the feature flags that changed on a refresh
+  (SSE / network), instead of reacting to the whole feature set — useful to avoid
+  invalidating an external cache for unrelated flags. The handler fires after features
+  are applied, only on an authoritative result and only when something changed; it does
+  not fire for the non-authoritative cached payload served before a network refresh. When
+  no features were applied yet, the first call reports the whole set as `added`.
+
+  ```kotlin
+  fun setFeaturesChangeHandler(handler: GBFeaturesChangeHandler): GBSDKBuilder
+  // GBFeaturesChangeHandler = (GBFeaturesDiff) -> Unit
+  // GBFeaturesDiff(added, removed, changed) + hasChanges / changedKeys
   ```
 
 - The isOn method takes a single string argument, which is the unique identifier for the feature and returns the feature
