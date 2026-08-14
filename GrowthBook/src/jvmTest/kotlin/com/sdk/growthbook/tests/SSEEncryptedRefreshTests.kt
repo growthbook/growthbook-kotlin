@@ -10,7 +10,11 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import com.sdk.growthbook.sandbox.CachingJvm
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
+import kotlin.test.BeforeTest
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -22,6 +26,19 @@ class SSEEncryptedRefreshTests {
         "vMSg2Bj/IurObDsWVmvkUg==.L6qtQkIzKDoE2Dix6IAKDcVel8PHUnzJ7JjmLjFZFQDqidRIoCxKmvxvUj2kTuHFTQ3/NJ3D6XhxhXXv2+dsXpw5woQf0eAgqrcxHrbtFORs18tRXRZza7zqgzwvcznx"
     private val encPayload = """{"status":200,"encryptedFeatures":"$encBlob"}"""
     private val attrs = mapOf("id" to GBString("user-1"))
+
+    // Isolate the JVM disk cache per test: without this, every SDK here shares
+    // <user.home>/.growthbook/…/FeatureCache_key.txt, so a payload persisted by one test is read
+    // back on the next SDK's init — e.g. the change-handler test would then see no diff (features
+    // already present) and its handler would never fire. Mirrors GrowthBookSDKBuilderTests.
+    @Rule
+    @JvmField
+    var tempFolder = TemporaryFolder()
+
+    @BeforeTest
+    fun setUp() {
+        CachingJvm.baseDir = tempFolder.newFolder()
+    }
 
     @Test
     fun plainFetch_appliesFeatures() = runTest {
@@ -74,7 +91,7 @@ class SSEEncryptedRefreshTests {
             trackingCallback = { _, _ -> },
             networkDispatcher = sseDispatcher,
             remoteEval = false
-        ).initialize()
+        ).setCoroutineContext(UnconfinedTestDispatcher(testScheduler)).initialize()
 
         val emissions = sdk.startAutoRefreshFeatures().toList()
         val first = emissions.first() as Resource.Success
@@ -105,6 +122,7 @@ class SSEEncryptedRefreshTests {
             remoteEval = false
         )
             .setFeaturesChangeHandler { diff -> captured = diff }
+            .setCoroutineContext(UnconfinedTestDispatcher(testScheduler))
             .initialize()
 
         sdk.startAutoRefreshFeatures().toList()
@@ -129,7 +147,7 @@ class SSEEncryptedRefreshTests {
             trackingCallback = { _, _ -> },
             networkDispatcher = sseDispatcher,
             remoteEval = false
-        ).initialize()
+        ).setCoroutineContext(UnconfinedTestDispatcher(testScheduler)).initialize()
 
         // A malformed payload must degrade to Resource.Error, not throw out of the Flow.
         val emissions = sdk.startAutoRefreshFeatures().toList()
@@ -153,7 +171,7 @@ class SSEEncryptedRefreshTests {
             trackingCallback = { _, _ -> },
             networkDispatcher = sseDispatcher,
             remoteEval = false
-        ).initialize()
+        ).setCoroutineContext(UnconfinedTestDispatcher(testScheduler)).initialize()
 
         val emissions = sdk.startAutoRefreshFeatures().toList()
 

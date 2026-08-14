@@ -8,6 +8,9 @@ import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBOptions
 import com.sdk.growthbook.network.NetworkDispatcher
 import com.sdk.growthbook.sandbox.CachingImpl
+import com.sdk.growthbook.sandbox.CachingLayer
+import com.sdk.growthbook.sandbox.GBCachingLayer
+import com.sdk.growthbook.sandbox.GBCachingLayerAdapter
 import com.sdk.growthbook.stickybucket.GBStickyBucketService
 import com.sdk.growthbook.stickybucket.GBStickyBucketServiceImp
 import com.sdk.growthbook.utils.GBCacheRefreshHandler
@@ -106,6 +109,10 @@ class GBSDKBuilder(
     private var refreshHandler: GBCacheRefreshHandler? = null
     private var featuresChangeHandler: GBFeaturesChangeHandler? = null
     private var stickyBucketService: GBStickyBucketService? = null
+    // Deferred builder for the default sticky-bucket service. The caching layer is resolved
+    // lazily at initialize() time (via resolveCachingLayer()) rather than when the setter is
+    // called, so setCachingLayer() and the sticky-bucket setters can be called in any order.
+    private var stickyBucketServiceFactory: ((CachingLayer) -> GBStickyBucketService)? = null
     private var featureUsageCallback: GBFeatureUsageCallback? = null
     private var initialFeatures: GBFeatures? = null
     private var cacheMaxAge: Long? = null
@@ -114,6 +121,7 @@ class GBSDKBuilder(
     // production; tests inject a deterministic dispatcher (e.g. Dispatchers.Unconfined or a
     // StandardTestDispatcher) to drive the async pipeline synchronously.
     private var coroutineContext: CoroutineContext = PlatformDependentIODispatcher
+    private var customCachingLayer: GBCachingLayer? = null
 
     /**
      * Override the dispatcher used to process fetched payloads. Intended for tests that need
@@ -156,13 +164,15 @@ class GBSDKBuilder(
     * Method for enable  default sticky bucket service
     */
     fun setStickyBucketService(coroutineScope: CoroutineScope): GBSDKBuilder {
-        return setStickyBucketService(
+        this.stickyBucketService = null
+        this.stickyBucketServiceFactory = { localStorage ->
             GBStickyBucketServiceImp(
                 coroutineScope = coroutineScope,
                 prefix = "gbStickyBuckets__${apiKey}_",
-                localStorage = CachingImpl.getLayer(),
+                localStorage = localStorage,
             )
-        )
+        }
+        return this
     }
 
     /**
@@ -172,6 +182,7 @@ class GBSDKBuilder(
         stickyBucketService: GBStickyBucketService
     ): GBSDKBuilder {
         this.stickyBucketService = stickyBucketService
+        this.stickyBucketServiceFactory = null
         return this
     }
 
@@ -185,9 +196,10 @@ class GBSDKBuilder(
         coroutineScope: CoroutineScope,
         prefix: String = "gbStickyBuckets__${apiKey}_"
     ): GBSDKBuilder {
-        this.stickyBucketService = GBStickyBucketServiceImp(
-            coroutineScope, prefix, CachingImpl.getLayer()
-        )
+        this.stickyBucketService = null
+        this.stickyBucketServiceFactory = { localStorage ->
+            GBStickyBucketServiceImp(coroutineScope, prefix, localStorage)
+        }
         return this
     }
 
@@ -215,6 +227,16 @@ class GBSDKBuilder(
      */
     fun setCacheMaxAge(cacheMaxAge: Long): GBSDKBuilder {
         this.cacheMaxAge = cacheMaxAge
+        return this
+    }
+
+    /**
+     * Provide a custom cache implementation, replacing the built-in per-platform cache.
+     * Replaces the feature-definition cache and also routes sticky-bucket storage through it.
+     * May be called in any order relative to the sticky-bucket setters.
+     */
+    fun setCachingLayer(cachingLayer: GBCachingLayer): GBSDKBuilder {
+        this.customCachingLayer = cachingLayer
         return this
     }
 
@@ -259,7 +281,8 @@ class GBSDKBuilder(
             cachingEnabled = cachingEnabled,
             cacheMaxAge = cacheMaxAge,
             coroutineContext = coroutineContext,
-            featuresChangeHandler = featuresChangeHandler
+            featuresChangeHandler = featuresChangeHandler,
+            cachingLayer = customCachingLayer
         )
     }
 
@@ -275,7 +298,10 @@ class GBSDKBuilder(
             encryptionKey = encryptionKey,
             remoteEval = remoteEval,
             enableLogging = enableLogging,
-            stickyBucketService = stickyBucketService,
+            // Resolve the caching layer now, so a custom layer set via setCachingLayer() is
+            // honoured regardless of whether it was set before or after the sticky-bucket setter.
+            stickyBucketService = stickyBucketService
+                ?: stickyBucketServiceFactory?.invoke(resolveCachingLayer()),
         )
 
     private inner class WaitForCallCaseHelper(
@@ -315,7 +341,11 @@ class GBSDKBuilder(
                 cacheMaxAge = cacheMaxAge,
                 coroutineContext = coroutineContext,
                 featuresChangeHandler = featuresChangeHandler,
+                cachingLayer = customCachingLayer
             )
         }
     }
+
+    private fun resolveCachingLayer(): CachingLayer =
+        customCachingLayer?.let { GBCachingLayerAdapter(it) } ?: CachingImpl.getLayer()
 }

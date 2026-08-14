@@ -39,6 +39,9 @@ import com.sdk.growthbook.kotlinx.serialization.from
 import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.StackContext
 import com.sdk.growthbook.utils.GBFeaturesChangeHandler
+import com.sdk.growthbook.sandbox.CachingImpl
+import com.sdk.growthbook.sandbox.GBCachingLayer
+import com.sdk.growthbook.sandbox.GBCachingLayerAdapter
 import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBuckets
 import com.sdk.growthbook.model.diffFeatures
 import kotlinx.coroutines.launch
@@ -74,7 +77,11 @@ class GrowthBookSDK internal constructor(
     // runs on a defined background context rather than an arbitrary thread. Overridable (e.g. with a
     // test dispatcher) so tests can drive the async pipeline deterministically.
     coroutineContext: CoroutineContext,
-    private val featuresChangeHandler: GBFeaturesChangeHandler? = null
+    private val featuresChangeHandler: GBFeaturesChangeHandler? = null,
+    // Internal seam only: the public way to plug a cache is GBSDKBuilder.setCachingLayer().
+    // Adding this to the public constructor would break binary compatibility,
+    // so the public constructor below preserves the pre-7.4.0 signature and delegates here.
+    cachingLayer: GBCachingLayer?
     ) : FeaturesFlowDelegate {
 
     /**
@@ -99,6 +106,7 @@ class GrowthBookSDK internal constructor(
         cachingEnabled = cachingEnabled,
         cacheMaxAge = null,
         coroutineContext = PlatformDependentIODispatcher,
+        cachingLayer = null
     )
     private var remoteSourceFeaturesFetchResult: FeaturesFetchResult =
         FeaturesFetchResult.NoResultYet
@@ -124,6 +132,7 @@ class GrowthBookSDK internal constructor(
         encryptionKey = gbContext.encryptionKey,
         cachingEnabled = cachingEnabled,
         cacheMaxAge = cacheMaxAge,
+        cachingLayer = cachingLayer?.let { GBCachingLayerAdapter(it) } ?: CachingImpl.getLayer(),
         cacheKey = "${Constants.FEATURE_CACHE}_${gbContext.apiKey}",
         remoteEval = gbContext.remoteEval,
         remoteEvalPayloadProvider = ::buildRemoteEvalParams,

@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "1.0.0"
+version = "1.1.0"
 
 kotlin {
     androidTarget {
@@ -30,11 +30,12 @@ kotlin {
 
     jvm()
     wasmJs {
-        nodejs()
+        browser()
     }
     iosX64()
     iosArm64()
     iosSimulatorArm64()
+    macosArm64()
 
     sourceSets {
         val commonMain by getting {
