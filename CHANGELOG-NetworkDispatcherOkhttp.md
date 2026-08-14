@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.0.9] - Unreleased
+## [1.0.9] - 2026-08-14
 
 ### Fixed
 - `Map`/`List.toJsonElement()` now pass an already-serialized `JsonElement` through

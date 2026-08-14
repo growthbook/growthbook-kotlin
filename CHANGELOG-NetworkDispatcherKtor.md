@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.0.15] - Unreleased
+## [1.0.15] - 2026-08-14
 
 ### Fixed
 - `consumePOSTRequest()` no longer wraps the request in `client.use { }`, which closed the

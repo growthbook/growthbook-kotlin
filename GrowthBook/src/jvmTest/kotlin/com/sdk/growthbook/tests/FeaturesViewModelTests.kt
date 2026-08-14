@@ -463,6 +463,88 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         )
     }
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun testRoundSupersededDuringApplyDoesNotCommitNorReportSuccess() = runTest {
+        // P1 (final payload-commit fence): the OLDER round passes its up-front generation check and
+        // then SUSPENDS mid-apply (inside onPayloadReady). A NEWER round bumps the generation DURING
+        // that suspend (incrementAndFetch runs outside applyMutex). When the older round resumes it
+        // must RE-VALIDATE the generation at the commit point and bail: it must NOT commit its now
+        // stale features (no featuresFetchedSuccessfully) and its awaiter must resolve as Superseded,
+        // not Success. Without the re-check the older round commits old_feature and reports Success
+        // for a superseded round.
+        //
+        // NB: the sibling test testOlderRemoteEvalApplyCannotOverwriteNewerWhileSuspended only asserts
+        // the newest features win LAST — it does not catch the stale commit / false Success this covers.
+        val client = DeferredPostNetworkClient()
+        val oldApplyGate = CompletableDeferred<Unit>()
+        val committed = mutableListOf<String>()
+        val delegate = object : FeaturesFlowDelegate {
+            override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
+                features.keys.firstOrNull()?.let { committed.add(it) }
+            }
+            override suspend fun onPayloadReady(model: FeaturesDataModel) {
+                // Hold the OLDER round inside its apply until the test releases the gate.
+                if (model.features?.containsKey("old_feature") == true) oldApplyGate.await()
+            }
+            override fun featuresFetchFailed(error: GBError, isRemote: Boolean) = Unit
+            override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) = Unit
+            override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) = Unit
+            override fun featuresNotModified() = Unit
+        }
+        val viewModel = FeaturesViewModel(
+            delegate = delegate,
+            dataSource = FeaturesDataSource(client, gbContext, testGbOptions),
+            cachingEnabled = false,
+            remoteEval = true,
+            remoteEvalPayloadProvider = { GBRemoteEvalParams(emptyMap(), emptyMap(), emptyMap()) },
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
+        )
+
+        // Older round (generation 1) via the coalesced path so we can observe its FetchResult.
+        var olderResult: FetchResult? = null
+        backgroundScope.launch { olderResult = viewModel.awaitRefresh() }
+        runCurrent()
+        assertEquals(1, client.pendingPosts.size)
+
+        // Its POST returns: the round passes the up-front check, takes applyMutex, and suspends inside
+        // onPayloadReady on the gate.
+        client.pendingPosts[0]("""{"status":200,"features":{"old_feature":{"defaultValue":true}}}""")
+        runCurrent()
+
+        // Newer round (generation 2). fetchFromNetwork's incrementAndFetch bumps the generation to 2
+        // synchronously — no need to resolve its POST yet — while the older round is still mid-apply.
+        viewModel.fetchFeatures() // generation 2 (newer)
+        runCurrent()
+        assertEquals(2, client.pendingPosts.size)
+
+        // Release the older apply; it resumes AFTER the generation moved to 2.
+        oldApplyGate.complete(Unit)
+        runCurrent()
+
+        // 1) The stale older round must NOT commit its features.
+        assertTrue(
+            "old_feature" !in committed,
+            "a remote-eval round superseded during its (suspend) apply must not commit stale features",
+        )
+        // 2) Its awaiter must see Superseded, not Success — so suspendFeature() re-joins the newest
+        //    generation (line 329) instead of returning a stale feature.
+        assertEquals(
+            FetchResult.Superseded,
+            olderResult,
+            "a round superseded during apply must resolve awaitRefresh() as Superseded, not Success",
+        )
+
+        // Let the newest round finish (no leaked coroutine) and confirm it is the one that commits.
+        client.pendingPosts[1]("""{"status":200,"features":{"new_feature":{"defaultValue":true}}}""")
+        runCurrent()
+        assertEquals(
+            "new_feature",
+            committed.lastOrNull(),
+            "the newest generation must be the one that commits",
+        )
+    }
+
     @Test
     fun testSynchronousDispatcherThrowIsReportedAsFailure() = runTest {
         // #3: a dispatcher that throws synchronously while enqueuing must be reported as a fetch

@@ -286,10 +286,20 @@ internal class FeaturesViewModel(
                             // Check the generation and apply the payload atomically under applyMutex:
                             // the check must hold until handleNetworkModel finishes, or a newer round
                             // could apply in between and then be overwritten by this (older) one.
+                            //
+                            // This up-front check is necessary but NOT sufficient: handleNetworkModel
+                            // suspends (onPayloadReady's sticky-bucket refresh) and the generation is
+                            // bumped outside applyMutex (incrementAndFetch in runNetworkRound /
+                            // fetchFromNetwork), so a newer round can supersede this one *during* that
+                            // suspend. handleNetworkModel therefore re-validates the generation at the
+                            // final commit point and returns false when it declined to commit — mapped
+                            // to Superseded here so a stale round never overwrites nor reports Success.
                             applyMutex.withLock {
                                 if (generation == remoteEvalGeneration.load()) {
-                                    handleNetworkModel(it.data)
-                                    resumeOnce(FetchResult.Success)
+                                    val committed = handleNetworkModel(it.data, generation)
+                                    resumeOnce(
+                                        if (committed) FetchResult.Success else FetchResult.Superseded
+                                    )
                                 } else {
                                     // Stale: payload not applied → do not report Success. Always resume
                                     // (no leak / no 30s timeout hang), but with a distinct result.
@@ -394,7 +404,18 @@ internal class FeaturesViewModel(
         coroutineScope.launch { performNetworkRound(payload, generation) }
     }
 
-    private suspend fun handleNetworkModel(model: FeaturesDataModel) {
+    /**
+     * Applies a fetched payload: decode → onPayloadReady (sticky-bucket refresh) → cache → dispatch.
+     *
+     * @param generation the remote-eval round token, or null for the non-remote GET path (no fence).
+     * @return true when the payload was committed (Success dispatched) or when it failed and reported
+     *   its own failure; false only when a newer remote-eval generation superseded this round during
+     *   the onPayloadReady suspend, so the caller maps the round to FetchResult.Superseded.
+     */
+    private suspend fun handleNetworkModel(
+        model: FeaturesDataModel,
+        generation: Long? = null,
+    ): Boolean {
         try {
             // Decode/decrypt the payload BEFORE the sticky-bucket refresh, mirroring the reference
             // TS SDK (decryptPayload -> refreshStickyBuckets). For an encrypted payload the raw
@@ -410,6 +431,17 @@ internal class FeaturesViewModel(
                     encryptedSavedGroups = null,
                 )
             )
+
+            // Final payload-commit fence. onPayloadReady above suspends (sticky-bucket refresh) and
+            // the generation is bumped outside applyMutex (incrementAndFetch), so a newer round may
+            // have superseded us while we were suspended. Bail before writing the cache / committing
+            // features / reporting Success, so a stale round never overwrites the fresher state nor
+            // reports Success. The newer round (already queued on applyMutex or still in flight)
+            // commits its own payload. Skipped on the non-remote GET path (generation == null).
+            if (generation != null && generation != remoteEvalGeneration.load()) {
+                return false
+            }
+
             if (cachingEnabled) {
                 runCatching { writeCache(model) }
                     .onFailure {
@@ -426,6 +458,7 @@ internal class FeaturesViewModel(
                     source = Source.NETWORK
                 )
             )
+            return true
         } catch (error: Throwable) {
             GB.error(
                 errorMessage = "FeaturesViewModel: failed to process remote features payload",
@@ -433,6 +466,7 @@ internal class FeaturesViewModel(
             )
 
             delegate.featuresFetchFailed(error = GBError(error), isRemote = true)
+            return true
         }
     }
 
