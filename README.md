@@ -28,13 +28,13 @@ repositories {
 
 dependencies {
     // Add GrowthBook module:
-    implementation 'io.growthbook.sdk:GrowthBook:7.2.0'
+    implementation 'io.growthbook.sdk:GrowthBook:7.5.0'
 
     // Add Network Dispatcher you prefer:
-    // 1) NetworkDispatcherKtor — supports Android, iOS, macOS (Apple Silicon), JVM, JS, Wasm
-    implementation 'io.growthbook.sdk:NetworkDispatcherKtor:1.0.12'
+    // 1) NetworkDispatcherKtor — supports Android, iOS, JVM, JS, Wasm
+    implementation 'io.growthbook.sdk:NetworkDispatcherKtor:1.0.15'
     // 2) NetworkDispatcherOkHttp — supports Android and JVM only
-    implementation 'io.growthbook.sdk:NetworkDispatcherOkHttp:1.0.7'
+    implementation 'io.growthbook.sdk:NetworkDispatcherOkHttp:1.0.9'
 }
 ```
 
@@ -228,6 +228,19 @@ and returns a feature value typed with specified type.
   fun stopAutoRefreshFeatures() {}
   ```
 
+- set a handler to be notified about only the feature flags that changed on a refresh
+  (SSE / network), instead of reacting to the whole feature set — useful to avoid
+  invalidating an external cache for unrelated flags. The handler fires after features
+  are applied, only on an authoritative result and only when something changed; it does
+  not fire for the non-authoritative cached payload served before a network refresh. When
+  no features were applied yet, the first call reports the whole set as `added`.
+
+  ```kotlin
+  fun setFeaturesChangeHandler(handler: GBFeaturesChangeHandler): GBSDKBuilder
+  // GBFeaturesChangeHandler = (GBFeaturesDiff) -> Unit
+  // GBFeaturesDiff(added, removed, changed) + hasChanges / changedKeys
+  ```
+
 - The isOn method takes a single string argument, which is the unique identifier for the feature and returns the feature
   state on/off
 
@@ -253,6 +266,23 @@ and returns a feature value typed with specified type.
   fun setAttributes(attributes: Map<String, GBValue>) {}
   ```
 
+- The updateAttributes method shallow-merges into the current attributes instead of replacing them
+  (parity with the TypeScript SDK's `updateAttributes`): new keys are added, existing keys are
+  overwritten, and untouched keys are preserved. The merge is one level deep — nested `GBJson`/
+  `GBArray` values are replaced wholesale. A key mapped to `GBNull` keeps the key with a null value
+  (it is **not** removed); to remove a key, rebuild the map with `setAttributes`.
+
+  ```kotlin
+  fun updateAttributes(attributes: Map<String, GBValue>) {}
+  ```
+
+  Example:
+  ```kotlin
+  sdk.setAttributes(mapOf("id" to GBString("1")))
+  sdk.updateAttributes(mapOf("plan" to GBString("pro")))
+  // evaluation now sees both "id" and "plan"
+  ```
+
 - The setAttributeOverrides method replaces the Map of attribute overrides used for Sticky Bucketing.
 
   ```kotlin
@@ -264,6 +294,7 @@ and returns a feature value typed with specified type.
 
   ```kotlin
   suspend fun setAttributesSync(attributes: Map<String, GBValue>) {}
+  suspend fun updateAttributesSync(attributes: Map<String, GBValue>) {}
   suspend fun setAttributeOverridesSync(overrides: Map<String, GBValue>) {}
   ```
 
@@ -329,7 +360,8 @@ You must enable Remote Evaluation in your SDK Connection settings. Cloud custome
 GrowthBook Proxy Server or custom remote evaluation backend.
 
 To use Remote Evaluation, set the `remoteEval = true` property to your SDK instance. A new evaluation API call will be
-made any time a user attribute or other dependency changes.
+made any time a user attribute or other dependency changes — specifically on `setAttributes` / `setAttributesSync` /
+`updateAttributes` / `updateAttributesSync`, `setAttributeOverrides`, `setForcedFeatures`, and `setForcedVariations`.
 
 > If you would like to implement Sticky Bucketing while using Remote Evaluation, you must configure your remote evaluation
 > backend to support Sticky Bucketing. You will not need to provide a StickyBucketService instance to the client side SDK.
