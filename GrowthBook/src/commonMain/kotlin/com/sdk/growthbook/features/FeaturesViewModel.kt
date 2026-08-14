@@ -183,7 +183,7 @@ internal class FeaturesViewModel(
             when (resource) {
                 is Resource.Error -> {
                     emit(resource)
-                    delegate.featuresFetchFailed(GBError(resource.exception), true)
+                    dispatch(FetchOutcome.Failed(GBError(resource.exception), source = Source.NETWORK))
                 }
                 is Resource.Success -> {
                     // Process the payload on coroutineScope (platform IO) like the network GET /
@@ -422,16 +422,15 @@ internal class FeaturesViewModel(
     }
 
     /**
-     * Applies a fetched payload: decode → onPayloadReady (sticky-bucket refresh) → cache → dispatch.
+     * Applies a freshly fetched payload: decode/decrypt → onPayloadReady (sticky-bucket refresh) →
+     * persist to cache → dispatch the resulting [FetchOutcome] to [delegate]. Returns that same
+     * outcome so the SSE [autoRefreshFeatures] flow can emit from the single authoritative verdict
+     * instead of decoding a second time.
      *
-     * @param generation the remote-eval round token, or null for the non-remote GET path (no fence).
-     * @return true when the payload was committed (Success dispatched) or when it failed and reported
-     *   its own failure; false only when a newer remote-eval generation superseded this round during
-     *   the onPayloadReady suspend, so the caller maps the round to FetchResult.Superseded.
-     *   Applies a freshly fetched payload: decode/decrypt, refresh sticky buckets, persist to cache,
-     *      * then dispatch the resulting [FetchOutcome] to [delegate]. Returns that same outcome so the
-     *      * SSE [autoRefreshFeatures] flow can emit from the single authoritative verdict instead of
-     *      * decoding a second time or re-deriving success/failure of its own.
+     * @param generation the remote-eval round token, or null for the non-remote GET / SSE path (no fence).
+     * @return the dispatched [FetchOutcome] (Ready or Failed), or null when a newer remote-eval
+     *   generation superseded this round during the onPayloadReady suspend — the caller then maps
+     *   the round to [FetchResult.Superseded] and nothing is committed.
      */
     private suspend fun handleNetworkModel(
         model: FeaturesDataModel,
