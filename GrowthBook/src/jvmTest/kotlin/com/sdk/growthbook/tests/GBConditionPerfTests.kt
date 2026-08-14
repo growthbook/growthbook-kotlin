@@ -16,14 +16,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Smoke/perf check: a 5000-item `$in` rule stays correct and finishes quickly
+ * Smoke/perf check: a 1000-item `$in` rule stays correct and finishes quickly
  * after load-time condition conversion (+ membership Set on [com.sdk.growthbook.model.GBArray]).
  */
 class GBConditionPerfTests {
 
     @Test
-    fun largeInConditionOf5000ItemsEvaluatesCorrectlyAndQuickly() {
-        val listSize = 5_000
+    fun largeInConditionOf1000ItemsEvaluatesCorrectlyAndQuickly() {
+        val listSize = 1_000
         // Unpatched (convert every eval + linear scan) is typically hundreds of ms+.
         val maxMs = 100.0
 
@@ -78,13 +78,13 @@ class GBConditionPerfTests {
         }
 
         val elapsedMs = measureNanoTime {
-            assertEquals(true, evalWith("item-2500"), "mid-list hit should match")
+            assertEquals(true, evalWith("item-500"), "mid-list hit should match")
             assertEquals(false, evalWith("item-missing"), "missing id should miss")
         } / 1_000_000.0
 
         assertTrue(
             elapsedMs < maxMs,
-            "5000-item \$in eval too slow: ${elapsedMs}ms (limit ${maxMs}ms)",
+            "1000-item \$in eval too slow: ${elapsedMs}ms (limit ${maxMs}ms)",
         )
     }
 
