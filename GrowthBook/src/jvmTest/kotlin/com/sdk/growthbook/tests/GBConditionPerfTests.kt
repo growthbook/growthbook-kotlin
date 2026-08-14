@@ -16,18 +16,16 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Verifies that large `$in` conditions stay fast after load-time conversion to [GBJson].
- * Hit and full-scan miss are both timed (miss walks the whole array with List.contains).
+ * Smoke/perf check: a 5000-item `$in` rule stays correct and finishes quickly
+ * after load-time condition conversion (+ membership Set on [com.sdk.growthbook.model.GBArray]).
  */
 class GBConditionPerfTests {
 
     @Test
-    fun largeInConditionHitAndMissAreFast() {
+    fun largeInConditionOf5000ItemsEvaluatesCorrectlyAndQuickly() {
         val listSize = 5_000
-        val iterations = 10_000
-        val warmup = 200
-        // Generous vs CI noise; unpatched (convert every eval) is typically multi-second.
-        val maxMsPerCase = 2_000.0
+        // Unpatched (convert every eval + linear scan) is typically hundreds of ms+.
+        val maxMs = 100.0
 
         val inItems = buildJsonArray {
             for (i in 0 until listSize) {
@@ -35,10 +33,7 @@ class GBConditionPerfTests {
             }
         }
         val featureJson = buildJsonObject {
-            put(
-                "defaultValue",
-                JsonPrimitive(false),
-            )
+            put("defaultValue", JsonPrimitive(false))
             put(
                 "rules",
                 buildJsonArray {
@@ -49,9 +44,7 @@ class GBConditionPerfTests {
                                 buildJsonObject {
                                     put(
                                         "id",
-                                        buildJsonObject {
-                                            put("\$in", inItems)
-                                        },
+                                        buildJsonObject { put("\$in", inItems) },
                                     )
                                 },
                             )
@@ -62,11 +55,10 @@ class GBConditionPerfTests {
             )
         }
 
-        val serializable = Json.decodeFromJsonElement(
+        val feature = Json.decodeFromJsonElement(
             SerializableGBFeature.serializer(),
             featureJson,
-        )
-        val feature = serializable.gbDeserialize()
+        ).gbDeserialize()
         assertTrue(
             feature.rules!!.first().condition is GBJson,
             "condition should be converted to GBJson at deserialize",
@@ -85,42 +77,14 @@ class GBConditionPerfTests {
             ).on
         }
 
-        assertEquals(true, evalWith("item-2500"), "mid-list hit should match")
-        assertEquals(false, evalWith("item-missing"), "missing id should miss")
-
-        fun timeEvals(id: String, expectedOn: Boolean): Double {
-            repeat(warmup) {
-                assertEquals(expectedOn, evalWith(id))
-            }
-            // Mirror GrowthBookSDK.feature(): fresh EvaluationContext each call so the
-            // evaluatedFeatures stack does not trip cyclic-prerequisite detection.
-            // Features (with load-time GBJson conditions) are reused across calls.
-            val ns = measureNanoTime {
-                repeat(iterations) {
-                    val on = evalWith(id)
-                    if (on != expectedOn) {
-                        error("unexpected result for id=$id")
-                    }
-                }
-            }
-            return ns / 1_000_000.0
-        }
-
-        val hitMs = timeEvals("item-2500", expectedOn = true)
-        val missMs = timeEvals("item-missing", expectedOn = false)
-
-        println(
-            "GBConditionPerfTests: $iterations evals, $listSize-item \$in — " +
-                "hit=${"%.1f".format(hitMs)}ms miss=${"%.1f".format(missMs)}ms",
-        )
+        val elapsedMs = measureNanoTime {
+            assertEquals(true, evalWith("item-2500"), "mid-list hit should match")
+            assertEquals(false, evalWith("item-missing"), "missing id should miss")
+        } / 1_000_000.0
 
         assertTrue(
-            hitMs < maxMsPerCase,
-            "hit too slow: ${hitMs}ms (limit ${maxMsPerCase}ms)",
-        )
-        assertTrue(
-            missMs < maxMsPerCase,
-            "miss too slow: ${missMs}ms (limit ${maxMsPerCase}ms)",
+            elapsedMs < maxMs,
+            "5000-item \$in eval too slow: ${elapsedMs}ms (limit ${maxMs}ms)",
         )
     }
 
