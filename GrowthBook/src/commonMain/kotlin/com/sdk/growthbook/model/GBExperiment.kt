@@ -3,7 +3,6 @@ package com.sdk.growthbook.model
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import com.sdk.growthbook.utils.GBFilter
-import com.sdk.growthbook.utils.GBCondition
 import com.sdk.growthbook.utils.GBBucketRange
 import com.sdk.growthbook.utils.GBVariationMeta
 import com.sdk.growthbook.utils.RangeSerializer
@@ -53,9 +52,9 @@ data class GBExperiment(
     var coverage: Float? = null,
 
     /**
-     * Optional targeting condition
+     * Optional targeting condition (converted from JSON once at feature load)
      */
-    var condition: GBCondition? = null,
+    var condition: GBJson? = null,
 
     /**
      * Each item defines a prerequisite where a `condition` must evaluate against
@@ -142,7 +141,7 @@ data class GBExperiment(
             filters = filters,
             weights = weights,
             coverage = coverage,
-            condition = condition,
+            condition = condition?.gbSerialize(),
             namespace = namespace,
             hashVersion = hashVersion,
             bucketVersion = bucketVersion,

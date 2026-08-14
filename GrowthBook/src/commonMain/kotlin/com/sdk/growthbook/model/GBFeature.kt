@@ -3,7 +3,6 @@ package com.sdk.growthbook.model
 import com.sdk.growthbook.serializable_model.SerializableGBFeature
 import com.sdk.growthbook.serializable_model.SerializableGBFeatureRule
 import com.sdk.growthbook.utils.GBBucketRange
-import com.sdk.growthbook.utils.GBCondition
 import com.sdk.growthbook.utils.GBFilter
 import com.sdk.growthbook.utils.GBTrackData
 import com.sdk.growthbook.utils.GBVariationMeta
@@ -45,9 +44,9 @@ data class GBFeatureRule(
      */
     val id: String? = "",
     /**
-     * Optional targeting condition
+     * Optional targeting condition (converted from JSON once at feature load)
      */
-    val condition: GBCondition? = null,
+    val condition: GBJson? = null,
 
     /**
      * Each item defines a prerequisite where a `condition` must evaluate against
@@ -164,7 +163,7 @@ data class GBFeatureRule(
     internal fun gbSerialize() =
         SerializableGBFeatureRule(
             id = id,
-            condition = condition,
+            condition = condition?.gbSerialize(),
             parentConditions = parentConditions,
             coverage = coverage,
             force = if (force == null) OptionalProperty.NotPresent

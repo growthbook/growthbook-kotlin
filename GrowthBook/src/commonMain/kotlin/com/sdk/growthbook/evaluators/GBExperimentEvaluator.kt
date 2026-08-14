@@ -182,10 +182,8 @@ internal class GBExperimentEvaluator(
                     attributeOverrides = attributeOverrides,
                     attributes = evaluationContext.userContext.attributes,
                 )
-                val conditionObj: GBJson = experiment.condition!!.let(GBValue::from) as? GBJson
-                    ?: GBJson(emptyMap())
                 val evaluationResult = GBConditionEvaluator().evalCondition(
-                    attr, conditionObj,
+                    attr, experiment.condition!!,
                     evaluationContext.savedGroups,
                 )
                 if (!evaluationResult) {

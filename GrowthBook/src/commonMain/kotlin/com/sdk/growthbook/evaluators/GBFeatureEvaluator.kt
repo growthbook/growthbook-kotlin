@@ -173,8 +173,7 @@ internal class GBFeatureEvaluator(
                                     attributeOverrides = attributeOverrides,
                                     attributes = evaluationContext.userContext.attributes,
                                 ),
-                                conditionObj = rule.condition.let(GBValue::from) as? GBJson
-                                    ?: GBJson(emptyMap()),
+                                conditionObj = rule.condition,
                                 savedGroups = evaluationContext.savedGroups,
                             )
                         ) {

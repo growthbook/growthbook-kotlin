@@ -13,6 +13,7 @@ import com.sdk.growthbook.utils.OptionalProperty
 import com.sdk.growthbook.utils.GBParentConditionInterface
 import com.sdk.growthbook.utils.OptionalPropertySerializer
 import com.sdk.growthbook.kotlinx.serialization.from
+import com.sdk.growthbook.kotlinx.serialization.toGBConditionJson
 
 /**
  * Rule object consists of various definitions to apply to calculate feature value
@@ -161,7 +162,7 @@ internal fun SerializableGBFeatureRule.gbDeserialize() =
         weights = weights,
         coverage = coverage,
         namespace = namespace,
-        condition = condition,
+        condition = condition?.toGBConditionJson(),
         hashVersion = hashVersion,
         bucketVersion = bucketVersion,
         hashAttribute = hashAttribute,
