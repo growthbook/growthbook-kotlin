@@ -599,16 +599,15 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             MockResponse.successResponse,
             cachedAt = Clock.System.now().toEpochMilliseconds(), // fresh
         )
+        val client = CountingPostNetworkClient(MockResponse.successResponse)
         val viewModel = FeaturesViewModel(
             delegate = this@FeaturesViewModelTests,
-            dataSource = FeaturesDataSource(
-                MockNetworkClient(MockResponse.successResponse, null),
-                gbContext, testGbOptions,
-            ),
+            dataSource = FeaturesDataSource(client, gbContext, testGbOptions),
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = false,
             cachingLayer = cacheLayer,
             cacheMaxAge = 48 * 60 * 60 * 1000L,
+            remoteEval = true,
             coroutineContext = UnconfinedTestDispatcher(testScheduler),
         )
 
@@ -617,8 +616,13 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             forcedFeatures = emptyMap(),
             forcedVariations = emptyMap(),
         )
-        viewModel.fetchFeatures(remoteEval = true, payload = payload)
+        viewModel.fetchFeatures(payload = payload)
 
+        // The decisive check: even with a FRESH cache present, remote-eval must hit the network via
+        // POST. A served fresh cache would short-circuit and skip the network (postCount == 0), so
+        // asserting the POST happened proves the cache was bypassed rather than served.
+        assertEquals(1, client.postCount, "remote-eval must POST even when a fresh cache exists")
+        assertEquals(0, client.getCount, "remote-eval must not issue a GET")
         assertTrue(
             !receivedFromCache,
             "Remote-eval must not serve the API-key-scoped cache (would leak user A's payload to B)"
@@ -642,6 +646,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = true,
             cachingLayer = cacheLayer,
+            remoteEval = true,
             coroutineContext = UnconfinedTestDispatcher(testScheduler),
         )
 
@@ -650,7 +655,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             forcedFeatures = emptyMap(),
             forcedVariations = emptyMap(),
         )
-        viewModel.fetchFeatures(remoteEval = true, payload = payload)
+        viewModel.fetchFeatures(payload = payload)
 
         assertTrue(isSuccess, "Remote-eval payload must still be applied")
         assertEquals(
@@ -1326,5 +1331,39 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         isError = false
         hasFeatures = !model.features.isNullOrEmpty()
         featuresAPIModelCalled = true
+    }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun testRemoteEvalAwaitRefreshPostsAndDoesNotPersist() = runTest {
+        // Reviewer follow-up: the revalidate()/awaitRefresh() path must keep the same remote-eval
+        // isolation as the direct fetch — issue a personalized POST (NOT a plain GET that could serve
+        // an API-key-scoped cached payload) and never persist the evaluated payload to that cache.
+        // The direct fetchFeatures() path is covered by testRemoteEvalDoesNotServeCache /
+        // testRemoteEvalDoesNotWriteCache; this covers the coalesced refresh behind suspendFeature().
+        val client = CountingPostNetworkClient(
+            """{"status":200,"features":{"remote_feature":{"defaultValue":true}}}"""
+        )
+        val cache = MockCachingLayer()
+        val viewModel = FeaturesViewModel(
+            delegate = this@FeaturesViewModelTests,
+            dataSource = FeaturesDataSource(client, gbContext, testGbOptions),
+            cachingEnabled = true, // caching ON so the test proves the BYPASS, not merely "caching off"
+            cachingLayer = cache,
+            remoteEval = true,
+            remoteEvalPayloadProvider = { GBRemoteEvalParams(emptyMap(), emptyMap(), emptyMap()) },
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
+        )
+
+        val result = viewModel.awaitRefresh()
+
+        assertEquals(FetchResult.Success, result)
+        assertEquals(1, client.postCount, "awaitRefresh must POST in remote-eval mode")
+        assertEquals(0, client.getCount, "awaitRefresh must not issue a plain GET in remote-eval mode")
+        assertEquals(
+            null,
+            cache.savedContent,
+            "remote-eval awaitRefresh must not persist to the API-key-scoped cache",
+        )
     }
 }

@@ -313,7 +313,11 @@ internal class FeaturesViewModel(
                             // to Superseded here so a stale round never overwrites nor reports Success.
                             applyMutex.withLock {
                                 if (generation == remoteEvalGeneration.load()) {
-                                    val outcome = handleNetworkModel(it.data, generation)
+                                    // persistToCache = false: the remote-eval cache is keyed only by API
+                                    // key (FeatureCache_<apiKey>), so persisting this user's evaluated
+                                    // payload would let it leak to the next user on the same key. Mirror
+                                    // the read-side bypass in serveCache — remote-eval never touches the cache.
+                                    val outcome = handleNetworkModel(it.data, generation, persistToCache = false)
                                     resumeOnce(
                                         if (outcome != null) FetchResult.Success else FetchResult.Superseded
                                     )
@@ -387,7 +391,6 @@ internal class FeaturesViewModel(
         }
 
     private fun serveCache(policy: FetchPolicy): Boolean {
-        /*
         // Remote-eval payloads are evaluated server-side against the CURRENT attributes/forced
         // variations, but our cache is keyed only by API key (FeatureCache_<apiKey>). Serving that
         // entry would let a previous user's evaluated payload leak to the next one after a
@@ -397,9 +400,6 @@ internal class FeaturesViewModel(
         // bypass in [handleNetworkModel].
         if (remoteEval) return false
 
-
-        Це прибирати????
-         */
         val entry = runCatching { readCache() }.getOrElse {
             GB.error("FeaturesViewModel: cache read failed", it)
             delegate.featuresFetchFailed(error = GBError(it), isRemote = false)
@@ -442,16 +442,13 @@ internal class FeaturesViewModel(
      * instead of decoding a second time.
      *
      * @param generation the remote-eval round token, or null for the non-remote GET / SSE path (no fence).
+     * @param persistToCache whether a successful payload may be written to [cachingLayer]. False for
+     *   remote-eval responses: they are evaluated per current attributes while the cache is keyed only
+     *   by API key, so persisting one would leak it to the next user on the same key (see the
+     *   read-side bypass in [serveCache]).
      * @return the dispatched [FetchOutcome] (Ready or Failed), or null when a newer remote-eval
      *   generation superseded this round during the onPayloadReady suspend — the caller then maps
      *   the round to [FetchResult.Superseded] and nothing is committed.
-     */
-
-    /**
-     * @param persistToCache whether a successful payload may be written to [cachingLayer].
-     *   False for remote-eval responses: they are evaluated per current attributes and the
-     *   cache is keyed only by API key, so persisting one would leak it to the next user on the
-     *   same key (see the read-side bypass in [serveCache]).
      */
     private suspend fun handleNetworkModel(
         model: FeaturesDataModel,
