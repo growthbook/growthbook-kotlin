@@ -6,8 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
-
-## [7.4.0] - Unreleased
+## [7.5.0] - 2026-08-14
 
 ### Added
 - `GBSDKBuilder.setFeaturesChangeHandler()` — callback notified with a `GBFeaturesDiff` (added / removed / changed flags) on each refresh, so consumers can react to only the flags that changed instead of the whole feature set. Fires on all update paths (SSE / GET / remote-eval) after features are applied, and only when something changed
@@ -15,6 +14,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - SSE auto-refresh now emits decrypted features to the `Flow` for encrypted-feature projects, instead of a "success with empty data" event (the raw `features` field is null for encrypted payloads)
 - An empty features payload (e.g. all flags deleted in the admin) is now applied as an empty feature set instead of surfacing a spurious refresh error
+
+---
+## [7.4.0] - 2026-08-14
+
+### Added
+- `GrowthBookSDK.updateAttributes()` / `updateAttributesSync()` — shallow-merge user
+  attributes into the current map (parity with the TS SDK's `updateAttributes`): new
+  keys are added, existing keys overwritten, untouched keys preserved. A `GBNull` value
+  keeps the key with a null value (it is not removed); use `setAttributes()` to replace
+  the whole map.
+
+### Fixed
+- Remote evaluation now re-runs when user attributes or forced features change:
+  `setAttributes()`, `setAttributesSync()` and `setForcedFeatures()` were not triggering
+  a fresh remote evaluation, so remote-eval consumers kept stale results after those
+  changes.
+- In remote-eval mode, `suspendFeature()`'s internal retry now goes through the
+  remote-eval POST instead of a plain GET, so a retry can no longer momentarily surface
+  non-personalized (unevaluated) feature definitions.
+- Rapid attribute or forced-feature changes in remote-eval mode could apply an
+  out-of-order (stale) evaluation when a slower earlier request completed after a newer
+  one; responses from superseded remote-eval requests are now discarded. A caller
+  awaiting such a superseded request is no longer reported a successful refresh, so
+  `suspendFeature()` cannot return the older, stale evaluation — it re-joins the latest
+  generation instead.
+- `setForcedFeatures()` and `setAttributeOverrides()` values are now published atomically
+  alongside the other evaluation inputs, so an evaluation running on another thread always
+  observes the latest values as part of a single consistent snapshot.
+- A custom `NetworkDispatcher` that throws synchronously while starting a request is now
+  reported through the refresh handler as a fetch failure, instead of being swallowed or
+  propagating out of `initialize()`/`setAttributes()`.
+- Remote-eval POST body is now well-formed. User attributes and forced features were
+  serialized via their `GBValue.toString()` (e.g. `"GBNumber(value=8490047)"`) instead of
+  the underlying JSON value, so server-side targeting saw garbage; they are now encoded as
+  real JSON. Forced features are also sent as an array of `[key, value]` pairs (matching
+  the reference SDK) instead of a JSON object, which the GrowthBook proxy rejected with
+  `400 Bad Request`.
 
 ---
 ## [7.3.0] - 2026-07-20

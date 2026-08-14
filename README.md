@@ -243,6 +243,23 @@ and returns a feature value typed with specified type.
   fun setAttributes(attributes: Map<String, GBValue>) {}
   ```
 
+- The updateAttributes method shallow-merges into the current attributes instead of replacing them
+  (parity with the TypeScript SDK's `updateAttributes`): new keys are added, existing keys are
+  overwritten, and untouched keys are preserved. The merge is one level deep — nested `GBJson`/
+  `GBArray` values are replaced wholesale. A key mapped to `GBNull` keeps the key with a null value
+  (it is **not** removed); to remove a key, rebuild the map with `setAttributes`.
+
+  ```kotlin
+  fun updateAttributes(attributes: Map<String, GBValue>) {}
+  ```
+
+  Example:
+  ```kotlin
+  sdk.setAttributes(mapOf("id" to GBString("1")))
+  sdk.updateAttributes(mapOf("plan" to GBString("pro")))
+  // evaluation now sees both "id" and "plan"
+  ```
+
 - The setAttributeOverrides method replaces the Map of attribute overrides used for Sticky Bucketing.
 
   ```kotlin
@@ -254,6 +271,7 @@ and returns a feature value typed with specified type.
 
   ```kotlin
   suspend fun setAttributesSync(attributes: Map<String, GBValue>) {}
+  suspend fun updateAttributesSync(attributes: Map<String, GBValue>) {}
   suspend fun setAttributeOverridesSync(overrides: Map<String, GBValue>) {}
   ```
 
@@ -319,7 +337,8 @@ You must enable Remote Evaluation in your SDK Connection settings. Cloud custome
 GrowthBook Proxy Server or custom remote evaluation backend.
 
 To use Remote Evaluation, set the `remoteEval = true` property to your SDK instance. A new evaluation API call will be
-made any time a user attribute or other dependency changes.
+made any time a user attribute or other dependency changes — specifically on `setAttributes` / `setAttributesSync` /
+`updateAttributes` / `updateAttributesSync`, `setAttributeOverrides`, `setForcedFeatures`, and `setForcedVariations`.
 
 > If you would like to implement Sticky Bucketing while using Remote Evaluation, you must configure your remote evaluation
 > backend to support Sticky Bucketing. You will not need to provide a StickyBucketService instance to the client side SDK.
