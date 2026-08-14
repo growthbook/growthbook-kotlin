@@ -28,13 +28,13 @@ repositories {
 
 dependencies {
     // Add GrowthBook module:
-    implementation 'io.growthbook.sdk:GrowthBook:7.4.0'
+    implementation 'io.growthbook.sdk:GrowthBook:7.5.0'
 
     // Add Network Dispatcher you prefer:
     // 1) NetworkDispatcherKtor — supports Android, iOS, JVM, JS, Wasm
-    implementation 'io.growthbook.sdk:NetworkDispatcherKtor:1.0.12'
+    implementation 'io.growthbook.sdk:NetworkDispatcherKtor:1.0.15'
     // 2) NetworkDispatcherOkHttp — supports Android and JVM only
-    implementation 'io.growthbook.sdk:NetworkDispatcherOkHttp:1.0.7'
+    implementation 'io.growthbook.sdk:NetworkDispatcherOkHttp:1.0.9'
 }
 ```
 
