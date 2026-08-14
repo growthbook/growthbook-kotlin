@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalAtomicApi::class)
+
 package com.sdk.growthbook.features
 
 import com.sdk.growthbook.logger.GB
@@ -13,6 +15,7 @@ import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.utils.GBRemoteEvalParams
 import com.sdk.growthbook.utils.Resource
 import com.sdk.growthbook.utils.SSEConnectionController
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.SupervisorJob
@@ -25,12 +28,15 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
+import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.resume
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 
-// Upper bound on a single network round in [FeaturesViewModel.runNetworkGet]. Both recommended
+// Upper bound on a single network round in [FeaturesViewModel.runNetworkRound]. Both recommended
 // dispatchers (Ktor/OkHttp) default to an INFINITE read timeout so a server that accepts the
 // connection then never responds would otherwise leave awaitRefresh()/suspendFeature() hanging
 // forever. Kept dispatcher-agnostic here so custom NetworkDispatcher impls are bounded too.
@@ -100,6 +106,20 @@ internal class FeaturesViewModel(
      */
     private val decoder: FeaturePayloadDecoder = FeaturePayloadDecoder(encryptionKey),
     /**
+     * Whether this view model fetches via remote evaluation (POST) instead of a plain GET.
+     * When true, the coalesced refresh ([awaitRefresh], used by suspendFeature() retries) issues
+     * a remote-eval POST built from [remoteEvalPayloadProvider] rather than a bare GET, so a retry
+     * cannot momentarily surface non-personalized (unevaluated) features. Mirrors the reference
+     * sdk-js `fetchFeatures()` branching on `isRemoteEval()`.
+     */
+    private val remoteEval: Boolean = false,
+    /**
+     * Builds the remote-eval request payload (attributes + forced features + forced variations)
+     * live at call time. Invoked only when [remoteEval] is true; kept live so a retry reflects the
+     * latest context. The payload lives on the owning SDK, hence the provider seam.
+     */
+    private val remoteEvalPayloadProvider: () -> GBRemoteEvalParams? = { null },
+    /**
      * Context on which fetched payloads are processed (decode + sticky-bucket
      * refresh + feature application) and on which the coalesced refresh started by
      * [awaitRefresh] (used by suspendFeature() retries and [revalidate]) runs. It
@@ -134,6 +154,27 @@ internal class FeaturesViewModel(
      */
     private var inFlight: Deferred<FetchResult>? = null
 
+    /**
+     * Monotonic counter bumped when a remote-eval round is initiated, by the wrappers that own the
+     * ordering point: [fetchFromNetwork] increments synchronously *before* its `launch` (so the
+     * generation tracks the payload captured at the same call), and [runNetworkRound] increments
+     * in-coroutine right before [performNetworkRound]. A remote-eval response is applied/reported
+     * only while its captured generation is still the latest, so a slow older POST cannot overwrite
+     * the result of a newer one (out-of-order responses after rapid attribute/forced-feature changes).
+     * The generation check and the (suspend) apply are made atomic by [applyMutex]; the check alone is
+     * not enough — see there.
+     */
+    private val remoteEvalGeneration = AtomicLong(0)
+
+    /**
+     * Serializes the *application* of a remote-eval payload (the generation check + [handleNetworkModel]).
+     * Without it the `generation == remoteEvalGeneration.load()` check and the suspend apply are not
+     * atomic: on a multi-threaded dispatcher an older round whose check passed could finish its slow
+     * sticky-bucket apply *after* a newer round already applied, overwriting the newer personalized
+     * features. Holding this lock across check+apply makes the newest generation win deterministically.
+     */
+    private val applyMutex = Mutex()
+
     /** Opens an SSE connection and streams feature updates as a [Flow]. */
     fun autoRefreshFeatures(): Flow<Resource<GBFeatures?>> {
         sseController.start()
@@ -144,19 +185,20 @@ internal class FeaturesViewModel(
     }
 
     /**
-     * @param remoteEval evaluate features remotely via POST instead of a regular GET.
+     * Whether this fetches remotely (POST) or via a regular GET is decided by the instance
+     * [remoteEval] mode, not per call.
+     *
      * @param payload attributes/forced features sent with the remote-eval request;
-     *   used only when [remoteEval] is true, ignored otherwise.
+     *   used only in [remoteEval] mode, ignored otherwise.
      * @param policy whether a fresh cache may satisfy this fetch or the network
      *   must always be hit; see [FetchPolicy].
      */
     fun fetchFeatures(
-        remoteEval: Boolean = false,
         payload: GBRemoteEvalParams? = null,
         policy: FetchPolicy = FetchPolicy.CacheFirst
     ) {
-        if (serveCache(remoteEval, policy)) return // fresh cache -> authoritative, skip network
-        fetchFromNetwork(remoteEval, payload)
+        if (serveCache(policy)) return // fresh cache -> authoritative, skip network
+        fetchFromNetwork(payload)
     }
 
     /**
@@ -166,14 +208,15 @@ internal class FeaturesViewModel(
      * await the same result. The slot is cleared once the request completes, so
      * the next round (e.g. a backoff retry) starts a fresh request.
      *
-     * This is the network primitive beneath the cache-aware [fetchFeatures];
-     * it always hits the network (GET only) and carries no [FetchPolicy].
+     * This is the network primitive beneath the cache-aware [fetchFeatures]; it always hits the
+     * network (a remote-eval POST when [remoteEval] is set, otherwise a GET) and carries no
+     * [FetchPolicy].
      */
     suspend fun awaitRefresh(): FetchResult {
         val deferred = refreshMutex.withLock {
             inFlight ?: coroutineScope.async {
                 try {
-                    runNetworkGet()
+                    runNetworkRound()
                 } finally {
                     refreshMutex.withLock { inFlight = null }
                 }
@@ -193,7 +236,7 @@ internal class FeaturesViewModel(
      * via the refresh handler rather than expecting features to be ready on return.
      */
     fun revalidate() {
-        serveCache(remoteEval = false, policy = FetchPolicy.ForceNetwork)
+        serveCache(policy = FetchPolicy.ForceNetwork)
         coroutineScope.launch { awaitRefresh() }
     }
 
@@ -207,30 +250,117 @@ internal class FeaturesViewModel(
         coroutineScope.cancel()
     }
 
-    /** Bridges the callback-based GET into a suspend result for [awaitRefresh]. */
-    private suspend fun runNetworkGet(): FetchResult =
-        withTimeoutOrNull(NETWORK_ROUND_TIMEOUT_MILLIS.milliseconds) {
-            suspendCancellableCoroutine { cont ->
+    /**
+     * The single network round: issues a remote-eval POST when [remoteEval] is true (mirroring the
+     * reference sdk-js `fetchFeatures()` branch on `isRemoteEval()`), otherwise a plain GET with 304
+     * handling, and feeds every result through the same [dispatch] pipeline. Returns only after the
+     * payload is fully applied (incl. the suspend sticky-bucket refresh in [handleNetworkModel] /
+     * onPayloadReady), so callers observe a completed refresh, not just a completed HTTP round.
+     *
+     * This is the one place the data-source callbacks are wired; [fetchFromNetwork] (fire-and-forget,
+     * cache-aware) and [runNetworkRound] (coalesced, timeout-bounded) are thin wrappers over it.
+     */
+    private suspend fun performNetworkRound(
+        payload: GBRemoteEvalParams?,
+        generation: Long
+    ): FetchResult = suspendCancellableCoroutine { cont ->
+        // Resume the continuation at most once: the synchronous catch below and an async data-source
+        // callback could otherwise both resume it (e.g. a misbehaving dispatcher that invokes a
+        // callback and then also throws synchronously), which is a hard error for a continuation.
+        fun resumeOnce(result: FetchResult) {
+            if (cont.isActive) cont.resume(result)
+        }
+        try {
+            if (remoteEval) {
+                // [generation] tags this remote-eval round (assigned by the caller at the ordering
+                // point). Remote-eval POSTs are independent and un-cancelled, so a slower older one
+                // can complete after a newer one. Apply/report a response only while it is still the
+                // latest generation, otherwise a stale evaluation (e.g. for the previous attributes)
+                // would overwrite the current one. A superseded round still resumes its continuation
+                // (as FetchResult.Superseded, never Success) so the awaiter re-joins the current
+                // generation instead of hanging or being told a discarded round succeeded.
+                dataSource.fetchRemoteEval(
+                    params = payload,
+                    success = {
+                        coroutineScope.launch {
+                            // Check the generation and apply the payload atomically under applyMutex:
+                            // the check must hold until handleNetworkModel finishes, or a newer round
+                            // could apply in between and then be overwritten by this (older) one.
+                            //
+                            // This up-front check is necessary but NOT sufficient: handleNetworkModel
+                            // suspends (onPayloadReady's sticky-bucket refresh) and the generation is
+                            // bumped outside applyMutex (incrementAndFetch in runNetworkRound /
+                            // fetchFromNetwork), so a newer round can supersede this one *during* that
+                            // suspend. handleNetworkModel therefore re-validates the generation at the
+                            // final commit point and returns false when it declined to commit — mapped
+                            // to Superseded here so a stale round never overwrites nor reports Success.
+                            applyMutex.withLock {
+                                if (generation == remoteEvalGeneration.load()) {
+                                    val committed = handleNetworkModel(it.data, generation)
+                                    resumeOnce(
+                                        if (committed) FetchResult.Success else FetchResult.Superseded
+                                    )
+                                } else {
+                                    // Stale: payload not applied → do not report Success. Always resume
+                                    // (no leak / no 30s timeout hang), but with a distinct result.
+                                    resumeOnce(FetchResult.Superseded)
+                                }
+                            }
+                        }
+                    },
+                    failure = {
+                        if (generation == remoteEvalGeneration.load()) {
+                            dispatch(FetchOutcome.Failed(GBError(it.exception), source = Source.NETWORK))
+                            resumeOnce(FetchResult.Failed)
+                        } else {
+                            // A stale failure is not the current fetch's failure either.
+                            resumeOnce(FetchResult.Superseded)
+                        }
+                    }
+                )
+            } else {
                 dataSource.fetchFeatures(
                     success = {
-                        // Resume only after the payload is fully applied (incl. the
-                        // suspend sticky-bucket refresh in onPayloadReady), so awaitRefresh()
-                        // callers observe a completed refresh, not just a completed HTTP round.
                         coroutineScope.launch {
                             handleNetworkModel(it)
-                            cont.resume(FetchResult.Success)
+                            resumeOnce(FetchResult.Success)
                         }
                     },
                     failure = {
                         dispatch(FetchOutcome.Failed(GBError(it), source = Source.NETWORK))
-                        cont.resume(FetchResult.Failed)
+                        resumeOnce(FetchResult.Failed)
                     },
                     onNotModified = {
                         dispatch(FetchOutcome.NotModified)
-                        cont.resume(FetchResult.NotModified)
+                        resumeOnce(FetchResult.NotModified)
                     }
                 )
             }
+        } catch (cancellation: CancellationException) {
+            // Never swallow cancellation: it must propagate so runNetworkRound's withTimeoutOrNull and
+            // close()/coroutineScope cancellation keep working. Unlike a real error it is not reported
+            // as a fetch failure.
+            throw cancellation
+        } catch (t: Throwable) {
+            // A dispatcher that throws synchronously while enqueuing the request (e.g. a custom
+            // NetworkDispatcher) must be surfaced as a normal fetch failure — not swallowed by the
+            // coroutine machinery (fire-and-forget path) nor rethrown into initialize()/setAttributes()
+            // (coalesced path). Both wrappers then behave consistently.
+            dispatch(FetchOutcome.Failed(GBError(t), source = Source.NETWORK))
+            resumeOnce(FetchResult.Failed)
+        }
+    }
+
+    /**
+     * The coalesced-refresh runner behind [awaitRefresh]: wraps [performNetworkRound] with a bounded
+     * timeout so a dispatcher that accepts the request but never calls back cannot hang
+     * suspendFeature()'s retry loop forever. Uses the instance [remoteEval] mode with a live payload
+     * from [remoteEvalPayloadProvider].
+     */
+    private suspend fun runNetworkRound(): FetchResult =
+        withTimeoutOrNull(NETWORK_ROUND_TIMEOUT_MILLIS.milliseconds) {
+            val generation = if (remoteEval) remoteEvalGeneration.incrementAndFetch() else 0L
+            performNetworkRound(remoteEvalPayloadProvider(), generation)
         } ?: run {
             // Timed out: the dispatcher accepted the request but never invoked any callback.
             // Surface it as a network failure so remoteSourceFeaturesFetchResult leaves NoResultYet
@@ -239,7 +369,7 @@ internal class FeaturesViewModel(
             FetchResult.Failed
         }
 
-    private fun serveCache(remoteEval: Boolean, policy: FetchPolicy): Boolean {
+    private fun serveCache(policy: FetchPolicy): Boolean {
         val entry = runCatching { readCache() }.getOrElse {
             GB.error("FeaturesViewModel: cache read failed", it)
             delegate.featuresFetchFailed(error = GBError(it), isRemote = false)
@@ -262,24 +392,30 @@ internal class FeaturesViewModel(
         return fresh && outcome is FetchOutcome.Ready
     }
 
-    private fun fetchFromNetwork(remoteEval: Boolean, payload: GBRemoteEvalParams?) {
-        if (remoteEval) dataSource.fetchRemoteEval(
-            params = payload,
-            success = { coroutineScope.launch { handleNetworkModel(it.data) }},
-            failure = {
-                delegate.featuresFetchFailed(
-                    error = GBError(it.exception),
-                    isRemote = true
-                )
-            }
-        ) else dataSource.fetchFeatures(
-            success = { coroutineScope.launch { handleNetworkModel(it) } },
-            failure = { delegate.featuresFetchFailed(error = GBError(it), isRemote = true) },
-            onNotModified = { dispatch(outcome = FetchOutcome.NotModified) }
-        )
+    /**
+     * Fire-and-forget network fetch behind the cache-aware [fetchFeatures]. Starts a *fresh*
+     * [performNetworkRound] (never joins the coalesced in-flight request, so a state-change-driven
+     * fetch — e.g. a remote-eval refresh after an attribute change — always sends the current
+     * payload) and reports the result through the delegate. Not timeout-bounded (that is
+     * [awaitRefresh]/[runNetworkRound]'s job); observe completion via the refresh handler.
+     */
+    private fun fetchFromNetwork(payload: GBRemoteEvalParams?) {
+        val generation = if (remoteEval) remoteEvalGeneration.incrementAndFetch() else 0L
+        coroutineScope.launch { performNetworkRound(payload, generation) }
     }
 
-    private suspend fun handleNetworkModel(model: FeaturesDataModel) {
+    /**
+     * Applies a fetched payload: decode → onPayloadReady (sticky-bucket refresh) → cache → dispatch.
+     *
+     * @param generation the remote-eval round token, or null for the non-remote GET path (no fence).
+     * @return true when the payload was committed (Success dispatched) or when it failed and reported
+     *   its own failure; false only when a newer remote-eval generation superseded this round during
+     *   the onPayloadReady suspend, so the caller maps the round to FetchResult.Superseded.
+     */
+    private suspend fun handleNetworkModel(
+        model: FeaturesDataModel,
+        generation: Long? = null,
+    ): Boolean {
         try {
             // Decode/decrypt the payload BEFORE the sticky-bucket refresh, mirroring the reference
             // TS SDK (decryptPayload -> refreshStickyBuckets). For an encrypted payload the raw
@@ -295,6 +431,17 @@ internal class FeaturesViewModel(
                     encryptedSavedGroups = null,
                 )
             )
+
+            // Final payload-commit fence. onPayloadReady above suspends (sticky-bucket refresh) and
+            // the generation is bumped outside applyMutex (incrementAndFetch), so a newer round may
+            // have superseded us while we were suspended. Bail before writing the cache / committing
+            // features / reporting Success, so a stale round never overwrites the fresher state nor
+            // reports Success. The newer round (already queued on applyMutex or still in flight)
+            // commits its own payload. Skipped on the non-remote GET path (generation == null).
+            if (generation != null && generation != remoteEvalGeneration.load()) {
+                return false
+            }
+
             if (cachingEnabled) {
                 runCatching { writeCache(model) }
                     .onFailure {
@@ -311,6 +458,7 @@ internal class FeaturesViewModel(
                     source = Source.NETWORK
                 )
             )
+            return true
         } catch (error: Throwable) {
             GB.error(
                 errorMessage = "FeaturesViewModel: failed to process remote features payload",
@@ -318,6 +466,7 @@ internal class FeaturesViewModel(
             )
 
             delegate.featuresFetchFailed(error = GBError(error), isRemote = true)
+            return true
         }
     }
 

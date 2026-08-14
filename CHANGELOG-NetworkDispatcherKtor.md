@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.15] - 2026-08-14
+
+### Fixed
+- `consumePOSTRequest()` no longer wraps the request in `client.use { }`, which closed the
+  shared, long-lived `HttpClient` after the first POST and broke every subsequent
+  GET/POST/SSE request. This surfaced in remote-eval mode, where each attribute change
+  issues a POST.
+- `Map`/`List.toJsonElement()` now pass an already-serialized `JsonElement` through
+  untouched (branch added before `Map`/`List`, since `JsonObject`/`JsonArray` are
+  themselves `Map`/`List`), so pre-encoded POST-body values are no longer re-stringified
+  and double-quoted.
+
+---
+
 ## [1.0.14] - 2026-04-30
 
 ### Added

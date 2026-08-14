@@ -1,8 +1,10 @@
 package com.sdk.growthbook.features
 
+import com.sdk.growthbook.kotlinx.serialization.gbSerialize
 import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBOptions
+import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.network.NetworkDispatcher
 import com.sdk.growthbook.network.NetworkDispatcherWithNotModified
 import com.sdk.growthbook.serializable_model.SerializableFeaturesDataModel
@@ -15,6 +17,8 @@ import com.sdk.growthbook.utils.SSEConnectionController
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.transform
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * DataSource for Feature API
@@ -115,8 +119,22 @@ internal class FeaturesDataSource(
          * Create body for request
          */
         params?.let {
-            payload["attributes"] = params.attributes
-            payload["forcedFeatures"] = params.forcedFeatures
+            // Attributes / forced features arrive as GBValue (or already-native) values. Convert
+            // them to JsonElement here — at the SDK boundary that owns the serialization bridge —
+            // so the injected dispatcher receives plain JSON. Otherwise the dispatcher's generic
+            // Map.toJsonElement() falls through to value.toString() and ships garbage like
+            // "GBNumber(value=8490047)" instead of 8490047, breaking server-side targeting.
+            payload["attributes"] = params.attributes.mapValues { (_, value) ->
+                if (value is GBValue) value.gbSerialize() else value
+            }
+            // The remote-eval API expects forcedFeatures as an array of [key, value] pairs
+            // (mirroring sdk-js `Array.from(forcedFeatures)`), NOT a JSON object. Sending an
+            // object makes the GrowthBook proxy reject the request with 400 Bad Request.
+            payload["forcedFeatures"] = JsonArray(
+                params.forcedFeatures.map { (key, value) ->
+                    JsonArray(listOf(JsonPrimitive(key), value.gbSerialize()))
+                }
+            )
             payload["forcedVariations"] = params.forcedVariations
         }
 
