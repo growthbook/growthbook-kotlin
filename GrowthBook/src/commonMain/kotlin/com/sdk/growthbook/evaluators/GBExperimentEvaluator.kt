@@ -177,13 +177,14 @@ internal class GBExperimentEvaluator(
              * 9. If experiment.condition is set and the condition evaluates to false,
              * return immediately (not in experiment, variationId 0)
              */
-            if (experiment.condition != null) {
+            val conditionGB = experiment.conditionGB
+            if (conditionGB != null) {
                 val attr = getAttributes(
                     attributeOverrides = attributeOverrides,
                     attributes = evaluationContext.userContext.attributes,
                 )
                 val evaluationResult = GBConditionEvaluator().evalCondition(
-                    attr, experiment.condition!!,
+                    attr, conditionGB,
                     evaluationContext.savedGroups,
                 )
                 if (!evaluationResult) {

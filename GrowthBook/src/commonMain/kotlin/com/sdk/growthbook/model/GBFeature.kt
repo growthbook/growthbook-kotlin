@@ -6,12 +6,14 @@ import com.sdk.growthbook.utils.GBBucketRange
 import com.sdk.growthbook.utils.GBFilter
 import com.sdk.growthbook.utils.GBTrackData
 import com.sdk.growthbook.utils.GBVariationMeta
+import com.sdk.growthbook.utils.GBCondition
 import com.sdk.growthbook.utils.GBParentConditionInterface
 import com.sdk.growthbook.utils.OptionalProperty
 import com.sdk.growthbook.utils.RangeSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import com.sdk.growthbook.kotlinx.serialization.gbSerialize
+import com.sdk.growthbook.kotlinx.serialization.toGBConditionJson
 
 /**
  * A Feature object consists of possible values plus rules for how to assign values to users.
@@ -44,9 +46,9 @@ data class GBFeatureRule(
      */
     val id: String? = "",
     /**
-     * Optional targeting condition (converted from JSON once at feature load)
+     * Optional targeting condition
      */
-    val condition: GBJson? = null,
+    val condition: GBCondition? = null,
 
     /**
      * Each item defines a prerequisite where a `condition` must evaluate against
@@ -160,10 +162,13 @@ data class GBFeatureRule(
      */
     val tracks: ArrayList<GBTrackData>? = null
 ) {
+    internal val conditionGB: GBJson? =
+        condition?.toGBConditionJson()
+
     internal fun gbSerialize() =
         SerializableGBFeatureRule(
             id = id,
-            condition = condition?.gbSerialize(),
+            condition = condition,
             parentConditions = parentConditions,
             coverage = coverage,
             force = if (force == null) OptionalProperty.NotPresent

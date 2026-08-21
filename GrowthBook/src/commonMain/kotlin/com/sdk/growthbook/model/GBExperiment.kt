@@ -6,8 +6,10 @@ import com.sdk.growthbook.utils.GBFilter
 import com.sdk.growthbook.utils.GBBucketRange
 import com.sdk.growthbook.utils.GBVariationMeta
 import com.sdk.growthbook.utils.RangeSerializer
+import com.sdk.growthbook.utils.GBCondition
 import com.sdk.growthbook.utils.GBParentConditionInterface
 import com.sdk.growthbook.kotlinx.serialization.gbSerialize
+import com.sdk.growthbook.kotlinx.serialization.toGBConditionJson
 import com.sdk.growthbook.serializable_model.SerializableGBExperiment
 import com.sdk.growthbook.serializable_model.SerializableGBExperimentResult
 
@@ -52,9 +54,9 @@ data class GBExperiment(
     var coverage: Float? = null,
 
     /**
-     * Optional targeting condition (converted from JSON once at feature load)
+     * Optional targeting condition
      */
-    var condition: GBJson? = null,
+    var condition: GBCondition? = null,
 
     /**
      * Each item defines a prerequisite where a `condition` must evaluate against
@@ -128,6 +130,20 @@ data class GBExperiment(
      */
     val minBucketVersion: Int? = null
 ) {
+    // Rebuild when `condition` is replaced (`experiment.condition = json` after construction).
+    private var conditionGBSource: GBCondition? = null
+    private var conditionGBParsed: GBJson? = null
+
+    internal val conditionGB: GBJson?
+        get() {
+            val current = condition
+            if (current !== conditionGBSource) {
+                conditionGBSource = current
+                conditionGBParsed = current?.toGBConditionJson()
+            }
+            return conditionGBParsed
+        }
+
     internal fun gbSerialize() =
         SerializableGBExperiment(
             key = key,
@@ -141,7 +157,7 @@ data class GBExperiment(
             filters = filters,
             weights = weights,
             coverage = coverage,
-            condition = condition?.gbSerialize(),
+            condition = condition,
             namespace = namespace,
             hashVersion = hashVersion,
             bucketVersion = bucketVersion,

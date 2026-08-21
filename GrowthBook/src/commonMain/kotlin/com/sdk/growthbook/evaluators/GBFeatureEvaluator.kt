@@ -168,12 +168,12 @@ internal class GBFeatureEvaluator(
                         /**
                          * If it's a conditional rule, skip if the condition doesn't pass
                          */
-                        if (rule.condition != null && !GBConditionEvaluator().evalCondition(
+                        if (rule.conditionGB != null && !GBConditionEvaluator().evalCondition(
                                 attributes = getAttributes(
                                     attributeOverrides = attributeOverrides,
                                     attributes = evaluationContext.userContext.attributes,
                                 ),
-                                conditionObj = rule.condition,
+                                conditionObj = rule.conditionGB,
                                 savedGroups = evaluationContext.savedGroups,
                             )
                         ) {

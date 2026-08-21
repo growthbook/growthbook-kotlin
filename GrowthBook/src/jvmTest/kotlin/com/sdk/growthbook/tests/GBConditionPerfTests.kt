@@ -1,12 +1,12 @@
 package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
-import com.sdk.growthbook.model.GBJson
 import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.serializable_model.SerializableGBFeature
 import com.sdk.growthbook.serializable_model.gbDeserialize
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -60,8 +60,8 @@ class GBConditionPerfTests {
             featureJson,
         ).gbDeserialize()
         assertTrue(
-            feature.rules!!.first().condition is GBJson,
-            "condition should be converted to GBJson at deserialize",
+            feature.rules!!.first().condition is JsonObject,
+            "condition should remain wire JsonElement after deserialize",
         )
 
         val features = mapOf(FEATURE_KEY to feature)
