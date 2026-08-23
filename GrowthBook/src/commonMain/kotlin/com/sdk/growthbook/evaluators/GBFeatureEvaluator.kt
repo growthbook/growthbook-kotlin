@@ -303,7 +303,8 @@ internal class GBFeatureEvaluator(
                                 .evaluateExperiment(
                                     featureId = featureKey,
                                     experiment = exp,
-                                    attributeOverrides = attributeOverrides
+                                    attributeOverrides = attributeOverrides,
+                                    conditionObj = rule.conditionGB,
                                 )
                             if (result.inExperiment && (result.passthrough != true)) {
                                 return prepareResult(

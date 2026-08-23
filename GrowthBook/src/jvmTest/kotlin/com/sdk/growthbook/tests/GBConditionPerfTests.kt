@@ -1,6 +1,7 @@
 package com.sdk.growthbook.tests
 
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
+import com.sdk.growthbook.model.GBFeatureSource
 import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.serializable_model.SerializableGBFeature
@@ -86,6 +87,66 @@ class GBConditionPerfTests {
             elapsedMs < maxMs,
             "1000-item \$in eval too slow: ${elapsedMs}ms (limit ${maxMs}ms)",
         )
+    }
+
+    @Test
+    fun experimentRuleWithInConditionHitAndMiss() {
+        val inItems = buildJsonArray {
+            add(JsonPrimitive("item-a"))
+            add(JsonPrimitive("item-b"))
+            add(JsonPrimitive("item-c"))
+        }
+        val featureJson = buildJsonObject {
+            put("defaultValue", JsonPrimitive(false))
+            put(
+                "rules",
+                buildJsonArray {
+                    add(
+                        buildJsonObject {
+                            put(
+                                "condition",
+                                buildJsonObject {
+                                    put(
+                                        "id",
+                                        buildJsonObject { put("\$in", inItems) },
+                                    )
+                                },
+                            )
+                            put(
+                                "variations",
+                                buildJsonArray {
+                                    add(JsonPrimitive(false))
+                                    add(JsonPrimitive(true))
+                                },
+                            )
+                            put("coverage", JsonPrimitive(1.0))
+                        },
+                    )
+                },
+            )
+        }
+
+        val feature = Json.decodeFromJsonElement(
+            SerializableGBFeature.serializer(),
+            featureJson,
+        ).gbDeserialize()
+        val features = mapOf(FEATURE_KEY to feature)
+
+        fun evalWith(id: String) = GBFeatureEvaluator(
+            GBTestHelper.createTestScopeEvaluationContext(
+                features,
+                mapOf("id" to GBString(id)),
+            ),
+        ).evaluateFeature(
+            featureKey = FEATURE_KEY,
+            attributeOverrides = mapOf("id" to GBString(id)),
+        )
+
+        val hit = evalWith("item-b")
+        assertEquals(GBFeatureSource.experiment, hit.source)
+
+        val miss = evalWith("item-missing")
+        assertEquals(GBFeatureSource.defaultValue, miss.source)
     }
 
     companion object {
