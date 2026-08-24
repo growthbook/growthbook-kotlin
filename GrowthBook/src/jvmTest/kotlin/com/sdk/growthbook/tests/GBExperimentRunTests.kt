@@ -6,6 +6,8 @@ import kotlin.test.assertTrue
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import com.sdk.growthbook.GBSDKBuilder
 import com.sdk.growthbook.integration.buildSDK
@@ -20,6 +22,7 @@ import com.sdk.growthbook.evaluators.EvaluationContext
 import com.sdk.growthbook.evaluators.GBExperimentHelper
 import com.sdk.growthbook.evaluators.UserContext
 import com.sdk.growthbook.model.GBNumber
+import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.toGbNumber
 import com.sdk.growthbook.serializable_model.SerializableGBExperiment
@@ -179,6 +182,55 @@ class GBExperimentRunTests {
             println("Count of calls TrackingCallback - $countTrackingCallback")
             assertEquals(countTrackingCallback, 1)
         }
+    }
+
+    @Test
+    fun inlineExperimentWithJsonElementConditionHitAndMiss() = runTest {
+        val experiment = GBExperiment(
+            key = "targeted-exp",
+            variations = listOf(GBNumber(0), GBNumber(1)),
+            condition = usCountryCondition(),
+        )
+        val miss = buildSDK(
+            json = "",
+            attributes = mapOf(
+                "id" to 1.toGbNumber(),
+                "country" to GBString("UK"),
+            ),
+        ).run(experiment)
+        assertTrue(!miss.inExperiment)
+
+        val hit = buildSDK(
+            json = "",
+            attributes = mapOf(
+                "id" to 1.toGbNumber(),
+                "country" to GBString("US"),
+            ),
+        ).run(experiment)
+        assertTrue(hit.inExperiment)
+    }
+
+    @Test
+    fun assigningConditionAfterConstructionIsHonoredOnLaterRun() = runTest {
+        val experiment = GBExperiment(
+            key = "targeted-exp",
+            variations = listOf(GBNumber(0), GBNumber(1)),
+        )
+        val gb = buildSDK(
+            json = "",
+            attributes = mapOf(
+                "id" to 1.toGbNumber(),
+                "country" to GBString("UK"),
+            ),
+        )
+        assertTrue(gb.run(experiment).inExperiment)
+
+        experiment.condition = usCountryCondition()
+        assertTrue(!gb.run(experiment).inExperiment)
+    }
+
+    private fun usCountryCondition() = buildJsonObject {
+        put("country", JsonPrimitive("US"))
     }
 
     @Test

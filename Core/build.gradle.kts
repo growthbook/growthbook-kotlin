@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "1.3.0"
+version = "1.5.0"
 
 kotlin {
     androidTarget {
@@ -33,11 +33,12 @@ kotlin {
 
     jvm()
     wasmJs {
-        nodejs()
+        browser()
     }
     iosX64()
     iosArm64()
     iosSimulatorArm64()
+    macosArm64()
 
     sourceSets {
         val commonMain by getting {
@@ -46,6 +47,11 @@ kotlin {
                 implementation(libs.kotlinx.serialization.json)
             }
         }
+        val appleMain by creating { dependsOn(commonMain) }
+        val iosX64Main by getting { dependsOn(appleMain) }
+        val iosArm64Main by getting { dependsOn(appleMain) }
+        val iosSimulatorArm64Main by getting { dependsOn(appleMain) }
+        val macosArm64Main by getting { dependsOn(appleMain) }
     }
 }
 

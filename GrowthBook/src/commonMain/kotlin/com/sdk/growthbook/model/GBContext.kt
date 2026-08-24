@@ -26,6 +26,8 @@ internal data class EvalSnapshot(
     val features: GBFeatures = HashMap(),
     val attributes: Map<String, GBValue> = emptyMap(),
     val forcedVariations: Map<String, Number> = emptyMap(),
+    val forcedFeatures: Map<String, GBValue> = emptyMap(),
+    val attributeOverrides: Map<String, GBValue> = emptyMap(),
     val stickyBucketAssignmentDocs: StickyBucketAssignmentDocsType? = null,
     val stickyBucketIdentifierAttributes: List<String>? = null,
     val savedGroups: Map<String, GBValue>? = null,
@@ -190,6 +192,42 @@ class GBContext(
     internal fun setAttributesClearingStickyDocs(attributes: Map<String, GBValue>) = mutate {
         it.copy(attributes = attributes, stickyBucketAssignmentDocs = null)
     }
+
+    /**
+     * Atomically shallow-merge [attributes] into the current attributes (new keys added, existing
+     * overwritten, others preserved). The read-merge-write happens inside the CAS loop, so two
+     * concurrent merges can never lose each other's keys — unlike a read-then-[attributes]-set from
+     * the caller. Mirrors the intent of [setAttributesClearingStickyDocs] for the merge case.
+     */
+    internal fun mergeAttributesClearingStickyDocs(attributes: Map<String, GBValue>) = mutate {
+        it.copy(attributes = it.attributes + attributes, stickyBucketAssignmentDocs = null)
+    }
+
+    /**
+     * Atomically shallow-merge [attributes] into the current attributes without touching the
+     * sticky-bucket docs (mirrors the plain [attributes] setter used by `setAttributesSync`). The
+     * merge is inside the CAS loop, so concurrent merges never lose keys.
+     */
+    internal fun mergeAttributes(attributes: Map<String, GBValue>) = mutate {
+        it.copy(attributes = it.attributes + attributes)
+    }
+
+    /**
+     * Forced feature values, published atomically alongside the other evaluation inputs so a reader
+     * on another thread always sees the latest write (previously a plain field on GrowthBookSDK with
+     * no happens-before guarantee).
+     */
+    internal var forcedFeatures: Map<String, GBValue>
+        get() = state.load().forcedFeatures
+        set(value) = mutate { it.copy(forcedFeatures = value) }
+
+    /**
+     * Attribute overrides used for Sticky Bucketing, published atomically alongside the other
+     * evaluation inputs (previously a plain field on GrowthBookSDK with no happens-before guarantee).
+     */
+    internal var attributeOverrides: Map<String, GBValue>
+        get() = state.load().attributeOverrides
+        set(value) = mutate { it.copy(attributeOverrides = value) }
 
     /**
      * List of user's attributes keys

@@ -370,3 +370,39 @@ class GBNetworkDispatcherOkHttp(
         enableLogging = enabled
     }
 }
+
+internal fun Map<*, *>.toJsonElement(): JsonElement {
+    val map: MutableMap<String, JsonElement> = mutableMapOf()
+    this.forEach {
+        val key = it.key as? String ?: return@forEach
+        val value = it.value ?: return@forEach
+        map[key] = when (value) {
+            // Pass already-serialized JsonElement through untouched. Must precede the Map/List
+            // branches: JsonObject is a Map and JsonArray is a List, so those branches would
+            // otherwise re-encode their JsonPrimitive contents via toString() and double-quote them.
+            is JsonElement -> value
+            is Map<*, *> -> (value).toJsonElement()
+            is List<*> -> value.toJsonElement()
+            is Boolean -> JsonPrimitive(value)
+            is Number -> JsonPrimitive(value)
+            else -> JsonPrimitive(value.toString())
+        }
+    }
+    return JsonObject(map)
+}
+
+internal fun List<*>.toJsonElement(): JsonElement {
+    val list: MutableList<JsonElement> = mutableListOf()
+    this.forEach {
+        val value = it ?: return@forEach
+        when (value) {
+            is JsonElement -> list.add(value)
+            is Map<*, *> -> list.add((value).toJsonElement())
+            is List<*> -> list.add(value.toJsonElement())
+            is Boolean -> list.add(JsonPrimitive(value))
+            is Number -> list.add(JsonPrimitive(value))
+            else -> list.add(JsonPrimitive(value.toString()))
+        }
+    }
+    return JsonArray(list)
+}

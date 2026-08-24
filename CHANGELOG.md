@@ -16,6 +16,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [7.7.0] - 2026-08-24
+
+### Changed
+- Feature-flag and experiment targeting is significantly faster for large $in / $nin lists. Targeting conditions are now converted to the internal GBValue tree **once at
+  feature load** instead of on every feature() / run() evaluation, and membership checks against arrays of 16+ items use a lazily-built HashSet (O(1) lookup) instead of a
+  linear scan. On an internal payload with thousand-item $in targeting, isOn() dropped from ~2.2 ms to ~5 µs. Wire JSON, the public condition shape, and evaluation results are
+  unchanged; case-insensitive operators (`$ini` / $nini / `$alli`) keep the existing fold-and-scan path
+
+### Added
+- `decodeAs<T>()` extension on `GBValue` (in `GrowthBookKotlinxSerialization`) to decode feature values into typed models via kotlinx.serialization. The default `Json` is tolerant of unknown keys, so feature config objects carrying fields the caller's model does not declare yet still decode successfully. Pass a custom `Json` to override (e.g. `Json { ignoreUnknownKeys = false }` for strict decoding).
+
+### Fixed
+- `GBArray` now implements value-based `equals`/`hashCode` (converted to a `data class`), so arrays with equal contents compare as equal.
+- $in / $nin against a missing attribute no longer perform a membership lookup with a null value
+
+---
+## [7.6.0] - 2026-08-14
+
+### Added
+- Persistent feature-definition cache is now implemented on **every target** — previously only Android persisted a cache and the rest were no-ops. Apple (iOS/macOS) writes to `<Application Support>/GrowthBook-KMM/` via `NSFileManager`, the JVM to `<user.home>/.growthbook/GrowthBook-KMM/` (fallback `<java.io.tmpdir>`) via `java.io` — both atomic (temp file + rename) and self-healing on corrupt data — and JS and wasmJs to the browser `localStorage` under the `GrowthBook-KMM/` key namespace, self-healing on corrupt data and treating a disabled/unavailable `localStorage` (e.g. private browsing) as a cache miss rather than an initialization failure
+- Remote-evaluation payloads are **not** persisted or served from the cache. The feature cache is keyed only by API key, so serving a remotely-evaluated payload could surface one user's evaluated features to the next after a logout/login on the same key; remote-eval therefore always fetches fresh from the network
+- The `wasmJs` target is now configured for the browser (`browser()` instead of `nodejs()`) so it can persist through `localStorage`
+- New `macosArm64` target for the `GrowthBook`, `Core`, and `GrowthBookKotlinxSerialization` artifacts
+- `GBSDKBuilder.setCachingLayer(GBCachingLayer)` — provide your own cache implementation so GrowthBook persists its cached state through your own storage (e.g. a shared KMP key/value store or encrypted storage) instead of the built-in per-platform cache. Replaces both the feature-definition cache and sticky-bucket storage, and may be called in any order relative to the sticky-bucket setters
+
+---
+## [7.5.0] - 2026-08-14
+
+### Added
+- `GBSDKBuilder.setFeaturesChangeHandler()` — callback notified with a `GBFeaturesDiff` (added / removed / changed flags) on each refresh, so consumers can react to only the flags that changed instead of the whole feature set. Fires on all update paths (SSE / GET / remote-eval) after features are applied, and only when something changed
+
+### Fixed
+- SSE auto-refresh now emits decrypted features to the `Flow` for encrypted-feature projects, instead of a "success with empty data" event (the raw `features` field is null for encrypted payloads)
+- An empty features payload (e.g. all flags deleted in the admin) is now applied as an empty feature set instead of surfacing a spurious refresh error
+
+---
+## [7.4.0] - 2026-08-14
+
+### Added
+- `GrowthBookSDK.updateAttributes()` / `updateAttributesSync()` — shallow-merge user
+  attributes into the current map (parity with the TS SDK's `updateAttributes`): new
+  keys are added, existing keys overwritten, untouched keys preserved. A `GBNull` value
+  keeps the key with a null value (it is not removed); use `setAttributes()` to replace
+  the whole map.
+
+### Fixed
+- Remote evaluation now re-runs when user attributes or forced features change:
+  `setAttributes()`, `setAttributesSync()` and `setForcedFeatures()` were not triggering
+  a fresh remote evaluation, so remote-eval consumers kept stale results after those
+  changes.
+- In remote-eval mode, `suspendFeature()`'s internal retry now goes through the
+  remote-eval POST instead of a plain GET, so a retry can no longer momentarily surface
+  non-personalized (unevaluated) feature definitions.
+- Rapid attribute or forced-feature changes in remote-eval mode could apply an
+  out-of-order (stale) evaluation when a slower earlier request completed after a newer
+  one; responses from superseded remote-eval requests are now discarded. A caller
+  awaiting such a superseded request is no longer reported a successful refresh, so
+  `suspendFeature()` cannot return the older, stale evaluation — it re-joins the latest
+  generation instead.
+- `setForcedFeatures()` and `setAttributeOverrides()` values are now published atomically
+  alongside the other evaluation inputs, so an evaluation running on another thread always
+  observes the latest values as part of a single consistent snapshot.
+- A custom `NetworkDispatcher` that throws synchronously while starting a request is now
+  reported through the refresh handler as a fetch failure, instead of being swallowed or
+  propagating out of `initialize()`/`setAttributes()`.
+- Remote-eval POST body is now well-formed. User attributes and forced features were
+  serialized via their `GBValue.toString()` (e.g. `"GBNumber(value=8490047)"`) instead of
+  the underlying JSON value, so server-side targeting saw garbage; they are now encoded as
+  real JSON. Forced features are also sent as an array of `[key, value]` pairs (matching
+  the reference SDK) instead of a JSON object, which the GrowthBook proxy rejected with
+  `400 Bad Request`.
+
+---
 ## [7.3.0] - 2026-07-20
 
 ### Added
@@ -48,7 +121,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [7.2.0] - 2026-06-19
+## [7.2.0] - 2026-06-12
 
 ### Added
 - `GBSDKBuilder.setInitialFeatures()` — seed the SDK with a bundled fallback payload; features are applied immediately and the normal cache/network refresh still runs on top (network > disk cache > seed > code defaults)
