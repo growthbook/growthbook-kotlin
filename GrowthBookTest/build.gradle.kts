@@ -1,7 +1,6 @@
 @file:OptIn(ExperimentalWasmDsl::class)
 
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
-import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackOutput
 import org.jetbrains.kotlin.gradle.targets.js.yarn.yarn
 
 plugins {
@@ -21,23 +20,31 @@ kotlin {
     js {
         yarn.lockFileDirectory = file("kotlin-js-store")
         browser {
-            commonWebpackConfig {
-                output = KotlinWebpackOutput(
-                    library = project.name,
-                    libraryTarget = KotlinWebpackOutput.Target.UMD,
-                    globalObject = KotlinWebpackOutput.Target.WINDOW
-                )
+            testTask {
+                useKarma {
+                    useChromeHeadless()
+                }
             }
         }
     }
 
     jvm()
+    // browser(), not nodejs(): FakeGrowthBook itself needs no browser API, but the real SDK's
+    // wasmJs caching actual reads kotlinx.browser.localStorage, which does not exist under Node.
+    // Matching :GrowthBook keeps the door open for tests here that build a real GrowthBookSDK.
     wasmJs {
-        nodejs()
+        browser {
+            testTask {
+                useKarma {
+                    useChromeHeadless()
+                }
+            }
+        }
     }
     iosX64()
     iosArm64()
     iosSimulatorArm64()
+    macosArm64()
 
     sourceSets {
         val commonMain by getting {

@@ -165,13 +165,17 @@ An explicit `refreshCache()` call always bypasses this window and hits the netwo
     ```kotlin
   fun feature(id: String) : GBFeatureResult
     ```
-- The featureValue method takes a string argument, which is the unique identifier, and the type of the accessed feature. 
-The supported types of accessed features are: Boolean, String, Number, Short, Int, Long, Float, Double], GBJson - 
-and returns a feature value typed with specified type.
+- The featureValue method takes a string argument, which is the unique identifier, and the type of the accessed
+feature. Booleans, strings and numbers are returned unwrapped; JSON objects and arrays are returned as `GBJson` and
+`GBArray` (`GBArray` also satisfies `List<GBValue>`). It returns `null` if the feature has no value or the value is
+not of the requested type.
 
     ```kotlin
   inline fun <reified V>featureValue(id: String): V?
     ```
+
+  The same function is available as an extension on `IGrowthBookSDK`, with identical behavior, so code written
+  against the interface reads values the same way.
 
 - The `decodeAs` extension (in the `GrowthBookKotlinxSerialization` module) decodes a `GBValue` — for example a
   `GBJson` feature value — into your own `@Serializable` model via kotlinx.serialization. It returns `null` if the

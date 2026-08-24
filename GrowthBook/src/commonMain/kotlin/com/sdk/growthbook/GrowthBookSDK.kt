@@ -26,12 +26,9 @@ import com.sdk.growthbook.model.GBJson
 import com.sdk.growthbook.model.GBNull
 import com.sdk.growthbook.model.GBArray
 import com.sdk.growthbook.model.GBValue
-import com.sdk.growthbook.model.GBNumber
-import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBOptions
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.EvalSnapshot
-import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBExperimentResult
@@ -411,11 +408,13 @@ class GrowthBookSDK internal constructor(
     /**
      * The featureValue method takes a string argument,
      * which is the unique identifier, and the type of the accessed feature.
-     * The supported types of accessed features are:
-     * [Boolean], [String], [Number], [Short],
-     * [Int], [Long], [Float], [Double], [GBJson]
      *
-     * @returns a feature value typed with specified type
+     * Boolean, string and numeric values are returned unwrapped ([Boolean], [String] and the
+     * concrete [Number] subtype the payload decoded to); JSON objects and arrays are returned as
+     * [GBJson] and [GBArray].
+     *
+     * @returns the feature value typed as [V], or null if the feature has no value or its value
+     * is not a [V]
      */
     inline fun <reified V> featureValue(id: String): V? {
         return extractFeatureValue(id)
@@ -631,32 +630,14 @@ class GrowthBookSDK internal constructor(
     }
 
     /**
-     * Helper method for reified feature and featureValue
+     * Helper method for reified feature and featureValue.
+     *
+     * Delegates to the shared [extractValue] so this member and the
+     * [IGrowthBookSDK.featureValue] extension can never disagree — see the note there.
      */
     @PublishedApi
-    internal inline fun <reified V> extractFeatureValue(id: String): V? {
-        val listOfSupportedTypes = listOf(
-            Boolean::class, String::class,
-            Number::class, Short::class, Int::class,
-            Long::class, Float::class, Double::class,
-            GBJson::class,
-        )
-        if (V::class !in listOfSupportedTypes) {
-            return null
-        }
-
-        val gbFeatureResult: GBFeatureResult = this.feature(id)
-        return when (val gbResultValue = gbFeatureResult.gbValue) {
-            is GBNull -> null
-            is GBBoolean -> gbResultValue.value as? V
-            is GBString -> gbResultValue.value as? V
-            is GBNumber -> gbResultValue.value as? V
-            is GBJson -> gbResultValue as? V
-            is GBValue.Unknown -> null
-            is GBArray -> null
-            null -> null
-        }
-    }
+    internal inline fun <reified V> extractFeatureValue(id: String): V? =
+        this.feature(id).extractValue()
 
     /**
      * Builds the remote-eval request payload from the current context, or null when not in

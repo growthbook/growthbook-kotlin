@@ -70,6 +70,21 @@ feature's `defaultValue` is used):
 val gb = FakeGrowthBook.fromFeaturesJson(exportedJson)
 ```
 
+It accepts a features response (`{"features": { ... }}`) or a bare features map, and throws
+`IllegalArgumentException` with an explanation for anything else — an encrypted payload, a
+non-object document, or JSON holding no features.
+
+### Reported source
+
+`GBFeatureResult.source` reflects where the value came from, matching what the real SDK would
+report, so hooks that branch on it are exercised against realistic states:
+
+| How the value was set | `source` |
+| --- | --- |
+| `enable` / `disable` / `setValue` | `override` |
+| `setFeatures` / `fromFeaturesJson` | `defaultValue` |
+| never configured | `unknownFeature` |
+
 ### Deterministic experiments
 
 `run` returns the control (variation 0, `inExperiment = false`) unless you force
@@ -78,7 +93,13 @@ a variation:
 ```kotlin
 val gb = FakeGrowthBook().setForcedVariation("exp", 1)
 gb.run(experiment).variationId   // 1, inExperiment = true
+gb.run(experiment).key           // "1" — the variation key, or meta[1].key when set
 ```
+
+Apart from skipping hashing, the returned `GBExperimentResult` matches what the real
+evaluator would build: `key` is the *variation* key (`meta[index].key`, falling back to the
+index), and an index outside `experiment.variations` falls back to the baseline with
+`inExperiment = false` rather than reporting a result production cannot produce.
 
 ### Interaction assertions
 
