@@ -6,6 +6,7 @@ import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBOptions
+import com.sdk.growthbook.plugin.tracking.GrowthBookPlugin
 import com.sdk.growthbook.network.NetworkDispatcher
 import com.sdk.growthbook.sandbox.CachingImpl
 import com.sdk.growthbook.sandbox.CachingLayer
@@ -114,6 +115,7 @@ class GBSDKBuilder(
     // called, so setCachingLayer() and the sticky-bucket setters can be called in any order.
     private var stickyBucketServiceFactory: ((CachingLayer) -> GBStickyBucketService)? = null
     private var featureUsageCallback: GBFeatureUsageCallback? = null
+    private var plugins: List<GrowthBookPlugin>? = null
     private var initialFeatures: GBFeatures? = null
     private var cacheMaxAge: Long? = null
 
@@ -241,6 +243,15 @@ class GBSDKBuilder(
     }
 
     /**
+     * Registers plugins that receive lifecycle callbacks: [GrowthBookPlugin.init],
+     * [GrowthBookPlugin.onExperimentViewed], [GrowthBookPlugin.onFeatureEvaluated], and [GrowthBookPlugin.close].
+     */
+    fun setPlugins(plugins: List<GrowthBookPlugin>): GBSDKBuilder {
+        this.plugins = plugins
+        return this
+    }
+
+    /**
      * Initialize the Kotlin SDK and provide it when ready
      */
     fun initialize(onResult: (GrowthBookSDK) -> Unit) {
@@ -302,6 +313,7 @@ class GBSDKBuilder(
             // honoured regardless of whether it was set before or after the sticky-bucket setter.
             stickyBucketService = stickyBucketService
                 ?: stickyBucketServiceFactory?.invoke(resolveCachingLayer()),
+            plugins = plugins
         )
 
     private inner class WaitForCallCaseHelper(

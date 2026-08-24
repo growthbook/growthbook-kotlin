@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [7.8.0] - 2026-08-24
+
+### Added
+- Plugin system: `GrowthBookPlugin` interface for observing experiment and feature evaluations
+- Built-in `GrowthBookTrackingPlugin` that batches events and POSTs them to the GrowthBook ingest endpoint
+- `GBSDKBuilder.setPlugins()` to register plugins with the SDK
+
+### Fixed
+- `List<*>.toJsonElement()` in `:Core` now passes an already-serialized `JsonElement` through untouched instead of re-encoding it via `toString()`, matching `Map<*, *>.toJsonElement()`. This prevents double-encoding of nested list values when building request bodies
+
+---
+
 ## [7.7.0] - 2026-08-24
 
 ### Changed

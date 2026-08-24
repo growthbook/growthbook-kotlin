@@ -3,11 +3,13 @@ package com.sdk.growthbook.tests
 import com.sdk.growthbook.utils.toHashMap
 import com.sdk.growthbook.utils.toJsonElement
 import com.sdk.growthbook.utils.toList
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -295,5 +297,13 @@ class ExtensionsTest {
 
         val result = mapOf("obj" to Custom(5)).toJsonElement().jsonObject
         assertEquals("Custom(n=5)", result["obj"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun `JsonElement value is passed through as-is`() {
+        val array = Json.encodeToJsonElement(listOf("a", "b")) // JsonArray
+        val result = mapOf("events" to array).toJsonElement().jsonObject
+        assertTrue(result["events"] is JsonArray)
+        assertEquals(2, result["events"]!!.jsonArray.size)
     }
 }

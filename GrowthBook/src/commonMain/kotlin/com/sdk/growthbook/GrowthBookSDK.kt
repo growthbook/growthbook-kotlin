@@ -37,6 +37,7 @@ import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.kotlinx.serialization.from
 import com.sdk.growthbook.logger.GB
+import com.sdk.growthbook.plugin.tracking.PluginRegistry
 import com.sdk.growthbook.model.StackContext
 import com.sdk.growthbook.utils.GBFeaturesChangeHandler
 import com.sdk.growthbook.sandbox.CachingImpl
@@ -119,6 +120,7 @@ class GrowthBookSDK internal constructor(
     // payload — otherwise a 304 arriving before the first remote fetch would be treated
     // as a failure, breaking the offline-first fallback.
     private var hasFeaturesPayload: Boolean = gbContext.features.isNotEmpty()
+    var pluginRegistry: PluginRegistry? = null
 
     /**
      * JAVA Consumers preset Features
@@ -140,6 +142,8 @@ class GrowthBookSDK internal constructor(
     )
 
     init {
+        pluginRegistry = PluginRegistry(gbContext.plugins)
+        pluginRegistry?.initAll()
         if (features != null) {
             gbContext.features = features
             hasFeaturesPayload = true
@@ -206,12 +210,15 @@ class GrowthBookSDK internal constructor(
     }
 
     /**
-     * Releases resources held by this SDK instance: stops any active SSE auto-refresh connection and
-     * cancels the background coroutine scope used to process fetched payloads. Call this when the
-     * instance is no longer needed (e.g. on logout, or before creating a replacement instance) to
-     * avoid leaking coroutines and threads. The instance must not be used after [close].
+     * Releases resources held by this SDK instance: flushes registered plugins (including the
+     * built-in tracking plugin) so any buffered events are sent, stops any active SSE auto-refresh
+     * connection, and cancels the background coroutine scope used to process fetched payloads. Call
+     * this when the instance is no longer needed (e.g. on logout, or before creating a replacement
+     * instance) to avoid leaking coroutines and threads. Safe to call multiple times. The instance
+     * must not be used after [close].
      */
     fun close() {
+        pluginRegistry?.closeAll()
         featuresViewModel.close()
     }
 
@@ -701,7 +708,7 @@ class GrowthBookSDK internal constructor(
     }
 
     private fun createEvaluationContext(snapshot: EvalSnapshot = gbContext.evalSnapshot()) =
-        createEvaluationContext(gbContext, gbExperimentHelper, snapshot)
+        createEvaluationContext(gbContext, gbExperimentHelper, snapshot, pluginRegistry)
 
     //@ThreadLocal
     internal companion object {
@@ -720,6 +727,7 @@ class GrowthBookSDK internal constructor(
             // snapshot, so the evaluation can never observe a torn mix (e.g. new features with stale
             // sticky docs, or new attributes with old overrides). Callers pass the snapshot they read.
             snapshot: EvalSnapshot,
+            pluginRegistry: PluginRegistry?
         ): EvaluationContext {
             return EvaluationContext(
                 enabled = gbContext.enabled,
@@ -742,7 +750,8 @@ class GrowthBookSDK internal constructor(
                 onStickyAssignmentChanged = { key, doc ->
                     gbContext.mergeStickyAssignmentDoc(key, doc)
                 },
-                stackContext = StackContext(null, mutableSetOf())
+                stackContext = StackContext(null, mutableSetOf()),
+                pluginRegistry = pluginRegistry
             )
         }
     }

@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "1.4.0"
+version = "1.5.0"
 
 kotlin {
     androidTarget {
@@ -44,6 +44,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.kotlinx.serialization.json)
             }
         }
         val appleMain by creating { dependsOn(commonMain) }

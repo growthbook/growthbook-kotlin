@@ -11,7 +11,24 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "7.7.0"
+version = "7.8.0"
+
+val generateSdkMeta by tasks.registering {
+    val outputDir = layout.buildDirectory.dir("generated/sdk-meta/commonMain/kotlin")
+    outputs.dir(outputDir)
+    doLast {
+        val file = outputDir.get().asFile
+            .resolve("com/sdk/growthbook/model/SdkVersion.kt")
+        file.parentFile.mkdirs()
+        file.writeText(
+            """
+            package com.sdk.growthbook.model
+
+            internal const val SDK_VERSION = "${project.version}"
+            """.trimIndent()
+        )
+    }
+}
 
 kotlin {
     androidTarget {
@@ -47,6 +64,7 @@ kotlin {
     //noinspection UseTomlInstead
     sourceSets {
         val commonMain by getting {
+            kotlin.srcDir(generateSdkMeta.map { it.outputs.files })
             dependencies {
                 api(project(":Core"))
 

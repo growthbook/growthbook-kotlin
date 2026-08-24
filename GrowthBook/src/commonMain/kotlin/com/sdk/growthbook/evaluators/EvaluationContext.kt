@@ -4,6 +4,7 @@ import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.GBTrackingCallback
+import com.sdk.growthbook.plugin.tracking.PluginRegistry
 import com.sdk.growthbook.model.StackContext
 import com.sdk.growthbook.model.StickyBucketAssignmentDocsType
 import com.sdk.growthbook.stickybucket.GBStickyBucketService
@@ -26,7 +27,8 @@ internal data class EvaluationContext(
     // GBContext.mergeStickyAssignmentDoc). Replaces the previous wholesale write-back of the whole
     // docs map after evaluation, which could clobber a concurrent background refresh.
     val onStickyAssignmentChanged: ((GBStickyAttributeKey, GBStickyAssignmentsDocument) -> Unit)? = null,
-    val stackContext: StackContext
+    val stackContext: StackContext,
+    val pluginRegistry: PluginRegistry?
 )
 
 internal data class UserContext(
