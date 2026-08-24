@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "1.0.14"
+version = "1.2.0"
 
 kotlin {
     androidTarget {
@@ -38,6 +38,7 @@ kotlin {
     iosX64()
     iosArm64()
     iosSimulatorArm64()
+    macosArm64()
 
     val ktorVersion = "3.4.2"
     //noinspection UseTomlInstead
@@ -56,15 +57,16 @@ kotlin {
                 implementation("io.ktor:ktor-client-android:$ktorVersion")
             }
         }
-        val iosMain by creating {
+        val appleMain by creating {
             dependsOn(commonMain)
             dependencies {
                 implementation("io.ktor:ktor-client-darwin:$ktorVersion")
             }
         }
-        val iosX64Main by getting { dependsOn(iosMain) }
-        val iosArm64Main by getting { dependsOn(iosMain) }
-        val iosSimulatorArm64Main by getting { dependsOn(iosMain) }
+        val iosX64Main by getting { dependsOn(appleMain) }
+        val iosArm64Main by getting { dependsOn(appleMain) }
+        val iosSimulatorArm64Main by getting { dependsOn(appleMain) }
+        val macosArm64Main by getting { dependsOn(appleMain) }
 
         val androidUnitTest by getting {
             dependencies {

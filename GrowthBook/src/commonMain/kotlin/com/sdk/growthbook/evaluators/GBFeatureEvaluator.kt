@@ -170,13 +170,12 @@ internal class GBFeatureEvaluator(
                         /**
                          * If it's a conditional rule, skip if the condition doesn't pass
                          */
-                        if (rule.condition != null && !GBConditionEvaluator().evalCondition(
+                        if (rule.conditionGB != null && !GBConditionEvaluator().evalCondition(
                                 attributes = getAttributes(
                                     attributeOverrides = attributeOverrides,
                                     attributes = evaluationContext.userContext.attributes,
                                 ),
-                                conditionObj = rule.condition.let(GBValue::from) as? GBJson
-                                    ?: GBJson(emptyMap()),
+                                conditionObj = rule.conditionGB,
                                 savedGroups = evaluationContext.savedGroups,
                             )
                         ) {
@@ -228,6 +227,11 @@ internal class GBFeatureEvaluator(
                                         evaluationContext.trackingCallback(
                                             track.experiment,
                                             track.result
+                                        )
+                                        evaluationContext.pluginRegistry?.fireExperimentViewed(
+                                            track.experiment,
+                                            track.result,
+                                            evaluationContext.userContext.attributes
                                         )
                                     } catch (e: Exception) {
                                         GB.error(
@@ -306,7 +310,8 @@ internal class GBFeatureEvaluator(
                                 .evaluateExperiment(
                                     featureId = featureKey,
                                     experiment = exp,
-                                    attributeOverrides = attributeOverrides
+                                    attributeOverrides = attributeOverrides,
+                                    conditionObj = rule.conditionGB,
                                 )
                             if (result.inExperiment && (result.passthrough != true)) {
                                 return prepareResult(
@@ -383,6 +388,11 @@ internal class GBFeatureEvaluator(
 
         try {
             evaluationContext.onFeatureUsage?.invoke(featureKey, gbFeatureResult)
+            evaluationContext.pluginRegistry?.fireFeatureEvaluated(
+                featureKey,
+                gbFeatureResult,
+                evaluationContext.userContext.attributes
+            )
         } catch (e: Exception) {
             GB.error("FeatureEvaluator: onFeatureUsage exception for '$featureKey'", e)
         }

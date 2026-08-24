@@ -22,6 +22,8 @@ import com.sdk.growthbook.model.GBArray
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBBoolean
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
 
 fun GBValue.gbSerialize(): JsonElement =
     when(this) {
@@ -39,6 +41,29 @@ fun GBValue.gbSerialize(): JsonElement =
 fun GBJson.gbSerialize() = JsonObject(
     this.mapValues { it.value.gbSerialize() }
 )
+
+/**
+ * Default [Json] used by [decodeAs]. Mirrors the JSON configuration the SDK uses
+ * internally (lenient + tolerant of unknown keys) so typed decoding behaves
+ * consistently with the rest of the SDK — feature config objects carrying fields
+ * the caller's model does not declare yet still decode successfully (forward
+ * compatibility). Pass a custom [Json] to override.
+ */
+@PublishedApi
+internal val defaultDecodeJson: Json = Json {
+    prettyPrint = true
+    isLenient = true
+    ignoreUnknownKeys = true
+}
+
+inline fun <reified T> GBValue.decodeAs(json: Json = defaultDecodeJson): T? {
+    val jsonElement = this.gbSerialize()
+    return try {
+        json.decodeFromJsonElement(jsonElement)
+    } catch (e: Exception) {
+        null
+    }
+}
 
 fun GBValue.Companion.from(jsonElement: JsonElement): GBValue =
     when(jsonElement) {
@@ -62,3 +87,7 @@ fun GBValue.Companion.from(jsonElement: JsonElement): GBValue =
         )
         else -> GBValue.Unknown
     }
+
+/** Convert a wire condition once at feature load; empty object if not a JSON object. */
+fun JsonElement.toGBConditionJson(): GBJson =
+    GBValue.from(this) as? GBJson ?: GBJson(emptyMap())

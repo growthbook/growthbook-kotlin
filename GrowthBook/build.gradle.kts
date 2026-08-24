@@ -1,7 +1,6 @@
 @file:OptIn(ExperimentalWasmDsl::class)
 
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
-import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackOutput
 import org.jetbrains.kotlin.gradle.targets.js.yarn.yarn
 
 plugins {
@@ -12,7 +11,24 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "7.4.0"
+version = "7.8.0"
+
+val generateSdkMeta by tasks.registering {
+    val outputDir = layout.buildDirectory.dir("generated/sdk-meta/commonMain/kotlin")
+    outputs.dir(outputDir)
+    doLast {
+        val file = outputDir.get().asFile
+            .resolve("com/sdk/growthbook/model/SdkVersion.kt")
+        file.parentFile.mkdirs()
+        file.writeText(
+            """
+            package com.sdk.growthbook.model
+
+            internal const val SDK_VERSION = "${project.version}"
+            """.trimIndent()
+        )
+    }
+}
 
 kotlin {
     androidTarget {
@@ -22,27 +38,33 @@ kotlin {
     js {
         yarn.lockFileDirectory = file("kotlin-js-store")
         browser {
-            commonWebpackConfig {
-                output = KotlinWebpackOutput(
-                    library = project.name,
-                    libraryTarget = KotlinWebpackOutput.Target.UMD,
-                    globalObject = KotlinWebpackOutput.Target.WINDOW
-                )
+            testTask {
+                useKarma {
+                    useChromeHeadless()
+                }
             }
         }
     }
 
     jvm()
     wasmJs {
-        nodejs()
+        browser {
+            testTask {
+                useKarma {
+                    useChromeHeadless()
+                }
+            }
+        }
     }
     iosX64()
     iosArm64()
     iosSimulatorArm64()
+    macosArm64()
 
     //noinspection UseTomlInstead
     sourceSets {
         val commonMain by getting {
+            kotlin.srcDir(generateSdkMeta.map { it.outputs.files })
             dependencies {
                 api(project(":Core"))
 
@@ -87,13 +109,46 @@ kotlin {
         val jsMain by getting {
             dependencies {
                 implementation(libs.cryptography.provider.webcrypto)
+                implementation("org.jetbrains.kotlinx:kotlinx-browser:0.5.0")
+            }
+        }
+        val jsTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
             }
         }
         val wasmJsMain by getting {
             dependencies {
                 implementation(libs.cryptography.provider.webcrypto)
+                implementation("org.jetbrains.kotlinx:kotlinx-browser:0.5.0")
             }
         }
+        val wasmJsTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
+        val appleMain by creating {
+            dependsOn(commonMain)
+        }
+        val iosX64Main by getting {
+            dependsOn(appleMain)
+        }
+        val iosArm64Main by getting {
+            dependsOn(appleMain)
+        }
+        val iosSimulatorArm64Main by getting {
+            dependsOn(appleMain)
+        }
+        val macosArm64Main by getting { dependsOn(appleMain) }
+        val commonTest by getting
+        val appleTest by creating {
+            dependsOn(commonTest)
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
+        val macosArm64Test by getting { dependsOn(appleTest) }
     }
 }
 

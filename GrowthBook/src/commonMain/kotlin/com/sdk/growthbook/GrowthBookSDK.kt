@@ -21,6 +21,7 @@ import com.sdk.growthbook.features.FeaturesDataModel
 import com.sdk.growthbook.features.FeaturesDataSource
 import com.sdk.growthbook.features.FeaturesFlowDelegate
 import com.sdk.growthbook.features.FeaturesViewModel
+import com.sdk.growthbook.features.FetchResult
 import com.sdk.growthbook.model.GBJson
 import com.sdk.growthbook.model.GBNull
 import com.sdk.growthbook.model.GBArray
@@ -29,14 +30,21 @@ import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBOptions
 import com.sdk.growthbook.model.GBContext
+import com.sdk.growthbook.model.EvalSnapshot
 import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.kotlinx.serialization.from
 import com.sdk.growthbook.logger.GB
+import com.sdk.growthbook.plugin.tracking.PluginRegistry
 import com.sdk.growthbook.model.StackContext
+import com.sdk.growthbook.utils.GBFeaturesChangeHandler
+import com.sdk.growthbook.sandbox.CachingImpl
+import com.sdk.growthbook.sandbox.GBCachingLayer
+import com.sdk.growthbook.sandbox.GBCachingLayerAdapter
 import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBuckets
+import com.sdk.growthbook.model.diffFeatures
 import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
 import kotlin.experimental.ExperimentalObjCRefinement
@@ -70,7 +78,12 @@ class GrowthBookSDK internal constructor(
     // runs on a defined background context rather than an arbitrary thread. Overridable (e.g. with a
     // test dispatcher) so tests can drive the async pipeline deterministically.
     coroutineContext: CoroutineContext,
-) : FeaturesFlowDelegate, IGrowthBookSDK {
+    private val featuresChangeHandler: GBFeaturesChangeHandler? = null,
+    // Internal seam only: the public way to plug a cache is GBSDKBuilder.setCachingLayer().
+    // Adding this to the public constructor would break binary compatibility,
+    // so the public constructor below preserves the pre-7.4.0 signature and delegates here.
+    cachingLayer: GBCachingLayer?
+    ) : FeaturesFlowDelegate, IGrowthBookSDK {
 
     /**
      * Public constructor, kept binary-compatible with pre-7.3.0 releases. To set a cache
@@ -94,9 +107,8 @@ class GrowthBookSDK internal constructor(
         cachingEnabled = cachingEnabled,
         cacheMaxAge = null,
         coroutineContext = PlatformDependentIODispatcher,
+        cachingLayer = null
     )
-    private var forcedFeatures: Map<String, GBValue> = emptyMap()
-    private var attributeOverrides: Map<String, GBValue> = emptyMap()
     private var remoteSourceFeaturesFetchResult: FeaturesFetchResult =
         FeaturesFetchResult.NoResultYet
     private val gbExperimentHelper: GBExperimentHelper = GBExperimentHelper()
@@ -108,6 +120,7 @@ class GrowthBookSDK internal constructor(
     // payload — otherwise a 304 arriving before the first remote fetch would be treated
     // as a failure, breaking the offline-first fallback.
     private var hasFeaturesPayload: Boolean = gbContext.features.isNotEmpty()
+    var pluginRegistry: PluginRegistry? = null
 
     /**
      * JAVA Consumers preset Features
@@ -121,11 +134,16 @@ class GrowthBookSDK internal constructor(
         encryptionKey = gbContext.encryptionKey,
         cachingEnabled = cachingEnabled,
         cacheMaxAge = cacheMaxAge,
+        cachingLayer = cachingLayer?.let { GBCachingLayerAdapter(it) } ?: CachingImpl.getLayer(),
         cacheKey = "${Constants.FEATURE_CACHE}_${gbContext.apiKey}",
+        remoteEval = gbContext.remoteEval,
+        remoteEvalPayloadProvider = ::buildRemoteEvalParams,
         coroutineContext = coroutineContext,
     )
 
     init {
+        pluginRegistry = PluginRegistry(gbContext.plugins)
+        pluginRegistry?.initAll()
         if (features != null) {
             gbContext.features = features
             hasFeaturesPayload = true
@@ -192,12 +210,15 @@ class GrowthBookSDK internal constructor(
     }
 
     /**
-     * Releases resources held by this SDK instance: stops any active SSE auto-refresh connection and
-     * cancels the background coroutine scope used to process fetched payloads. Call this when the
-     * instance is no longer needed (e.g. on logout, or before creating a replacement instance) to
-     * avoid leaking coroutines and threads. The instance must not be used after [close].
+     * Releases resources held by this SDK instance: flushes registered plugins (including the
+     * built-in tracking plugin) so any buffered events are sent, stops any active SSE auto-refresh
+     * connection, and cancels the background coroutine scope used to process fetched payloads. Call
+     * this when the instance is no longer needed (e.g. on logout, or before creating a replacement
+     * instance) to avoid leaking coroutines and threads. Safe to call multiple times. The instance
+     * must not be used after [close].
      */
     fun close() {
+        pluginRegistry?.closeAll()
         featuresViewModel.close()
     }
 
@@ -212,12 +233,22 @@ class GrowthBookSDK internal constructor(
      * Delegate that set to Context successfully fetched features
      */
     override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
+        // Compute the diff only for authoritative results (network / SSE / fresh cache), against the
+        // features currently applied. The non-authoritative cache pre-load that precedes a network
+        // refresh must not notify, otherwise the handler double-fires on a warm start (cache, then
+        // network); the subsequent authoritative result reports the real delta.
+        val diff = if (isRemote) {
+            featuresChangeHandler?.let { diffFeatures(gbContext.features, features) }
+        } else null
+
         gbContext.features = features
         hasFeaturesPayload = true
         if (isRemote) {
             remoteSourceFeaturesFetchResult = FeaturesFetchResult.Success
             this.refreshHandler?.invoke(true, null)
         }
+
+        diff?.takeIf { it.hasChanges }?.let { featuresChangeHandler?.invoke(it) }
     }
 
     /**
@@ -300,12 +331,9 @@ class GrowthBookSDK internal constructor(
      * If a call is in progress, it waits for the result. If network
      * call failed, it tries to call again.
      *
-     * Known limitation (remote-eval): the internal retry uses the coalesced GET refresh
-     * ([FeaturesViewModel.awaitRefresh]), not the remote-eval POST. In remote-eval mode, if this is
-     * called while the initial remote-eval POST is still in flight or has failed, the retry issues a
-     * plain GET, so a GET that lands first can momentarily surface non-personalized (unevaluated)
-     * feature definitions until the POST completes and overwrites them. Routing the retry through the
-     * remote-eval path is deferred to a later release.
+     * In remote-eval mode the retry goes through the remote-eval POST (see
+     * [FeaturesViewModel.awaitRefresh] / [buildRemoteEvalParams]), so it never momentarily surfaces
+     * non-personalized (unevaluated) feature definitions.
      *
      * @returns a [GBFeatureResult] object
      */
@@ -324,9 +352,12 @@ class GrowthBookSDK internal constructor(
 
                 FeaturesFetchResult.Failed -> {
                     if (attempt >= MAX_RETRY_ATTEMPTS) return feature(id)
-                    featuresViewModel.awaitRefresh()
-
+                    // A superseded round is not a failure (nothing went wrong, its payload was just
+                    // discarded by a newer generation): re-join the latest generation without burning
+                    // a retry attempt or applying backoff.
+                    if (featuresViewModel.awaitRefresh() == FetchResult.Superseded) continue
                     if (remoteSourceFeaturesFetchResult != FeaturesFetchResult.Failed) continue
+
                     if (gbContext.enableLogging) {
                         GB.log("GrowthBookSDK: suspendFeature: retry attempt ${attempt + 1}/$MAX_RETRY_ATTEMPTS, waiting ${delaysMs}ms")
                     }
@@ -350,9 +381,12 @@ class GrowthBookSDK internal constructor(
      * (and sticky-bucket assignments) are loaded before evaluating, use [suspendFeature] instead.
      */
     override fun feature(id: String): GBFeatureResult {
-        val evalContext = createEvaluationContext()
-        val evaluator = GBFeatureEvaluator(evalContext, this.forcedFeatures)
-        val result = evaluator.evaluateFeature(featureKey = id, attributeOverrides = attributeOverrides)
+        // Single atomic snapshot for every evaluation input (attributes, forced features/variations,
+        // attribute overrides, sticky docs), so a concurrent setter can't yield a torn mix.
+        val snapshot = gbContext.evalSnapshot()
+        val evalContext = createEvaluationContext(snapshot)
+        val evaluator = GBFeatureEvaluator(evalContext, snapshot.forcedFeatures)
+        val result = evaluator.evaluateFeature(featureKey = id, attributeOverrides = snapshot.attributeOverrides)
         // Newly-generated sticky assignments are merged into the context per-key during evaluation
         // (see EvaluationContext.onStickyAssignmentChanged) — no whole-map write-back needed here.
         return result
@@ -399,13 +433,14 @@ class GrowthBookSDK internal constructor(
      * The run method takes an Experiment object and returns an ExperimentResult
      */
     override fun run(experiment: GBExperiment): GBExperimentResult {
-        val evalContext = createEvaluationContext()
+        val snapshot = gbContext.evalSnapshot()
+        val evalContext = createEvaluationContext(snapshot)
         val evaluator = GBExperimentEvaluator(
             evalContext
         )
         val result = evaluator.evaluateExperiment(
             experiment = experiment,
-            attributeOverrides = attributeOverrides
+            attributeOverrides = snapshot.attributeOverrides
         )
 
         // Newly-generated sticky assignments are merged into the context per-key during evaluation
@@ -427,6 +462,27 @@ class GrowthBookSDK internal constructor(
         // with the previous user's stale sticky docs (the docs are repopulated by the refresh below).
         gbContext.setAttributesClearingStickyDocs(attributes)
         refreshStickyBucketService()
+        refreshForRemoteEval()
+    }
+
+    /**
+     * Shallow-merges [attributes] into the current user attributes (parity with the TypeScript
+     * SDK's `updateAttributes`): new keys are added, existing keys are overwritten, and untouched
+     * keys are preserved. To fully replace the attribute map use [setAttributes] instead.
+     *
+     * The merge is one level deep — nested [GBJson]/[GBArray] values are replaced wholesale, not
+     * deep-merged. A key mapped to [GBNull] keeps the key with a null value (it is NOT removed);
+     * remove a key by rebuilding the map with [setAttributes].
+     *
+     * Sticky bucket refresh runs in the background (fire-and-forget). If you use Sticky Bucketing
+     * and need to evaluate experiments immediately after updating, use [updateAttributesSync].
+     */
+    fun updateAttributes(attributes: Map<String, GBValue>) {
+        // Merge inside the context's atomic CAS loop (not read-then-setAttributes), so two concurrent
+        // updateAttributes calls can't lose each other's keys. Side effects mirror setAttributes.
+        gbContext.mergeAttributesClearingStickyDocs(attributes)
+        refreshStickyBucketService()
+        refreshForRemoteEval()
     }
 
     /**
@@ -451,9 +507,33 @@ class GrowthBookSDK internal constructor(
             refreshStickyBuckets(
                 context = gbContext,
                 data = null,
-                attributeOverrides = attributeOverrides
+                attributeOverrides = gbContext.attributeOverrides
             )
         }
+
+        refreshForRemoteEval()
+    }
+
+    /**
+     * Coroutine version of [updateAttributes] that awaits sticky bucket refresh before returning.
+     * Shallow-merges [attributes] into the current user attributes (see [updateAttributes] for the
+     * exact merge and [GBNull] semantics).
+     *
+     * Note: despite the "Sync" suffix this is a suspend function — it does not block the thread.
+     */
+    suspend fun updateAttributesSync(attributes: Map<String, GBValue>) {
+        // Atomic merge (see updateAttributes); side effects mirror setAttributesSync.
+        gbContext.mergeAttributes(attributes)
+
+        if (gbContext.stickyBucketService != null) {
+            refreshStickyBuckets(
+                context = gbContext,
+                data = null,
+                attributeOverrides = gbContext.attributeOverrides
+            )
+        }
+
+        refreshForRemoteEval()
     }
 
     /**
@@ -464,7 +544,7 @@ class GrowthBookSDK internal constructor(
      * use [setAttributeOverridesSync] instead.
      */
     fun setAttributeOverrides(overrides: Map<String, GBValue>) {
-        attributeOverrides = overrides
+        gbContext.attributeOverrides = overrides
         if (gbContext.stickyBucketService != null) {
             gbContext.stickyBucketAssignmentDocs = null
             refreshStickyBucketService()
@@ -478,13 +558,13 @@ class GrowthBookSDK internal constructor(
      * Note: despite the "Sync" suffix this is a suspend function — it does not block the thread.
      */
     suspend fun setAttributeOverridesSync(overrides: Map<String, GBValue>) {
-        attributeOverrides = overrides
+        gbContext.attributeOverrides = overrides
 
         if (gbContext.stickyBucketService != null) {
             refreshStickyBuckets(
                 context = gbContext,
                 data = null,
-                attributeOverrides = attributeOverrides
+                attributeOverrides = gbContext.attributeOverrides
             )
         }
 
@@ -492,12 +572,19 @@ class GrowthBookSDK internal constructor(
     }
 
     fun getAttributeOverrides(): Map<String, Any> {
-        return attributeOverrides
+        return gbContext.attributeOverrides
     }
 
-    fun getForcedFeatures(): Map<String, GBValue> = forcedFeatures
+    fun getForcedFeatures(): Map<String, GBValue> = gbContext.forcedFeatures
+
+    /**
+     * Sets the Map of forced feature values. In remote evaluation mode this triggers a fresh
+     * remote evaluation, since forced features are part of the remote-eval request payload
+     * (see [GBRemoteEvalParams]).
+     */
     fun setForcedFeatures(forcedFeatures: Map<String, GBValue>) {
-        this.forcedFeatures = forcedFeatures
+        gbContext.forcedFeatures = forcedFeatures
+        refreshForRemoteEval()
     }
 
     /**
@@ -518,7 +605,7 @@ class GrowthBookSDK internal constructor(
             refreshStickyBuckets(
                 context = gbContext,
                 data = model,
-                attributeOverrides = attributeOverrides
+                attributeOverrides = gbContext.attributeOverrides
             )
         } catch (e: Exception) {
             if (gbContext.enableLogging) {
@@ -533,7 +620,7 @@ class GrowthBookSDK internal constructor(
                 refreshStickyBuckets(
                     context = gbContext,
                     data = dataModel,
-                    attributeOverrides = attributeOverrides
+                    attributeOverrides = gbContext.attributeOverrides
                 )
             } catch (e: Exception) {
                 if (gbContext.enableLogging) {
@@ -572,17 +659,27 @@ class GrowthBookSDK internal constructor(
     }
 
     /**
+     * Builds the remote-eval request payload from the current context, or null when not in
+     * remote-eval mode. Used both to kick off an eager re-evaluation ([refreshForRemoteEval]) and,
+     * via a provider seam, so the coalesced retry in [FeaturesViewModel.awaitRefresh] can issue a
+     * remote-eval POST with the latest context instead of a bare GET.
+     */
+    private fun buildRemoteEvalParams(): GBRemoteEvalParams? {
+        if (!gbContext.remoteEval) {
+            return null
+        }
+        return GBRemoteEvalParams(
+            gbContext.attributes,
+            gbContext.forcedFeatures, gbContext.forcedVariations
+        )
+    }
+
+    /**
      * Method for sending request evaluate features remotely
      */
     private fun refreshForRemoteEval() {
-        if (!gbContext.remoteEval) {
-            return
-        }
-        val payload = GBRemoteEvalParams(
-            gbContext.attributes,
-            this.forcedFeatures, gbContext.forcedVariations
-        )
-        featuresViewModel.fetchFeatures(gbContext.remoteEval, payload)
+        val payload = buildRemoteEvalParams() ?: return
+        featuresViewModel.fetchFeatures(payload = payload)
     }
 
     private fun fireSubscriptions(experiment: GBExperiment, experimentResult: GBExperimentResult) {
@@ -610,8 +707,8 @@ class GrowthBookSDK internal constructor(
         NoResultYet, Success, Failed
     }
 
-    private fun createEvaluationContext() =
-        createEvaluationContext(gbContext, gbExperimentHelper)
+    private fun createEvaluationContext(snapshot: EvalSnapshot = gbContext.evalSnapshot()) =
+        createEvaluationContext(gbContext, gbExperimentHelper, snapshot, pluginRegistry)
 
     //@ThreadLocal
     internal companion object {
@@ -625,11 +722,13 @@ class GrowthBookSDK internal constructor(
         private fun createEvaluationContext(
             gbContext: GBContext,
             gbExperimentHelper: GBExperimentHelper,
+            // One atomic read of the whole shared state: features, savedGroups, attributes, forced
+            // features/variations, attribute overrides and the sticky-bucket docs come from the SAME
+            // snapshot, so the evaluation can never observe a torn mix (e.g. new features with stale
+            // sticky docs, or new attributes with old overrides). Callers pass the snapshot they read.
+            snapshot: EvalSnapshot,
+            pluginRegistry: PluginRegistry?
         ): EvaluationContext {
-            // One atomic read of the whole shared state: features, savedGroups, attributes and the
-            // sticky-bucket docs come from the SAME snapshot, so the evaluation can never observe a
-            // torn mix (e.g. new features with stale sticky docs).
-            val snapshot = gbContext.evalSnapshot()
             return EvaluationContext(
                 enabled = gbContext.enabled,
                 features = snapshot.features,
@@ -651,7 +750,8 @@ class GrowthBookSDK internal constructor(
                 onStickyAssignmentChanged = { key, doc ->
                     gbContext.mergeStickyAssignmentDoc(key, doc)
                 },
-                stackContext = StackContext(null, mutableSetOf())
+                stackContext = StackContext(null, mutableSetOf()),
+                pluginRegistry = pluginRegistry
             )
         }
     }
