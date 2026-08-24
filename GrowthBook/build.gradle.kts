@@ -141,7 +141,11 @@ kotlin {
             dependsOn(appleMain)
         }
         val macosArm64Main by getting { dependsOn(appleMain) }
-        val commonTest by getting
+        val commonTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
         val appleTest by creating {
             dependsOn(commonTest)
             dependencies {
