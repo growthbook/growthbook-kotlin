@@ -34,7 +34,8 @@ import kotlin.concurrent.Volatile
  */
 class GrowthBookTrackingPlugin(
     private val config: TrackingPluginConfig,
-    private val coroutineScope: CoroutineScope = CoroutineScope(PlatformDependentIODispatcher)
+    private val coroutineScope: CoroutineScope = CoroutineScope(
+        PlatformDependentIODispatcher.limitedParallelism(1))
 ) : GrowthBookPlugin {
 
     private val disabled = config.clientKey.isNullOrEmpty()
