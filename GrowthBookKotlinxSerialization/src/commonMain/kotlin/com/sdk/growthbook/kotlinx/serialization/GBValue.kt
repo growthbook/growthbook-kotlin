@@ -62,3 +62,7 @@ fun GBValue.Companion.from(jsonElement: JsonElement): GBValue =
         )
         else -> GBValue.Unknown
     }
+
+/** Convert a wire condition once at feature load; empty object if not a JSON object. */
+fun JsonElement.toGBConditionJson(): GBJson =
+    GBValue.from(this) as? GBJson ?: GBJson(emptyMap())
