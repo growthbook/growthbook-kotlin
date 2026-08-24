@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [7.7.0] - 2026-08-24
+
+### Changed
+- Feature-flag and experiment targeting is significantly faster for large $in / $nin lists. Targeting conditions are now converted to the internal GBValue tree **once at
+  feature load** instead of on every feature() / run() evaluation, and membership checks against arrays of 16+ items use a lazily-built HashSet (O(1) lookup) instead of a
+  linear scan. On an internal payload with thousand-item $in targeting, isOn() dropped from ~2.2 ms to ~5 µs. Wire JSON, the public condition shape, and evaluation results are
+  unchanged; case-insensitive operators (`$ini` / $nini / `$alli`) keep the existing fold-and-scan path
+
+### Added
+- `decodeAs<T>()` extension on `GBValue` (in `GrowthBookKotlinxSerialization`) to decode feature values into typed models via kotlinx.serialization. The default `Json` is tolerant of unknown keys, so feature config objects carrying fields the caller's model does not declare yet still decode successfully. Pass a custom `Json` to override (e.g. `Json { ignoreUnknownKeys = false }` for strict decoding).
+
+### Fixed
+- `GBArray` now implements value-based `equals`/`hashCode` (converted to a `data class`), so arrays with equal contents compare as equal.
+- $in / $nin against a missing attribute no longer perform a membership lookup with a null value
+
+---
 ## [7.6.0] - 2026-08-14
 
 ### Added

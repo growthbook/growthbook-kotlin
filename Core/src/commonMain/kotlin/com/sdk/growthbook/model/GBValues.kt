@@ -39,7 +39,7 @@ class GBNumber(val value: Number): GBValue() {
 
 }
 
-class GBArray(
+data class GBArray(
     private val value: List<GBValue>,
 ) : GBValue(), List<GBValue> by value {
 

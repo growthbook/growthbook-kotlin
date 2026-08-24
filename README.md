@@ -173,6 +173,36 @@ and returns a feature value typed with specified type.
   inline fun <reified V>featureValue(id: String): V?
     ```
 
+- The `decodeAs` extension (in the `GrowthBookKotlinxSerialization` module) decodes a `GBValue` — for example a
+  `GBJson` feature value — into your own `@Serializable` model via kotlinx.serialization. It returns `null` if the
+  value cannot be decoded into the requested type.
+
+    ```kotlin
+  inline fun <reified T> GBValue.decodeAs(json: Json = defaultDecodeJson): T?
+    ```
+
+  ```kotlin
+  import com.sdk.growthbook.kotlinx.serialization.decodeAs
+  import kotlinx.serialization.Serializable
+
+  @Serializable
+  data class CheckoutConfig(val title: String, val maxItems: Int)
+
+  // Decode a GBJson feature value into a typed model
+  val config: CheckoutConfig? = sdkInstance.featureValue<GBJson>("checkout-config")?.decodeAs<CheckoutConfig>()
+  ```
+
+  By default `decodeAs` uses a `Json` that **ignores unknown keys**, so a feature config that gains new fields on the
+  backend still decodes into older app models (forward compatibility). Pass your own `Json` to change this — for
+  example, to fail on unknown fields instead:
+
+  ```kotlin
+  import kotlinx.serialization.json.Json
+
+  val strictJson = Json { ignoreUnknownKeys = false }
+  val config = featureValue.decodeAs<CheckoutConfig>(strictJson) // null if the JSON has unmodeled fields
+  ```
+  
 - If you changed, added or removed any features, you can call the refreshCache method to fetch the latest feature
   definitions from the network. It always bypasses the `setCacheMaxAge` freshness window, so it refetches even when the
   cache is still fresh.
