@@ -39,9 +39,32 @@ class GBNumber(val value: Number): GBValue() {
 
 }
 
-data class GBArray(
-    val value: List<GBValue>
-): GBValue(), List<GBValue> by value
+class GBArray(
+    private val value: List<GBValue>,
+) : GBValue(), List<GBValue> by value {
+
+    /**
+     * Membership index for large `$in` / `$nin` arrays.
+     * Keeps the original list for order/serialize; Set is an O(1) lookup side structure.
+     * Built lazily on first [contains] for arrays at/above [MEMBERSHIP_SET_THRESHOLD]
+     * so small lists stay list-only (no extra memory or Set overhead).
+     */
+    private val membershipSet: Set<GBValue> by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        value.toHashSet()
+    }
+
+    override fun contains(element: GBValue): Boolean =
+        if (value.size < MEMBERSHIP_SET_THRESHOLD) {
+            value.contains(element)
+        } else {
+            membershipSet.contains(element)
+        }
+
+    private companion object {
+        /** Below this size, linear scan beats HashSet lookup for GBValue equality. */
+        const val MEMBERSHIP_SET_THRESHOLD = 16
+    }
+}
 data class GBJson(
     private val value: Map<String, GBValue>,
 ): GBValue(), Map<String, GBValue> by value

@@ -8,9 +8,11 @@ import com.sdk.growthbook.features.FeaturesDataSource
 import com.sdk.growthbook.features.FeaturesFlowDelegate
 import com.sdk.growthbook.features.FeaturesViewModel
 import com.sdk.growthbook.features.FetchResult
+import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBOptions
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
@@ -26,7 +28,14 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonArray
+import com.sdk.growthbook.sandbox.CachingJvm
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import org.junit.Rule
+import org.junit.rules.TemporaryFolder
+import java.nio.file.Files.createTempDirectory
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -54,6 +63,15 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         remoteEval = false,
     )
     private val testGbOptions = GBOptions("https://example.com", null)
+
+    @Rule
+    @JvmField
+    var tempFolder = TemporaryFolder()
+
+    @BeforeTest
+    fun setUp() {
+        CachingJvm.baseDir = tempFolder.newFolder()
+    }
 
     @Test
     fun testSuccess() = runTest {
@@ -165,6 +183,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 ),
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = false,
+            remoteEval = true,
             coroutineContext = UnconfinedTestDispatcher(testScheduler),
         )
         val forcedFeature = mapOf("feature" to GBNumber(123))
@@ -176,7 +195,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             forcedVariations = forcedVariation,
         )
 
-        viewModel.fetchFeatures(remoteEval = true, payload = payload)
+        viewModel.fetchFeatures(payload = payload)
         assertTrue(isSuccess)
         assertTrue(!isError)
         assertTrue(hasFeatures)
@@ -199,6 +218,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 ),
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
             cachingEnabled = false,
+            remoteEval = true,
             coroutineContext = UnconfinedTestDispatcher(testScheduler),
         )
         val forcedFeature = mapOf("feature" to GBNumber(123))
@@ -210,11 +230,439 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             forcedVariations = forcedVariation
         )
 
-        viewModel.fetchFeatures(remoteEval = true, payload = payload)
+        viewModel.fetchFeatures(payload = payload)
 
         assertTrue(!isSuccess)
         assertTrue(isError)
         assertTrue(!hasFeatures)
+    }
+
+    @Test
+    fun testRemoteEvalPostBodyEncodesNativeValuesAndForcedFeaturesArray() = runTest {
+        // Regression: the remote-eval POST body must carry real JSON, not GBValue.toString().
+        //   - attributes: GBNumber(8490047) -> 8490047 (NOT the string "GBNumber(value=8490047)")
+        //   - forcedFeatures: an array of [key, value] pairs (mirroring sdk-js), NOT a JSON object,
+        //     otherwise the GrowthBook proxy rejects the request with 400 Bad Request.
+        val client = CapturingPostNetworkClient(MockResponse.successResponse)
+        val payload = GBRemoteEvalParams(
+            attributes = mapOf(
+                "user_id" to GBNumber(8490047),
+                "os_platform" to GBString("Android"),
+            ),
+            forcedFeatures = mapOf("demo-forced-flag" to GBBoolean(true)),
+            forcedVariations = emptyMap(),
+        )
+        val viewModel = FeaturesViewModel(
+            delegate = this@FeaturesViewModelTests,
+            dataSource = FeaturesDataSource(client, gbContext, testGbOptions),
+            cachingEnabled = false,
+            remoteEval = true,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
+        )
+
+        viewModel.fetchFeatures(payload = payload)
+
+        val body = assertNotNull(client.lastBodyParams)
+
+        @Suppress("UNCHECKED_CAST")
+        val attrs = body["attributes"] as Map<String, Any?>
+        // Real JSON primitives — never the GBValue.toString() fallback.
+        assertEquals(JsonPrimitive(8490047), attrs["user_id"])
+        assertEquals(JsonPrimitive("Android"), attrs["os_platform"])
+
+        val forced = body["forcedFeatures"]
+        assertTrue(forced is JsonArray, "forcedFeatures must be a JsonArray, was ${forced?.let { it::class }}")
+        assertEquals(1, forced.size)
+        val pair = forced[0]
+        assertTrue(pair is JsonArray, "each forcedFeatures entry must be a [key, value] JsonArray")
+        assertEquals(JsonPrimitive("demo-forced-flag"), pair[0])
+        assertEquals(JsonPrimitive(true), pair[1])
+    }
+
+    @Test
+    fun testAwaitRefreshUsesRemoteEvalPostWhenRemoteEval() = runTest {
+        // #8: in remote-eval mode the coalesced retry (awaitRefresh, driven by suspendFeature)
+        // must issue a remote-eval POST, never a bare GET that could surface unevaluated features.
+        val client = CountingPostNetworkClient(MockResponse.successResponse)
+        val payload = GBRemoteEvalParams(
+            attributes = mapOf("id" to "1"),
+            forcedFeatures = emptyMap(),
+            forcedVariations = emptyMap(),
+        )
+        val viewModel = FeaturesViewModel(
+            delegate = this@FeaturesViewModelTests,
+            dataSource = FeaturesDataSource(client, gbContext, testGbOptions),
+            cachingEnabled = false,
+            remoteEval = true,
+            remoteEvalPayloadProvider = { payload },
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
+        )
+
+        val result = viewModel.awaitRefresh()
+
+        assertEquals(FetchResult.Success, result)
+        assertEquals(1, client.postCount)
+        assertEquals(0, client.getCount)
+        assertTrue(isSuccess)
+        assertTrue(hasFeatures)
+    }
+
+    @Test
+    fun testAwaitRefreshUsesGetWhenNotRemoteEval() = runTest {
+        val client = CountingPostNetworkClient(MockResponse.successResponse)
+        val viewModel = FeaturesViewModel(
+            delegate = this@FeaturesViewModelTests,
+            dataSource = FeaturesDataSource(client, gbContext, testGbOptions),
+            cachingEnabled = false,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
+        )
+
+        val result = viewModel.awaitRefresh()
+
+        assertEquals(FetchResult.Success, result)
+        assertEquals(0, client.postCount)
+        assertEquals(1, client.getCount)
+    }
+
+    @Test
+    fun testRemoteEvalOutOfOrderResponseIsDiscarded() = runTest {
+        // #2: two remote-eval POSTs are in flight; the OLDER one completing last must NOT overwrite
+        // the newer one's evaluated features (generation guard).
+        val client = DeferredPostNetworkClient()
+        var appliedFeatures: GBFeatures? = null
+        val delegate = object : FeaturesFlowDelegate {
+            override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
+                appliedFeatures = features
+            }
+            override suspend fun onPayloadReady(model: FeaturesDataModel) = Unit
+            override fun featuresFetchFailed(error: GBError, isRemote: Boolean) = Unit
+            override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) = Unit
+            override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) = Unit
+            override fun featuresNotModified() = Unit
+        }
+        val viewModel = FeaturesViewModel(
+            delegate = delegate,
+            dataSource = FeaturesDataSource(client, gbContext, testGbOptions),
+            cachingEnabled = false,
+            remoteEval = true,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
+        )
+        val respOld = """{"status":200,"features":{"old_feature":{"defaultValue":true}}}"""
+        val respNew = """{"status":200,"features":{"new_feature":{"defaultValue":true}}}"""
+
+        viewModel.fetchFeatures() // generation 1 (older)
+        viewModel.fetchFeatures() // generation 2 (newer)
+        assertEquals(2, client.pendingPosts.size)
+
+        // Respond newest first, then the stale older one arrives late.
+        client.pendingPosts[1](respNew)
+        client.pendingPosts[0](respOld)
+
+        assertNotNull(appliedFeatures)
+        assertTrue(
+            appliedFeatures!!.containsKey("new_feature"),
+            "the newest remote-eval response must be applied"
+        )
+        assertTrue(
+            !appliedFeatures!!.containsKey("old_feature"),
+            "a stale older remote-eval response must be discarded, not applied last"
+        )
+    }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun testStaleRemoteEvalRoundReportsSupersededNotSuccess() = runTest {
+        // P1 (awaiter contract): a remote-eval round whose response is discarded by the generation
+        // guard must NOT resolve awaitRefresh() as Success — otherwise a suspendFeature() awaiting
+        // the OLD attributes would return a stale evaluation while a newer request is still pending.
+        // It must resolve as Superseded so the caller re-joins the current generation. Companion to
+        // testRemoteEvalOutOfOrderResponseIsDiscarded, which only checks the final applied payload.
+        val client = DeferredPostNetworkClient()
+        val emptyParams = GBRemoteEvalParams(emptyMap(), emptyMap(), emptyMap())
+        val viewModel = FeaturesViewModel(
+            delegate = this@FeaturesViewModelTests,
+            dataSource = FeaturesDataSource(client, gbContext, testGbOptions),
+            cachingEnabled = false,
+            cachingLayer = MockCachingLayer(), // empty store, keeps the test off disk
+            remoteEval = true,
+            remoteEvalPayloadProvider = { emptyParams },
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
+        )
+
+        // Coalesced round for the OLD attributes (generation 1); it suspends awaiting its POST.
+        var awaiterResult: FetchResult? = null
+        backgroundScope.launch { awaiterResult = viewModel.awaitRefresh() }
+        runCurrent()
+
+        // A newer state-change fetch bumps the generation (generation 2), superseding the awaiter.
+        viewModel.fetchFeatures(payload = emptyParams)
+        runCurrent()
+        assertEquals(2, client.pendingPosts.size)
+
+        // The OLD round's response arrives while the newer one is still pending.
+        client.pendingPosts[0]("""{"status":200,"features":{"old_feature":{"defaultValue":true}}}""")
+        runCurrent()
+
+        assertEquals(
+            FetchResult.Superseded,
+            awaiterResult,
+            "a discarded (superseded) remote-eval round must resolve awaitRefresh() as Superseded, not Success",
+        )
+
+        // Complete the still-pending latest round so runTest sees no leaked coroutine.
+        client.pendingPosts[1]("""{"status":200,"features":{"new_feature":{"defaultValue":true}}}""")
+        runCurrent()
+    }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun testOlderRemoteEvalApplyCannotOverwriteNewerWhileSuspended() = runTest {
+        // #2: the generation check and the (suspend) payload apply must be atomic. Here the OLDER
+        // round passes its generation check and then SUSPENDS mid-apply (inside onPayloadReady) while
+        // the NEWER round completes. Without serializing the apply under applyMutex, the older round
+        // would resume and apply last, overwriting the newer personalized features. The mutex must
+        // make the newest generation win regardless of how the applies interleave.
+        val client = DeferredPostNetworkClient()
+        val oldApplyGate = CompletableDeferred<Unit>()
+        val appliedOrder = mutableListOf<String>()
+        val delegate = object : FeaturesFlowDelegate {
+            override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
+                features.keys.firstOrNull()?.let { appliedOrder.add(it) }
+            }
+            override suspend fun onPayloadReady(model: FeaturesDataModel) {
+                // Hold the OLDER round inside its apply until the test releases the gate.
+                if (model.features?.containsKey("old_feature") == true) oldApplyGate.await()
+            }
+            override fun featuresFetchFailed(error: GBError, isRemote: Boolean) = Unit
+            override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) = Unit
+            override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) = Unit
+            override fun featuresNotModified() = Unit
+        }
+        val viewModel = FeaturesViewModel(
+            delegate = delegate,
+            dataSource = FeaturesDataSource(client, gbContext, testGbOptions),
+            cachingEnabled = false,
+            remoteEval = true,
+            remoteEvalPayloadProvider = { GBRemoteEvalParams(emptyMap(), emptyMap(), emptyMap()) },
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
+        )
+
+        // Older round via the COALESCED path (awaitRefresh), so the fetchFromNetwork job ref does not
+        // cancel it — this isolates the applyMutex behaviour from the fire-and-forget cancellation (#3).
+        backgroundScope.launch { viewModel.awaitRefresh() } // generation 1 (older)
+        runCurrent()
+        assertEquals(1, client.pendingPosts.size)
+        client.pendingPosts[0]("""{"status":200,"features":{"old_feature":{"defaultValue":true}}}""")
+        runCurrent()
+        // Older round now holds applyMutex, suspended inside onPayloadReady on the gate.
+
+        viewModel.fetchFeatures() // generation 2 (newer)
+        runCurrent()
+        assertEquals(2, client.pendingPosts.size)
+        client.pendingPosts[1]("""{"status":200,"features":{"new_feature":{"defaultValue":true}}}""")
+        runCurrent()
+        // Newer round is now blocked on applyMutex behind the older round (it must not have applied yet).
+        assertTrue(
+            "new_feature" !in appliedOrder,
+            "the newer round must wait for the older apply to release the mutex",
+        )
+
+        oldApplyGate.complete(Unit) // release older apply; the newer one applies after it, winning.
+        runCurrent()
+
+        assertEquals(
+            "new_feature",
+            appliedOrder.lastOrNull(),
+            "the newest generation must win even when an older apply was suspended mid-flight",
+        )
+    }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun testRoundSupersededDuringApplyDoesNotCommitNorReportSuccess() = runTest {
+        // P1 (final payload-commit fence): the OLDER round passes its up-front generation check and
+        // then SUSPENDS mid-apply (inside onPayloadReady). A NEWER round bumps the generation DURING
+        // that suspend (incrementAndFetch runs outside applyMutex). When the older round resumes it
+        // must RE-VALIDATE the generation at the commit point and bail: it must NOT commit its now
+        // stale features (no featuresFetchedSuccessfully) and its awaiter must resolve as Superseded,
+        // not Success. Without the re-check the older round commits old_feature and reports Success
+        // for a superseded round.
+        //
+        // NB: the sibling test testOlderRemoteEvalApplyCannotOverwriteNewerWhileSuspended only asserts
+        // the newest features win LAST — it does not catch the stale commit / false Success this covers.
+        val client = DeferredPostNetworkClient()
+        val oldApplyGate = CompletableDeferred<Unit>()
+        val committed = mutableListOf<String>()
+        val delegate = object : FeaturesFlowDelegate {
+            override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
+                features.keys.firstOrNull()?.let { committed.add(it) }
+            }
+            override suspend fun onPayloadReady(model: FeaturesDataModel) {
+                // Hold the OLDER round inside its apply until the test releases the gate.
+                if (model.features?.containsKey("old_feature") == true) oldApplyGate.await()
+            }
+            override fun featuresFetchFailed(error: GBError, isRemote: Boolean) = Unit
+            override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) = Unit
+            override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) = Unit
+            override fun featuresNotModified() = Unit
+        }
+        val viewModel = FeaturesViewModel(
+            delegate = delegate,
+            dataSource = FeaturesDataSource(client, gbContext, testGbOptions),
+            cachingEnabled = false,
+            remoteEval = true,
+            remoteEvalPayloadProvider = { GBRemoteEvalParams(emptyMap(), emptyMap(), emptyMap()) },
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
+        )
+
+        // Older round (generation 1) via the coalesced path so we can observe its FetchResult.
+        var olderResult: FetchResult? = null
+        backgroundScope.launch { olderResult = viewModel.awaitRefresh() }
+        runCurrent()
+        assertEquals(1, client.pendingPosts.size)
+
+        // Its POST returns: the round passes the up-front check, takes applyMutex, and suspends inside
+        // onPayloadReady on the gate.
+        client.pendingPosts[0]("""{"status":200,"features":{"old_feature":{"defaultValue":true}}}""")
+        runCurrent()
+
+        // Newer round (generation 2). fetchFromNetwork's incrementAndFetch bumps the generation to 2
+        // synchronously — no need to resolve its POST yet — while the older round is still mid-apply.
+        viewModel.fetchFeatures() // generation 2 (newer)
+        runCurrent()
+        assertEquals(2, client.pendingPosts.size)
+
+        // Release the older apply; it resumes AFTER the generation moved to 2.
+        oldApplyGate.complete(Unit)
+        runCurrent()
+
+        // 1) The stale older round must NOT commit its features.
+        assertTrue(
+            "old_feature" !in committed,
+            "a remote-eval round superseded during its (suspend) apply must not commit stale features",
+        )
+        // 2) Its awaiter must see Superseded, not Success — so suspendFeature() re-joins the newest
+        //    generation (line 329) instead of returning a stale feature.
+        assertEquals(
+            FetchResult.Superseded,
+            olderResult,
+            "a round superseded during apply must resolve awaitRefresh() as Superseded, not Success",
+        )
+
+        // Let the newest round finish (no leaked coroutine) and confirm it is the one that commits.
+        client.pendingPosts[1]("""{"status":200,"features":{"new_feature":{"defaultValue":true}}}""")
+        runCurrent()
+        assertEquals(
+            "new_feature",
+            committed.lastOrNull(),
+            "the newest generation must be the one that commits",
+        )
+    }
+
+    @Test
+    fun testSynchronousDispatcherThrowIsReportedAsFailure() = runTest {
+        // #3: a dispatcher that throws synchronously while enqueuing must be reported as a fetch
+        // failure — not swallowed by the coroutine machinery, and not rethrown into the caller.
+        var failed = false
+        val delegate = object : FeaturesFlowDelegate {
+            override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) = Unit
+            override suspend fun onPayloadReady(model: FeaturesDataModel) = Unit
+            override fun featuresFetchFailed(error: GBError, isRemote: Boolean) { failed = true }
+            override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) = Unit
+            override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) = Unit
+            override fun featuresNotModified() = Unit
+        }
+        val viewModel = FeaturesViewModel(
+            delegate = delegate,
+            dataSource = FeaturesDataSource(SynchronouslyThrowingNetworkClient(), gbContext, testGbOptions),
+            cachingEnabled = false,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
+        )
+
+        // Must return (not throw) and surface the error through the delegate.
+        val result = viewModel.awaitRefresh()
+
+        assertEquals(FetchResult.Failed, result)
+        assertTrue(failed, "a synchronous dispatcher throw must be reported via featuresFetchFailed")
+    }
+
+    @Test
+    fun testRemoteEvalDoesNotServeCachedPayload() = runTest {
+        // Regression (A -> B leak): the feature cache is keyed only by API key, but a remote-eval
+        // payload is evaluated server-side for the CURRENT user's attributes. If serveCache served
+        // that entry, user B would momentarily receive user A's evaluated payload after a
+        // logout/login on the same key. Even a FRESH cache (large cacheMaxAge) must be bypassed in
+        // remote-eval mode, so nothing is dispatched as isRemote=false from cache.
+        receivedFromCache = false
+        isSuccess = false
+        val cacheLayer = MockCachingLayer.fromApiResponse(
+            MockResponse.successResponse,
+            cachedAt = Clock.System.now().toEpochMilliseconds(), // fresh
+        )
+        val client = CountingPostNetworkClient(MockResponse.successResponse)
+        val viewModel = FeaturesViewModel(
+            delegate = this@FeaturesViewModelTests,
+            dataSource = FeaturesDataSource(client, gbContext, testGbOptions),
+            encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
+            cachingEnabled = false,
+            cachingLayer = cacheLayer,
+            cacheMaxAge = 48 * 60 * 60 * 1000L,
+            remoteEval = true,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
+        )
+
+        val payload = GBRemoteEvalParams(
+            attributes = emptyMap<String, Any>(),
+            forcedFeatures = emptyMap(),
+            forcedVariations = emptyMap(),
+        )
+        viewModel.fetchFeatures(payload = payload)
+
+        // The decisive check: even with a FRESH cache present, remote-eval must hit the network via
+        // POST. A served fresh cache would short-circuit and skip the network (postCount == 0), so
+        // asserting the POST happened proves the cache was bypassed rather than served.
+        assertEquals(1, client.postCount, "remote-eval must POST even when a fresh cache exists")
+        assertEquals(0, client.getCount, "remote-eval must not issue a GET")
+        assertTrue(
+            !receivedFromCache,
+            "Remote-eval must not serve the API-key-scoped cache (would leak user A's payload to B)"
+        )
+        assertTrue(isSuccess, "Remote-eval must still apply the freshly evaluated network payload")
+        assertTrue(hasFeatures)
+    }
+
+    @Test
+    fun testRemoteEvalDoesNotWriteCache() = runTest {
+        // The write-side of the same A -> B isolation: a remote-eval response must never be
+        // persisted under the API-key-scoped cache key, or the next user would read it back.
+        isSuccess = false
+        val cacheLayer = MockCachingLayer()
+        val viewModel = FeaturesViewModel(
+            delegate = this@FeaturesViewModelTests,
+            dataSource = FeaturesDataSource(
+                MockNetworkClient(MockResponse.successResponse, null),
+                gbContext, testGbOptions,
+            ),
+            encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
+            cachingEnabled = true,
+            cachingLayer = cacheLayer,
+            remoteEval = true,
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
+        )
+
+        val payload = GBRemoteEvalParams(
+            attributes = emptyMap<String, Any>(),
+            forcedFeatures = emptyMap(),
+            forcedVariations = emptyMap(),
+        )
+        viewModel.fetchFeatures(payload = payload)
+
+        assertTrue(isSuccess, "Remote-eval payload must still be applied")
+        assertEquals(
+            null,
+            cacheLayer.savedContent,
+            "Remote-eval payload must not be written to the API-key-scoped cache"
+        )
     }
 
     @Test
@@ -883,5 +1331,39 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         isError = false
         hasFeatures = !model.features.isNullOrEmpty()
         featuresAPIModelCalled = true
+    }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun testRemoteEvalAwaitRefreshPostsAndDoesNotPersist() = runTest {
+        // Reviewer follow-up: the revalidate()/awaitRefresh() path must keep the same remote-eval
+        // isolation as the direct fetch — issue a personalized POST (NOT a plain GET that could serve
+        // an API-key-scoped cached payload) and never persist the evaluated payload to that cache.
+        // The direct fetchFeatures() path is covered by testRemoteEvalDoesNotServeCache /
+        // testRemoteEvalDoesNotWriteCache; this covers the coalesced refresh behind suspendFeature().
+        val client = CountingPostNetworkClient(
+            """{"status":200,"features":{"remote_feature":{"defaultValue":true}}}"""
+        )
+        val cache = MockCachingLayer()
+        val viewModel = FeaturesViewModel(
+            delegate = this@FeaturesViewModelTests,
+            dataSource = FeaturesDataSource(client, gbContext, testGbOptions),
+            cachingEnabled = true, // caching ON so the test proves the BYPASS, not merely "caching off"
+            cachingLayer = cache,
+            remoteEval = true,
+            remoteEvalPayloadProvider = { GBRemoteEvalParams(emptyMap(), emptyMap(), emptyMap()) },
+            coroutineContext = UnconfinedTestDispatcher(testScheduler),
+        )
+
+        val result = viewModel.awaitRefresh()
+
+        assertEquals(FetchResult.Success, result)
+        assertEquals(1, client.postCount, "awaitRefresh must POST in remote-eval mode")
+        assertEquals(0, client.getCount, "awaitRefresh must not issue a plain GET in remote-eval mode")
+        assertEquals(
+            null,
+            cache.savedContent,
+            "remote-eval awaitRefresh must not persist to the API-key-scoped cache",
+        )
     }
 }

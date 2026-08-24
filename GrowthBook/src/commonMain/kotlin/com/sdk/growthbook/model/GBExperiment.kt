@@ -1,16 +1,21 @@
+@file:OptIn(ExperimentalAtomicApi::class)
+
 package com.sdk.growthbook.model
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import com.sdk.growthbook.utils.GBFilter
-import com.sdk.growthbook.utils.GBCondition
 import com.sdk.growthbook.utils.GBBucketRange
 import com.sdk.growthbook.utils.GBVariationMeta
 import com.sdk.growthbook.utils.RangeSerializer
+import com.sdk.growthbook.utils.GBCondition
 import com.sdk.growthbook.utils.GBParentConditionInterface
 import com.sdk.growthbook.kotlinx.serialization.gbSerialize
+import com.sdk.growthbook.kotlinx.serialization.toGBConditionJson
 import com.sdk.growthbook.serializable_model.SerializableGBExperiment
 import com.sdk.growthbook.serializable_model.SerializableGBExperimentResult
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 /*
     Defines a single experiment
@@ -129,6 +134,21 @@ data class GBExperiment(
      */
     val minBucketVersion: Int? = null
 ) {
+    // One atomic publish: two @Volatile fields still tear regardless of write order.
+    private val conditionGBCache = AtomicReference<ConditionGBCache?>(null)
+
+    internal val conditionGB: GBJson?
+        get() {
+            val current = condition
+            val cached = conditionGBCache.load()
+            if (cached != null && cached.source === current) {
+                return cached.parsed
+            }
+            val parsed = current?.toGBConditionJson()
+            conditionGBCache.store(ConditionGBCache(source = current, parsed = parsed))
+            return parsed
+        }
+
     internal fun gbSerialize() =
         SerializableGBExperiment(
             key = key,
@@ -237,3 +257,8 @@ data class GBExperimentResult(
             stickyBucketUsed = stickyBucketUsed,
         )
 }
+
+private data class ConditionGBCache(
+    val source: GBCondition?,
+    val parsed: GBJson?,
+)

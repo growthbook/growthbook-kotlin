@@ -1,8 +1,10 @@
 package com.sdk.growthbook.features
 
+import com.sdk.growthbook.kotlinx.serialization.gbSerialize
 import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBOptions
+import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.network.NetworkDispatcher
 import com.sdk.growthbook.network.NetworkDispatcherWithNotModified
 import com.sdk.growthbook.serializable_model.SerializableFeaturesDataModel
@@ -15,6 +17,8 @@ import com.sdk.growthbook.utils.SSEConnectionController
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.transform
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * DataSource for Feature API
@@ -49,7 +53,8 @@ internal class FeaturesDataSource(
         onNotModified: (() -> Unit)
     ) {
         if (dispatcher is NetworkDispatcherWithNotModified) {
-            dispatcher.consumeGETRequestWithNotModified(request = getEndpoint(),
+            dispatcher.consumeGETRequestWithNotModified(
+                request = getEndpoint(),
                 onSuccess = { rawContent ->
                     val result = jsonParser.decodeFromString(
                         deserializer = SerializableFeaturesDataModel.serializer(),
@@ -81,25 +86,33 @@ internal class FeaturesDataSource(
     /**
      * Supportive method for automatically refresh features
      */
-    fun autoRefresh(
-        success: (FeaturesDataModel) -> Unit, failure: (Throwable?) -> Unit
-    ): Flow<Resource<GBFeatures?>> = dispatcher.consumeSSEConnection(
-        url = getEndpoint(FeatureRefreshStrategy.SERVER_SENT_EVENTS),sseController = sseController
-    ).transform { resource ->
-        if (resource is Resource.Success) {
-            val serializableFeaturesDataModel = jsonParser.decodeFromString(
-                SerializableFeaturesDataModel.serializer(), resource.data
-            )
-            val featuresDataModel = serializableFeaturesDataModel.gbDeserialize()
-
-            val gbFeatures = featuresDataModel.features
-            emit(Resource.Success(gbFeatures))
-            featuresDataModel.also(success)
-        } else if (resource is Resource.Error) {
-            emit(resource)
-            resource.exception.also(failure)
+    fun autoRefreshRaw(): Flow<Resource<FeaturesDataModel>> =
+        dispatcher.consumeSSEConnection(
+            url = getEndpoint(FeatureRefreshStrategy.SERVER_SENT_EVENTS),
+            sseController = sseController
+        ).transform { resource ->
+            when (resource) {
+                is Resource.Success -> {
+                    // Decode + deserialize can throw on a malformed SSE payload. Catch here and
+                    // degrade to Resource.Error so the stream survives and the collector still gets
+                    // featuresFetchFailed, instead of the exception terminating the Flow. emit stays
+                    // outside the catch so a downstream CancellationException is not swallowed.
+                    val featuresDataModel = try {
+                        jsonParser.decodeFromString(
+                            SerializableFeaturesDataModel.serializer(),
+                            resource.data
+                        ).gbDeserialize()
+                    } catch (e: Exception) {
+                        emit(Resource.Error(e))
+                        return@transform
+                    }
+                    emit(Resource.Success(featuresDataModel))
+                }
+                is Resource.Error -> {
+                    emit(resource)
+                }
+            }
         }
-    }
 
     /**
      * Method that make POST request to server for evaluate feature remotely
@@ -115,8 +128,22 @@ internal class FeaturesDataSource(
          * Create body for request
          */
         params?.let {
-            payload["attributes"] = params.attributes
-            payload["forcedFeatures"] = params.forcedFeatures
+            // Attributes / forced features arrive as GBValue (or already-native) values. Convert
+            // them to JsonElement here — at the SDK boundary that owns the serialization bridge —
+            // so the injected dispatcher receives plain JSON. Otherwise the dispatcher's generic
+            // Map.toJsonElement() falls through to value.toString() and ships garbage like
+            // "GBNumber(value=8490047)" instead of 8490047, breaking server-side targeting.
+            payload["attributes"] = params.attributes.mapValues { (_, value) ->
+                if (value is GBValue) value.gbSerialize() else value
+            }
+            // The remote-eval API expects forcedFeatures as an array of [key, value] pairs
+            // (mirroring sdk-js `Array.from(forcedFeatures)`), NOT a JSON object. Sending an
+            // object makes the GrowthBook proxy reject the request with 400 Bad Request.
+            payload["forcedFeatures"] = JsonArray(
+                params.forcedFeatures.map { (key, value) ->
+                    JsonArray(listOf(JsonPrimitive(key), value.gbSerialize()))
+                }
+            )
             payload["forcedVariations"] = params.forcedVariations
         }
 

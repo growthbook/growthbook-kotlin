@@ -31,11 +31,12 @@ kotlin {
 
     jvm()
     wasmJs {
-        nodejs()
+        browser()
     }
     iosX64()
     iosArm64()
     iosSimulatorArm64()
+    macosArm64()
 
     sourceSets {
         val commonMain by getting {
