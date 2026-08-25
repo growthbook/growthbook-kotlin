@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.0.0] - Unreleased
+## [1.0.0] - 2026-08-25
 
 Initial release of `GrowthBookExt` — a pure-Kotlin companion module with
 quality-of-life helpers over the core SDK. No extra runtime dependencies; all
