@@ -322,16 +322,20 @@ class GBNetworkDispatcherKtor(
             // for every GET/POST/SSE. `.use` closes it after the first POST, breaking all later
             // requests and the SSE stream. Matches the GET path, which also reuses `client`.
             try {
+                val payload = bodyParams.toJsonElement()
+                if (enableLogging) {
+                    // Size only, never the body itself: a remote-eval POST carries the user's
+                    // attributes — personal data that must not end up in logcat/stdout on a
+                    // production device. The SSE path logs a byte count for the same reason.
+                    println("GrowthBook: POST $url (${payload.toString().length} chars)")
+                }
                 val response = client.post(url) {
                     headers {
                         append("Content-Type", "application/json")
                         append("Accept", "application/json")
                     }
                     contentType(ContentType.Application.Json)
-                    setBody(bodyParams.toJsonElement())
-                    if (enableLogging) {
-                        println("body = $body")
-                    }
+                    setBody(payload)
                 }
                 if (response.status.value in 200..299) {
                     onSuccess(response.body())
@@ -372,6 +376,13 @@ class GBNetworkDispatcherKtor(
                 // Honour the caller's Content-Type (the tracking plugin sends text/plain, matching
                 // JS/Python); default to application/json when none is supplied.
                 val contentTypeValue = headers["Content-Type"] ?: ContentType.Application.Json.toString()
+                val serializedBody = body.toString()
+                if (enableLogging) {
+                    // Size only, never the body itself: tracking events carry `context_json` with
+                    // the user's attributes plus `user_id`/`device_id`/`session_id` — personal data
+                    // that must not end up in logcat/stdout on a production device.
+                    println("GrowthBook: POST $url (${serializedBody.length} chars)")
+                }
                 val response = client.post(url) {
                     headers {
                         append("Accept", "application/json")
@@ -380,10 +391,7 @@ class GBNetworkDispatcherKtor(
                         }
                     }
                     contentType(ContentType.parse(contentTypeValue))
-                    setBody(body.toString())
-                    if (enableLogging) {
-                        println("body = $body")
-                    }
+                    setBody(serializedBody)
                 }
                 if (response.status.value in 200..299) {
                     onSuccess(response.body())

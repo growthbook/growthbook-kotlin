@@ -43,8 +43,14 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation(libs.kotlinx.coroutines.core)
-                implementation(libs.kotlinx.serialization.json)
+                // `api`, not `implementation`: both libraries show up in this module's public API —
+                // `NetworkDispatcher.consumeSSEConnection` returns a `Flow`, while
+                // `TrackingNetworkDispatcher.consumePOSTRequest` and the public `toJsonElement()`
+                // helpers take/return `JsonElement`. Under `implementation` they land only in the
+                // published artifact's `runtimeElements`, so a consumer writing their own
+                // dispatcher cannot even name those types without declaring kotlinx themselves.
+                api(libs.kotlinx.coroutines.core)
+                api(libs.kotlinx.serialization.json)
             }
         }
         val appleMain by creating { dependsOn(commonMain) }

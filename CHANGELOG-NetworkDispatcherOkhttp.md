@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Removed the duplicated internal `toJsonElement` helper and now use the shared implementation from `:Core`
 
+### Fixed
+- Both `consumePOSTRequest` overloads now build the request inside a `try`/`catch` and route failures to `onError`. `Request.Builder.url()` raises `IllegalArgumentException` for a URL without a scheme (an `ingestorHost` of `us1.gb-ingest.com`, say); raised inside a bare `launch` it escaped to the platform's uncaught-exception handler, which on Android crashes the app
+
 ---
 
 ## [1.0.9] - 2026-08-14
