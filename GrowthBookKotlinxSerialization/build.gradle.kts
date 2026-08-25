@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.targets.js.yarn.yarn
 
 plugins {
     kotlin("multiplatform")
+    kotlin("plugin.serialization")
     id("com.android.library")
     id("org.jetbrains.dokka") version "1.9.10"
 }
@@ -46,6 +47,12 @@ kotlin {
             dependencies {
                 implementation(project(":Core"))
                 api(libs.kotlinx.serialization.json)
+            }
+        }
+
+        val jvmTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
             }
         }
     }
@@ -114,7 +121,7 @@ publishing {
             artifact(javadocJar)
             pom {
                 name.set("kotlin")
-                description.set("Core module of GrowthBook Kotlin SDK")
+                description.set("Serialization module of GrowthBook Kotlin SDK")
                 licenses {
                     license {
                         name.set("MIT")

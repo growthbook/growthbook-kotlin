@@ -1,5 +1,6 @@
 package com.sdk.growthbook.network
 
+import com.sdk.growthbook.utils.toJsonElement
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray

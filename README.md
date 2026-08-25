@@ -178,14 +178,48 @@ An explicit `refreshCache()` call always bypasses this window and hits the netwo
     ```kotlin
   fun feature(id: String) : GBFeatureResult
     ```
-- The featureValue method takes a string argument, which is the unique identifier, and the type of the accessed feature. 
-The supported types of accessed features are: Boolean, String, Number, Short, Int, Long, Float, Double], GBJson - 
-and returns a feature value typed with specified type.
+- The featureValue method takes a string argument, which is the unique identifier, and the type of the accessed
+feature. Booleans, strings and numbers are returned unwrapped; JSON objects and arrays are returned as `GBJson` and
+`GBArray` (`GBArray` also satisfies `List<GBValue>`). It returns `null` if the feature has no value or the value is
+not of the requested type.
 
     ```kotlin
   inline fun <reified V>featureValue(id: String): V?
     ```
 
+  The same function is available as an extension on `IGrowthBookSDK`, with identical behavior, so code written
+  against the interface reads values the same way.
+
+- The `decodeAs` extension (in the `GrowthBookKotlinxSerialization` module) decodes a `GBValue` — for example a
+  `GBJson` feature value — into your own `@Serializable` model via kotlinx.serialization. It returns `null` if the
+  value cannot be decoded into the requested type.
+
+    ```kotlin
+  inline fun <reified T> GBValue.decodeAs(json: Json = defaultDecodeJson): T?
+    ```
+
+  ```kotlin
+  import com.sdk.growthbook.kotlinx.serialization.decodeAs
+  import kotlinx.serialization.Serializable
+
+  @Serializable
+  data class CheckoutConfig(val title: String, val maxItems: Int)
+
+  // Decode a GBJson feature value into a typed model
+  val config: CheckoutConfig? = sdkInstance.featureValue<GBJson>("checkout-config")?.decodeAs<CheckoutConfig>()
+  ```
+
+  By default `decodeAs` uses a `Json` that **ignores unknown keys**, so a feature config that gains new fields on the
+  backend still decodes into older app models (forward compatibility). Pass your own `Json` to change this — for
+  example, to fail on unknown fields instead:
+
+  ```kotlin
+  import kotlinx.serialization.json.Json
+
+  val strictJson = Json { ignoreUnknownKeys = false }
+  val config = featureValue.decodeAs<CheckoutConfig>(strictJson) // null if the JSON has unmodeled fields
+  ```
+  
 - If you changed, added or removed any features, you can call the refreshCache method to fetch the latest feature
   definitions from the network. It always bypasses the `setCacheMaxAge` freshness window, so it refetches even when the
   cache is still fresh.
@@ -325,6 +359,158 @@ and returns a feature value typed with specified type.
   ```kotlin
   fun setForcedVariations(forcedVariations: Map<String, Any>) {}
   ```
+
+## Extensions (GrowthBookExt)
+
+`GrowthBookExt` is a pure-Kotlin companion module with quality-of-life helpers
+over the core SDK — no extra runtime dependencies, all Kotlin Multiplatform
+targets. It adds typed feature accessors, fallback strategies, a typed `Flag<T>`
+API, and DSLs for attributes and SDK configuration.
+
+```groovy
+implementation 'io.growthbook.sdk:GrowthBookExt:1.0.0'
+```
+
+### Typed feature accessors
+
+Read a feature value with a type and a default instead of unwrapping `GBValue`:
+
+```kotlin
+val theme: String  = sdk.getString("theme", default = "light")
+val maxItems: Int  = sdk.getInt("max-items", default = 10)
+val ratio: Double? = sdk.getDoubleOrNull("ratio")
+val payload: GBJson? = sdk.getJson("payload")
+```
+
+Each type (`String`/`Boolean`/`Int`/`Long`/`Float`/`Double`) has three variants:
+
+- `getX(id, default)` — value or a constant default
+- `getXOrNull(id)` — value or `null`
+- `getXOrElse(id) { ... }` — value or a lazily computed default
+
+Boolean helpers: `isEnabled(id)`, `isDisabled(id)`, and `isFeatureKnown(id)`
+(distinguishes "missing" from "present but off").
+
+### Fallback strategies
+
+When a feature is *unknown* — i.e. absent from the loaded configuration — choose
+fail-open vs fail-closed explicitly at the call site:
+
+```kotlin
+if (sdk.isEnabled("new-checkout", FallbackStrategy.FAIL_CLOSED)) { ... }
+```
+
+The strategy applies **only** to an unknown feature. A known-but-off feature still
+returns its real evaluated value, and so does a loaded feature whose evaluation
+fails (malformed rule, failed prerequisite) — an evaluation error is never mistaken
+for a missing feature, so `FAIL_OPEN` cannot flip a kill switch on.
+
+> **Startup window.** Feature definitions are fetched asynchronously, so until the
+> first payload (or cached payload) is applied *every* feature is unknown, and
+> `FAIL_OPEN` reports all of them as enabled — permanently so if the fetch fails and
+> no cache exists. Use `suspendFeature`, or seed a bundled payload with
+> `initialFeatures`, when a flag must not be read before the SDK is ready.
+
+### Typed flags — `Flag<T>`
+
+Declare flags once (key + type + per-feature default) to remove magic strings:
+
+```kotlin
+object Flags {
+    val DARK_MODE = Flag("dark-mode", default = false) // Flag<Boolean>
+    val MAX_ITEMS = Flag("max-items", default = 10)     // Flag<Int>
+}
+
+val dark  = sdk.isOn(Flags.DARK_MODE)  // Boolean
+val items = sdk.value(Flags.MAX_ITEMS) // Int, falls back to 10
+```
+
+`Flag.default` covers both a missing feature and a present-but-wrong-typed value.
+Supported types: `Boolean`/`String`/`Int`/`Long`/`Float`/`Double` (decode custom
+`@Serializable` types via the `GrowthBookKotlinxSerialization` module instead).
+
+### Property delegates
+
+Read a flag as a Kotlin property with `by`. The flag is re-evaluated on **every**
+read, so the property always reflects the current config — a refreshed payload is
+picked up without re-declaring the property:
+
+```kotlin
+val newHome by sdk.featureFlag("new-home")                               // Boolean, via isOn
+val betaCheckout by sdk.featureFlag("beta-checkout", FallbackStrategy.FAIL_CLOSED)
+val maxItems by sdk.featureFlag(Flag("max-items", default = 10))         // Int, falls back to 10
+
+if (newHome) renderNewHome() else renderOldHome()
+```
+
+Pure sugar over `isOn` / `isEnabled(id, fallback)` / `value(flag)` — same semantics,
+just a delegate form. Handy when a flag is read in several places or grouped as
+screen/ViewModel config. In a hot loop, snapshot it into a local `val` to avoid
+re-evaluating on each read.
+
+### Attributes DSL
+
+Set targeting attributes with plain Kotlin values, hiding the `GBValue` wrappers:
+
+```kotlin
+sdk.setAttributes {
+    "id" to "user-123"
+    "premium" to true
+    "age" to 42
+    "tags" to listOf("a", "b")
+    "address" to obj {
+        "city" to "Kyiv"
+    }
+}
+```
+
+Or build a reusable map: `val attrs = buildAttributes { "id" to "user-123" }`.
+
+Inside the block, `to` on a `String` is the DSL's own entry function and shadows
+`kotlin.to`, so nest objects with `obj { }` rather than an inline
+`mapOf("city" to "Kyiv")` (a map built outside the block works as a value).
+
+### Configuration DSL
+
+Assemble and initialize the SDK declaratively:
+
+```kotlin
+val sdk = growthBook {
+    apiKey = "sdk-abc"
+    apiHost = "https://cdn.growthbook.io"
+    networkDispatcher = GBNetworkDispatcherKtor() // from NetworkDispatcherKtor
+
+    enableLogging = true
+    attributes {
+        "id" to "user-123"
+        "premium" to true
+    }
+}
+```
+
+`apiKey`, `apiHost` and `networkDispatcher` are required (missing →
+`IllegalArgumentException`); every other field falls back to the SDK default.
+
+The DSL covers the whole of `GBSDKBuilder`, so nothing forces you back to the
+builder: `streamingHost`, `encryptionKey`, `enableLogging`, `remoteEval`, `qaMode`,
+`enabled`, `forceVariations`, `trackingCallback`, `refreshHandler`,
+`featuresChangeHandler`, `featureUsageCallback`, `initialFeatures`, `plugins`,
+`cachingEnabled`, `cacheMaxAge`, `cachingLayer`, and sticky bucketing via either
+`stickyBucketService` or `stickyBucketScope` (+ optional `stickyBucketPrefix`).
+
+```kotlin
+val sdk = growthBook {
+    apiKey = "sdk-abc"
+    apiHost = "https://cdn.growthbook.io"
+    networkDispatcher = GBNetworkDispatcherKtor()
+
+    plugins = listOf(
+        GrowthBookTrackingPlugin(TrackingPluginConfig(clientKey = "sdk-abc"))
+    )
+    cacheMaxAge = 60_000
+    stickyBucketScope = viewModelScope
+}
+```
 
 ## Models
 
