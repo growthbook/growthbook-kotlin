@@ -1,0 +1,158 @@
+@file:OptIn(ExperimentalWasmDsl::class)
+
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackOutput
+import org.jetbrains.kotlin.gradle.targets.js.yarn.yarn
+
+plugins {
+    kotlin("multiplatform")
+    id("com.android.library")
+    id("org.jetbrains.dokka") version "1.9.10"
+}
+
+group = "io.growthbook.sdk"
+version = "1.0.0"
+
+kotlin {
+    androidTarget {
+        publishLibraryVariants("release")
+    }
+
+    js {
+        yarn.lockFileDirectory = file("kotlin-js-store")
+        browser {
+            commonWebpackConfig {
+                output = KotlinWebpackOutput(
+                    library = project.name,
+                    libraryTarget = KotlinWebpackOutput.Target.UMD,
+                    globalObject = KotlinWebpackOutput.Target.WINDOW
+                )
+            }
+        }
+    }
+
+    jvm()
+    // browser(), not nodejs(): these extensions carry no platform code themselves, but the SDK
+    // they wrap reads kotlinx.browser.localStorage in its wasmJs caching actual, which does not
+    // exist under Node. Matching the other modules keeps any future wasmJs test runnable.
+    wasmJs {
+        browser()
+    }
+    iosX64()
+    iosArm64()
+    iosSimulatorArm64()
+    macosArm64()
+
+    sourceSets {
+        val commonMain by getting {
+            dependencies {
+                api(project(":GrowthBook"))
+            }
+        }
+        val jvmTest by getting {
+            dependencies {
+                implementation(kotlin("test-junit"))
+                implementation("junit:junit:4.13.2")
+                implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.kotlinx.serialization.json)
+
+            }
+        }
+    }
+}
+
+android {
+    compileSdk = 34
+    namespace = "com.sdk.growthbook.ext"
+    defaultConfig {
+        minSdk = 21
+    }
+    buildTypes {
+        release {}
+        debug {}
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+}
+
+val dokkaOutputDir = "$buildDir/dokka"
+
+tasks.dokkaHtml {
+    outputDirectory.set(file(dokkaOutputDir))
+}
+
+/**
+ * This task deletes older documents
+ */
+val deleteDokkaOutputDir by tasks.register<Delete>("deleteDokkaOutputDirectory") {
+    delete(dokkaOutputDir)
+}
+
+/**
+ * This task creates JAVA Docs for Release
+ */
+val javadocJar = tasks.register<Jar>("javadocJar") {
+    dependsOn(deleteDokkaOutputDir, tasks.dokkaHtml)
+    archiveClassifier.set("javadoc")
+    from(dokkaOutputDir)
+}
+
+val sonatypeUsername: String? = System.getenv("GB_SONATYPE_USERNAME")
+val sonatypePassword: String? = System.getenv("GB_SONATYPE_PASSWORD")
+
+/**
+ * Publishing Task for MavenCentral
+ */
+publishing {
+    repositories {
+        maven {
+            name = "kotlin"
+            val releasesRepoUrl =
+                uri("https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/")
+            val snapshotsRepoUrl =
+                uri("https://ossrh-staging-api.central.sonatype.com/content/repositories/snapshots/")
+            url = if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl
+            credentials {
+                username = sonatypeUsername
+                password = sonatypePassword
+            }
+        }
+    }
+
+    publications {
+        withType<MavenPublication> {
+            artifact(javadocJar)
+            pom {
+                name.set("kotlin")
+                description.set(
+                    "Pure-Kotlin DX extensions for the GrowthBook Kotlin SDK: " +
+                        "typed feature value helpers, fallback strategies, typed Flag<T>, " +
+                        "and attributes/config DSLs."
+                )
+                licenses {
+                    license {
+                        name.set("MIT")
+                        url.set("https://opensource.org/licenses/MIT")
+                    }
+                }
+                url.set("https://github.com/growthbook/growthbook-kotlin")
+                issueManagement {
+                    system.set("Github")
+                    url.set("https://github.com/growthbook/growthbook-kotlin/issues")
+                }
+                scm {
+                    connection.set("https://github.com/growthbook/growthbook-kotlin.git")
+                    url.set("https://github.com/growthbook/growthbook-kotlin")
+                }
+                developers {
+                    developer {
+                        name.set("Bohdan Kim")
+                        email.set("user576g@gmail.com")
+                    }
+                }
+            }
+        }
+    }
+}

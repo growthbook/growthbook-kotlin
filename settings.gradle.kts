@@ -13,4 +13,4 @@ include(":NetworkDispatcherKtor")
 include(":NetworkDispatcherOkHttp")
 include(":GrowthBookKotlinxSerialization")
 include(":GrowthBookTest")
-
+include(":GrowthBookExt")
