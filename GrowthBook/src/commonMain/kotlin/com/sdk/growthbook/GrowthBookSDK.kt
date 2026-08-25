@@ -30,7 +30,6 @@ import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBOptions
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.EvalSnapshot
-import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBExperimentResult
@@ -44,7 +43,6 @@ import com.sdk.growthbook.sandbox.GBCachingLayer
 import com.sdk.growthbook.sandbox.GBCachingLayerAdapter
 import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBuckets
 import com.sdk.growthbook.model.diffFeatures
-import com.sdk.growthbook.utils.BackoffPolicy
 import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
 import kotlin.experimental.ExperimentalObjCRefinement
@@ -253,10 +251,10 @@ class GrowthBookSDK internal constructor(
     /**
      * Releases resources held by this SDK instance: flushes registered plugins (including the
      * built-in tracking plugin) so any buffered events are sent, stops any active SSE auto-refresh
-     * connection, and cancels the background coroutine scope used to process fetched payloads. Call
-     * this when the instance is no longer needed (e.g. on logout, or before creating a replacement
-     * instance) to avoid leaking coroutines and threads. Safe to call multiple times. The instance
-     * must not be used after [close].
+     * connection or background polling, and cancels the background coroutine scope used to process
+     * fetched payloads. Call this when the instance is no longer needed (e.g. on logout, or before
+     * creating a replacement instance) to avoid leaking coroutines and threads. Safe to call
+     * multiple times. The instance must not be used after [close].
      */
     fun close() {
         pluginRegistry?.closeAll()

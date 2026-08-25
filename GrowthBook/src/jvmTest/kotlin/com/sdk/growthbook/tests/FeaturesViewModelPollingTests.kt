@@ -420,4 +420,34 @@ class FeaturesViewModelPollingTests {
         assertFailsWith<IllegalArgumentException> { builder.setRefreshInterval(0) }
         assertFailsWith<IllegalArgumentException> { builder.setRefreshInterval(-5) }
     }
+
+    @Test
+    fun testSetStaleTtlRejectsNonPositive() {
+        val builder = GBSDKBuilder(
+            apiKey = "key",
+            apiHost = "https://example.com",
+            attributes = HashMap(),
+            trackingCallback = { _, _ -> },
+            networkDispatcher = CountingClient(),
+        )
+        // A non-positive inner window leaves no FRESH zone at all (every entry classified stale),
+        // so it is rejected up front rather than silently disabling the fresh tier.
+        assertFailsWith<IllegalArgumentException> { builder.setStaleTtl(0) }
+        assertFailsWith<IllegalArgumentException> { builder.setStaleTtl(-5) }
+    }
+
+    @Test
+    fun testSetCacheMaxAgeRejectsNonPositive() {
+        val builder = GBSDKBuilder(
+            apiKey = "key",
+            apiHost = "https://example.com",
+            attributes = HashMap(),
+            trackingCallback = { _, _ -> },
+            networkDispatcher = CountingClient(),
+        )
+        // Same reasoning as staleTtl: a non-positive window is indistinguishable from leaving the
+        // setter off, so it is rejected instead of silently disabling the freshness gate.
+        assertFailsWith<IllegalArgumentException> { builder.setCacheMaxAge(0) }
+        assertFailsWith<IllegalArgumentException> { builder.setCacheMaxAge(-5) }
+    }
 }

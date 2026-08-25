@@ -34,7 +34,6 @@ import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.incrementAndFetch
-import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.resume
 import kotlin.time.Clock
@@ -534,7 +533,7 @@ internal class FeaturesViewModel(
 
         val fresh = zone == CacheZone.FRESH
 
-        val outcome = outcomeOf(payload = decoder.decode(m = model), source = Source.CACHE, authoritative = fresh)
+        val outcome = outcomeOf(payload = decoded, source = Source.CACHE, authoritative = fresh)
         dispatch(outcome = outcome)
 
         // Only treat the cache as authoritative (and skip the network) when it actually

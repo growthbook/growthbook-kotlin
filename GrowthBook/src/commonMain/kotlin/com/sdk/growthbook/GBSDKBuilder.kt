@@ -222,15 +222,33 @@ class GBSDKBuilder(
      *
      * While the cache is younger than this age, the network call on the next
      * fetch is skipped and the cached features are served as the authoritative
-     * result. Once the cache is older, the SDK refetches from the network.
-     * This is a cache-staleness gate evaluated on the next fetch, not a
-     * background polling mechanism. When unset, the SDK always refetches.
-     * To force a network refresh regardless of this window, call
-     * [GrowthBookSDK.refreshCache].
+     * result. Once the cache is older, the SDK refetches from the network — the
+     * stale cache is still served (as a non-authoritative result) while that
+     * refresh runs, it is never dropped. This is a cache-staleness gate evaluated
+     * on the next fetch, not a background polling mechanism. When unset, the SDK
+     * always refetches. To force a network refresh regardless of this window,
+     * call [GrowthBookSDK.refreshCache].
+     *
+     * Pair this with [setStaleTtl] when you also need a hard staleness ceiling
+     * (past which the cache is no longer served at all); used alone, this window
+     * has no such cutoff.
+     *
+     * No effect when the SDK is built with `remoteEval = true`: a remote-eval
+     * payload is evaluated server-side against the current attributes while the
+     * cache is keyed only by API key, so that mode bypasses the feature cache
+     * entirely (nothing is read from it, nothing written to it) and always hits
+     * the network.
      *
      * @param cacheMaxAge freshness window in milliseconds.
+     * @throws IllegalArgumentException if [cacheMaxAge] is not positive. A non-positive
+     *   window makes every cache entry stale, which is indistinguishable from not
+     *   setting it at all — omit the setter instead. (Behaviour change in 7.9.0: this
+     *   was previously accepted and silently disabled the freshness window.)
+     * @see setStaleTtl
+     * @see setServeStaleOnError
      */
     fun setCacheMaxAge(cacheMaxAge: Long): GBSDKBuilder {
+        require(cacheMaxAge > 0) { "cacheMaxAge must be positive, was $cacheMaxAge" }
         this.cacheMaxAge = cacheMaxAge
         return this
     }
@@ -286,6 +304,9 @@ class GBSDKBuilder(
      * neither as success nor as failure. The handler's `(Boolean, GBError?)` contract cannot express
      * "stale fallback served", so signalling either would mislead; treat `serveStaleOnError` as a
      * best-effort offline safety net rather than a signal you can observe through the handler.
+     *
+     * No effect when the SDK is built with `remoteEval = true`: that mode bypasses the feature cache
+     * entirely, so there is no expired entry to fall back to.
      */
     fun setServeStaleOnError(enabled: Boolean): GBSDKBuilder {
         this.serveStaleOnError = enabled
@@ -307,8 +328,16 @@ class GBSDKBuilder(
      * When `staleTtl` is unset, [setCacheMaxAge] alone governs the skip-network window with NO hard
      * cutoff (it keeps serving stale beyond the window while revalidating) — the pre-existing
      * behaviour.
+     *
+     * No effect when the SDK is built with `remoteEval = true`: that mode bypasses the feature cache
+     * entirely, so there is no cached entry to classify.
+     *
+     * @throws IllegalArgumentException if [ttlMs] is not positive. A non-positive window would leave
+     *   no "fresh" zone at all (every cache entry classified stale), which is never what a caller
+     *   means — omit the setter instead.
      */
     fun setStaleTtl(ttlMs: Long): GBSDKBuilder {
+        require(ttlMs > 0) { "staleTtl must be positive, was $ttlMs" }
         this.staleTtl = ttlMs
         return this
     }

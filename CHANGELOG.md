@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
-## [7.4.0] - Unreleased
+## [7.9.0] - Unreleased
 
 ### Added
 - Background polling auto-refresh engine. `GBSDKBuilder.setRefreshInterval(<ms>)` configures a
@@ -30,16 +30,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the revalidating network round fails, so an offline client keeps its stale flags instead of falling
   back to code defaults. Default false fails closed (nothing stale served past the ceiling). The
   freshness ceiling still holds whenever the network is reachable.
+- `BackoffPolicy` — new public class in `:Core` (`io.growthbook.sdk:Core:1.6.0`): pure, stateless
+  capped exponential backoff (`delayFor(attempt)` / `shouldRetry(attempt)`), the shared
+  implementation behind every retry path in the SDK. Usable directly by consumers writing their own
+  `NetworkDispatcher`.
 
 ### Changed
-- Exponential backoff is now centralised in `BackoffPolicy` (`:Core`) and shared by the polling
-  engine and `suspendFeature()`'s retry loop. Behaviour of `suspendFeature()` is unchanged
-  (initial 1s, doubling, 60s cap, 5 attempts).
+- Exponential backoff is now centralised in `BackoffPolicy` and shared by all three retry paths:
+  the polling engine, `suspendFeature()`'s retry loop and SSE reconnection (`SSERetryManager` now
+  delegates its delay/attempt maths to it and only owns the reconnection counter). No behaviour
+  change: `suspendFeature()` still does initial 1s, doubling, 60s cap, 5 attempts, and SSE
+  reconnect still does initial 1s, doubling, 30s cap, 10 attempts.
 - A `GBCacheRefreshHandler` that throws is now caught and logged instead of propagating. The SDK's
   background payload-processing scope also carries a `CoroutineExceptionHandler`, so an exception
   escaping a fire-and-forget fetch (e.g. from a consumer handler) is logged rather than reaching the
   platform's default uncaught-exception handler — which on Android crashes the app. This matters most
   under polling, where the fetch path runs repeatedly.
+- **Potentially breaking:** `GBSDKBuilder.setCacheMaxAge()` now rejects a non-positive window with
+  `IllegalArgumentException` instead of accepting it. A zero/negative window silently disabled the
+  freshness gate (every cache entry classified stale), which is indistinguishable from never calling
+  the setter — and, now that it doubles as the outer ceiling for `setStaleTtl()`, it would also
+  arm a ceiling that expires everything. Callers that were passing a computed value must guard it
+  or omit the call.
+- `GrowthBookSDK.stopAutoRefreshFeatures()` now also releases the auto-refresh mode, not just the SSE
+  connection, so `startPolling()` works after SSE has been stopped (previously nothing claimed or
+  released the mode, since polling did not exist). `close()` stops polling as well as SSE.
 
 ---
 ## [7.8.0] - 2026-08-25
