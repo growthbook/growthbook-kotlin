@@ -4,9 +4,14 @@ import com.sdk.growthbook.GBSDKBuilder
 import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.model.GBFeature
+import com.sdk.growthbook.model.GBFeatureRule
+import com.sdk.growthbook.model.GBFeatureSource
 import com.sdk.growthbook.model.GBJson
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBString
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -26,6 +31,10 @@ class ExtensionsTest {
             networkDispatcher = MockNetworkDispatcher(),
             attributes = emptyMap(),
             trackingCallback = { _, _ -> },
+            // Off, so the suite never reads or writes the real per-user cache directory
+            // (~/.growthbook on the JVM) — a stale payload there would otherwise override
+            // setInitialFeatures and make these tests depend on the host machine.
+            cachingEnabled = false,
         ).setInitialFeatures(features)
             .initialize()
         return sdk
@@ -77,6 +86,74 @@ class ExtensionsTest {
     fun `isFeatureKnown is false for a missing feature`() {
         val sdk = sdkWith(emptyMap())
         assertFalse(sdk.isFeatureKnown("missing"))
+    }
+
+    @Test
+    fun `isFeatureKnown does not evaluate a loaded feature`() {
+        val evaluated = mutableListOf<String>()
+        val sdk = GBSDKBuilder(
+            apiKey = "",
+            apiHost = "",
+            networkDispatcher = MockNetworkDispatcher(),
+            attributes = emptyMap(),
+            trackingCallback = { _, _ -> },
+            cachingEnabled = false,
+        ).setInitialFeatures(mapOf("flag" to GBFeature(GBBoolean(true))))
+            .setFeatureUsageCallback { key, _ -> evaluated += key }
+            .initialize()
+
+        assertTrue(sdk.isFeatureKnown("flag"))
+
+        // Asking whether a feature exists must not look like a feature *view*: evaluation is
+        // observable through this callback (and through experiment tracking).
+        assertEquals(emptyList(), evaluated)
+    }
+
+    @Test
+    fun `isEnabled with FAIL_OPEN does not open a loaded feature that fails to evaluate`() {
+        // Malformed rule: a namespace is expected to be [name, start, end] primitives, and the
+        // object in the first slot makes the evaluator throw mid-rule. Its catch-all then reports
+        // source = unknownFeature even though the feature is loaded — which must not be mistaken
+        // for "feature missing".
+        val malformed = GBFeature(
+            defaultValue = GBBoolean(false),
+            rules = listOf(
+                GBFeatureRule(
+                    key = "exp",
+                    hashAttribute = "id",
+                    coverage = 1f,
+                    variations = listOf(GBBoolean(false), GBBoolean(true)),
+                    namespace = JsonArray(
+                        listOf(JsonObject(emptyMap()), JsonPrimitive(0), JsonPrimitive(1))
+                    ),
+                )
+            )
+        )
+        val sdk = GBSDKBuilder(
+            apiKey = "",
+            apiHost = "",
+            networkDispatcher = MockNetworkDispatcher(),
+            attributes = mapOf("id" to GBString("user-123")),
+            trackingCallback = { _, _ -> },
+            cachingEnabled = false,
+        ).setInitialFeatures(mapOf("flag" to malformed))
+            .initialize()
+
+        // Guards the premise of this test: without it the assertions below would also hold for
+        // a feature that simply evaluated to its default.
+        assertEquals(GBFeatureSource.unknownFeature, sdk.feature("flag").source)
+
+        assertTrue(sdk.isFeatureKnown("flag"))
+        assertFalse(sdk.isEnabled("flag", FallbackStrategy.FAIL_OPEN))
+    }
+
+    @Test
+    fun `isEnabled applies the fallback only for a genuinely missing feature`() {
+        val sdk = sdkWith(mapOf("off" to GBFeature(GBBoolean(false))))
+
+        assertFalse(sdk.isEnabled("off", FallbackStrategy.FAIL_OPEN))
+        assertTrue(sdk.isEnabled("missing", FallbackStrategy.FAIL_OPEN))
+        assertFalse(sdk.isEnabled("missing", FallbackStrategy.FAIL_CLOSED))
     }
 
     @Test

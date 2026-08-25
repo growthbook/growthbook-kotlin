@@ -25,6 +25,10 @@ class AttributesDslTest {
             networkDispatcher = MockNetworkDispatcher(),
             attributes = emptyMap(),
             trackingCallback = { _, _ -> },
+            // Off, so the suite never reads or writes the real per-user cache directory
+            // (~/.growthbook on the JVM) — a stale payload there would otherwise override
+            // setInitialFeatures and make these tests depend on the host machine.
+            cachingEnabled = false,
         ).setInitialFeatures(features).initialize()
 
     @Test
@@ -77,6 +81,23 @@ class AttributesDslTest {
                 "map" to mapOf(1 to "value")
             }
         }
+    }
+
+    @Test
+    fun `buildAttributes accepts a String-keyed map built outside the block`() {
+        // Inside the block `"city" to "Kyiv"` would resolve to the builder's own `to`
+        // (a member of the DSL receiver shadows kotlin.to), so a String-keyed map has to be
+        // built outside it — or nested with obj { }, as the test above does.
+        val address = mapOf("city" to "Kyiv", "zip" to 1001)
+
+        val attrs = buildAttributes {
+            "address" to address
+        }
+
+        assertEquals(
+            GBJson(mapOf("city" to GBString("Kyiv"), "zip" to GBNumber(1001))),
+            attrs["address"]
+        )
     }
 
     @Test

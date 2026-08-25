@@ -19,6 +19,7 @@ class ConfigDslTest {
             apiKey = "key"
             apiHost = "host"
             networkDispatcher = MockNetworkDispatcher()
+            cachingEnabled = false
         }
         assertFalse(sdk.isEnabled("nope"))
     }
@@ -71,6 +72,9 @@ class ConfigDslTest {
             apiKey = "key"
             apiHost = "host"
             networkDispatcher = MockNetworkDispatcher()
+            // Off, so a stale payload in the real cache directory (~/.growthbook on the JVM)
+            // cannot override setInitialFeatures and make this assertion host-dependent.
+            cachingEnabled = false
             attributes { "country" to "UA" }
             initialFeatures = mapOf("promo" to feature)
         }
@@ -94,6 +98,7 @@ class ConfigDslTest {
         fun buildSdk(isEnabled: Boolean) = growthBook {
             apiKey = "key"; apiHost = "host"
             networkDispatcher = MockNetworkDispatcher()
+            cachingEnabled = false
             enabled = isEnabled
             attributes { "id" to "user-123" }
             initialFeatures = mapOf("exp" to experiment)

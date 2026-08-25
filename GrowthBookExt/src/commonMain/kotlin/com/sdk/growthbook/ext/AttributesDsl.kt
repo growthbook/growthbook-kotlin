@@ -36,15 +36,20 @@ fun Any?.toGBValue(): GBValue =
         is Number -> GBNumber(this)
         is Map<*, *> -> GBJson(
             entries.associate { (key, mapValue) ->
+                // Type only, never the key or value itself: attributes routinely carry personal
+                // data (email, device id, address) and these messages end up in logs and crash
+                // reports.
                 require(key is String) {
-                    "GrowthBook attributes keys must be String, but got: $key (${key?.let { it::class.simpleName }})"
+                    "GrowthBook attribute keys must be String, but got ${key?.let { it::class.simpleName } ?: "null"}"
                 }
                 key to mapValue.toGBValue()
             }
         )
 
         is List<*> -> GBArray(map { it.toGBValue() })
-        else -> throw IllegalArgumentException("Cannot convert value of type ${this::class.simpleName} to GBValue: $this")
+        else -> throw IllegalArgumentException(
+            "Cannot convert a value of type ${this::class.simpleName} to GBValue"
+        )
     }
 
 /**
@@ -79,6 +84,11 @@ class GBAttributesBuilder {
     /**
      * Associates this key with [value], converting it via [toGBValue].
      * A later entry with the same key overwrites the earlier one.
+     *
+     * Note that inside this block `to` on a [String] receiver always resolves to *this*
+     * function — as a member of the DSL receiver it takes precedence over `kotlin.to`, so
+     * an inline `"address" to mapOf("city" to "Kyiv")` does not compile. Nest objects with
+     * [obj] instead, or build the map outside the block and pass it in as a value.
      */
     infix fun String.to(value: Any?) {
         entries[this] = value.toGBValue()

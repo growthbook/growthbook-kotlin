@@ -25,6 +25,10 @@ class DelegatesTest {
             networkDispatcher = MockNetworkDispatcher(),
             attributes = emptyMap(),
             trackingCallback = { _, _ -> },
+            // Off, so the suite never reads or writes the real per-user cache directory
+            // (~/.growthbook on the JVM) — a stale payload there would otherwise override
+            // setInitialFeatures and make these tests depend on the host machine.
+            cachingEnabled = false,
         ).setInitialFeatures(features)
             .initialize()
 

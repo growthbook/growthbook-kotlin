@@ -19,7 +19,9 @@ Kotlin Multiplatform targets.
   plus `getJson(id)`. Boolean helpers `isEnabled(id)`, `isDisabled(id)` and
   `isFeatureKnown(id)` (distinguishes "missing" from "present but off").
 - `FallbackStrategy` (`FAIL_OPEN` / `FAIL_CLOSED`) with `isEnabled(id, fallback)` —
-  an explicit fail-open/fail-closed policy that applies only to an unknown feature.
+  an explicit fail-open/fail-closed policy that applies only to a feature absent from
+  the loaded configuration. A loaded feature whose evaluation fails keeps its real
+  evaluated value, so an evaluation error cannot make `FAIL_OPEN` turn a flag on.
 - Typed flags: `Flag<T>` (key + type + per-feature default) with `value(flag)` and
   `isOn(flag)`. Supported types `Boolean`/`String`/`Int`/`Long`/`Float`/`Double`;
   numeric flags are robust to how the number was stored.
@@ -28,6 +30,9 @@ Kotlin Multiplatform targets.
   re-evaluated on every read, so the property always reflects the current config.
 - Attributes DSL: `setAttributes { }` / `buildAttributes { }` with an `obj { }` block
   for nested objects, hiding the `GBValue` wrappers.
-- Configuration DSL: `growthBook { }` — assemble and initialize the SDK declaratively.
+- Configuration DSL: `growthBook { }` — assemble and initialize the SDK declaratively,
+  covering the full `GBSDKBuilder` surface, including `plugins`, `cachingEnabled`,
+  `cacheMaxAge`, `cachingLayer`, `featuresChangeHandler`, and sticky bucketing via
+  either `stickyBucketService` or `stickyBucketScope` (+ optional `stickyBucketPrefix`).
 
 ---

@@ -380,15 +380,23 @@ Boolean helpers: `isEnabled(id)`, `isDisabled(id)`, and `isFeatureKnown(id)`
 
 ### Fallback strategies
 
-When a feature is *unknown* (missing config / empty cache), choose fail-open vs
-fail-closed explicitly at the call site:
+When a feature is *unknown* — i.e. absent from the loaded configuration — choose
+fail-open vs fail-closed explicitly at the call site:
 
 ```kotlin
 if (sdk.isEnabled("new-checkout", FallbackStrategy.FAIL_CLOSED)) { ... }
 ```
 
-The strategy applies **only** to an unknown feature — a known-but-off feature
-still returns its real evaluated value.
+The strategy applies **only** to an unknown feature. A known-but-off feature still
+returns its real evaluated value, and so does a loaded feature whose evaluation
+fails (malformed rule, failed prerequisite) — an evaluation error is never mistaken
+for a missing feature, so `FAIL_OPEN` cannot flip a kill switch on.
+
+> **Startup window.** Feature definitions are fetched asynchronously, so until the
+> first payload (or cached payload) is applied *every* feature is unknown, and
+> `FAIL_OPEN` reports all of them as enabled — permanently so if the fetch fails and
+> no cache exists. Use `suspendFeature`, or seed a bundled payload with
+> `initialFeatures`, when a flag must not be read before the SDK is ready.
 
 ### Typed flags — `Flag<T>`
 
@@ -445,6 +453,10 @@ sdk.setAttributes {
 
 Or build a reusable map: `val attrs = buildAttributes { "id" to "user-123" }`.
 
+Inside the block, `to` on a `String` is the DSL's own entry function and shadows
+`kotlin.to`, so nest objects with `obj { }` rather than an inline
+`mapOf("city" to "Kyiv")` (a map built outside the block works as a value).
+
 ### Configuration DSL
 
 Assemble and initialize the SDK declaratively:
@@ -465,6 +477,27 @@ val sdk = growthBook {
 
 `apiKey`, `apiHost` and `networkDispatcher` are required (missing →
 `IllegalArgumentException`); every other field falls back to the SDK default.
+
+The DSL covers the whole of `GBSDKBuilder`, so nothing forces you back to the
+builder: `streamingHost`, `encryptionKey`, `enableLogging`, `remoteEval`, `qaMode`,
+`enabled`, `forceVariations`, `trackingCallback`, `refreshHandler`,
+`featuresChangeHandler`, `featureUsageCallback`, `initialFeatures`, `plugins`,
+`cachingEnabled`, `cacheMaxAge`, `cachingLayer`, and sticky bucketing via either
+`stickyBucketService` or `stickyBucketScope` (+ optional `stickyBucketPrefix`).
+
+```kotlin
+val sdk = growthBook {
+    apiKey = "sdk-abc"
+    apiHost = "https://cdn.growthbook.io"
+    networkDispatcher = GBNetworkDispatcherKtor()
+
+    plugins = listOf(
+        GrowthBookTrackingPlugin(TrackingPluginConfig(clientKey = "sdk-abc"))
+    )
+    cacheMaxAge = 60_000
+    stickyBucketScope = viewModelScope
+}
+```
 
 ## Models
 

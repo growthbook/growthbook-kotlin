@@ -2,20 +2,28 @@ name: Verify targets
 
 # The `test` workflow only exercises the JVM test source sets, so non-JVM
 # targets (JS, Wasm, iOS, Android) are never compiled there. This workflow gates
-# every pull request: it compiles all modules across all KMP targets and
-# validates that each publication artifact is produced (via publishToMavenLocal),
-# so public modules — including the new GrowthBookExt — are checked beyond the
-# JVM test suite. Runs on macOS because the iOS (Kotlin/Native) targets can only
-# be compiled and linked on a macOS host.
+# every pull request and every push to `main`: it compiles all modules across all
+# KMP targets and validates that each publication artifact is produced (via
+# publishToMavenLocal), so public modules — including the new GrowthBookExt — are
+# checked beyond the JVM test suite. Runs on macOS because the iOS (Kotlin/Native)
+# targets can only be compiled and linked on a macOS host.
 
+# Also runs on `main` so the Konan/Gradle caches are populated on the default
+# branch: GitHub only lets a run restore caches from its own ref or from the
+# default branch, so without this every pull request would start cold and
+# re-download the whole Kotlin/Native toolchain.
 on:
-  pull_request
+  pull_request:
+  push:
+    branches:
+      - main
 
 # A newer push to the same PR cancels the previous in-progress run so we don't
-# wait behind (or queue up) stale runs of this long macOS build.
+# wait behind (or queue up) stale runs of this long macOS build. Runs on `main`
+# are never cancelled — they are what writes the shared cache.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   compile-all-targets:
@@ -27,12 +35,15 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
     # Cache the Kotlin/Native (Konan) toolchain + LLVM/sysroot dependencies, which
-    # are otherwise re-downloaded (hundreds of MB) on every cold run.
+    # are otherwise re-downloaded (hundreds of MB) on every cold run. Keyed on the
+    # root build script (which pins kotlinPluginsVersion) plus the version catalog:
+    # the Kotlin version is what determines the contents of ~/.konan, so editing an
+    # unrelated module's build script must not evict the toolchain.
     - name: Cache Konan
       uses: actions/cache@v4
       with:
         path: ~/.konan
-        key: konan-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml') }}
+        key: konan-${{ runner.os }}-${{ hashFiles('build.gradle.kts', 'gradle/libs.versions.toml') }}
         restore-keys: konan-${{ runner.os }}-
     - name: Set up Gradle
       uses: gradle/actions/setup-gradle@v3

@@ -32,12 +32,16 @@ kotlin {
     }
 
     jvm()
+    // browser(), not nodejs(): these extensions carry no platform code themselves, but the SDK
+    // they wrap reads kotlinx.browser.localStorage in its wasmJs caching actual, which does not
+    // exist under Node. Matching the other modules keeps any future wasmJs test runnable.
     wasmJs {
-        nodejs()
+        browser()
     }
     iosX64()
     iosArm64()
     iosSimulatorArm64()
+    macosArm64()
 
     sourceSets {
         val commonMain by getting {
