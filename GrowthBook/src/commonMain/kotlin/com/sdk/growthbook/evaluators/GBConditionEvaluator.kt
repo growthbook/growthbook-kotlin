@@ -428,7 +428,9 @@ internal class GBConditionEvaluator {
                 "\$in" -> {
                     return if (attributeValue is GBArray) {
                         isIn(attributeValue, conditionValue)
-                    } else conditionValue.contains(attributeValue)
+                    } else {
+                        attributeValue != null && conditionValue.contains(attributeValue)
+                    }
                 }
                 // Evaluate INI operator - attributeValue in the conditionValue array
                 "\$ini" -> {
@@ -442,7 +444,9 @@ internal class GBConditionEvaluator {
                 "\$nin" -> {
                     return if (attributeValue is GBArray) {
                         !isIn(attributeValue, conditionValue)
-                    } else !conditionValue.contains(attributeValue)
+                    } else {
+                        attributeValue == null || !conditionValue.contains(attributeValue)
+                    }
                 }
                 // Evaluate ALL operator - whether condition contains all attribute
                 "\$all" -> {
@@ -621,6 +625,15 @@ internal class GBConditionEvaluator {
             }
         }
 
+        // Case-sensitive path uses GBArray.contains → HashSet membership.
+        if (!inSensitive) {
+            if (actualValue is GBArray) {
+                if (actualValue.isEmpty()) return false
+                return actualValue.any { conditionValue.contains(it) }
+            }
+            return actualValue != null && conditionValue.contains(actualValue)
+        }
+
         if (actualValue is GBArray) {
             if (actualValue.isEmpty()) return false
 
@@ -632,7 +645,7 @@ internal class GBConditionEvaluator {
         }
 
         return conditionValue.any {
-            caseFold(actualValue) ==  caseFold(it)
+            caseFold(actualValue) == caseFold(it)
         }
     }
 

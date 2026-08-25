@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.0] - 2026-08-25
+
+### Added
+- Implement `TrackingNetworkDispatcher` to support `GrowthBookTrackingPlugin`
+
+### Changed
+- Removed the duplicated internal `toJsonElement` helper and now use the shared implementation from `:Core`
+
+### Fixed
+- Both `consumePOSTRequest` overloads now catch `Throwable`, not only `Exception`. On Kotlin/JS and Kotlin/Wasm a Ktor failure surfaces as a `Throwable` that is not a `kotlin.Exception` (e.g. "Failed to fetch"); on the POST paths it escaped as an uncaught coroutine error instead of reaching `onError`. This is the same defect that was fixed for `handleGetRequest` in 1.1.0
+
+### Security
+- POST bodies are no longer written to the log when logging is enabled — only the target URL and the payload size are. A remote-eval body carries the user's attributes, and a tracking body carries `context_json` plus `user_id`/`device_id`/`session_id`; those are personal data and must not reach logcat/stdout on a production device
+
+---
+## [1.1.0] - 2026-08-14
+
+### Added
+- New `macosArm64` target, so the Ktor dispatcher covers the same Apple platforms as the core SDK (the shared Apple source set now uses `ktor-client-darwin` for iOS and macOS)
+
+### Fixed
+- `handleGetRequest`: catch `Throwable` (not just `Exception`) so a Ktor fetch failure on Kotlin/JS and Kotlin/Wasm — which surfaces as a `Throwable` that is not a `kotlin.Exception` (e.g. "Failed to fetch") — is routed to `onError` instead of escaping as an uncaught coroutine error
+
+---
+## [1.0.15] - 2026-08-14
+
+### Fixed
+- `consumePOSTRequest()` no longer wraps the request in `client.use { }`, which closed the
+  shared, long-lived `HttpClient` after the first POST and broke every subsequent
+  GET/POST/SSE request. This surfaced in remote-eval mode, where each attribute change
+  issues a POST.
+- `Map`/`List.toJsonElement()` now pass an already-serialized `JsonElement` through
+  untouched (branch added before `Map`/`List`, since `JsonObject`/`JsonArray` are
+  themselves `Map`/`List`), so pre-encoded POST-body values are no longer re-stringified
+  and double-quoted.
+
+---
+
 ## [1.0.14] - 2026-04-30
 
 ### Added

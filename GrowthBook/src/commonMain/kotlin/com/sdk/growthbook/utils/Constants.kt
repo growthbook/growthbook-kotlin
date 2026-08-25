@@ -4,6 +4,7 @@ import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
+import com.sdk.growthbook.model.GBFeaturesDiff
 import com.sdk.growthbook.serializable_model.SerializableGBTrackData
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
@@ -55,6 +56,8 @@ typealias GBCondition = JsonElement
  * It updates back whether cache was refreshed or not
  */
 typealias GBCacheRefreshHandler = (Boolean, GBError?) -> Unit
+
+typealias GBFeaturesChangeHandler = (GBFeaturesDiff) -> Unit
 
 /**
  * Triple Tuple for GrowthBook Namespaces

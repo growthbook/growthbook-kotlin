@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "1.2.0"
+version = "1.5.0"
 
 kotlin {
     androidTarget {
@@ -33,18 +33,31 @@ kotlin {
 
     jvm()
     wasmJs {
-        nodejs()
+        browser()
     }
     iosX64()
     iosArm64()
     iosSimulatorArm64()
+    macosArm64()
 
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation(libs.kotlinx.coroutines.core)
+                // `api`, not `implementation`: both libraries show up in this module's public API —
+                // `NetworkDispatcher.consumeSSEConnection` returns a `Flow`, while
+                // `TrackingNetworkDispatcher.consumePOSTRequest` and the public `toJsonElement()`
+                // helpers take/return `JsonElement`. Under `implementation` they land only in the
+                // published artifact's `runtimeElements`, so a consumer writing their own
+                // dispatcher cannot even name those types without declaring kotlinx themselves.
+                api(libs.kotlinx.coroutines.core)
+                api(libs.kotlinx.serialization.json)
             }
         }
+        val appleMain by creating { dependsOn(commonMain) }
+        val iosX64Main by getting { dependsOn(appleMain) }
+        val iosArm64Main by getting { dependsOn(appleMain) }
+        val iosSimulatorArm64Main by getting { dependsOn(appleMain) }
+        val macosArm64Main by getting { dependsOn(appleMain) }
     }
 }
 

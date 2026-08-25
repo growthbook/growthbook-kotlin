@@ -77,6 +77,106 @@ open class MockNetworkClient(
     }
 }
 
+/**
+ * Mock client that counts POST (remote-eval) and GET requests so tests can assert which network
+ * path was taken — e.g. that an attribute change triggered a remote-eval POST, or that a retry in
+ * remote-eval mode issued a POST rather than a bare GET.
+ */
+open class CountingPostNetworkClient(
+    successResponse: String?,
+) : MockNetworkClient(successResponse, null) {
+
+    var postCount = 0
+        private set
+
+    var getCount = 0
+        private set
+
+    override fun consumeGETRequestWithNotModified(
+        request: String,
+        onSuccess: (String) -> Unit,
+        onError: (Throwable) -> Unit,
+        onNotModified: (() -> Unit)
+    ): Job {
+        getCount++
+        return super.consumeGETRequestWithNotModified(request, onSuccess, onError, onNotModified)
+    }
+
+    override fun consumePOSTRequest(
+        url: String,
+        bodyParams: Map<String, Any>,
+        onSuccess: (String) -> Unit,
+        onError: (Throwable) -> Unit
+    ) {
+        postCount++
+        super.consumePOSTRequest(url, bodyParams, onSuccess, onError)
+    }
+}
+
+/**
+ * Mock client that records the last POST body it was handed, so a test can assert the exact
+ * on-the-wire shape of the remote-eval payload (native JSON values for attributes, forcedFeatures
+ * as an array of [key, value] pairs). Still invokes onSuccess so the fetch flow completes.
+ */
+open class CapturingPostNetworkClient(
+    successResponse: String?,
+) : MockNetworkClient(successResponse, null) {
+
+    var lastBodyParams: Map<String, Any>? = null
+        private set
+
+    override fun consumePOSTRequest(
+        url: String,
+        bodyParams: Map<String, Any>,
+        onSuccess: (String) -> Unit,
+        onError: (Throwable) -> Unit
+    ) {
+        lastBodyParams = bodyParams
+        super.consumePOSTRequest(url, bodyParams, onSuccess, onError)
+    }
+}
+
+/**
+ * Mock client that captures each POST's success callback instead of invoking it, so a test can
+ * drive remote-eval responses in an arbitrary order (e.g. an older request completing after a
+ * newer one) and assert the out-of-order guard.
+ */
+open class DeferredPostNetworkClient : MockNetworkClient(null, null) {
+
+    val pendingPosts = mutableListOf<(String) -> Unit>()
+
+    override fun consumePOSTRequest(
+        url: String,
+        bodyParams: Map<String, Any>,
+        onSuccess: (String) -> Unit,
+        onError: (Throwable) -> Unit
+    ) {
+        pendingPosts.add(onSuccess)
+    }
+}
+
+/**
+ * Mock dispatcher that throws synchronously while enqueuing (as a misbehaving custom
+ * NetworkDispatcher might). Used to assert the view model reports this as a fetch failure instead of
+ * swallowing it or rethrowing it into the caller.
+ */
+open class SynchronouslyThrowingNetworkClient : MockNetworkClient(null, null) {
+
+    override fun consumeGETRequestWithNotModified(
+        request: String,
+        onSuccess: (String) -> Unit,
+        onError: (Throwable) -> Unit,
+        onNotModified: (() -> Unit)
+    ): Job = throw RuntimeException("dispatcher failed to enqueue GET")
+
+    override fun consumePOSTRequest(
+        url: String,
+        bodyParams: Map<String, Any>,
+        onSuccess: (String) -> Unit,
+        onError: (Throwable) -> Unit
+    ): Unit = throw RuntimeException("dispatcher failed to enqueue POST")
+}
+
 class MockResponse {
     companion object {
 

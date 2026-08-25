@@ -3,16 +3,17 @@ package com.sdk.growthbook.model
 import com.sdk.growthbook.serializable_model.SerializableGBFeature
 import com.sdk.growthbook.serializable_model.SerializableGBFeatureRule
 import com.sdk.growthbook.utils.GBBucketRange
-import com.sdk.growthbook.utils.GBCondition
 import com.sdk.growthbook.utils.GBFilter
 import com.sdk.growthbook.utils.GBTrackData
 import com.sdk.growthbook.utils.GBVariationMeta
+import com.sdk.growthbook.utils.GBCondition
 import com.sdk.growthbook.utils.GBParentConditionInterface
 import com.sdk.growthbook.utils.OptionalProperty
 import com.sdk.growthbook.utils.RangeSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import com.sdk.growthbook.kotlinx.serialization.gbSerialize
+import com.sdk.growthbook.kotlinx.serialization.toGBConditionJson
 
 /**
  * A Feature object consists of possible values plus rules for how to assign values to users.
@@ -161,6 +162,9 @@ data class GBFeatureRule(
      */
     val tracks: ArrayList<GBTrackData>? = null
 ) {
+    internal val conditionGB: GBJson? =
+        condition?.toGBConditionJson()
+
     internal fun gbSerialize() =
         SerializableGBFeatureRule(
             id = id,

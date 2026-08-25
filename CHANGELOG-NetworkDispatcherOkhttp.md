@@ -1,9 +1,32 @@
-# Changelog — NetworkDispatcherKtor
+# Changelog — NetworkDispatcherOkHttp
 
-All notable changes to the `NetworkDispatcherOkhttp` artifact will be documented in this file.
+All notable changes to the `NetworkDispatcherOkHttp` artifact will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [1.1.0] - 2026-08-25
+
+### Added
+- Implement `TrackingNetworkDispatcher` to support `GrowthBookTrackingPlugin`
+
+### Changed
+- Removed the duplicated internal `toJsonElement` helper and now use the shared implementation from `:Core`
+
+### Fixed
+- Both `consumePOSTRequest` overloads now build the request inside a `try`/`catch` and route failures to `onError`. `Request.Builder.url()` raises `IllegalArgumentException` for a URL without a scheme (an `ingestorHost` of `us1.gb-ingest.com`, say); raised inside a bare `launch` it escaped to the platform's uncaught-exception handler, which on Android crashes the app
+
+---
+
+## [1.0.9] - 2026-08-14
+
+### Fixed
+- `Map`/`List.toJsonElement()` now pass an already-serialized `JsonElement` through
+  untouched (branch added before `Map`/`List`, since `JsonObject`/`JsonArray` are
+  themselves `Map`/`List`), so pre-encoded POST-body values are no longer re-stringified
+  and double-quoted.
 
 ---
 
