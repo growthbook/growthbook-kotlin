@@ -27,8 +27,6 @@ import com.sdk.growthbook.model.GBJson
 import com.sdk.growthbook.model.GBNull
 import com.sdk.growthbook.model.GBArray
 import com.sdk.growthbook.model.GBValue
-import com.sdk.growthbook.model.GBNumber
-import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBOptions
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.EvalSnapshot
@@ -38,8 +36,15 @@ import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.kotlinx.serialization.from
 import com.sdk.growthbook.logger.GB
+import com.sdk.growthbook.plugin.tracking.PluginRegistry
 import com.sdk.growthbook.model.StackContext
+import com.sdk.growthbook.utils.GBFeaturesChangeHandler
+import com.sdk.growthbook.sandbox.CachingImpl
+import com.sdk.growthbook.sandbox.GBCachingLayer
+import com.sdk.growthbook.sandbox.GBCachingLayerAdapter
 import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBuckets
+import com.sdk.growthbook.model.diffFeatures
+import com.sdk.growthbook.utils.BackoffPolicy
 import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
 import kotlin.experimental.ExperimentalObjCRefinement
@@ -84,7 +89,12 @@ class GrowthBookSDK internal constructor(
     // runs on a defined background context rather than an arbitrary thread. Overridable (e.g. with a
     // test dispatcher) so tests can drive the async pipeline deterministically.
     coroutineContext: CoroutineContext,
-) : FeaturesFlowDelegate {
+    private val featuresChangeHandler: GBFeaturesChangeHandler? = null,
+    // Internal seam only: the public way to plug a cache is GBSDKBuilder.setCachingLayer().
+    // Adding this to the public constructor would break binary compatibility,
+    // so the public constructor below preserves the pre-7.4.0 signature and delegates here.
+    cachingLayer: GBCachingLayer?
+    ) : FeaturesFlowDelegate, IGrowthBookSDK {
 
     /**
      * Public constructor, kept binary-compatible with pre-7.3.0 releases. To set a cache
@@ -108,6 +118,7 @@ class GrowthBookSDK internal constructor(
         cachingEnabled = cachingEnabled,
         cacheMaxAge = null,
         coroutineContext = PlatformDependentIODispatcher,
+        cachingLayer = null
     )
     private var remoteSourceFeaturesFetchResult: FeaturesFetchResult =
         FeaturesFetchResult.NoResultYet
@@ -120,6 +131,7 @@ class GrowthBookSDK internal constructor(
     // payload — otherwise a 304 arriving before the first remote fetch would be treated
     // as a failure, breaking the offline-first fallback.
     private var hasFeaturesPayload: Boolean = gbContext.features.isNotEmpty()
+    var pluginRegistry: PluginRegistry? = null
 
     /**
      * JAVA Consumers preset Features
@@ -135,6 +147,7 @@ class GrowthBookSDK internal constructor(
         cacheMaxAge = cacheMaxAge,
         staleTtl = staleTtl,
         serveStaleOnError = serveStaleOnError,
+        cachingLayer = cachingLayer?.let { GBCachingLayerAdapter(it) } ?: CachingImpl.getLayer(),
         cacheKey = "${Constants.FEATURE_CACHE}_${gbContext.apiKey}",
         remoteEval = gbContext.remoteEval,
         remoteEvalPayloadProvider = ::buildRemoteEvalParams,
@@ -142,6 +155,8 @@ class GrowthBookSDK internal constructor(
     )
 
     init {
+        pluginRegistry = PluginRegistry(gbContext.plugins)
+        pluginRegistry?.initAll()
         if (features != null) {
             gbContext.features = features
             hasFeaturesPayload = true
@@ -236,12 +251,15 @@ class GrowthBookSDK internal constructor(
     }
 
     /**
-     * Releases resources held by this SDK instance: stops any active SSE auto-refresh connection or
-     * background polling, and cancels the background coroutine scope used to process fetched payloads.
-     * Call this when the instance is no longer needed (e.g. on logout, or before creating a replacement
-     * instance) to avoid leaking coroutines and threads. The instance must not be used after [close].
+     * Releases resources held by this SDK instance: flushes registered plugins (including the
+     * built-in tracking plugin) so any buffered events are sent, stops any active SSE auto-refresh
+     * connection, and cancels the background coroutine scope used to process fetched payloads. Call
+     * this when the instance is no longer needed (e.g. on logout, or before creating a replacement
+     * instance) to avoid leaking coroutines and threads. Safe to call multiple times. The instance
+     * must not be used after [close].
      */
     fun close() {
+        pluginRegistry?.closeAll()
         featuresViewModel.close()
     }
 
@@ -256,12 +274,22 @@ class GrowthBookSDK internal constructor(
      * Delegate that set to Context successfully fetched features
      */
     override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
+        // Compute the diff only for authoritative results (network / SSE / fresh cache), against the
+        // features currently applied. The non-authoritative cache pre-load that precedes a network
+        // refresh must not notify, otherwise the handler double-fires on a warm start (cache, then
+        // network); the subsequent authoritative result reports the real delta.
+        val diff = if (isRemote) {
+            featuresChangeHandler?.let { diffFeatures(gbContext.features, features) }
+        } else null
+
         gbContext.features = features
         hasFeaturesPayload = true
         if (isRemote) {
             remoteSourceFeaturesFetchResult = FeaturesFetchResult.Success
             invokeRefreshHandler(true, null)
         }
+
+        diff?.takeIf { it.hasChanges }?.let { featuresChangeHandler?.invoke(it) }
     }
 
     /**
@@ -350,7 +378,7 @@ class GrowthBookSDK internal constructor(
      *
      * @returns a [GBFeatureResult] object
      */
-    suspend fun suspendFeature(id: String): GBFeatureResult {
+    override suspend fun suspendFeature(id: String): GBFeatureResult {
         val backOff = BackoffPolicy(
             initialDelayMs = INITIAL_RETRY_DELAY_MILLIS,
             maxDelayMs = MAX_RETRY_DELAY_MILLIS,
@@ -396,7 +424,7 @@ class GrowthBookSDK internal constructor(
      * the first fetch completes — returns default/unknown values. To guarantee the fetched payload
      * (and sticky-bucket assignments) are loaded before evaluating, use [suspendFeature] instead.
      */
-    fun feature(id: String): GBFeatureResult {
+    override fun feature(id: String): GBFeatureResult {
         // Single atomic snapshot for every evaluation input (attributes, forced features/variations,
         // attribute overrides, sticky docs), so a concurrent setter can't yield a torn mix.
         val snapshot = gbContext.evalSnapshot()
@@ -427,11 +455,13 @@ class GrowthBookSDK internal constructor(
     /**
      * The featureValue method takes a string argument,
      * which is the unique identifier, and the type of the accessed feature.
-     * The supported types of accessed features are:
-     * [Boolean], [String], [Number], [Short],
-     * [Int], [Long], [Float], [Double], [GBJson]
      *
-     * @returns a feature value typed with specified type
+     * Boolean, string and numeric values are returned unwrapped ([Boolean], [String] and the
+     * concrete [Number] subtype the payload decoded to); JSON objects and arrays are returned as
+     * [GBJson] and [GBArray].
+     *
+     * @returns the feature value typed as [V], or null if the feature has no value or its value
+     * is not a [V]
      */
     inline fun <reified V> featureValue(id: String): V? {
         return extractFeatureValue(id)
@@ -441,14 +471,14 @@ class GrowthBookSDK internal constructor(
      * The isOn method takes a single string argument,
      * which is the unique identifier for the feature and returns the feature state on/off
      */
-    fun isOn(featureId: String): Boolean {
+    override fun isOn(featureId: String): Boolean {
         return feature(id = featureId).on
     }
 
     /**
      * The run method takes an Experiment object and returns an ExperimentResult
      */
-    fun run(experiment: GBExperiment): GBExperimentResult {
+    override fun run(experiment: GBExperiment): GBExperimentResult {
         val snapshot = gbContext.evalSnapshot()
         val evalContext = createEvaluationContext(snapshot)
         val evaluator = GBExperimentEvaluator(
@@ -473,7 +503,7 @@ class GrowthBookSDK internal constructor(
      * If you use Sticky Bucketing and need to evaluate experiments immediately
      * after setting attributes, use [setAttributesSync] instead.
      */
-    fun setAttributes(attributes: Map<String, GBValue>) {
+    override fun setAttributes(attributes: Map<String, GBValue>) {
         // Single atomic update so a concurrent feature()/run() never sees the new attributes paired
         // with the previous user's stale sticky docs (the docs are repopulated by the refresh below).
         gbContext.setAttributesClearingStickyDocs(attributes)
@@ -516,7 +546,7 @@ class GrowthBookSDK internal constructor(
      * }
      * ```
      */
-    suspend fun setAttributesSync(attributes: Map<String, GBValue>) {
+    override suspend fun setAttributesSync(attributes: Map<String, GBValue>) {
         gbContext.attributes = attributes
 
         if (gbContext.stickyBucketService != null) {
@@ -647,32 +677,14 @@ class GrowthBookSDK internal constructor(
     }
 
     /**
-     * Helper method for reified feature and featureValue
+     * Helper method for reified feature and featureValue.
+     *
+     * Delegates to the shared [extractValue] so this member and the
+     * [IGrowthBookSDK.featureValue] extension can never disagree — see the note there.
      */
     @PublishedApi
-    internal inline fun <reified V> extractFeatureValue(id: String): V? {
-        val listOfSupportedTypes = listOf(
-            Boolean::class, String::class,
-            Number::class, Short::class, Int::class,
-            Long::class, Float::class, Double::class,
-            GBJson::class,
-        )
-        if (V::class !in listOfSupportedTypes) {
-            return null
-        }
-
-        val gbFeatureResult: GBFeatureResult = this.feature(id)
-        return when (val gbResultValue = gbFeatureResult.gbValue) {
-            is GBNull -> null
-            is GBBoolean -> gbResultValue.value as? V
-            is GBString -> gbResultValue.value as? V
-            is GBNumber -> gbResultValue.value as? V
-            is GBJson -> gbResultValue as? V
-            is GBValue.Unknown -> null
-            is GBArray -> null
-            null -> null
-        }
-    }
+    internal inline fun <reified V> extractFeatureValue(id: String): V? =
+        this.feature(id).extractValue()
 
     /**
      * Builds the remote-eval request payload from the current context, or null when not in
@@ -742,7 +754,7 @@ class GrowthBookSDK internal constructor(
     }
 
     private fun createEvaluationContext(snapshot: EvalSnapshot = gbContext.evalSnapshot()) =
-        createEvaluationContext(gbContext, gbExperimentHelper, snapshot)
+        createEvaluationContext(gbContext, gbExperimentHelper, snapshot, pluginRegistry)
 
     //@ThreadLocal
     internal companion object {
@@ -761,6 +773,7 @@ class GrowthBookSDK internal constructor(
             // snapshot, so the evaluation can never observe a torn mix (e.g. new features with stale
             // sticky docs, or new attributes with old overrides). Callers pass the snapshot they read.
             snapshot: EvalSnapshot,
+            pluginRegistry: PluginRegistry?
         ): EvaluationContext {
             return EvaluationContext(
                 enabled = gbContext.enabled,
@@ -783,7 +796,8 @@ class GrowthBookSDK internal constructor(
                 onStickyAssignmentChanged = { key, doc ->
                     gbContext.mergeStickyAssignmentDoc(key, doc)
                 },
-                stackContext = StackContext(null, mutableSetOf())
+                stackContext = StackContext(null, mutableSetOf()),
+                pluginRegistry = pluginRegistry
             )
         }
     }

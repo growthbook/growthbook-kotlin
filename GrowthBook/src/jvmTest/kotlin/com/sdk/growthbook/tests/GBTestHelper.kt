@@ -112,7 +112,8 @@ class GBTestHelper {
                     attributes = attributes,
                     stickyBucketAssignmentDocs = stickyBucketAssignmentDocs,
                 ),
-                stackContext = StackContext(null, mutableSetOf())
+                stackContext = StackContext(null, mutableSetOf()),
+                pluginRegistry = null
 
             )
     }

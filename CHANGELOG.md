@@ -9,11 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [7.4.0] - Unreleased
 
 ### Added
-- `GrowthBookSDK.updateAttributes()` / `updateAttributesSync()` — shallow-merge user
-  attributes into the current map (parity with the TS SDK's `updateAttributes`): new
-  keys are added, existing keys overwritten, untouched keys preserved. A `GBNull` value
-  keeps the key with a null value (it is not removed); use `setAttributes()` to replace
-  the whole map.
 - Background polling auto-refresh engine. `GBSDKBuilder.setRefreshInterval(<ms>)` configures a
   periodic network revalidation; start/stop it with `GrowthBookSDK.startPolling()` /
   `stopPolling()`. The poller runs as a coroutine on the SDK's background scope (not a dedicated
@@ -35,6 +30,105 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the revalidating network round fails, so an offline client keeps its stale flags instead of falling
   back to code defaults. Default false fails closed (nothing stale served past the ceiling). The
   freshness ceiling still holds whenever the network is reachable.
+
+### Changed
+- Exponential backoff is now centralised in `BackoffPolicy` (`:Core`) and shared by the polling
+  engine and `suspendFeature()`'s retry loop. Behaviour of `suspendFeature()` is unchanged
+  (initial 1s, doubling, 60s cap, 5 attempts).
+- A `GBCacheRefreshHandler` that throws is now caught and logged instead of propagating. The SDK's
+  background payload-processing scope also carries a `CoroutineExceptionHandler`, so an exception
+  escaping a fire-and-forget fetch (e.g. from a consumer handler) is logged rather than reaching the
+  platform's default uncaught-exception handler — which on Android crashes the app. This matters most
+  under polling, where the fetch path runs repeatedly.
+
+---
+## [7.8.0] - 2026-08-25
+
+### Added
+- Plugin system: `GrowthBookPlugin` interface for observing experiment and feature evaluations
+- Built-in `GrowthBookTrackingPlugin` that batches events and POSTs them to the GrowthBook ingest endpoint
+- `GBSDKBuilder.setPlugins()` to register plugins with the SDK
+- `IGrowthBookSDK` interface extracted from `GrowthBookSDK` (`isOn`, `feature`, `suspendFeature`, `run`, `setAttributes`, `setAttributesSync`), so app code can depend on the abstraction and swap in a test double
+- New `GrowthBookTest` module providing `FakeGrowthBook`, a deterministic in-memory `IGrowthBookSDK` for unit tests (no network or cache). Supports:
+    - Feature overrides — `enable`/`disable`/`setValue`
+    - Fixtures & scenarios — `setFeatures(Map)`, `copy()` to fork a base fixture per test, and `FakeGrowthBook.fromFeaturesJson(...)` to load a real dashboard export. `fromFeaturesJson` rejects encrypted, non-object and feature-less JSON with an explanatory error instead of an opaque decoding failure, and tells a bare map containing a flag named `features` apart from a features response
+    - Honest `GBFeatureResult.source` — `override` for values set from code, `defaultValue` for seeded or loaded ones, `unknownFeature` for keys never configured — so code and hooks that branch on `source` (`setFeatureUsageCallback`, `GrowthBookPlugin`) are exercised against states production produces
+    - Deterministic experiments — `setForcedVariation(key, index)`. Apart from skipping hashing, the returned `GBExperimentResult` matches what the real evaluator builds: the *variation* key, variation meta, and the same out-of-range fallback to the baseline with `inExperiment = false`
+    - Interaction assertions — `wasQueried(id)`, `queriedFeatures()`
+
+
+### Fixed
+- `List<*>.toJsonElement()` in `:Core` now passes an already-serialized `JsonElement` through untouched instead of re-encoding it via `toString()`, matching `Map<*, *>.toJsonElement()`. This prevents double-encoding of nested list values when building request bodies
+- Feature truthiness now matches the reference (TypeScript) SDK, whose `off = !value` is plain JS falsiness over the decoded value. A feature now evaluates as **off** (`on = false`) when its value is JSON `null`, the empty string (`""`), or zero in *any* numeric representation — `0.0`, `0.0f`, `0L`, `-0.0` and `NaN` included. Previously only `null`, `false` and integer `0` were off, because the zero check compared a boxed `Number` against `Int` `0`; a dashboard `defaultValue` of `0.0` was reported as `on` while every other SDK reported `off`. Values that are truthy in JS — the string `"0"`, `Infinity`, and empty arrays/objects — remain `on`
+- An unresolvable feature value (`GBValue.Unknown`) is now **off** as well. It was reported as `on` even though a typed read via `featureValue<T>()` returns `null` for it
+- `featureValue<V>(id)` no longer depends on the declared type of the receiver. The `GrowthBookSDK` member and the new `IGrowthBookSDK` extension now share one implementation, so switching a field from `GrowthBookSDK` to `IGrowthBookSDK` cannot change what a read returns (a member always shadows an extension in Kotlin, and the two bodies had diverged)
+- `featureValue<V>(id)` dropped its hard-coded list of "supported" types, matching the reference (TypeScript) SDK's `getFeatureValue`, which applies no such gate. Requesting a supertype — `featureValue<Any>(id)` and friends — now returns the value instead of `null`. A type mismatch still returns `null`
+- `featureValue<V>(id)` can now read array-valued features, returning them as `GBArray` (symmetric with `GBJson`) — or as `List<GBValue>`, which `GBArray` implements. Arrays previously returned `null` in every case, although the reference SDK's value type (`JSONValue`) includes `Array<JSONValue>`
+- `:Core` now declares `kotlinx-coroutines-core` and `kotlinx-serialization-json` as `api` rather than `implementation` dependencies. Both types show up in its public API — `NetworkDispatcher.consumeSSEConnection` returns a `Flow`, while `TrackingNetworkDispatcher.consumePOSTRequest` and the public `toJsonElement()` helpers take/return `JsonElement` — but `implementation` publishes them into `runtimeElements` only. A consumer writing their own `NetworkDispatcher` or `TrackingNetworkDispatcher` therefore could not name those types without declaring kotlinx in their own build
+
+### Changed
+- **Behavioral change (spec conformance).** Because of the truthiness fix above, `isOn()` and
+  `GBFeatureResult.on` now return `false` — where 7.7.0 returned `true` — for features whose
+  resolved value is JSON `null`, `""`, a non-integer zero (`0.0`, `0L`, `-0.0`, `NaN`) or
+  `GBValue.Unknown`. The flip only ever goes `on → off`, and it brings the Kotlin SDK in line
+  with the reference (TypeScript) SDK; no dashboard change is involved.
+
+  What to audit before upgrading:
+    - Feature flags whose `defaultValue` (or any rule value) is `null`, `""` or a decimal zero,
+      if the app uses `isOn()`/`on` as a "is this configured?" check rather than reading the value
+    - Dashboards and metrics fed by `trackingCallback`, `setFeatureUsageCallback` or a
+      `GrowthBookPlugin`: `GBFeatureResult.on`/`off` are reported through all three, so
+      "share of users with flag on" can shift without any config change
+
+  Targeting is unaffected: prerequisite rules evaluate the feature *value*, not `on`/`off`.
+  Note that the shared cross-SDK spec (`cases.json`) only covers integer `0`, `null` and `false`,
+  so a green spec run does not exercise these cases — see `GBFeatureTruthinessTests`
+
+---
+## [7.7.0] - 2026-08-24
+
+### Changed
+- Feature-flag and experiment targeting is significantly faster for large $in / $nin lists. Targeting conditions are now converted to the internal GBValue tree **once at
+  feature load** instead of on every feature() / run() evaluation, and membership checks against arrays of 16+ items use a lazily-built HashSet (O(1) lookup) instead of a
+  linear scan. On an internal payload with thousand-item $in targeting, isOn() dropped from ~2.2 ms to ~5 µs. Wire JSON, the public condition shape, and evaluation results are
+  unchanged; case-insensitive operators (`$ini` / $nini / `$alli`) keep the existing fold-and-scan path
+
+### Added
+- `decodeAs<T>()` extension on `GBValue` (in `GrowthBookKotlinxSerialization`) to decode feature values into typed models via kotlinx.serialization. The default `Json` is tolerant of unknown keys, so feature config objects carrying fields the caller's model does not declare yet still decode successfully. Pass a custom `Json` to override (e.g. `Json { ignoreUnknownKeys = false }` for strict decoding).
+
+### Fixed
+- `GBArray` now implements value-based `equals`/`hashCode` (converted to a `data class`), so arrays with equal contents compare as equal.
+- $in / $nin against a missing attribute no longer perform a membership lookup with a null value
+
+---
+## [7.6.0] - 2026-08-14
+
+### Added
+- Persistent feature-definition cache is now implemented on **every target** — previously only Android persisted a cache and the rest were no-ops. Apple (iOS/macOS) writes to `<Application Support>/GrowthBook-KMM/` via `NSFileManager`, the JVM to `<user.home>/.growthbook/GrowthBook-KMM/` (fallback `<java.io.tmpdir>`) via `java.io` — both atomic (temp file + rename) and self-healing on corrupt data — and JS and wasmJs to the browser `localStorage` under the `GrowthBook-KMM/` key namespace, self-healing on corrupt data and treating a disabled/unavailable `localStorage` (e.g. private browsing) as a cache miss rather than an initialization failure
+- Remote-evaluation payloads are **not** persisted or served from the cache. The feature cache is keyed only by API key, so serving a remotely-evaluated payload could surface one user's evaluated features to the next after a logout/login on the same key; remote-eval therefore always fetches fresh from the network
+- The `wasmJs` target is now configured for the browser (`browser()` instead of `nodejs()`) so it can persist through `localStorage`
+- New `macosArm64` target for the `GrowthBook`, `Core`, and `GrowthBookKotlinxSerialization` artifacts
+- `GBSDKBuilder.setCachingLayer(GBCachingLayer)` — provide your own cache implementation so GrowthBook persists its cached state through your own storage (e.g. a shared KMP key/value store or encrypted storage) instead of the built-in per-platform cache. Replaces both the feature-definition cache and sticky-bucket storage, and may be called in any order relative to the sticky-bucket setters
+
+---
+## [7.5.0] - 2026-08-14
+
+### Added
+- `GBSDKBuilder.setFeaturesChangeHandler()` — callback notified with a `GBFeaturesDiff` (added / removed / changed flags) on each refresh, so consumers can react to only the flags that changed instead of the whole feature set. Fires on all update paths (SSE / GET / remote-eval) after features are applied, and only when something changed
+
+### Fixed
+- SSE auto-refresh now emits decrypted features to the `Flow` for encrypted-feature projects, instead of a "success with empty data" event (the raw `features` field is null for encrypted payloads)
+- An empty features payload (e.g. all flags deleted in the admin) is now applied as an empty feature set instead of surfacing a spurious refresh error
+
+---
+## [7.4.0] - 2026-08-14
+
+### Added
+- `GrowthBookSDK.updateAttributes()` / `updateAttributesSync()` — shallow-merge user
+  attributes into the current map (parity with the TS SDK's `updateAttributes`): new
+  keys are added, existing keys overwritten, untouched keys preserved. A `GBNull` value
+  keeps the key with a null value (it is not removed); use `setAttributes()` to replace
+  the whole map.
 
 ### Fixed
 - Remote evaluation now re-runs when user attributes or forced features change:
@@ -62,16 +156,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   real JSON. Forced features are also sent as an array of `[key, value]` pairs (matching
   the reference SDK) instead of a JSON object, which the GrowthBook proxy rejected with
   `400 Bad Request`.
-
-### Changed
-- Exponential backoff is now centralised in `BackoffPolicy` (`:Core`) and shared by the polling
-  engine and `suspendFeature()`'s retry loop. Behaviour of `suspendFeature()` is unchanged
-  (initial 1s, doubling, 60s cap, 5 attempts).
-- A `GBCacheRefreshHandler` that throws is now caught and logged instead of propagating. The SDK's
-  background payload-processing scope also carries a `CoroutineExceptionHandler`, so an exception
-  escaping a fire-and-forget fetch (e.g. from a consumer handler) is logged rather than reaching the
-  platform's default uncaught-exception handler — which on Android crashes the app. This matters most
-  under polling, where the fetch path runs repeatedly.
 
 ---
 ## [7.3.0] - 2026-07-20

@@ -3,6 +3,7 @@
 package com.sdk.growthbook.model
 
 import com.sdk.growthbook.GBTrackingCallback
+import com.sdk.growthbook.plugin.tracking.GrowthBookPlugin
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.utils.GBStickyAssignmentsDocument
 import com.sdk.growthbook.utils.GBStickyAttributeKey
@@ -108,8 +109,27 @@ class GBContext(
      */
     val enableLogging: Boolean = false,
 
+    /**
+     * Saved Groups let you target the same group of users across multiple features and experiments.
+     */
     savedGroups: Map<String, GBValue>? = null,
 ) {
+
+    /**
+     * Plugins registered with the GrowthBook. See
+     * [GrowthBookPlugin] and
+     * [com.sdk.growthbook.plugin.tracking.GrowthBookTrackingPlugin].
+     *
+     * Set this before constructing [com.sdk.growthbook.GrowthBookSDK] — normally via
+     * [com.sdk.growthbook.GBSDKBuilder.setPlugins]. The SDK reads it once while initialising its
+     * plugin registry, so assigning afterwards has no effect (the reference JS SDK consumes
+     * `options.plugins` in its constructor the same way).
+     *
+     * Declared here rather than as a constructor parameter: adding a parameter to the public
+     * primary constructor changes its JVM signature, so bytecode compiled against an earlier
+     * release would fail with `NoSuchMethodError`. A property is purely additive.
+     */
+    var plugins: List<GrowthBookPlugin>? = null
 
     // Single source of truth for all cross-thread-shared evaluation inputs.
     private val state = AtomicReference(

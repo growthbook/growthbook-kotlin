@@ -6,6 +6,7 @@ import com.sdk.growthbook.utils.SSEConnectionController
 import com.sdk.growthbook.utils.SSEConnectionState
 import com.sdk.growthbook.utils.SSERetryManager
 import com.sdk.growthbook.utils.readSse
+import com.sdk.growthbook.utils.toJsonElement
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.ClientRequestException
@@ -34,10 +35,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 import kotlinx.io.IOException
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Creates default Ktor HTTP client configured for:
@@ -86,7 +84,7 @@ class GBNetworkDispatcherKtor(
     private val maxRetries: Int = 10,
     private val initialRetryDelayMs: Long = 1000L,
     private val maxRetryDelayMs: Long = 30_000L
-) : NetworkDispatcherWithNotModified {
+) : NetworkDispatcherWithNotModified, TrackingNetworkDispatcher {
 
     // Regex to match the desired URL pattern: "/api/features/<clientKey>"
     private val featuresPathPattern = Regex(".*/api/features/[^/]+")
@@ -148,6 +146,11 @@ class GBNetworkDispatcherKtor(
                     }
                 } catch (exception: Exception) {
                     onError(exception)
+                } catch (throwable: Throwable) {
+                    // On Kotlin/JS & Kotlin/Wasm a Ktor failure can be a Throwable that is NOT a
+                    // kotlin.Exception ("Failed to fetch"); route it to onError instead of letting
+                    // it escape as an uncaught coroutine error.
+                    onError(throwable)
                 }
             } catch (clientRequestException: ClientRequestException) {
                 onError(clientRequestException)
@@ -155,8 +158,10 @@ class GBNetworkDispatcherKtor(
                 onError(serverResponseException)
             } catch (ioException: IOException) {
                 onError(ioException)
-            } catch (exception: Exception) { // for the case if something was missed
+            } catch (exception: Exception) {
                 onError(exception)
+            } catch (throwable: Throwable) { // for the case if something was missed
+                onError(throwable)
             }
         }
     }
@@ -317,16 +322,20 @@ class GBNetworkDispatcherKtor(
             // for every GET/POST/SSE. `.use` closes it after the first POST, breaking all later
             // requests and the SSE stream. Matches the GET path, which also reuses `client`.
             try {
+                val payload = bodyParams.toJsonElement()
+                if (enableLogging) {
+                    // Size only, never the body itself: a remote-eval POST carries the user's
+                    // attributes — personal data that must not end up in logcat/stdout on a
+                    // production device. The SSE path logs a byte count for the same reason.
+                    println("GrowthBook: POST $url (${payload.toString().length} chars)")
+                }
                 val response = client.post(url) {
                     headers {
                         append("Content-Type", "application/json")
                         append("Accept", "application/json")
                     }
                     contentType(ContentType.Application.Json)
-                    setBody(bodyParams.toJsonElement())
-                    if (enableLogging) {
-                        println("body = $body")
-                    }
+                    setBody(payload)
                 }
                 if (response.status.value in 200..299) {
                     onSuccess(response.body())
@@ -343,6 +352,70 @@ class GBNetworkDispatcherKtor(
                     println("exception $e")
                 }
                 onError(e)
+            } catch (t: Throwable) {
+                // On Kotlin/JS & Kotlin/Wasm a Ktor failure can be a Throwable that is NOT a
+                // kotlin.Exception ("Failed to fetch"); route it to onError instead of letting
+                // it escape as an uncaught coroutine error. Mirrors the GET path.
+                if (enableLogging) {
+                    println("exception $t")
+                }
+                onError(t)
+            }
+        }
+    }
+
+    override fun consumePOSTRequest(
+        url: String,
+        headers: Map<String, String>,
+        body: JsonElement,
+        onSuccess: (String) -> Unit,
+        onError: (Throwable) -> Unit
+    ) {
+        CoroutineScope(PlatformDependentIODispatcher).launch {
+            try {
+                // Honour the caller's Content-Type (the tracking plugin sends text/plain, matching
+                // JS/Python); default to application/json when none is supplied.
+                val contentTypeValue = headers["Content-Type"] ?: ContentType.Application.Json.toString()
+                val serializedBody = body.toString()
+                if (enableLogging) {
+                    // Size only, never the body itself: tracking events carry `context_json` with
+                    // the user's attributes plus `user_id`/`device_id`/`session_id` — personal data
+                    // that must not end up in logcat/stdout on a production device.
+                    println("GrowthBook: POST $url (${serializedBody.length} chars)")
+                }
+                val response = client.post(url) {
+                    headers {
+                        append("Accept", "application/json")
+                        headers.forEach { (key, value) ->
+                            if (!key.equals("Content-Type", ignoreCase = true)) append(key, value)
+                        }
+                    }
+                    contentType(ContentType.parse(contentTypeValue))
+                    setBody(serializedBody)
+                }
+                if (response.status.value in 200..299) {
+                    onSuccess(response.body())
+                } else {
+                    onError(
+                        Exception(
+                            "Response not successful status code is : ${response.status.value} " +
+                                "and description : ${response.status.description}"
+                        )
+                    )
+                }
+            } catch (e: Exception) {
+                if (enableLogging) {
+                    println("exception $e")
+                }
+                onError(e)
+            } catch (t: Throwable) {
+                // On Kotlin/JS & Kotlin/Wasm a Ktor failure can be a Throwable that is NOT a
+                // kotlin.Exception ("Failed to fetch"); route it to onError instead of letting
+                // it escape as an uncaught coroutine error. Mirrors the GET path.
+                if (enableLogging) {
+                    println("exception $t")
+                }
+                onError(t)
             }
         }
     }
@@ -360,40 +433,4 @@ class GBNetworkDispatcherKtor(
             url.parameters.remove(key)
             url.parameters.append(key, it)
         } ?: Unit
-}
-
-internal fun Map<*, *>.toJsonElement(): JsonElement {
-    val map: MutableMap<String, JsonElement> = mutableMapOf()
-    this.forEach {
-        val key = it.key as? String ?: return@forEach
-        val value = it.value ?: return@forEach
-        map[key] = when (value) {
-            // Pass already-serialized JsonElement through untouched. Must precede the Map/List
-            // branches: JsonObject is a Map and JsonArray is a List, so those branches would
-            // otherwise re-encode their JsonPrimitive contents via toString() and double-quote them.
-            is JsonElement -> value
-            is Map<*, *> -> (value).toJsonElement()
-            is List<*> -> value.toJsonElement()
-            is Boolean -> JsonPrimitive(value)
-            is Number -> JsonPrimitive(value)
-            else -> JsonPrimitive(value.toString())
-        }
-    }
-    return JsonObject(map)
-}
-
-internal fun List<*>.toJsonElement(): JsonElement {
-    val list: MutableList<JsonElement> = mutableListOf()
-    this.forEach {
-        val value = it ?: return@forEach
-        when (value) {
-            is JsonElement -> list.add(value)
-            is Map<*, *> -> list.add((value).toJsonElement())
-            is List<*> -> list.add(value.toJsonElement())
-            is Boolean -> list.add(JsonPrimitive(value))
-            is Number -> list.add(JsonPrimitive(value))
-            else -> list.add(JsonPrimitive(value.toString()))
-        }
-    }
-    return JsonArray(list)
 }

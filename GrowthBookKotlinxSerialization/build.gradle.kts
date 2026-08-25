@@ -3,12 +3,13 @@ import org.jetbrains.kotlin.gradle.targets.js.yarn.yarn
 
 plugins {
     kotlin("multiplatform")
+    kotlin("plugin.serialization")
     id("com.android.library")
     id("org.jetbrains.dokka") version "1.9.10"
 }
 
 group = "io.growthbook.sdk"
-version = "1.0.0"
+version = "1.2.0"
 
 kotlin {
     androidTarget {
@@ -30,17 +31,24 @@ kotlin {
 
     jvm()
     wasmJs {
-        nodejs()
+        browser()
     }
     iosX64()
     iosArm64()
     iosSimulatorArm64()
+    macosArm64()
 
     sourceSets {
         val commonMain by getting {
             dependencies {
                 implementation(project(":Core"))
                 api(libs.kotlinx.serialization.json)
+            }
+        }
+
+        val jvmTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
             }
         }
     }
@@ -109,7 +117,7 @@ publishing {
             artifact(javadocJar)
             pom {
                 name.set("kotlin")
-                description.set("Core module of GrowthBook Kotlin SDK")
+                description.set("Serialization module of GrowthBook Kotlin SDK")
                 licenses {
                     license {
                         name.set("MIT")

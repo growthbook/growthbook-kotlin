@@ -23,6 +23,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
@@ -32,6 +33,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.resume
@@ -241,10 +243,26 @@ internal class FeaturesViewModel(
         refreshMode.store(RefreshMode.SSE)
         poller.stop()
         sseController.start()
-        return dataSource.autoRefresh(
-            success = { coroutineScope.launch { handleNetworkModel(it) } },
-            failure = { delegate.featuresFetchFailed(GBError(it), isRemote = true) }
-        )
+        return dataSource.autoRefreshRaw().transform { resource ->
+            when (resource) {
+                is Resource.Error -> {
+                    emit(resource)
+                    dispatch(FetchOutcome.Failed(GBError(resource.exception), source = Source.NETWORK))
+                }
+                is Resource.Success -> {
+                    // Process the payload on coroutineScope (platform IO) like the network GET /
+                    // remote-eval paths, so decode + sticky-bucket refresh + feature application
+                    // never run on the collector's thread (e.g. Dispatchers.Main) and are torn down
+                    // by close(). await() resumes on the collector coroutine, so emit stays
+                    // flow-safe, and we still emit the same FetchOutcome the pipeline dispatched.
+                    val outcome = coroutineScope.async { handleNetworkModel(resource.data) }.await()
+                    when (outcome) {
+                        is FetchOutcome.Ready -> emit(Resource.Success(outcome.payload.features))
+                        else -> emit(Resource.Error(Exception("Failed to decode features payload")))
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -385,10 +403,24 @@ internal class FeaturesViewModel(
                             // Check the generation and apply the payload atomically under applyMutex:
                             // the check must hold until handleNetworkModel finishes, or a newer round
                             // could apply in between and then be overwritten by this (older) one.
+                            //
+                            // This up-front check is necessary but NOT sufficient: handleNetworkModel
+                            // suspends (onPayloadReady's sticky-bucket refresh) and the generation is
+                            // bumped outside applyMutex (incrementAndFetch in runNetworkRound /
+                            // fetchFromNetwork), so a newer round can supersede this one *during* that
+                            // suspend. handleNetworkModel therefore re-validates the generation at the
+                            // final commit point and returns false when it declined to commit — mapped
+                            // to Superseded here so a stale round never overwrites nor reports Success.
                             applyMutex.withLock {
                                 if (generation == remoteEvalGeneration.load()) {
-                                    handleNetworkModel(it.data)
-                                    resumeOnce(FetchResult.Success)
+                                    // persistToCache = false: the remote-eval cache is keyed only by API
+                                    // key (FeatureCache_<apiKey>), so persisting this user's evaluated
+                                    // payload would let it leak to the next user on the same key. Mirror
+                                    // the read-side bypass in serveCache — remote-eval never touches the cache.
+                                    val outcome = handleNetworkModel(it.data, generation, persistToCache = false)
+                                    resumeOnce(
+                                        if (outcome != null) FetchResult.Success else FetchResult.Superseded
+                                    )
                                 } else {
                                     // Stale: payload not applied → do not report Success. Always resume
                                     // (no leak / no 30s timeout hang), but with a distinct result.
@@ -470,6 +502,15 @@ internal class FeaturesViewModel(
         }
 
     private fun serveCache(policy: FetchPolicy): CacheOutcome {
+        // Remote-eval payloads are evaluated server-side against the CURRENT attributes/forced
+        // variations, but our cache is keyed only by API key (FeatureCache_<apiKey>). Serving that
+        // entry would let a previous user's evaluated payload leak to the next one after a
+        // logout/login on the same key. Unlike JS/Python (which key the remote-eval cache by
+        // selected attributes + forced variations + URL), this single-user KMM client bypasses the
+        // cache entirely in remote-eval mode and always hits the network. See also the write-side
+        // bypass in [handleNetworkModel].
+        if (remoteEval) return CacheOutcome.ServedStaleOrMiss
+
         val entry = runCatching { readCache() }.getOrElse {
             GB.error("FeaturesViewModel: cache read failed", it)
             delegate.featuresFetchFailed(error = GBError(it), isRemote = false)
@@ -477,6 +518,7 @@ internal class FeaturesViewModel(
         } ?: return CacheOutcome.ServedStaleOrMiss
 
         val (model, cachedAt) = entry
+        // remoteEval already returned above, so this path is local-eval only.
         val decoded = decoder.decode(model)
 
         // Freshness gating applies only to plain CacheFirst GETs; remote-eval and ForceNetwork always
@@ -491,11 +533,15 @@ internal class FeaturesViewModel(
         if (zone == CacheZone.EXPIRED) return CacheOutcome.Expired(decoded)
 
         val fresh = zone == CacheZone.FRESH
-        val outcome = outcomeOf(payload = decoded, source = Source.CACHE, authoritative = fresh)
+
+        val outcome = outcomeOf(payload = decoder.decode(m = model), source = Source.CACHE, authoritative = fresh)
         dispatch(outcome = outcome)
 
-        // Skip the network only for a FRESH cache that actually decoded to a usable payload; a
-        // fresh-but-undecodable/empty cache degrades to FetchOutcome.Failed above and falls through.
+        // Only treat the cache as authoritative (and skip the network) when it actually
+        // yielded a usable payload. A fresh-but-undecodable/empty cache degrades to
+        // FetchOutcome.Failed above (both features and savedGroups null) — returning false
+        // then lets fetchFeatures() fall through to the network instead of silently serving
+        // nothing for the whole freshness window.
         return if (fresh && outcome is FetchOutcome.Ready) CacheOutcome.ServedFresh else CacheOutcome.ServedStaleOrMiss
     }
 
@@ -511,8 +557,27 @@ internal class FeaturesViewModel(
         coroutineScope.launch { performNetworkRound(payload, generation, onErrorFallback) }
     }
 
-    private suspend fun handleNetworkModel(model: FeaturesDataModel) {
-        try {
+    /**
+     * Applies a freshly fetched payload: decode/decrypt → onPayloadReady (sticky-bucket refresh) →
+     * persist to cache → dispatch the resulting [FetchOutcome] to [delegate]. Returns that same
+     * outcome so the SSE [autoRefreshFeatures] flow can emit from the single authoritative verdict
+     * instead of decoding a second time.
+     *
+     * @param generation the remote-eval round token, or null for the non-remote GET / SSE path (no fence).
+     * @param persistToCache whether a successful payload may be written to [cachingLayer]. False for
+     *   remote-eval responses: they are evaluated per current attributes while the cache is keyed only
+     *   by API key, so persisting one would leak it to the next user on the same key (see the
+     *   read-side bypass in [serveCache]).
+     * @return the dispatched [FetchOutcome] (Ready or Failed), or null when a newer remote-eval
+     *   generation superseded this round during the onPayloadReady suspend — the caller then maps
+     *   the round to [FetchResult.Superseded] and nothing is committed.
+     */
+    private suspend fun handleNetworkModel(
+        model: FeaturesDataModel,
+        generation: Long? = null,
+        persistToCache: Boolean = true
+    ): FetchOutcome? {
+       return try {
             // Decode/decrypt the payload BEFORE the sticky-bucket refresh, mirroring the reference
             // TS SDK (decryptPayload -> refreshStickyBuckets). For an encrypted payload the raw
             // model has features == null, so deriveStickyBucketIdentifierAttributes would fall back
@@ -527,7 +592,18 @@ internal class FeaturesViewModel(
                     encryptedSavedGroups = null,
                 )
             )
-            if (cachingEnabled) {
+
+            // Final payload-commit fence. onPayloadReady above suspends (sticky-bucket refresh) and
+            // the generation is bumped outside applyMutex (incrementAndFetch), so a newer round may
+            // have superseded us while we were suspended. Bail before writing the cache / committing
+            // features / reporting Success, so a stale round never overwrites the fresher state nor
+            // reports Success. The newer round (already queued on applyMutex or still in flight)
+            // commits its own payload. Skipped on the non-remote GET path (generation == null).
+            if (generation != null && generation != remoteEvalGeneration.load()) {
+                return null
+            }
+
+            if (cachingEnabled && persistToCache) {
                 runCatching { writeCache(model) }
                     .onFailure {
                         GB.error(
@@ -537,19 +613,14 @@ internal class FeaturesViewModel(
                     }
             }
 
-            dispatch(
-                outcome = outcomeOf(
-                    payload = decoded,
-                    source = Source.NETWORK
-                )
-            )
+            outcomeOf(payload = decoded, source = Source.NETWORK).also { dispatch(it) }
         } catch (error: Throwable) {
             GB.error(
                 errorMessage = "FeaturesViewModel: failed to process remote features payload",
                 throwable = error
             )
 
-            delegate.featuresFetchFailed(error = GBError(error), isRemote = true)
+            FetchOutcome.Failed(GBError(error), source = Source.NETWORK).also { dispatch(it) }
         }
     }
 

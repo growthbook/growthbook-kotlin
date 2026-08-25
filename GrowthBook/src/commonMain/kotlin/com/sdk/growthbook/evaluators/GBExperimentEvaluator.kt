@@ -26,7 +26,8 @@ internal class GBExperimentEvaluator(
     fun evaluateExperiment(
         experiment: GBExperiment,
         attributeOverrides: Map<String, GBValue>,
-        featureId: String? = null
+        featureId: String? = null,
+        conditionObj: GBJson? = experiment.conditionGB,
     ): GBExperimentResult {
 
         /**
@@ -177,13 +178,11 @@ internal class GBExperimentEvaluator(
              * 9. If experiment.condition is set and the condition evaluates to false,
              * return immediately (not in experiment, variationId 0)
              */
-            if (experiment.condition != null) {
+            if (conditionObj != null) {
                 val attr = getAttributes(
                     attributeOverrides = attributeOverrides,
                     attributes = evaluationContext.userContext.attributes,
                 )
-                val conditionObj: GBJson = experiment.condition!!.let(GBValue::from) as? GBJson
-                    ?: GBJson(emptyMap())
                 val evaluationResult = GBConditionEvaluator().evalCondition(
                     attr, conditionObj,
                     evaluationContext.savedGroups,
@@ -420,6 +419,11 @@ internal class GBExperimentEvaluator(
             } catch (e: Exception) {
                 GB.error("ExperimentEvaluator: trackingCallback exception for '${experiment.key}'", e)
             }
+            evaluationContext.pluginRegistry?.fireExperimentViewed(
+                experiment,
+                result,
+                evaluationContext.userContext.attributes
+            )
         }
 
         /**
