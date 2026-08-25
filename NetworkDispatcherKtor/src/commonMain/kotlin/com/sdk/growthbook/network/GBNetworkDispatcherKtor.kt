@@ -348,6 +348,14 @@ class GBNetworkDispatcherKtor(
                     println("exception $e")
                 }
                 onError(e)
+            } catch (t: Throwable) {
+                // On Kotlin/JS & Kotlin/Wasm a Ktor failure can be a Throwable that is NOT a
+                // kotlin.Exception ("Failed to fetch"); route it to onError instead of letting
+                // it escape as an uncaught coroutine error. Mirrors the GET path.
+                if (enableLogging) {
+                    println("exception $t")
+                }
+                onError(t)
             }
         }
     }
@@ -392,6 +400,14 @@ class GBNetworkDispatcherKtor(
                     println("exception $e")
                 }
                 onError(e)
+            } catch (t: Throwable) {
+                // On Kotlin/JS & Kotlin/Wasm a Ktor failure can be a Throwable that is NOT a
+                // kotlin.Exception ("Failed to fetch"); route it to onError instead of letting
+                // it escape as an uncaught coroutine error. Mirrors the GET path.
+                if (enableLogging) {
+                    println("exception $t")
+                }
+                onError(t)
             }
         }
     }
