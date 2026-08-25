@@ -1,6 +1,5 @@
 package com.sdk.growthbook.plugin.tracking
 
-import com.sdk.growthbook.PlatformDependentIODispatcher
 import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
@@ -34,8 +33,7 @@ import kotlin.concurrent.Volatile
  */
 class GrowthBookTrackingPlugin(
     private val config: TrackingPluginConfig,
-    private val coroutineScope: CoroutineScope = CoroutineScope(
-        PlatformDependentIODispatcher.limitedParallelism(1))
+    private val coroutineScope: CoroutineScope = CoroutineScope(TrackingDispatcher)
 ) : GrowthBookPlugin {
 
     private val disabled = config.clientKey.isNullOrEmpty()

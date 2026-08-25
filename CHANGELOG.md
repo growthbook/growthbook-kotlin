@@ -6,19 +6,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
-
-## [7.8.0] - 2026-08-24
+## [7.8.0] - 2026-08-25
 
 ### Added
 - Plugin system: `GrowthBookPlugin` interface for observing experiment and feature evaluations
 - Built-in `GrowthBookTrackingPlugin` that batches events and POSTs them to the GrowthBook ingest endpoint
 - `GBSDKBuilder.setPlugins()` to register plugins with the SDK
+- `IGrowthBookSDK` interface extracted from `GrowthBookSDK` (`isOn`, `feature`, `suspendFeature`, `run`, `setAttributes`, `setAttributesSync`), so app code can depend on the abstraction and swap in a test double
+- New `GrowthBookTest` module providing `FakeGrowthBook`, a deterministic in-memory `IGrowthBookSDK` for unit tests (no network or cache). Supports:
+    - Feature overrides — `enable`/`disable`/`setValue`
+    - Fixtures & scenarios — `setFeatures(Map)`, `copy()` to fork a base fixture per test, and `FakeGrowthBook.fromFeaturesJson(...)` to load a real dashboard export. `fromFeaturesJson` rejects encrypted, non-object and feature-less JSON with an explanatory error instead of an opaque decoding failure, and tells a bare map containing a flag named `features` apart from a features response
+    - Honest `GBFeatureResult.source` — `override` for values set from code, `defaultValue` for seeded or loaded ones, `unknownFeature` for keys never configured — so code and hooks that branch on `source` (`setFeatureUsageCallback`, `GrowthBookPlugin`) are exercised against states production produces
+    - Deterministic experiments — `setForcedVariation(key, index)`. Apart from skipping hashing, the returned `GBExperimentResult` matches what the real evaluator builds: the *variation* key, variation meta, and the same out-of-range fallback to the baseline with `inExperiment = false`
+    - Interaction assertions — `wasQueried(id)`, `queriedFeatures()`
+
 
 ### Fixed
 - `List<*>.toJsonElement()` in `:Core` now passes an already-serialized `JsonElement` through untouched instead of re-encoding it via `toString()`, matching `Map<*, *>.toJsonElement()`. This prevents double-encoding of nested list values when building request bodies
+- Feature truthiness now matches the reference (TypeScript) SDK, whose `off = !value` is plain JS falsiness over the decoded value. A feature now evaluates as **off** (`on = false`) when its value is JSON `null`, the empty string (`""`), or zero in *any* numeric representation — `0.0`, `0.0f`, `0L`, `-0.0` and `NaN` included. Previously only `null`, `false` and integer `0` were off, because the zero check compared a boxed `Number` against `Int` `0`; a dashboard `defaultValue` of `0.0` was reported as `on` while every other SDK reported `off`. Values that are truthy in JS — the string `"0"`, `Infinity`, and empty arrays/objects — remain `on`
+- An unresolvable feature value (`GBValue.Unknown`) is now **off** as well. It was reported as `on` even though a typed read via `featureValue<T>()` returns `null` for it
+- `featureValue<V>(id)` no longer depends on the declared type of the receiver. The `GrowthBookSDK` member and the new `IGrowthBookSDK` extension now share one implementation, so switching a field from `GrowthBookSDK` to `IGrowthBookSDK` cannot change what a read returns (a member always shadows an extension in Kotlin, and the two bodies had diverged)
+- `featureValue<V>(id)` dropped its hard-coded list of "supported" types, matching the reference (TypeScript) SDK's `getFeatureValue`, which applies no such gate. Requesting a supertype — `featureValue<Any>(id)` and friends — now returns the value instead of `null`. A type mismatch still returns `null`
+- `featureValue<V>(id)` can now read array-valued features, returning them as `GBArray` (symmetric with `GBJson`) — or as `List<GBValue>`, which `GBArray` implements. Arrays previously returned `null` in every case, although the reference SDK's value type (`JSONValue`) includes `Array<JSONValue>`
+- `:Core` now declares `kotlinx-coroutines-core` and `kotlinx-serialization-json` as `api` rather than `implementation` dependencies. Both types show up in its public API — `NetworkDispatcher.consumeSSEConnection` returns a `Flow`, while `TrackingNetworkDispatcher.consumePOSTRequest` and the public `toJsonElement()` helpers take/return `JsonElement` — but `implementation` publishes them into `runtimeElements` only. A consumer writing their own `NetworkDispatcher` or `TrackingNetworkDispatcher` therefore could not name those types without declaring kotlinx in their own build
+
+### Changed
+- **Behavioral change (spec conformance).** Because of the truthiness fix above, `isOn()` and
+  `GBFeatureResult.on` now return `false` — where 7.7.0 returned `true` — for features whose
+  resolved value is JSON `null`, `""`, a non-integer zero (`0.0`, `0L`, `-0.0`, `NaN`) or
+  `GBValue.Unknown`. The flip only ever goes `on → off`, and it brings the Kotlin SDK in line
+  with the reference (TypeScript) SDK; no dashboard change is involved.
+
+  What to audit before upgrading:
+    - Feature flags whose `defaultValue` (or any rule value) is `null`, `""` or a decimal zero,
+      if the app uses `isOn()`/`on` as a "is this configured?" check rather than reading the value
+    - Dashboards and metrics fed by `trackingCallback`, `setFeatureUsageCallback` or a
+      `GrowthBookPlugin`: `GBFeatureResult.on`/`off` are reported through all three, so
+      "share of users with flag on" can shift without any config change
+
+  Targeting is unaffected: prerequisite rules evaluate the feature *value*, not `on`/`off`.
+  Note that the shared cross-SDK spec (`cases.json`) only covers integer `0`, `null` and `false`,
+  so a green spec run does not exercise these cases — see `GBFeatureTruthinessTests`
 
 ---
-
 ## [7.7.0] - 2026-08-24
 
 ### Changed

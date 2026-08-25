@@ -89,34 +89,45 @@ class GBNetworkDispatcherOkHttp(
         onError: (Throwable) -> Unit
     ) {
         CoroutineScope(PlatformDependentIODispatcher).launch {
-            val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
-            val requestBody: RequestBody =
-                bodyParams.toJsonElement().toString().toRequestBody(mediaType)
+            try {
+                val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
+                val requestBody: RequestBody =
+                    bodyParams.toJsonElement().toString().toRequestBody(mediaType)
 
-            val postRequest = Request.Builder()
-                .url(url)
-                .addHeader("Content-Type", "application/json")
-                .addHeader("Accept", "application/json")
-                .post(requestBody)
-                .build()
+                val postRequest = Request.Builder()
+                    .url(url)
+                    .addHeader("Content-Type", "application/json")
+                    .addHeader("Accept", "application/json")
+                    .post(requestBody)
+                    .build()
 
-            client.newCall(postRequest).enqueue(object : Callback {
-                override fun onFailure(call: Call, e: IOException) {
-                    onError(e)
-                }
-
-                override fun onResponse(call: Call, response: Response) {
-                    response.use { resp ->
-                        if (!resp.isSuccessful || resp.code !in 200..299) {
-                            onError(IOException("Unexpected code $resp"))
-                            return
-                        }
-                        resp.body?.string()?.let { body ->
-                            onSuccess(body)
-                        } ?: onError(IOException("Response body is null: ${resp.body}"))
+                client.newCall(postRequest).enqueue(object : Callback {
+                    override fun onFailure(call: Call, e: IOException) {
+                        onError(e)
                     }
+
+                    override fun onResponse(call: Call, response: Response) {
+                        response.use { resp ->
+                            if (!resp.isSuccessful || resp.code !in 200..299) {
+                                onError(IOException("Unexpected code $resp"))
+                                return
+                            }
+                            resp.body?.string()?.let { body ->
+                                onSuccess(body)
+                            } ?: onError(IOException("Response body is null: ${resp.body}"))
+                        }
+                    }
+                })
+            } catch (t: Throwable) {
+                // Building the request can throw before the call is ever enqueued — a malformed
+                // `url` (no scheme) makes Request.Builder.url() raise IllegalArgumentException.
+                // Inside launch, not around it: `launch` returns before the body runs, so a `try`
+                // around the call would never see this.
+                if (enableLogging) {
+                    println("exception: $t")
                 }
-            })
+                onError(t)
+            }
         }
     }
 
@@ -331,38 +342,48 @@ class GBNetworkDispatcherOkHttp(
         onError: (Throwable) -> Unit
     ) {
         CoroutineScope(PlatformDependentIODispatcher).launch {
-            // Honour the caller's Content-Type (the tracking plugin sends text/plain, matching
-            // JS/Python); default to application/json when none is supplied.
-            val contentTypeValue = headers["Content-Type"] ?: "application/json; charset=utf-8"
-            val mediaType = contentTypeValue.toMediaTypeOrNull()
-            val requestBody: RequestBody = body.toString().toRequestBody(mediaType)
-            val postRequest = Request.Builder()
-                .url(url)
-                .addHeader("Accept", "application/json")
-                .apply {
-                    headers.forEach { (key, value) ->
-                        if (!key.equals("Content-Type", ignoreCase = true)) addHeader(key, value)
-                    }
-                }
-                .post(requestBody)
-                .build()
-            client.newCall(postRequest).enqueue(object : Callback {
-                override fun onFailure(call: Call, e: IOException) {
-                    onError(e)
-                }
-
-                override fun onResponse(call: Call, response: Response) {
-                    response.use { resp ->
-                        if (!resp.isSuccessful || resp.code !in 200..299) {
-                            val errorBody = resp.body?.string() ?: ""
-                            onError(IOException("Unexpected code ${resp.code}: $errorBody"))
-                            return
+            try {
+                // Honour the caller's Content-Type (the tracking plugin sends text/plain, matching
+                // JS/Python); default to application/json when none is supplied.
+                val contentTypeValue = headers["Content-Type"] ?: "application/json; charset=utf-8"
+                val mediaType = contentTypeValue.toMediaTypeOrNull()
+                val requestBody: RequestBody = body.toString().toRequestBody(mediaType)
+                val postRequest = Request.Builder()
+                    .url(url)
+                    .addHeader("Accept", "application/json")
+                    .apply {
+                        headers.forEach { (key, value) ->
+                            if (!key.equals("Content-Type", ignoreCase = true)) addHeader(
+                                key,
+                                value
+                            )
                         }
-                        resp.body?.string()?.let { onSuccess(it) }
-                            ?: onError(IOException("Response body is null"))
                     }
+                    .post(requestBody)
+                    .build()
+                client.newCall(postRequest).enqueue(object : Callback {
+                    override fun onFailure(call: Call, e: IOException) {
+                        onError(e)
+                    }
+
+                    override fun onResponse(call: Call, response: Response) {
+                        response.use { resp ->
+                            if (!resp.isSuccessful || resp.code !in 200..299) {
+                                val errorBody = resp.body?.string() ?: ""
+                                onError(IOException("Unexpected code ${resp.code}: $errorBody"))
+                                return
+                            }
+                            resp.body?.string()?.let { onSuccess(it) }
+                                ?: onError(IOException("Response body is null"))
+                        }
+                    }
+                })
+            } catch (t: Throwable) {
+                if (enableLogging) {
+                    println("exception: $t")
                 }
-            })
+                onError(t)
+            }
         }
     }
 

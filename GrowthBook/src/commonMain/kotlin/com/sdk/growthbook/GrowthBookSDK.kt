@@ -26,12 +26,9 @@ import com.sdk.growthbook.model.GBJson
 import com.sdk.growthbook.model.GBNull
 import com.sdk.growthbook.model.GBArray
 import com.sdk.growthbook.model.GBValue
-import com.sdk.growthbook.model.GBNumber
-import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBOptions
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.EvalSnapshot
-import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBExperimentResult
@@ -83,7 +80,7 @@ class GrowthBookSDK internal constructor(
     // Adding this to the public constructor would break binary compatibility,
     // so the public constructor below preserves the pre-7.4.0 signature and delegates here.
     cachingLayer: GBCachingLayer?
-    ) : FeaturesFlowDelegate {
+    ) : FeaturesFlowDelegate, IGrowthBookSDK {
 
     /**
      * Public constructor, kept binary-compatible with pre-7.3.0 releases. To set a cache
@@ -337,7 +334,7 @@ class GrowthBookSDK internal constructor(
      *
      * @returns a [GBFeatureResult] object
      */
-    suspend fun suspendFeature(id: String): GBFeatureResult {
+    override suspend fun suspendFeature(id: String): GBFeatureResult {
         var attempt = 0
         var delaysMs = INITIAL_RETRY_DELAY_MILLIS
 
@@ -380,7 +377,7 @@ class GrowthBookSDK internal constructor(
      * the first fetch completes — returns default/unknown values. To guarantee the fetched payload
      * (and sticky-bucket assignments) are loaded before evaluating, use [suspendFeature] instead.
      */
-    fun feature(id: String): GBFeatureResult {
+    override fun feature(id: String): GBFeatureResult {
         // Single atomic snapshot for every evaluation input (attributes, forced features/variations,
         // attribute overrides, sticky docs), so a concurrent setter can't yield a torn mix.
         val snapshot = gbContext.evalSnapshot()
@@ -411,11 +408,13 @@ class GrowthBookSDK internal constructor(
     /**
      * The featureValue method takes a string argument,
      * which is the unique identifier, and the type of the accessed feature.
-     * The supported types of accessed features are:
-     * [Boolean], [String], [Number], [Short],
-     * [Int], [Long], [Float], [Double], [GBJson]
      *
-     * @returns a feature value typed with specified type
+     * Boolean, string and numeric values are returned unwrapped ([Boolean], [String] and the
+     * concrete [Number] subtype the payload decoded to); JSON objects and arrays are returned as
+     * [GBJson] and [GBArray].
+     *
+     * @returns the feature value typed as [V], or null if the feature has no value or its value
+     * is not a [V]
      */
     inline fun <reified V> featureValue(id: String): V? {
         return extractFeatureValue(id)
@@ -425,14 +424,14 @@ class GrowthBookSDK internal constructor(
      * The isOn method takes a single string argument,
      * which is the unique identifier for the feature and returns the feature state on/off
      */
-    fun isOn(featureId: String): Boolean {
+    override fun isOn(featureId: String): Boolean {
         return feature(id = featureId).on
     }
 
     /**
      * The run method takes an Experiment object and returns an ExperimentResult
      */
-    fun run(experiment: GBExperiment): GBExperimentResult {
+    override fun run(experiment: GBExperiment): GBExperimentResult {
         val snapshot = gbContext.evalSnapshot()
         val evalContext = createEvaluationContext(snapshot)
         val evaluator = GBExperimentEvaluator(
@@ -457,7 +456,7 @@ class GrowthBookSDK internal constructor(
      * If you use Sticky Bucketing and need to evaluate experiments immediately
      * after setting attributes, use [setAttributesSync] instead.
      */
-    fun setAttributes(attributes: Map<String, GBValue>) {
+    override fun setAttributes(attributes: Map<String, GBValue>) {
         // Single atomic update so a concurrent feature()/run() never sees the new attributes paired
         // with the previous user's stale sticky docs (the docs are repopulated by the refresh below).
         gbContext.setAttributesClearingStickyDocs(attributes)
@@ -500,7 +499,7 @@ class GrowthBookSDK internal constructor(
      * }
      * ```
      */
-    suspend fun setAttributesSync(attributes: Map<String, GBValue>) {
+    override suspend fun setAttributesSync(attributes: Map<String, GBValue>) {
         gbContext.attributes = attributes
 
         if (gbContext.stickyBucketService != null) {
@@ -631,32 +630,14 @@ class GrowthBookSDK internal constructor(
     }
 
     /**
-     * Helper method for reified feature and featureValue
+     * Helper method for reified feature and featureValue.
+     *
+     * Delegates to the shared [extractValue] so this member and the
+     * [IGrowthBookSDK.featureValue] extension can never disagree — see the note there.
      */
     @PublishedApi
-    internal inline fun <reified V> extractFeatureValue(id: String): V? {
-        val listOfSupportedTypes = listOf(
-            Boolean::class, String::class,
-            Number::class, Short::class, Int::class,
-            Long::class, Float::class, Double::class,
-            GBJson::class,
-        )
-        if (V::class !in listOfSupportedTypes) {
-            return null
-        }
-
-        val gbFeatureResult: GBFeatureResult = this.feature(id)
-        return when (val gbResultValue = gbFeatureResult.gbValue) {
-            is GBNull -> null
-            is GBBoolean -> gbResultValue.value as? V
-            is GBString -> gbResultValue.value as? V
-            is GBNumber -> gbResultValue.value as? V
-            is GBJson -> gbResultValue as? V
-            is GBValue.Unknown -> null
-            is GBArray -> null
-            null -> null
-        }
-    }
+    internal inline fun <reified V> extractFeatureValue(id: String): V? =
+        this.feature(id).extractValue()
 
     /**
      * Builds the remote-eval request payload from the current context, or null when not in

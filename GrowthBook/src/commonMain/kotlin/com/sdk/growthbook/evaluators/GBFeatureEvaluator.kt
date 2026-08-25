@@ -9,7 +9,9 @@ import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBFeatureSource
 import com.sdk.growthbook.model.GBJson
+import com.sdk.growthbook.model.GBNull
 import com.sdk.growthbook.model.GBNumber
+import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.utils.Constants
 import com.sdk.growthbook.utils.GBTrackData
@@ -365,16 +367,27 @@ internal class GBFeatureEvaluator(
         experimentResult: GBExperimentResult? = null
     ): GBFeatureResult {
 
-        val gate2 = (gbValue is GBBoolean && !gbValue.value)
-        val gate3 = (gbValue is GBNumber && (gbValue.value == 0))
-        val isFalse = gbValue == null || gate2 || gate3
+        // Truthiness matches the reference (TypeScript) SDK's `off = !value`, which is plain
+        // JS falsiness over the decoded value: undefined/null, false, zero of any numeric
+        // type (including -0.0 and NaN) and the empty string are "off". Empty arrays and
+        // objects, and the string "0", are truthy in JS, so they stay "on".
+        // GBValue.Unknown has no JS counterpart: it marks a value the SDK could not resolve,
+        // which the reference SDK would leave as `undefined`, so it is "off" as well.
+        val isNullishValue = gbValue == null || gbValue is GBNull || gbValue is GBValue.Unknown
+        val isFalseValue = (gbValue is GBBoolean && !gbValue.value)
+        // Compare numerically rather than with boxed equals(): GBNumber holds a Number, so
+        // `value == 0` only ever matches Byte/Short/Int zero and misses 0.0f, 0.0 and 0L.
+        val isZeroValue = gbValue is GBNumber &&
+            gbValue.value.toDouble().let { it == 0.0 || it.isNaN() }
+        val isEmptyStringValue = (gbValue is GBString && gbValue.value.isEmpty())
+        val isOff = isNullishValue || isFalseValue || isZeroValue || isEmptyStringValue
 
         //val castResult = gbValue as? V
         val gbFeatureResult = GBFeatureResult(
             ruleId = ruleId,
             gbValue = gbValue,
-            on = !isFalse,
-            off = isFalse,
+            on = !isOff,
+            off = isOff,
             source = source,
             experiment = experiment,
             experimentResult = experimentResult

@@ -1,7 +1,6 @@
 @file:OptIn(ExperimentalWasmDsl::class)
 
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
-import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackOutput
 import org.jetbrains.kotlin.gradle.targets.js.yarn.yarn
 
 plugins {
@@ -11,7 +10,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "1.5.0"
+version = "1.0.0"
 
 kotlin {
     androidTarget {
@@ -21,19 +20,26 @@ kotlin {
     js {
         yarn.lockFileDirectory = file("kotlin-js-store")
         browser {
-            commonWebpackConfig {
-                output = KotlinWebpackOutput(
-                    library = project.name,
-                    libraryTarget = KotlinWebpackOutput.Target.UMD,
-                    globalObject = KotlinWebpackOutput.Target.WINDOW
-                )
+            testTask {
+                useKarma {
+                    useChromeHeadless()
+                }
             }
         }
     }
 
     jvm()
+    // browser(), not nodejs(): FakeGrowthBook itself needs no browser API, but the real SDK's
+    // wasmJs caching actual reads kotlinx.browser.localStorage, which does not exist under Node.
+    // Matching :GrowthBook keeps the door open for tests here that build a real GrowthBookSDK.
     wasmJs {
-        browser()
+        browser {
+            testTask {
+                useKarma {
+                    useChromeHeadless()
+                }
+            }
+        }
     }
     iosX64()
     iosArm64()
@@ -43,27 +49,22 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                // `api`, not `implementation`: both libraries show up in this module's public API —
-                // `NetworkDispatcher.consumeSSEConnection` returns a `Flow`, while
-                // `TrackingNetworkDispatcher.consumePOSTRequest` and the public `toJsonElement()`
-                // helpers take/return `JsonElement`. Under `implementation` they land only in the
-                // published artifact's `runtimeElements`, so a consumer writing their own
-                // dispatcher cannot even name those types without declaring kotlinx themselves.
-                api(libs.kotlinx.coroutines.core)
-                api(libs.kotlinx.serialization.json)
+                api(project(":GrowthBook"))
+                implementation(libs.kotlinx.serialization.json)
             }
         }
-        val appleMain by creating { dependsOn(commonMain) }
-        val iosX64Main by getting { dependsOn(appleMain) }
-        val iosArm64Main by getting { dependsOn(appleMain) }
-        val iosSimulatorArm64Main by getting { dependsOn(appleMain) }
-        val macosArm64Main by getting { dependsOn(appleMain) }
+        val commonTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+                implementation(libs.kotlinx.coroutines.core)
+            }
+        }
     }
 }
 
 android {
     compileSdk = 34
-    namespace = "com.sdk.growthbook.core"
+    namespace = "com.sdk.growthbook.test"
     defaultConfig {
         minSdk = 21
     }
@@ -109,8 +110,10 @@ publishing {
     repositories {
         maven {
             name = "kotlin"
-            val releasesRepoUrl = uri("https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/")
-            val snapshotsRepoUrl = uri("https://ossrh-staging-api.central.sonatype.com/content/repositories/snapshots/")
+            val releasesRepoUrl =
+                uri("https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/")
+            val snapshotsRepoUrl =
+                uri("https://ossrh-staging-api.central.sonatype.com/content/repositories/snapshots/")
             url = if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl
             credentials {
                 username = sonatypeUsername
@@ -124,7 +127,11 @@ publishing {
             artifact(javadocJar)
             pom {
                 name.set("kotlin")
-                description.set("Core module of GrowthBook Kotlin SDK")
+                description.set(
+                    "In-memory test doubles for the GrowthBook Kotlin SDK: " +
+                        "FakeGrowthBook, a deterministic IGrowthBookSDK implementation " +
+                        "for unit tests without network."
+                )
                 licenses {
                     license {
                         name.set("MIT")

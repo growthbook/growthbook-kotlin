@@ -313,8 +313,11 @@ class GBSDKBuilder(
             // honoured regardless of whether it was set before or after the sticky-bucket setter.
             stickyBucketService = stickyBucketService
                 ?: stickyBucketServiceFactory?.invoke(resolveCachingLayer()),
-            plugins = plugins
-        )
+        ).also {
+            // Assigned rather than passed: keeping it out of GBContext's primary constructor
+            // preserves that constructor's signature for already-compiled consumers.
+            it.plugins = plugins
+        }
 
     private inner class WaitForCallCaseHelper(
         gbContext: GBContext,
