@@ -373,6 +373,57 @@ class FeaturesViewModelPollingTests {
     }
 
     @Test
+    fun testRevalidateDoesNotServeExpiredCacheButStillRefetches() = runTest {
+        // The freshness ceiling is a property of the cache entry, not of the fetch policy: an
+        // explicit refreshCache() (ForceNetwork) must not apply a payload past cacheMaxAge either.
+        // Its "always refetch" contract is unaffected — the network round still runs.
+        var appliedFromCache = false
+        val client = CountingClient(response = null, error = Throwable("offline"))
+        val fiftyHoursAgo = Clock.System.now().toEpochMilliseconds() - (50 * 60 * 60 * 1000L)
+        val cacheLayer = MockCachingLayer.fromApiResponse(
+            MockResponse.successResponse,
+            cachedAt = fiftyHoursAgo
+        )
+        val viewModel = buildViewModel(
+            client, testScheduler,
+            cachingLayer = cacheLayer,
+            cacheMaxAge = 48 * 60 * 60 * 1000L, // ceiling 48h; cache is 50h old -> expired
+            staleTtl = 60 * 60 * 1000L,         // arms the hard cutoff
+            delegate = cacheAppliedRecordingDelegate { appliedFromCache = true },
+        )
+
+        viewModel.revalidate()
+
+        assertEquals(1, client.getCount, "refreshCache() must always hit the network")
+        assertTrue(!appliedFromCache, "refreshCache() must not apply a cache past cacheMaxAge")
+    }
+
+    @Test
+    fun testRevalidateServesCacheWithinCeilingEvenWhenFresh() = runTest {
+        // Counterpart to the above: within the ceiling, ForceNetwork still serves the cache
+        // immediately (non-authoritative) AND refetches — a fresh cache cannot cancel the round.
+        var appliedFromCache = false
+        val client = CountingClient(response = null, error = Throwable("offline"))
+        val tenMinutesAgo = Clock.System.now().toEpochMilliseconds() - (10 * 60 * 1000L)
+        val cacheLayer = MockCachingLayer.fromApiResponse(
+            MockResponse.successResponse,
+            cachedAt = tenMinutesAgo
+        )
+        val viewModel = buildViewModel(
+            client, testScheduler,
+            cachingLayer = cacheLayer,
+            cacheMaxAge = 48 * 60 * 60 * 1000L,
+            staleTtl = 60 * 60 * 1000L, // cache is well inside the fresh window
+            delegate = cacheAppliedRecordingDelegate { appliedFromCache = true },
+        )
+
+        viewModel.revalidate()
+
+        assertEquals(1, client.getCount, "A fresh cache must not cancel an explicit refreshCache()")
+        assertTrue(appliedFromCache, "Cache within the ceiling is still served immediately")
+    }
+
+    @Test
     fun testCacheMaxAgeAloneStillServesStaleBeyondWindow() = runTest {
         // Backward-compatibility: with staleTtl UNSET, the hard cutoff is disarmed, so a cache older
         // than cacheMaxAge is still served (non-authoritative) while the network revalidates —

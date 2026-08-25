@@ -29,7 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (third) tier: when enabled, a cache older than `cacheMaxAge` is served as a last resort **only if**
   the revalidating network round fails, so an offline client keeps its stale flags instead of falling
   back to code defaults. Default false fails closed (nothing stale served past the ceiling). The
-  freshness ceiling still holds whenever the network is reachable.
+  freshness ceiling still holds whenever the network is reachable, and it holds on *every* path —
+  including an explicit `refreshCache()`, which never applies a payload past `cacheMaxAge`. The
+  fallback itself covers automatic refreshes only (startup, polling, the stale-while-revalidate
+  round); `refreshCache()` reports the network failure through `GBCacheRefreshHandler` instead,
+  since it is coalesced with any in-flight round and a per-caller fallback cannot be attributed.
 - `BackoffPolicy` — new public class in `:Core` (`io.growthbook.sdk:Core:1.6.0`): pure, stateless
   capped exponential backoff (`delayFor(attempt)` / `shouldRetry(attempt)`), the shared
   implementation behind every retry path in the SDK. Usable directly by consumers writing their own

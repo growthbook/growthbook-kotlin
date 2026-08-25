@@ -305,6 +305,13 @@ class GBSDKBuilder(
      * "stale fallback served", so signalling either would mislead; treat `serveStaleOnError` as a
      * best-effort offline safety net rather than a signal you can observe through the handler.
      *
+     * Scope: this is a safety net for *automatic* refreshes (startup, background polling, the
+     * stale-while-revalidate round). It does not apply to an explicit
+     * [GrowthBookSDK.refreshCache], which reports the network failure through
+     * [GBCacheRefreshHandler] instead of quietly applying an expired payload — that refresh is
+     * coalesced with any in-flight round, and a per-caller fallback cannot be attributed once
+     * several callers share it.
+     *
      * No effect when the SDK is built with `remoteEval = true`: that mode bypasses the feature cache
      * entirely, so there is no expired entry to fall back to.
      */

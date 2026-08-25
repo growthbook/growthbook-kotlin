@@ -341,10 +341,15 @@ internal class FeaturesViewModel(
 
     /**
      * Stale-while-revalidate refresh backing [com.sdk.growthbook.GrowthBookSDK.refreshCache].
-     * Serves any cached payload immediately as non-authoritative, then triggers a
+     * Serves the cached payload immediately as non-authoritative, then triggers a
      * coalesced network revalidation that joins an in-flight [awaitRefresh] instead
      * of starting a duplicate request. Always bypasses cache freshness (see
-     * [FetchPolicy.ForceNetwork]).
+     * [FetchPolicy.ForceNetwork]) — a fresh cache can never cancel this round.
+     *
+     * The freshness ceiling still applies: a cache past `cacheMaxAge` is not served here either
+     * (see [serveCache]). It is not carried as an on-error fallback on this path — the returned
+     * [CacheOutcome] is deliberately discarded, because [awaitRefresh] is coalesced and a fallback
+     * belongs to one caller, so a second caller joining the same round would inherit it.
      *
      * Fire-and-forget: the network round runs on [coroutineScope]; observe completion
      * via the refresh handler rather than expecting features to be ready on return.
@@ -520,18 +525,23 @@ internal class FeaturesViewModel(
         // remoteEval already returned above, so this path is local-eval only.
         val decoded = decoder.decode(model)
 
-        // Freshness gating applies only to plain CacheFirst GETs; remote-eval and ForceNetwork always
-        // refetch, so their cache is treated as (non-authoritative) STALE and revalidated. All zone
-        // logic (inner window, hard ceiling, backward-compat) lives in CachePolicy.
-        val gated = policy == FetchPolicy.CacheFirst && !remoteEval && cachedAt != null
+        // Classified regardless of [policy]: the freshness ceiling is a property of the cache ENTRY,
+        // not of the fetch mode. An entry past cacheMaxAge is unfit to serve no matter who reads it,
+        // and since serveCache is the only caller of readCache, this is the single choke point where
+        // that can be enforced. An entry with no timestamp (pre-7.3.0 cache file) cannot be
+        // classified, so it degrades to STALE rather than being dropped. All zone logic (inner
+        // window, hard ceiling, backward-compat) lives in CachePolicy.
         val age = cachedAt?.let { Clock.System.now().toEpochMilliseconds() - it }
-        val zone = if (gated && age != null) cachePolicy.classify(age) else CacheZone.STALE
+        val zone = if (age != null) cachePolicy.classify(age) else CacheZone.STALE
 
         // EXPIRED (Zone 3): do not surface stale data — carry it only as the on-error fallback so
         // evaluation never sees data past its freshness ceiling while the network is reachable.
         if (zone == CacheZone.EXPIRED) return CacheOutcome.Expired(decoded)
 
-        val fresh = zone == CacheZone.FRESH
+        // Skipping the network (and serving the cache as authoritative) is the part that IS policy
+        // dependent: only a plain CacheFirst GET may do it. ForceNetwork always revalidates, so its
+        // cache is served as non-authoritative STALE even when still inside the fresh window.
+        val fresh = policy == FetchPolicy.CacheFirst && zone == CacheZone.FRESH
 
         val outcome = outcomeOf(payload = decoded, source = Source.CACHE, authoritative = fresh)
         dispatch(outcome = outcome)

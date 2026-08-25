@@ -188,6 +188,8 @@ While the network is reachable the freshness ceiling still holds (fresh data is 
 
 > **Observability caveat:** when the stale fallback is served, it is applied as a non-authoritative payload and your `GBCacheRefreshHandler` is **not** invoked — neither as success nor as failure. The handler's `(Boolean, GBError?)` contract cannot express "stale fallback served", so signalling either side would mislead. Treat `setServeStaleOnError` as a best-effort offline safety net, not something you can observe through the refresh handler.
 
+> **Scope:** the fallback covers *automatic* refreshes (startup, background polling, the stale-while-revalidate round). An explicit `refreshCache()` does not serve an expired cache — it reports the failure through your refresh handler instead. The freshness ceiling itself holds on every path: nothing older than `cacheMaxAge` is ever applied, including on `refreshCache()`.
+
 #### Background polling (`setRefreshInterval`)
 
 For long-lived processes (JVM/backend) you can opt into periodic background refresh as an alternative to SSE. Configure the interval with `setRefreshInterval(<ms>)`, then start/stop the poller via the SDK:
