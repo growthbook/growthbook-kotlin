@@ -181,7 +181,7 @@ internal class VerifySDKReturnFeatureValues {
 
         delay(100) // cancel only after 100 millis of waiting
         job.cancel()
-        // or gbSdk.featuresFetchedSuccessfully(emptyMap(), true)
+        // or gbSdk.payloadFetchedSuccessfully(emptyMap(), null, null, true)
 
         coVerify { mockedFeaturesViewModel.awaitRefresh() }
     }
@@ -205,7 +205,12 @@ internal class VerifySDKReturnFeatureValues {
             // 2nd awaitRefresh(): the newer round lands, applies the FRESH features and reports success.
             coEvery { awaitRefresh() } returns FetchResult.Superseded andThenAnswer {
                 gbSdk.getGBContext().features = mapOf("flag" to GBFeature(GBBoolean(true)))
-                gbSdk.featuresFetchedSuccessfully(gbSdk.getGBContext().features, true)
+                gbSdk.payloadFetchedSuccessfully(
+                    features = gbSdk.getGBContext().features,
+                    savedGroups = null,
+                    contextualBandits = null,
+                    isRemote = true
+                )
                 FetchResult.Success
             }
         }

@@ -473,6 +473,10 @@ internal class GBExperimentEvaluator(
             if (experimentMeta.size > targetVariationIndex)
                 experimentMeta[targetVariationIndex] else null
 
+        // Bandit metadata is gated to enrolled users here. Kotlin has no unconditional experiment-eval
+        // hook (cf. TS onExperimentEval), so we don't need to strip exp.contextualBandit. If such a hook
+        // is ever added, revisit: exp would leak bandit metadata for non-enrolled users.
+        val cb = experiment.contextualBandit?.takeIf { hashUsed && inExperiment }
         return GBExperimentResult(
             inExperiment = inExperiment,
             variationId = targetVariationIndex,
@@ -487,7 +491,10 @@ internal class GBExperimentEvaluator(
             stickyBucketUsed = stickyBucketUsed ?: false,
             name = meta?.name,
             bucket = bucket,
-            passthrough = meta?.passthrough
+            passthrough = meta?.passthrough,
+            leafId = cb?.leafId,
+            variationWeights = cb?.variationWeights,
+            banditVersion = cb?.banditVersion
         )
     }
 }

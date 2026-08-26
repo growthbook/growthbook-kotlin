@@ -1,9 +1,11 @@
 package com.sdk.growthbook.features
 
+import com.sdk.growthbook.model.GBContextualBandit
 import com.sdk.growthbook.utils.Crypto
 import com.sdk.growthbook.utils.DefaultCrypto
 import com.sdk.growthbook.utils.GBError
 import com.sdk.growthbook.utils.GBFeatures
+import com.sdk.growthbook.utils.getBanditsFromEncryptedBandits
 import com.sdk.growthbook.utils.getFeaturesFromEncryptedFeatures
 import com.sdk.growthbook.utils.getSavedGroupFromEncryptedSavedGroup
 import kotlinx.serialization.json.JsonObject
@@ -12,7 +14,8 @@ import kotlinx.serialization.json.JsonObject
 internal class FeaturePayloadDecoder(private val encryptionKey: String?) {
     fun decode(m: FeaturesDataModel) = DecodedPayload(
         features = decode(m.features, m.encryptedFeatures, ::getFeaturesFromEncryptedFeatures),
-        savedGroups = decode(m.savedGroups, m.encryptedSavedGroups, ::getSavedGroupFromEncryptedSavedGroup)
+        savedGroups = decode(m.savedGroups, m.encryptedSavedGroups, ::getSavedGroupFromEncryptedSavedGroup),
+        contextualBandits = decode(m.contextualBandits, m.encryptedContextualBandits, ::getBanditsFromEncryptedBandits)
     )
 
     private fun <T: Map<*, *>> decode(plain: T?, encrypted: String?, decrypt: (String, String, Crypto?) -> T?) : T? {
@@ -29,4 +32,8 @@ internal class FeaturePayloadDecoder(private val encryptionKey: String?) {
     }
 }
 
-internal data class DecodedPayload(val features: GBFeatures?, val savedGroups: JsonObject?)
+internal data class DecodedPayload(
+    val features: GBFeatures?,
+    val savedGroups: JsonObject?,
+    val contextualBandits: Map<String, GBContextualBandit>? = null
+)

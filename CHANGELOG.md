@@ -6,6 +6,74 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [8.0.0] - Unreleased
+
+### Added
+- **Contextual bandits.** The SDK now understands contextual bandit rules and their definitions in the features payload
+  (`contextualBandits` / `encryptedContextualBandits`), matching the reference TS SDK against shared spec version 0.8.0.
+  A bandit rule carries its variations under `contextualVariations`; at evaluation the SDK routes the user into the
+  first context (leaf) whose condition matches and buckets by that leaf's weights. All weight maths stays server-side.
+    - New exposure metadata on `GBExperimentResult`: `leafId`, `variationWeights`, `banditVersion`, populated only for
+      users actually enrolled in the experiment. `leafId == -1` means no leaf matched and the rule's aggregate weights
+      were used.
+    - Fallbacks mirror the reference SDK: a dangling `contextualBanditRef` keeps the rule's aggregate weights and emits
+      no metadata; empty or non-matching contexts fall back to aggregate (or equal) weights with the `-1` sentinel.
+    - Sticky bucketing recognises bandit rules — identifier attributes are now derived from `contextualVariations` as
+      well as `variations`. Previously sticky bucketing silently did nothing on a bandit-driven feature.
+- `GBSDKBuilder.setInitialPayload(json)` seeds the SDK with a bundled **raw API payload** rather than just features:
+  saved groups and contextual bandit definitions are seeded too, including their encrypted variants. Bandit rules are
+  inert without their definitions, so offline-first setups covering a bandit-driven feature need this over
+  `setInitialFeatures`. A payload that cannot be parsed is ignored instead of failing initialization.
+
+### Changed
+- `GBUtils.isIncludedInRollout` aligned with the reference SDK: `coverage == 0` now excludes everyone, and an empty or
+  missing hash attribute value excludes the user, instead of both being treated as "included".
+- A payload that cannot be decrypted no longer throws. `getFeaturesFromEncryptedFeatures`,
+  `getSavedGroupFromEncryptedSavedGroup` and `getBanditsFromEncryptedBandits` now return `null` for a malformed blob or
+  a rotated key (previously only a JSON-parse failure was handled, while the split/base64/AES steps threw), so one bad
+  field no longer discards the rest of the payload — matching the reference SDK's per-field handling. Consequence for
+  `GrowthBookSDK.setEncryptedFeatures`: a payload it cannot decrypt is now ignored instead of throwing at the call site.
+
+### Fixed
+- Features, saved groups and contextual bandit definitions from a fetched payload are published to the context in a
+  single atomic update. Previously each was a separate write, so an evaluation on another thread could observe new
+  features paired with the previous generation's bandit definitions (routing by stale weights, or falling back to
+  aggregate weights for a rule whose bandit had just arrived).
+
+### Breaking changes
+This release narrows which types application code may **construct**. Reading, passing around and pattern-matching them
+is unaffected — only creating instances is now the SDK's job.
+
+- Constructors of SDK-owned types are `internal`, and their `copy()` with them (`@ConsistentCopyVisibility`):
+  `GBContext`, `GBOptions`, `StackContext`, `GBFeaturesDiff`, `GBFeatureChange`, `FeaturesDataModel`,
+  `GBContextualBandit`, `GBBanditContext`, and every `SerializableGB*` wire type. Build a context through
+  `GBSDKBuilder`; the other types only ever arrive from the SDK. This is what lets future payload fields be added to
+  them without another major release. Note that Kotlin enforces `internal` at compile time; for Java callers it is a
+  declaration of intent rather than a hard lock, and such use is unsupported.
+- Types application code legitimately constructs — `GBFeature`, `GBFeatureRule`, `GBExperiment`, `GBExperimentResult`,
+  `GBFeatureResult` — keep public constructors, but gained fields for contextual bandits. Adding a constructor
+  parameter changes the JVM signature, so code compiled against 7.x must be recompiled against 8.0.0.
+- `GBContext.plugins` moved from a mutable property into the constructor as a `val`. Set plugins with
+  `GBSDKBuilder.setPlugins()`, as before; assigning after construction was already a silent no-op and is now impossible.
+- Because `GBContext` can no longer be constructed by application code, the public `GrowthBookSDK(gbContext, ...)`
+  constructor is unreachable in practice. Use `GBSDKBuilder`.
+- The internal fetch-result callbacks `featuresFetchedSuccessfully` / `savedGroupsFetchedSuccessfully` on
+  `GrowthBookSDK` are replaced by a single `payloadFetchedSuccessfully(features, savedGroups, contextualBandits,
+  isRemote)`, which is what makes the payload land atomically (see *Fixed*). They were never part of the documented
+  API — `FeaturesFlowDelegate` is internal — but they were reachable from the JVM, hence the note.
+
+### Known limitations
+- GrowthBook's querystring variation override is not implemented in this SDK, so the corresponding shared spec case
+  (`querystring force overrides CB routing`) is skipped rather than ported. Use `setForcedVariations` instead.
+
+### Companion artifacts
+- `GrowthBookTest` **2.0.0** — no source changes, but it builds `GBExperimentResult` internally, so the 1.0.0 artifact
+  is not binary-compatible with this release and must be upgraded alongside it.
+- `GrowthBookExt` **2.0.0** — no source changes; the major bump propagates this release through its `api` dependency.
+- `Core`, `GrowthBookKotlinxSerialization`, `NetworkDispatcherKtor` and `NetworkDispatcherOkHttp` are unaffected and
+  keep their current versions.
+
+---
 ## [7.9.0] - 2026-09-03
 
 ### Added

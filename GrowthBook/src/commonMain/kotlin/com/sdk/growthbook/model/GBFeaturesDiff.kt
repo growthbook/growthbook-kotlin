@@ -2,9 +2,13 @@ package com.sdk.growthbook.model
 
 import com.sdk.growthbook.utils.GBFeatures
 
-data class GBFeatureChange(val old: GBFeature, val new: GBFeature)
+/** SDK-owned: produced by [diffFeatures] and handed to the features-change handler, read-only. */
+@ConsistentCopyVisibility
+data class GBFeatureChange internal constructor(val old: GBFeature, val new: GBFeature)
 
-data class GBFeaturesDiff(
+/** SDK-owned: produced by [diffFeatures] and handed to the features-change handler, read-only. */
+@ConsistentCopyVisibility
+data class GBFeaturesDiff internal constructor(
     val added: GBFeatures,
     val removed: GBFeatures,
     val changed: Map<String, GBFeatureChange>
