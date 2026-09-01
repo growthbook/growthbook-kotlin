@@ -1,6 +1,5 @@
 package com.sdk.growthbook.utils
 
-import com.ionspin.kotlin.bignum.integer.BigInteger
 import com.sdk.growthbook.evaluators.EvaluationContext
 import com.sdk.growthbook.evaluators.UserContext
 import com.sdk.growthbook.features.FeaturesDataModel
@@ -23,27 +22,35 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+// FNV-1a offset basis. Unsigned 0x811c9dc5 does not fit in a signed Int
+// (high bit set); -0x7ee3623b is the same 32-bit pattern.
+private const val FNV_OFFSET_BASIS = -0x7ee3623b
+private const val FNV_PRIME = 0x01000193
+
 /**
- * Fowler-Noll-Vo hash - 32 bit
+ * Fowler-Noll-Vo FNV-1a, 32-bit.
+ *
+ * For each UTF-16 code unit: XOR the low 8 bits into [hash], then multiply
+ * by [FNV_PRIME]. Kotlin `Int` multiply wraps at 32 bits — that wrap *is*
+ * the FNV modulo 2^32.
+ *
+ * Only the low byte of each code unit is mixed in (`code and 0xFF`). That
+ * is this SDK's historical behaviour; ASCII ids/keys are identical either
+ * way. Code units > 255 (e.g. `'€'`) hash differently than a full-char XOR.
+ *
+ * Returns an unsigned value in 0..2^32-1 so remainders and hash-v2's
+ * decimal stringify do not see a negative `Int`.
  */
-internal class FNV {
-
-    private val INIT32 = BigInteger(0x811c9dc5)
-    private val PRIME32 = BigInteger(0x01000193)
-    private val MOD32 = BigInteger(2).pow(32)
-
-    /**
-     * Fowler-Noll-Vo hash - 32 bit
-     * Returns BigInteger
-     */
-    fun fnv1a32(data: String): BigInteger {
-        var hash: BigInteger = INIT32
-        for (b in data) {
-            hash = hash.xor(BigInteger(b.code and 0xff))
-            hash = hash.multiply(PRIME32).mod(MOD32)
-        }
-        return hash
+private fun fnv1a32(data: String): Long {
+    var hash = FNV_OFFSET_BASIS
+    val length = data.length
+    var i = 0
+    while (i < length) {
+        hash = hash xor (data[i].code and 0xFF)
+        hash *= FNV_PRIME
+        i++
     }
+    return hash.toLong() and 0xFFFFFFFFL
 }
 
 /**
@@ -81,29 +88,19 @@ internal class GBUtils {
         }
 
         /**
-         * Method for hash stings to float for hash version #1
+         * Hash version 1: fnv1a32(value + seed) % 1000 / 1000
          */
         private fun hashV1(stringValue: String, seed: String?): Float {
-            val bigInt: BigInteger = FNV().fnv1a32(stringValue + seed)
-            val thousand = BigInteger(1000)
-            val remainder = bigInt.remainder(thousand)
-
-            val remainderAsFloat = remainder.toString().toFloat()
-            return remainderAsFloat / 1000f
+            return (fnv1a32(stringValue + seed) % 1000L).toFloat() / 1000f
         }
 
         /**
-         * Method for hash stings to float for hash version #2
+         * Hash version 2: hash the unsigned decimal of the first FNV pass, then
+         * % 10000 / 10000. [fnv1a32] returns 0..2^32-1 so [Long.toString] has no sign.
          */
         private fun hashV2(stringValue: String, seed: String?): Float {
-            val first: BigInteger = FNV().fnv1a32(seed + stringValue)
-            val second: BigInteger = FNV().fnv1a32(first.toString())
-
-            val tenThousand = BigInteger(10000)
-            val remainder = second.remainder(tenThousand)
-
-            val remainderAsFloat = remainder.toString().toFloat()
-            return remainderAsFloat / 10000f
+            val first = fnv1a32(seed + stringValue)
+            return (fnv1a32(first.toString()) % 10000L).toFloat() / 10000f
         }
 
         /**
