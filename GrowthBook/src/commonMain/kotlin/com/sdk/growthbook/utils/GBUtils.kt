@@ -88,15 +88,14 @@ internal class GBUtils {
         }
 
         /**
-         * Hash version 1: fnv1a32(value + seed) % 1000 / 1000
+         * Method for hash stings to float for hash version #1
          */
         private fun hashV1(stringValue: String, seed: String?): Float {
             return (fnv1a32(stringValue + seed) % 1000L).toFloat() / 1000f
         }
 
         /**
-         * Hash version 2: hash the unsigned decimal of the first FNV pass, then
-         * % 10000 / 10000. [fnv1a32] returns 0..2^32-1 so [Long.toString] has no sign.
+         * Method for hash stings to float for hash version #2
          */
         private fun hashV2(stringValue: String, seed: String?): Float {
             val first = fnv1a32(seed + stringValue)
