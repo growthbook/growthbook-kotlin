@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "7.8.0"
+version = "7.8.1"
 
 val generateSdkMeta by tasks.registering {
     val outputDir = layout.buildDirectory.dir("generated/sdk-meta/commonMain/kotlin")
@@ -70,7 +70,6 @@ kotlin {
 
                 implementation("org.jetbrains.kotlin:kotlin-stdlib-common")
                 implementation(libs.kotlinx.coroutines.core)
-                implementation("com.ionspin.kotlin:bignum:0.3.9") // used in hash calculation
                 implementation(libs.cryptography.core) // encryption/decryption
 
                 implementation(libs.kotlinx.serialization.json)
