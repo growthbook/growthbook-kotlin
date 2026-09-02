@@ -24,6 +24,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Requirements section of the README.
 
 ---
+## [7.8.1] - 2026-09-02
+
+### Changed
+- The FNV-1a hash behind bucketing (`GBUtils.hash`, hash versions 1 and 2) is now computed with
+  plain `Int` arithmetic instead of arbitrary-precision `BigInteger`. `Int` multiplication wraps at
+  32 bits, which is exactly the modulo 2^32 the algorithm calls for, so the explicit `mod(2^32)`
+  step is gone; the accumulator is widened to an unsigned `Long` once at the end. The old code
+  allocated an `FNV` instance per hash (twice per hash-v2 call), computed `BigInteger(2).pow(32)` in
+  its constructor, and created roughly three `BigInteger` objects per character; the new code
+  allocates nothing. **Hash output is bit-identical for every input** — no user is re-bucketed, and
+  hashing stays byte-compatible with the reference (TypeScript) SDK for all ASCII and Latin-1
+  inputs, as before
+
+### Removed
+- `com.ionspin.kotlin:bignum` is no longer a dependency of the `:GrowthBook` module, since the hash
+  rewrite above was its only consumer. It was declared `implementation`, so it never appeared on
+  consumers' compile classpath and no consumer code can fail to compile. It does disappear from the
+  published POM's `runtime` scope: if your build resolves `bignum` at an older version and was
+  silently being upgraded to `0.3.9` through us, it will now resolve to your declared version.
+  Declare it explicitly if you depend on it
+
+---
 ## [7.8.0] - 2026-08-25
 
 ### Added
