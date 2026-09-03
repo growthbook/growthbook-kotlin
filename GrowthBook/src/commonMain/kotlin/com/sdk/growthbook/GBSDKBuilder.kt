@@ -2,12 +2,18 @@ package com.sdk.growthbook
 
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.serialization.json.Json
 import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBOptions
+import com.sdk.growthbook.features.DecodedPayload
+import com.sdk.growthbook.features.FeaturePayloadDecoder
+import com.sdk.growthbook.kotlinx.serialization.from
 import com.sdk.growthbook.plugin.tracking.GrowthBookPlugin
 import com.sdk.growthbook.network.NetworkDispatcher
+import com.sdk.growthbook.serializable_model.SerializableFeaturesDataModel
+import com.sdk.growthbook.serializable_model.gbDeserialize
 import com.sdk.growthbook.sandbox.CachingImpl
 import com.sdk.growthbook.sandbox.CachingLayer
 import com.sdk.growthbook.sandbox.GBCachingLayer
@@ -117,6 +123,7 @@ class GBSDKBuilder(
     private var featureUsageCallback: GBFeatureUsageCallback? = null
     private var plugins: List<GrowthBookPlugin>? = null
     private var initialFeatures: GBFeatures? = null
+    private var initialPayload: String? = null
     private var cacheMaxAge: Long? = null
 
     // Dispatcher used to process fetched payloads. Defaults to the platform IO dispatcher in
@@ -156,9 +163,26 @@ class GBSDKBuilder(
      * Features are applied immediately so flags are available from the first millisecond,
      * and the normal cache/network refresh still runs on top — overwriting the seed as
      * fresher data arrives. Effective precedence: network > disk cache > seed > code defaults.
+     *
+     * Takes an already-decoded feature map; see [setInitialPayload] to seed straight from a
+     * payload as the API returns it.
      */
     fun setInitialFeatures(features: GBFeatures): GBSDKBuilder {
         this.initialFeatures = features
+        return this
+    }
+
+    /**
+     * Seed the SDK from a raw feature payload, byte for byte as the API returns it — encrypted
+     * or plain, and including saved groups. Decryption uses the same `encryptionKey` as network
+     * payloads, so an encrypted snapshot can be bundled without decrypting it at build time and
+     * shipping plaintext definitions inside the app.
+     *
+     * Seeding semantics match [setInitialFeatures], which wins if both are set. A payload that
+     * cannot be parsed or decrypted is logged and ignored rather than failing initialization.
+     */
+    fun setInitialPayload(payload: String): GBSDKBuilder {
+        this.initialPayload = payload
         return this
     }
 
@@ -280,7 +304,7 @@ class GBSDKBuilder(
             )
         }
 
-        initialFeatures?.let { gbContext.features = it }
+        applySeed(gbContext)
 
         val gbOptions = GBOptions(apiHost, streamingHost)
 
@@ -344,7 +368,7 @@ class GBSDKBuilder(
                 handleWaitForCallCallback = null
                 growthBookSDK = null
             }
-            initialFeatures?.let { gbContext.features = it }
+            applySeed(gbContext)
 
             val gbOptions = GBOptions(apiHost, streamingHost)
             growthBookSDK = GrowthBookSDK(
@@ -363,4 +387,30 @@ class GBSDKBuilder(
 
     private fun resolveCachingLayer(): CachingLayer =
         customCachingLayer?.let { GBCachingLayerAdapter(it) } ?: CachingImpl.getLayer()
+
+    /** Applies the raw payload seed first, so an explicit [setInitialFeatures] map wins. */
+    private fun applySeed(gbContext: GBContext) {
+        initialPayload?.let(::decodeSeed)?.let { seed ->
+            seed.features?.let { gbContext.features = it }
+            seed.savedGroups?.let { groups ->
+                gbContext.savedGroups = groups.mapValues { GBValue.from(it.value) }
+            }
+        }
+        initialFeatures?.let { gbContext.features = it }
+    }
+
+    // A seed is a fallback by definition, so a bad one must not stop the SDK from starting.
+    private fun decodeSeed(payload: String): DecodedPayload? =
+        runCatching {
+            FeaturePayloadDecoder(encryptionKey).decode(
+                Json { isLenient = true; ignoreUnknownKeys = true }
+                    .decodeFromString(SerializableFeaturesDataModel.serializer(), payload)
+                    .gbDeserialize()
+            )
+        }.onFailure {
+            GB.error(
+                errorMessage = "GBSDKBuilder: seeded payload could not be decoded, ignoring it",
+                throwable = it
+            )
+        }.getOrNull()
 }
