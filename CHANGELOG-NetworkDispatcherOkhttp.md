@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [1.2.0] - Unreleased
+
+### Fixed
+- Pinned the JVM toolchain to JDK 17 (`jvmToolchain(17)`) so the published `-jvm`
+  artifact always contains Java 17 bytecode (class file 61) regardless of the JDK used
+  to build it (#250).
+### Compatibility
+- **Java 17 is now the explicit minimum runtime floor for the JVM and Android artifacts.**
+  Consumers must run on a Java 17-or-newer runtime; older runtimes fail at class load with
+  `UnsupportedClassVersionError`. (This artifact supports Android and JVM only.)
 
 ## [1.1.1] - 2026-09-03
 

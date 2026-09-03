@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [7.10.0] - Unreleased
+
+### Fixed
+- Pinned every module's JVM toolchain to JDK 17 (`jvmToolchain(17)`, with the Foojay
+  resolver for auto-provisioning) so the published `-jvm` artifacts always contain
+  Java 17 bytecode (class file 61), regardless of the JDK used to build/publish them.
+  Previously the bytecode version tracked the build machine's JDK, so artifacts built
+  on JDK 21 shipped class file 65 and crashed JDK 17 consumers with
+  `UnsupportedClassVersionError` (#250).
+
+### Compatibility
+- **Java 17 is now the explicit minimum runtime floor for the JVM and Android artifacts.**
+  This release makes the bytecode deterministic *and* defines the runtime compatibility
+  contract for consumers: the JVM/Android targets require a Java 17-or-newer runtime.
+  Earlier versions had no guaranteed floor (bytecode tracked the publishing JDK). See the
+  Requirements section of the README.
+
+---
 ## [7.9.0] - 2026-09-03
 
 ### Added
