@@ -60,6 +60,26 @@ typealias GBCacheRefreshHandler = (Boolean, GBError?) -> Unit
 typealias GBFeaturesChangeHandler = (GBFeaturesDiff) -> Unit
 
 /**
+ * Timing and size of a single feature fetch. Reported before the payload is parsed, so the
+ * numbers describe the network round trip rather than the SDK's own work.
+ */
+data class GBFetchStats(
+    val success: Boolean,
+    val durationMillis: Long,
+    /**
+     * Payload size as received, after any transport decompression — the decoded size, not the
+     * compressed bytes on the wire. 0 for a 304, null when the fetch failed.
+     */
+    val payloadBytes: Int?,
+)
+
+/**
+ * Handler for per-fetch timing. Use it to track how long the initial feature fetch actually
+ * takes on real devices, which no server-side measurement can see.
+ */
+typealias GBFetchStatsHandler = (GBFetchStats) -> Unit
+
+/**
  * Triple Tuple for GrowthBook Namespaces
  * It has ID, StartRange & EndRange
  */

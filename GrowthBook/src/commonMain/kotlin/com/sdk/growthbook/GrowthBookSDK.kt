@@ -10,6 +10,7 @@ import com.sdk.growthbook.utils.Constants
 import com.sdk.growthbook.utils.GBCacheRefreshHandler
 import com.sdk.growthbook.utils.GBError
 import com.sdk.growthbook.utils.GBFeatures
+import com.sdk.growthbook.utils.GBFetchStatsHandler
 import com.sdk.growthbook.utils.GBRemoteEvalParams
 import com.sdk.growthbook.utils.Resource
 import com.sdk.growthbook.utils.getFeaturesFromEncryptedFeatures
@@ -79,7 +80,9 @@ class GrowthBookSDK internal constructor(
     // Internal seam only: the public way to plug a cache is GBSDKBuilder.setCachingLayer().
     // Adding this to the public constructor would break binary compatibility,
     // so the public constructor below preserves the pre-7.4.0 signature and delegates here.
-    cachingLayer: GBCachingLayer?
+    cachingLayer: GBCachingLayer?,
+    // Internal seam only, same reasoning: set via GBSDKBuilder.setFetchStatsHandler().
+    private val fetchStatsHandler: GBFetchStatsHandler? = null
     ) : FeaturesFlowDelegate, IGrowthBookSDK {
 
     /**
@@ -126,7 +129,7 @@ class GrowthBookSDK internal constructor(
     internal var featuresViewModel: FeaturesViewModel = FeaturesViewModel(
         delegate = this,
         dataSource = FeaturesDataSource(
-            networkDispatcher, gbContext, gbOptions
+            networkDispatcher, gbContext, gbOptions, onFetchStats = fetchStatsHandler
         ),
         encryptionKey = gbContext.encryptionKey,
         cachingEnabled = cachingEnabled,
