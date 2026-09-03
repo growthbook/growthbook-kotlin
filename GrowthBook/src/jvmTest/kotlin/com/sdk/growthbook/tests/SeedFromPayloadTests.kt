@@ -4,8 +4,12 @@ import com.sdk.growthbook.GBSDKBuilder
 import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
+import com.sdk.growthbook.sandbox.CachingJvm
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.utils.encryptToFeaturesDataModel
+import org.junit.Rule
+import org.junit.rules.TemporaryFolder
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -21,6 +25,17 @@ class SeedFromPayloadTests {
     private val encKey = "Ns04T5n9+59rl2x3SlNHtQ=="
     private val encBlob =
         "vMSg2Bj/IurObDsWVmvkUg==.L6qtQkIzKDoE2Dix6IAKDcVel8PHUnzJ7JjmLjFZFQDqidRIoCxKmvxvUj2kTuHFTQ3/NJ3D6XhxhXXv2+dsXpw5woQf0eAgqrcxHrbtFORs18tRXRZza7zqgzwvcznx"
+
+    @Rule
+    @JvmField
+    var tempFolder = TemporaryFolder()
+
+    // Cache reads happen even when writes are disabled, so point them at an empty dir per test;
+    // otherwise a payload left by an earlier run could overwrite the seed under assertion.
+    @BeforeTest
+    fun setUp() {
+        CachingJvm.baseDir = tempFolder.newFolder()
+    }
 
     // Caching stays off so the assertions see the seed alone, not a cache read racing it.
     private fun seed(
