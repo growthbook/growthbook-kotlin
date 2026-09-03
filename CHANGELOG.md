@@ -6,6 +6,61 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [7.9.0] - 2026-09-03
+
+### Added
+- Background polling auto-refresh engine. `GBSDKBuilder.setRefreshInterval(<ms>)` configures a
+  periodic network revalidation; start/stop it with `GrowthBookSDK.startPolling()` /
+  `stopPolling()`. The poller runs as a coroutine on the SDK's background scope (not a dedicated
+  thread), retries failed rounds with capped exponential backoff plus random jitter (so many
+  instances that fail together do not all retry in lockstep), and is mutually exclusive with SSE —
+  starting SSE stops the poller and `startPolling()` is a no-op while SSE is active; the switch
+  between the two mechanisms is race-free. A round that throws is treated as a failed round (logged +
+  backoff) rather than terminating the loop. Disabled by default; intended mainly for long-lived
+  JVM/backend usage (tie it to app lifecycle on mobile).
+- `GBSDKBuilder.setStaleTtl(<ms>)` — turns `setCacheMaxAge()` into a full three-tier
+  stale-while-revalidate policy: `age < staleTtl` → fresh (served, network skipped);
+  `staleTtl ≤ age < cacheMaxAge` → stale (served immediately + background revalidation);
+  `age ≥ cacheMaxAge` → expired (not served, refetched as a cache miss). The hard ceiling (third
+  tier) is armed only when `staleTtl` is set; `setCacheMaxAge()` used alone keeps its original
+  two-tier behaviour (serve-stale beyond the window, never dropped), so existing consumers are
+  unaffected. Set `staleTtl < cacheMaxAge`.
+- `GBSDKBuilder.setServeStaleOnError(<Boolean>)` — HTTP `stale-if-error` semantics for the expired
+  (third) tier: when enabled, a cache older than `cacheMaxAge` is served as a last resort **only if**
+  the revalidating network round fails, so an offline client keeps its stale flags instead of falling
+  back to code defaults. Default false fails closed (nothing stale served past the ceiling). The
+  freshness ceiling still holds whenever the network is reachable, and it holds on *every* path —
+  including an explicit `refreshCache()`, which never applies a payload past `cacheMaxAge`. The
+  fallback itself covers automatic refreshes only (startup, polling, the stale-while-revalidate
+  round); `refreshCache()` reports the network failure through `GBCacheRefreshHandler` instead,
+  since it is coalesced with any in-flight round and a per-caller fallback cannot be attributed.
+- `BackoffPolicy` — new public class in `:Core` (`io.growthbook.sdk:Core:1.6.0`): pure, stateless
+  capped exponential backoff (`delayFor(attempt)` / `shouldRetry(attempt)`), the shared
+  implementation behind every retry path in the SDK. Usable directly by consumers writing their own
+  `NetworkDispatcher`.
+
+### Changed
+- Exponential backoff is now centralised in `BackoffPolicy` and shared by all three retry paths:
+  the polling engine, `suspendFeature()`'s retry loop and SSE reconnection (`SSERetryManager` now
+  delegates its delay/attempt maths to it and only owns the reconnection counter). No behaviour
+  change: `suspendFeature()` still does initial 1s, doubling, 60s cap, 5 attempts, and SSE
+  reconnect still does initial 1s, doubling, 30s cap, 10 attempts.
+- A `GBCacheRefreshHandler` that throws is now caught and logged instead of propagating. The SDK's
+  background payload-processing scope also carries a `CoroutineExceptionHandler`, so an exception
+  escaping a fire-and-forget fetch (e.g. from a consumer handler) is logged rather than reaching the
+  platform's default uncaught-exception handler — which on Android crashes the app. This matters most
+  under polling, where the fetch path runs repeatedly.
+- **Potentially breaking:** `GBSDKBuilder.setCacheMaxAge()` now rejects a non-positive window with
+  `IllegalArgumentException` instead of accepting it. A zero/negative window silently disabled the
+  freshness gate (every cache entry classified stale), which is indistinguishable from never calling
+  the setter — and, now that it doubles as the outer ceiling for `setStaleTtl()`, it would also
+  arm a ceiling that expires everything. Callers that were passing a computed value must guard it
+  or omit the call.
+- `GrowthBookSDK.stopAutoRefreshFeatures()` now also releases the auto-refresh mode, not just the SSE
+  connection, so `startPolling()` works after SSE has been stopped (previously nothing claimed or
+  released the mode, since polling did not exist). `close()` stops polling as well as SSE.
+
+---
 ## [7.8.1] - 2026-09-02
 
 ### Changed

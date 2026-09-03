@@ -14,3 +14,9 @@ internal sealed interface FetchOutcome {
     data object NotModified : FetchOutcome
 }
 internal enum class Source { CACHE, NETWORK }
+
+internal sealed interface CacheOutcome {
+    object ServedFresh: CacheOutcome
+    object ServedStaleOrMiss: CacheOutcome
+    data class Expired(val stale: DecodedPayload): CacheOutcome
+}

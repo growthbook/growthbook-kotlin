@@ -118,6 +118,9 @@ class GBSDKBuilder(
     private var plugins: List<GrowthBookPlugin>? = null
     private var initialFeatures: GBFeatures? = null
     private var cacheMaxAge: Long? = null
+    private var refreshInterval: Long? = null
+    private var staleTtl: Long? = null
+    private var serveStaleOnError: Boolean = false
 
     // Dispatcher used to process fetched payloads. Defaults to the platform IO dispatcher in
     // production; tests inject a deterministic dispatcher (e.g. Dispatchers.Unconfined or a
@@ -219,15 +222,33 @@ class GBSDKBuilder(
      *
      * While the cache is younger than this age, the network call on the next
      * fetch is skipped and the cached features are served as the authoritative
-     * result. Once the cache is older, the SDK refetches from the network.
-     * This is a cache-staleness gate evaluated on the next fetch, not a
-     * background polling mechanism. When unset, the SDK always refetches.
-     * To force a network refresh regardless of this window, call
-     * [GrowthBookSDK.refreshCache].
+     * result. Once the cache is older, the SDK refetches from the network — the
+     * stale cache is still served (as a non-authoritative result) while that
+     * refresh runs, it is never dropped. This is a cache-staleness gate evaluated
+     * on the next fetch, not a background polling mechanism. When unset, the SDK
+     * always refetches. To force a network refresh regardless of this window,
+     * call [GrowthBookSDK.refreshCache].
+     *
+     * Pair this with [setStaleTtl] when you also need a hard staleness ceiling
+     * (past which the cache is no longer served at all); used alone, this window
+     * has no such cutoff.
+     *
+     * No effect when the SDK is built with `remoteEval = true`: a remote-eval
+     * payload is evaluated server-side against the current attributes while the
+     * cache is keyed only by API key, so that mode bypasses the feature cache
+     * entirely (nothing is read from it, nothing written to it) and always hits
+     * the network.
      *
      * @param cacheMaxAge freshness window in milliseconds.
+     * @throws IllegalArgumentException if [cacheMaxAge] is not positive. A non-positive
+     *   window makes every cache entry stale, which is indistinguishable from not
+     *   setting it at all — omit the setter instead. (Behaviour change in 7.9.0: this
+     *   was previously accepted and silently disabled the freshness window.)
+     * @see setStaleTtl
+     * @see setServeStaleOnError
      */
     fun setCacheMaxAge(cacheMaxAge: Long): GBSDKBuilder {
+        require(cacheMaxAge > 0) { "cacheMaxAge must be positive, was $cacheMaxAge" }
         this.cacheMaxAge = cacheMaxAge
         return this
     }
@@ -248,6 +269,83 @@ class GBSDKBuilder(
      */
     fun setPlugins(plugins: List<GrowthBookPlugin>): GBSDKBuilder {
         this.plugins = plugins
+        return this
+    }
+
+    /**
+     * Opt-in background polling interval in milliseconds.
+     *
+     * When set, [GrowthBookSDK.startPolling] launches a coroutine on the SDK's background scope
+     * that revalidates features from the network every [intervalMs]. It is a suspend loop, not a
+     * dedicated thread, so it is cheap while idle. Mutually exclusive with SSE auto-refresh, and SSE
+     * wins: starting SSE stops any running poller, while [GrowthBookSDK.startPolling] is a no-op while
+     * SSE is active. Disabled (null) by default.
+     *
+     * Mobile note: the SDK cannot observe app lifecycle, so tie [GrowthBookSDK.startPolling] /
+     * [GrowthBookSDK.stopPolling] to your foreground/background transitions to avoid draining the
+     * radio in the background. On mobile prefer SSE or the pull-on-access cache window
+     * ([setCacheMaxAge]); polling is intended mainly for long-lived JVM/backend usage.
+     */
+    fun setRefreshInterval(intervalMs: Long): GBSDKBuilder {
+        require(intervalMs > 0) { "refreshInterval must be positive, was $intervalMs" }
+        this.refreshInterval = intervalMs
+        return this
+    }
+
+    /**
+     * When true, an expired cache (older than [setCacheMaxAge], with [setStaleTtl] set) is served as
+     * a last-resort fallback if the revalidating network round fails — HTTP `stale-if-error`
+     * semantics, useful for offline resilience on mobile. Default false fails closed: past the
+     * ceiling nothing stale is served and the SDK falls back to code defaults. Only has an effect
+     * together with [setStaleTtl] + [setCacheMaxAge].
+     *
+     * Observability note: when the stale fallback is served after a failed refresh, it is applied as a
+     * non-authoritative payload and the refresh handler ([GBCacheRefreshHandler]) is **not** invoked —
+     * neither as success nor as failure. The handler's `(Boolean, GBError?)` contract cannot express
+     * "stale fallback served", so signalling either would mislead; treat `serveStaleOnError` as a
+     * best-effort offline safety net rather than a signal you can observe through the handler.
+     *
+     * Scope: this is a safety net for *automatic* refreshes (startup, background polling, the
+     * stale-while-revalidate round). It does not apply to an explicit
+     * [GrowthBookSDK.refreshCache], which reports the network failure through
+     * [GBCacheRefreshHandler] instead of quietly applying an expired payload — that refresh is
+     * coalesced with any in-flight round, and a per-caller fallback cannot be attributed once
+     * several callers share it.
+     *
+     * No effect when the SDK is built with `remoteEval = true`: that mode bypasses the feature cache
+     * entirely, so there is no expired entry to fall back to.
+     */
+    fun setServeStaleOnError(enabled: Boolean): GBSDKBuilder {
+        this.serveStaleOnError = enabled
+        return this
+    }
+
+    /**
+     * Inner "fresh" window (ms) that turns [setCacheMaxAge] into a full three-tier
+     * stale-while-revalidate policy:
+     *  - age < staleTtl                -> fresh: served from cache, network skipped
+     *  - staleTtl <= age < cacheMaxAge -> stale: served immediately while a background refresh runs
+     *  - age >= cacheMaxAge            -> expired: NOT served, refetched from the network (cache miss)
+     *
+     * Use `staleTtl` when you need both a low revalidation cadence AND a hard staleness ceiling
+     * (e.g. "revalidate at most once a minute, but never serve data older than 24h"). Pair it with
+     * [setCacheMaxAge] as the outer ceiling; when both are set `ttlMs` must be `< cacheMaxAge`
+     * (enforced at construction). Set on its own (without [setCacheMaxAge]) `staleTtl` is just the
+     * inner "fresh" window with no hard cutoff — a cache past it is served while revalidating.
+     * When `staleTtl` is unset, [setCacheMaxAge] alone governs the skip-network window with NO hard
+     * cutoff (it keeps serving stale beyond the window while revalidating) — the pre-existing
+     * behaviour.
+     *
+     * No effect when the SDK is built with `remoteEval = true`: that mode bypasses the feature cache
+     * entirely, so there is no cached entry to classify.
+     *
+     * @throws IllegalArgumentException if [ttlMs] is not positive. A non-positive window would leave
+     *   no "fresh" zone at all (every cache entry classified stale), which is never what a caller
+     *   means — omit the setter instead.
+     */
+    fun setStaleTtl(ttlMs: Long): GBSDKBuilder {
+        require(ttlMs > 0) { "staleTtl must be positive, was $ttlMs" }
+        this.staleTtl = ttlMs
         return this
     }
 
@@ -291,6 +389,9 @@ class GBSDKBuilder(
             networkDispatcher,
             cachingEnabled = cachingEnabled,
             cacheMaxAge = cacheMaxAge,
+            refreshInterval = refreshInterval,
+            staleTtl = staleTtl,
+            serveStaleOnError = serveStaleOnError,
             coroutineContext = coroutineContext,
             featuresChangeHandler = featuresChangeHandler,
             cachingLayer = customCachingLayer
@@ -354,6 +455,9 @@ class GBSDKBuilder(
                 networkDispatcher,
                 cachingEnabled = cachingEnabled,
                 cacheMaxAge = cacheMaxAge,
+                refreshInterval = refreshInterval,
+                staleTtl = staleTtl,
+                serveStaleOnError = serveStaleOnError,
                 coroutineContext = coroutineContext,
                 featuresChangeHandler = featuresChangeHandler,
                 cachingLayer = customCachingLayer

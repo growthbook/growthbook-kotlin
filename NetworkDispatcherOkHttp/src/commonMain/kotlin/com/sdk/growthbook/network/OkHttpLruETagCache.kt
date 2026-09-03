@@ -30,11 +30,17 @@ internal class OkHttpLruETagCache(private val maxSize: Int = 100) {
     
     /**
      * Retrieves the ETag for the given URL.
-     * 
+     *
+     * Uses the WRITE lock, not the read lock: because the backing [LinkedHashMap] is access-ordered
+     * (LRU), a `get` structurally mutates it (LinkedHashMap.afterNodeAccess moves the entry to the
+     * tail, rewriting head/tail/before/after and bumping modCount). Under the shared read lock,
+     * concurrent gets would corrupt that linked list and desync size/eviction — so this must be an
+     * exclusive operation.
+     *
      * @param url The URL key
      * @return The ETag value, or null if not present
      */
-    fun get(url: String): String? = lock.read {
+    fun get(url: String): String? = lock.write {
         cache[url]
     }
     
