@@ -11,9 +11,12 @@ import com.sdk.growthbook.serializable_model.SerializableFeaturesDataModel
 import com.sdk.growthbook.serializable_model.gbDeserialize
 import com.sdk.growthbook.utils.FeatureRefreshStrategy
 import com.sdk.growthbook.utils.GBFeatures
+import com.sdk.growthbook.utils.GBFetchStats
+import com.sdk.growthbook.utils.GBFetchStatsHandler
 import com.sdk.growthbook.utils.GBRemoteEvalParams
 import com.sdk.growthbook.utils.Resource
 import com.sdk.growthbook.utils.SSEConnectionController
+import kotlin.time.TimeSource
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.transform
 import kotlinx.serialization.json.Json
@@ -27,7 +30,8 @@ internal class FeaturesDataSource(
     private val dispatcher: NetworkDispatcher,
     private val gbContext: GBContext,
     private val gbOptions: GBOptions,
-    val sseController: SSEConnectionController = SSEConnectionController()
+    val sseController: SSEConnectionController = SSEConnectionController(),
+    private val onFetchStats: GBFetchStatsHandler? = null,
 ) {
 
     private val jsonParser: Json
@@ -52,34 +56,45 @@ internal class FeaturesDataSource(
         failure: (Throwable?) -> Unit,
         onNotModified: (() -> Unit)
     ) {
+        val startedAt = TimeSource.Monotonic.markNow()
+        // Reported before parsing, so the duration is the fetch and not the SDK's own decode work.
+        fun report(ok: Boolean, bytes: Int?) = onFetchStats?.invoke(
+            GBFetchStats(
+                success = ok,
+                durationMillis = startedAt.elapsedNow().inWholeMilliseconds,
+                payloadBytes = bytes,
+            )
+        )
+
+        val onSuccess: (String) -> Unit = { rawContent ->
+            report(ok = true, bytes = rawContent.encodeToByteArray().size)
+            val result = jsonParser.decodeFromString(
+                deserializer = SerializableFeaturesDataModel.serializer(),
+                string = rawContent
+            )
+            success.invoke(result.gbDeserialize())
+        }
+        val onError: (Throwable) -> Unit = { apiTimeError ->
+            report(ok = false, bytes = null)
+            apiTimeError.also(failure)
+        }
+
         if (dispatcher is NetworkDispatcherWithNotModified) {
             dispatcher.consumeGETRequestWithNotModified(
                 request = getEndpoint(),
-                onSuccess = { rawContent ->
-                    val result = jsonParser.decodeFromString(
-                        deserializer = SerializableFeaturesDataModel.serializer(),
-                        string = rawContent
-                    )
-                    success.invoke(result.gbDeserialize())
-                },
-                onError = { apiTimeError ->
-                    apiTimeError.also(failure)
-                },
-                onNotModified = onNotModified
+                onSuccess = onSuccess,
+                onError = onError,
+                onNotModified = {
+                    report(ok = true, bytes = 0)
+                    onNotModified()
+                }
             )
         } else {
             dispatcher.consumeGETRequest(
                 request = getEndpoint(),
-                onSuccess = { rawContent ->
-                    val result = jsonParser.decodeFromString(
-                        deserializer = SerializableFeaturesDataModel.serializer(),
-                        string = rawContent
-                    )
-                    success.invoke(result.gbDeserialize())
-                },
-                onError = { apiTimeError ->
-                    apiTimeError.also(failure)
-                })
+                onSuccess = onSuccess,
+                onError = onError
+            )
         }
     }
 
