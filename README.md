@@ -21,7 +21,7 @@ See [CHANGELOG.md](CHANGELOG.md) for version history.
 
 App level build.gradle (Groovy DSL):
 
-```kotlin
+```groovy
 repositories {
     mavenCentral()
 }
@@ -35,6 +35,10 @@ dependencies {
     implementation 'io.growthbook.sdk:NetworkDispatcherKtor:1.2.0'
     // 2) NetworkDispatcherOkHttp — supports Android and JVM only
     implementation 'io.growthbook.sdk:NetworkDispatcherOkHttp:1.1.1'
+    
+    // Optional: Redis-backed sticky bucketing and feature cache — server-side JVM only.
+    // See "Redis (GrowthBookRedis)" below; you also add the Redis client of your choice.
+    implementation 'io.growthbook.sdk:GrowthBookRedis:1.0.0'
 }
 ```
 
@@ -133,7 +137,7 @@ var sdkInstance: GrowthBookSDK = GBSDKBuilder(
     .initialize()
 ```
 
-Values are opaque JSON strings keyed by filename — persist and return them verbatim. When set, the custom layer replaces the built-in cache for both feature definitions and sticky-bucket storage. It may be called in any order relative to the sticky-bucket setters.
+Values are opaque JSON strings keyed by filename — persist and return them verbatim. When set, the custom layer replaces the built-in cache for feature definitions, and also backs the **default** sticky-bucket service. It may be called in any order relative to the sticky-bucket setters. Note that passing your own service to `setStickyBucketService(GBStickyBucketService)` means that service owns its storage — the caching layer is not used for sticky buckets in that case.
 
 #### Cache freshness window (`setCacheMaxAge`)
 
@@ -690,6 +694,158 @@ class GBStickyBucketServiceImp(
     }
 }
 ```
+
+## Redis (GrowthBookRedis)
+
+`io.growthbook.sdk:GrowthBookRedis` stores sticky bucket assignments and the feature cache in Redis,
+so every instance of a horizontally scaled service shares one store instead of keeping its own.
+
+It is **Kotlin/JVM only and intended for server-side use**. There is deliberately no Android target:
+Redis has no per-user authorization, so credentials shipped in an app plus a reachable port would let
+any user read or overwrite everyone's assignments. On mobile, use the on-device cache with the
+default sticky bucket service, or remote evaluation.
+
+Both Redis clients are `compileOnly`, so the artifact pulls in neither — add the one you use:
+
+```groovy
+dependencies {
+    implementation 'io.growthbook.sdk:GrowthBookRedis:1.0.0'
+
+    // pick one
+    implementation 'redis.clients:jedis:8.0.0'
+    // implementation 'io.lettuce:lettuce-core:7.7.0.RELEASE'
+}
+```
+
+### Sticky bucketing
+
+```kotlin
+import com.sdk.growthbook.redis.jedis   // the factory lives next to the Jedis adapter
+
+val jedis = RedisClient.create("localhost", 6379)   // redis.clients.jedis.RedisClient
+
+val sdkInstance = GBSDKBuilder(
+    apiKey = <API_KEY>,
+    hostURL = <GrowthBook_URL>,
+    attributes = <Hashmap>,
+    trackingCallback = { _, _ -> },
+    networkDispatcher = GBNetworkDispatcherKtor(),
+)
+    .setStickyBucketService(
+        GBRedisStickyBucketService.jedis(jedis, applicationScope)
+    )
+    .initialize()
+```
+
+Use `GBRedisStickyBucketService.lettuce(connection, applicationScope)` for Lettuce (from
+`com.sdk.growthbook.redis.lettuce`), where `connection` is a `StatefulRedisConnection<String, String>`.
+Both factories also accept a `keyPrefix`, a `ttl` and an `onError` callback. The client's lifecycle
+stays with you — the module never closes it. Each client's factories live in their own file so no
+class carries both clients' types, which keeps eager analysers such as GraalVM native-image happy.
+
+Sticky bucketing always goes through this service. `setCachingLayer(GBRedisCachingLayer(...))`
+routes only the feature cache — see below.
+
+Documents are stored as one JSON string per user under `<keyPrefix><attributeName>||<attributeValue>`,
+and `getAllAssignments` reads them all in a single `MGET`. The key prefix is **empty by default on
+purpose**: that layout matches the TypeScript SDK's `RedisStickyBucketService`, so a fleet running
+both shares assignments. Setting a prefix isolates this SDK from it.
+
+#### Concurrent writes
+
+A document is written whole, and its assignments were merged in memory against the snapshot that
+instance last read. Two instances whose snapshots predate either write will overwrite each other:
+
+```
+A and B both read id||u42  ->  empty
+A buckets "checkout"       ->  SET id||u42 {checkout: variant}
+B buckets "banner"         ->  SET id||u42 {banner: control}     // checkout is gone
+```
+
+The lost assignment is rebucketed next time. Bucketing is deterministic, so the user normally lands
+in the same variation — unless the experiment's weights, coverage or variations changed in between,
+which is precisely the case sticky bucketing protects against. The window opens only when two
+instances evaluate *different* experiments for the *same* user at nearly the same time, and stays
+shut when a load balancer pins users to an instance.
+
+This comes with sharing one store rather than being specific to this SDK: the TypeScript Redis
+service writes the whole document too, and the per-process file cache could not hit it at all.
+Closing it would take an atomic read-merge-write (a Lua script behind an opt-in capability
+interface); that is left for a future release, since in a fleet shared with another SDK it would
+only protect this SDK's own writes.
+
+#### Expiry
+
+Assignments are written **without a TTL by default**, matching the TypeScript Redis service, which
+writes with a plain `SET` — an assignment must outlive any single process, so a user keeps the same variation across
+restarts and across a scaled fleet. The cost is unbounded growth where identifiers are anonymous or
+high-cardinality, which under `maxmemory` + `allkeys-lru` also pressures your other keys. Set a
+`ttl` there and accept the trade-off:
+
+```kotlin
+GBRedisStickyBucketService.jedis(jedis, applicationScope, ttl = 180.days)
+```
+
+A returning user past the TTL is rebucketed. Two caveats: the value must be at least one second
+(Redis rejects `EX 0`, so a shorter duration is rejected at construction), and in a fleet shared
+with the TypeScript service its `SET` without an expiry clears the TTL this service applied.
+
+### Feature cache
+
+`GBCachingLayer` is synchronous and the SDK reads it inside the non-suspending `initialize()`, so
+`GBRedisCachingLayer` answers reads from memory and talks to Redis around them. Warm it up first:
+
+```kotlin
+val cache = GBRedisCachingLayer.jedis(jedis, applicationScope, clientKey = <API_KEY>)
+cache.warmUp()                        // suspend — one Redis round trip
+
+val sdkInstance = GBSDKBuilder(/* ... */)
+    .setStickyBucketService(GBRedisStickyBucketService.jedis(jedis, applicationScope))
+    .setCachingLayer(cache)
+    .initialize()
+```
+
+Skipping the warm-up is allowed: the first start simply misses the cache and fetches from the
+network. Unlike the sticky bucket layout, this one has no counterpart in another GrowthBook SDK —
+the payload is stored as this SDK writes it, with its own `cachedAt` inside, so do not expect
+another SDK to read it.
+
+The cached payload is written **without a TTL by default**: the cache holds one key per client key
+so it does not grow, and its age already lives inside the payload, which `setCacheMaxAge` gates on.
+Pass a `ttl` to bound how stale a cold instance's first answer may be — past it the key is gone and
+that instance simply fetches from the network.
+
+**The layer backs the feature cache only, so pair it with the sticky bucket service** as above.
+`setCachingLayer` normally also routes the *default* sticky bucket service through the layer, and
+`GBRedisCachingLayer` cannot serve that: sticky documents are keyed per user and read
+synchronously, so they can never be warmed up ahead of time. Asked for any key other than its own
+feature cache, the layer touches neither Redis nor memory and reports a
+`GBRedisCacheScopeException` through `onError` — the assignments would otherwise be written to
+Redis and never read back, silently rebucketing every user on restart. Passing
+`GBRedisStickyBucketService` explicitly takes precedence and is the supported setup.
+
+### Failure behaviour
+
+Redis errors and malformed payloads degrade to a miss and are passed to the optional `onError`
+callback rather than thrown — an outage must not fail evaluation or initialization, and sticky
+assignments are written from a fire-and-forget coroutine where a throw would cancel your scope.
+`CancellationException` is always rethrown.
+
+### Another Redis client
+
+Both the sticky bucket service and the caching layer are built on a three-method seam, so any client
+can be plugged in without waiting for an adapter:
+
+```kotlin
+interface GBRedisCommands {
+    suspend fun get(key: String): String?
+    suspend fun set(key: String, value: String, ttlSeconds: Long?)  // null = no expiry
+    suspend fun mget(keys: List<String>): List<String?>   // positionally aligned with keys
+}
+```
+
+On Redis Cluster, note that `MGET` across keys in different slots is rejected with `CROSSSLOT` and
+degrades to a miss; implement `mget` with a slot-aware fan-out if you need it.
 
 ## License
 
