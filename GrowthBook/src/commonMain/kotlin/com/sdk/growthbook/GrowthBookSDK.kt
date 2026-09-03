@@ -43,6 +43,14 @@ import com.sdk.growthbook.sandbox.GBCachingLayer
 import com.sdk.growthbook.sandbox.GBCachingLayerAdapter
 import com.sdk.growthbook.utils.GBUtils.Companion.refreshStickyBuckets
 import com.sdk.growthbook.model.diffFeatures
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
 import kotlin.experimental.ExperimentalObjCRefinement
@@ -131,6 +139,28 @@ class GrowthBookSDK internal constructor(
     private var hasFeaturesPayload: Boolean = gbContext.features.isNotEmpty()
     var pluginRegistry: PluginRegistry? = null
 
+    // Scope backing the reactive StateFlows ([featuresStateFlow]). Independent of the payload
+    // pipeline scope (own SupervisorJob) and cancelled in [close].
+    private val reactiveScope: CoroutineScope = CoroutineScope(coroutineContext + SupervisorJob())
+
+    /**
+     * Reactive stream of the full feature map. Emits the current snapshot on
+     * subscription and a new value every time features are replaced — from a network
+     * fetch, disk cache, [GBSDKBuilder.setInitialFeatures] seed, [setEncryptedFeatures], or SSE
+     * auto-refresh. Backed by a [StateFlow], so [StateFlow.value] is always the
+     * currently loaded map (the same value [getFeatures] returns).
+     *
+     * Hidden from Objective-C/Swift: Kotlin Flow has no native ObjC representation.
+     * Apple consumers should read [getFeatures] or bridge the flow via SKIE.
+     */
+    @OptIn(ExperimentalObjCRefinement::class)
+    @HiddenFromObjC
+    val featuresStateFlow: StateFlow<GBFeatures> =
+        gbContext.snapshotFlow
+            .map { it.features }
+            .distinctUntilChanged()
+            .stateIn(reactiveScope, SharingStarted.Eagerly, gbContext.evalSnapshot().features)
+
     /**
      * JAVA Consumers preset Features
      * SDK will not call API to fetch Features List
@@ -184,6 +214,60 @@ class GrowthBookSDK internal constructor(
             featuresViewModel.revalidate()
         }
     }
+
+    /**
+     * Suspend variant of [refreshCache]: awaits the coalesced network refresh
+     * (payload applied + sticky buckets refreshed) and reports whether features
+     * are usable afterwards.
+     *
+     * @return true if the refresh succeeded. A 304 Not Modified counts as success only when a feature
+     * payload has already been loaded (the cached payload stays valid); a 304 received before any
+     * payload exists returns false, mirroring [featuresNotModified]. Returns false when the network
+     * round failed.
+     *
+     * In remote-eval mode the underlying refresh issues the personalized remote-eval
+     * POST (see [FeaturesViewModel.awaitRefresh]), the same path [suspendFeature] uses,
+     * so it does not surface non-personalized definitions. A round repeatedly superseded by newer
+     * remote-eval generations is re-joined up to [MAX_SUPERSEDED_ROUNDS] times before returning.
+     */
+    suspend fun refreshCacheSuspend(): Boolean {
+        var superseded = 0
+        while (true) {
+            return when (featuresViewModel.awaitRefresh()) {
+                FetchResult.Success -> true
+                // A 304 only means "usable" if a payload was already loaded. A 304 received before
+                // any payload exists is treated as a failure (mirrors featuresNotModified()), so the
+                // caller retries instead of being told empty features are ready.
+                FetchResult.NotModified -> hasFeaturesPayload
+                FetchResult.Failed -> false
+                FetchResult.Superseded ->
+                    if (++superseded > MAX_SUPERSEDED_ROUNDS) hasFeaturesPayload
+                    else continue
+            }
+        }
+    }
+
+    /**
+     * Reactive stream of a single feature's evaluated [GBFeatureResult]. Re-evaluates whenever any
+     * evaluation input changes — features, attributes, attribute overrides, forced features/variations
+     * or saved groups (it observes the full state snapshot, not just the feature map) — and only
+     * forwards distinct results.
+     *
+     * The reactive re-evaluations pass through a fully silent evaluation: they fire neither the
+     * `featureUsageCallback` nor the experiment `trackingCallback`, do not notify registered
+     * [com.sdk.growthbook.plugin.tracking.GrowthBookPlugin]s (so the built-in tracking plugin sends
+     * nothing), and do not touch the shared tracking-dedup state — observing a feature via the flow
+     * inflates neither usage analytics nor experiment exposures. Only explicit [feature] access
+     * reports usage and fires exposures.
+     *
+     * Hidden from Objective-C/Swift for the same reason as [featuresStateFlow].
+     */
+    @OptIn(ExperimentalObjCRefinement::class)
+    @HiddenFromObjC
+    fun featureFlow(id: String): Flow<GBFeatureResult> =
+        gbContext.snapshotFlow
+            .map { evaluateFeature(id, true) }
+            .distinctUntilChanged()
 
     /**
      * Get Context - Holding the complete data regarding cached features & attributes etc.
@@ -259,6 +343,7 @@ class GrowthBookSDK internal constructor(
     fun close() {
         pluginRegistry?.closeAll()
         featuresViewModel.close()
+        reactiveScope.cancel()
     }
 
     /**
@@ -383,6 +468,7 @@ class GrowthBookSDK internal constructor(
             maxAttempts = MAX_RETRY_ATTEMPTS,
         )
         var attempt = 0
+        var superseded = 0
 
         while (true) {
             when (remoteSourceFeaturesFetchResult) {
@@ -398,7 +484,10 @@ class GrowthBookSDK internal constructor(
                     // A superseded round is not a failure (nothing went wrong, its payload was just
                     // discarded by a newer generation): re-join the latest generation without burning
                     // a retry attempt or applying backoff.
-                    if (featuresViewModel.awaitRefresh() == FetchResult.Superseded) continue
+                    if (featuresViewModel.awaitRefresh() == FetchResult.Superseded) {
+                        if (++superseded > MAX_SUPERSEDED_ROUNDS) return feature(id)
+                        else continue
+                    }
                     if (remoteSourceFeaturesFetchResult != FeaturesFetchResult.Failed) continue
                     val delaysMs = backOff.delayFor(attempt)
                     if (gbContext.enableLogging) {
@@ -425,13 +514,17 @@ class GrowthBookSDK internal constructor(
     override fun feature(id: String): GBFeatureResult {
         // Single atomic snapshot for every evaluation input (attributes, forced features/variations,
         // attribute overrides, sticky docs), so a concurrent setter can't yield a torn mix.
-        val snapshot = gbContext.evalSnapshot()
-        val evalContext = createEvaluationContext(snapshot)
-        val evaluator = GBFeatureEvaluator(evalContext, snapshot.forcedFeatures)
-        val result = evaluator.evaluateFeature(featureKey = id, attributeOverrides = snapshot.attributeOverrides)
+        val result = evaluateFeature(id, false)
         // Newly-generated sticky assignments are merged into the context per-key during evaluation
         // (see EvaluationContext.onStickyAssignmentChanged) — no whole-map write-back needed here.
         return result
+    }
+
+    private fun evaluateFeature(id: String, silent: Boolean): GBFeatureResult {
+        val snapshot = gbContext.evalSnapshot()
+        val evalContext = createEvaluationContext(snapshot, silent)
+        val evaluator = GBFeatureEvaluator(evalContext, snapshot.forcedFeatures)
+        return evaluator.evaluateFeature(featureKey = id, attributeOverrides = snapshot.attributeOverrides)
     }
 
     /**
@@ -751,8 +844,27 @@ class GrowthBookSDK internal constructor(
         NoResultYet, Success, Failed
     }
 
-    private fun createEvaluationContext(snapshot: EvalSnapshot = gbContext.evalSnapshot()) =
-        createEvaluationContext(gbContext, gbExperimentHelper, snapshot, pluginRegistry)
+    private fun createEvaluationContext(
+        snapshot: EvalSnapshot = gbContext.evalSnapshot(),
+        silent: Boolean = false
+    ) = createEvaluationContext(
+        gbContext,
+        // A silent (reactive) evaluation must not touch the shared tracking-dedup state:
+        // GBExperimentHelper.isTracked() marks the experiment as tracked as a side effect, which
+        // would suppress the real exposure on a later feature()/run() call. Give silent evals a
+        // throwaway helper so the shared one stays clean (paired with the no-op trackingCallback
+        // below, which keeps the silent pass from firing anything).
+        if (silent) GBExperimentHelper() else gbExperimentHelper,
+        snapshot,
+        // Plugins are muted for a silent evaluation too, not just the callbacks: the evaluators fire
+        // pluginRegistry.fireFeatureEvaluated/fireExperimentViewed right next to onFeatureUsage /
+        // trackingCallback, so leaving the registry in place would let the built-in tracking plugin
+        // POST an exposure for every reactive re-evaluation. Worse than the callback case: the
+        // exposure fire is gated by GBExperimentHelper.isTracked(), and the throwaway helper above is
+        // empty on every pass, so the dedup would never suppress anything.
+        if (silent) null else pluginRegistry,
+        silent
+    )
 
     //@ThreadLocal
     internal companion object {
@@ -762,6 +874,7 @@ class GrowthBookSDK internal constructor(
         private const val INITIAL_RETRY_DELAY_MILLIS = 1000L
         private const val MAX_RETRY_DELAY_MILLIS = 60_000L
         private const val MAX_RETRY_ATTEMPTS = 5
+        private const val MAX_SUPERSEDED_ROUNDS = 5
 
         private fun createEvaluationContext(
             gbContext: GBContext,
@@ -771,7 +884,8 @@ class GrowthBookSDK internal constructor(
             // snapshot, so the evaluation can never observe a torn mix (e.g. new features with stale
             // sticky docs, or new attributes with old overrides). Callers pass the snapshot they read.
             snapshot: EvalSnapshot,
-            pluginRegistry: PluginRegistry?
+            pluginRegistry: PluginRegistry?,
+            silent: Boolean
         ): EvaluationContext {
             return EvaluationContext(
                 enabled = gbContext.enabled,
@@ -779,9 +893,9 @@ class GrowthBookSDK internal constructor(
                 savedGroups = snapshot.savedGroups,
                 gbExperimentHelper = gbExperimentHelper,
                 loggingEnabled = gbContext.enableLogging,
-                onFeatureUsage = gbContext.onFeatureUsage,
+                onFeatureUsage = if (silent) null else gbContext.onFeatureUsage,
                 forcedVariations = snapshot.forcedVariations,
-                trackingCallback = gbContext.trackingCallback,
+                trackingCallback = if (silent) { _, _ -> } else gbContext.trackingCallback,
                 stickyBucketService = gbContext.stickyBucketService,
                 userContext = UserContext(
                     qaMode = gbContext.qaMode,
@@ -795,7 +909,7 @@ class GrowthBookSDK internal constructor(
                     gbContext.mergeStickyAssignmentDoc(key, doc)
                 },
                 stackContext = StackContext(null, mutableSetOf()),
-                pluginRegistry = pluginRegistry
+                pluginRegistry = if (silent) null else pluginRegistry
             )
         }
     }

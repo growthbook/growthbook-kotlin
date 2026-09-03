@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [7.10.0] - Unreleased
+
+### Added
+- Reactive feature-observation API. `GrowthBookSDK.featuresStateFlow: StateFlow<GBFeatures>` exposes
+  the current feature map as a coroutine flow, and `GrowthBookSDK.featureFlow(id): Flow<GBFeatureResult>`
+  streams a single feature's evaluated result (de-duplicated via `distinctUntilChanged`). Both derive
+  from a single observable state snapshot on the context, so they can never diverge from the evaluated
+  state under concurrent writers. `featuresStateFlow` emits on every feature change — network fetch,
+  disk cache, `setInitialFeatures` seed, `setEncryptedFeatures`, and SSE. `featureFlow(id)`
+  re-evaluates on any change that can affect the result — feature definitions **and** attributes,
+  attribute overrides, forced features and saved groups — and its reactive re-evaluations use a fully
+  silent evaluation: they fire **neither** the `featureUsageCallback` **nor** the experiment
+  `trackingCallback`, do not notify registered `GrowthBookPlugin`s (so the built-in tracking plugin
+  sends nothing), and do not touch the tracking-dedup state. Observing a feature via the flow
+  therefore inflates neither usage analytics nor experiment exposures — only explicit `feature()`
+  access reports usage and fires exposures. Both are `@HiddenFromObjC` (Kotlin `Flow` has no native Objective-C
+  representation); Apple consumers read `getFeatures()` or bridge via SKIE.
+- `GrowthBookSDK.refreshCacheSuspend(): Boolean` — coroutine variant of `refreshCache()` that awaits
+  the network round and returns `true` on success. A 304 Not Modified counts as success only when a
+  payload has already been loaded (cached payload stays valid); a 304 before any payload exists returns
+  `false`, as does a failed round. In remote-eval mode it issues the personalized remote-eval POST
+  (same path as `suspendFeature()`), so it never surfaces non-personalized definitions.
+
+---
 ## [7.9.0] - 2026-09-03
 
 ### Added

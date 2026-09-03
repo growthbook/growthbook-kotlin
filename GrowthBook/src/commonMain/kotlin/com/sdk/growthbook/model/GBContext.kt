@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalAtomicApi::class)
-
 package com.sdk.growthbook.model
 
 import com.sdk.growthbook.GBTrackingCallback
@@ -8,8 +6,10 @@ import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.utils.GBStickyAssignmentsDocument
 import com.sdk.growthbook.utils.GBStickyAttributeKey
 import com.sdk.growthbook.stickybucket.GBStickyBucketService
-import kotlin.concurrent.atomics.AtomicReference
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 internal typealias FeatureUsageFuncCallback = (String, GBFeatureResult) -> Unit
 internal typealias StickyBucketAssignmentDocsType = Map<GBStickyAttributeKey, GBStickyAssignmentsDocument>
@@ -19,7 +19,7 @@ internal typealias StickyBucketAssignmentDocsType = Map<GBStickyAttributeKey, GB
  *
  * These fields are written by the background payload pipeline (network fetch + sticky-bucket refresh)
  * and read synchronously by feature()/run(). They are published together as a single immutable value
- * behind an AtomicReference, so any reader observes a fully consistent set — there is no window where,
+ * behind a MutableStateFlow, so any reader observes a fully consistent set — there is no window where,
  * e.g., new [features] are visible while [stickyBucketAssignmentDocs] are still stale.
  */
 internal data class EvalSnapshot(
@@ -37,10 +37,11 @@ internal data class EvalSnapshot(
  * Defines the GrowthBook context.
  *
  * The cross-thread-shared evaluation inputs (features, attributes, forced variations, sticky-bucket
- * state, saved groups) are kept in a single [EvalSnapshot] behind an [AtomicReference]. Reads return
- * the current snapshot; writes atomically swap in a copy with the changed field (CAS loop, so
- * concurrent writers never lose each other's updates). For a consistent multi-field read during
- * evaluation, use [evalSnapshot] rather than reading the individual properties one by one.
+ * state, saved groups) are kept in a single [EvalSnapshot] behind a [kotlinx.coroutines.flow.MutableStateFlow].
+ * Reads return the current snapshot; writes atomically swap in a copy with the changed field (via
+ * [kotlinx.coroutines.flow.update]'s CAS loop, so concurrent writers never lose each other's updates)
+ * and publish it to observers. For a consistent multi-field read during evaluation, use [evalSnapshot]
+ * rather than reading the individual properties one by one.
  */
 class GBContext(
 
@@ -132,7 +133,7 @@ class GBContext(
     var plugins: List<GrowthBookPlugin>? = null
 
     // Single source of truth for all cross-thread-shared evaluation inputs.
-    private val state = AtomicReference(
+    private val state = MutableStateFlow(
         EvalSnapshot(
             attributes = attributes,
             forcedVariations = forcedVariations,
@@ -141,39 +142,38 @@ class GBContext(
             savedGroups = savedGroups,
         )
     )
+    // Single observable source of truth for evaluation inputs. Reactive consumers (featuresStateFlow,
+    // featureFlow) derive from this snapshot, so they react to ANY input change — features, attributes,
+    // overrides, forced values, saved groups — and can never diverge from the committed state.
+    internal val snapshotFlow: StateFlow<EvalSnapshot> = state.asStateFlow()
 
     /**
      * Atomically read the full evaluation-input snapshot. Evaluation must use this (one read) instead
      * of reading the individual properties separately, so it operates on a single consistent state.
      */
-    internal fun evalSnapshot(): EvalSnapshot = state.load()
+    internal fun evalSnapshot(): EvalSnapshot = state.value
 
-    private fun mutate(transform: (EvalSnapshot) -> EvalSnapshot) {
-        while (true) {
-            val current = state.load()
-            if (state.compareAndSet(current, transform(current))) return
-        }
-    }
+    private fun mutate(transform: (EvalSnapshot) -> EvalSnapshot) = state.update(transform)
 
     /**
      * Map of user attributes that are used to assign variations
      */
     internal var attributes: Map<String, GBValue>
-        get() = state.load().attributes
+        get() = state.value.attributes
         set(value) = mutate { it.copy(attributes = value) }
 
     /**
      * Force specific experiments to always assign a specific variation (used for QA)
      */
     var forcedVariations: Map<String, Number>
-        get() = state.load().forcedVariations
+        get() = state.value.forcedVariations
         set(value) = mutate { it.copy(forcedVariations = value) }
 
     /**
      * Map of Sticky Bucket documents
      */
     var stickyBucketAssignmentDocs: StickyBucketAssignmentDocsType?
-        get() = state.load().stickyBucketAssignmentDocs
+        get() = state.value.stickyBucketAssignmentDocs
         set(value) = mutate { it.copy(stickyBucketAssignmentDocs = value) }
 
     /**
@@ -227,7 +227,7 @@ class GBContext(
      * no happens-before guarantee).
      */
     internal var forcedFeatures: Map<String, GBValue>
-        get() = state.load().forcedFeatures
+        get() = state.value.forcedFeatures
         set(value) = mutate { it.copy(forcedFeatures = value) }
 
     /**
@@ -235,27 +235,27 @@ class GBContext(
      * evaluation inputs (previously a plain field on GrowthBookSDK with no happens-before guarantee).
      */
     internal var attributeOverrides: Map<String, GBValue>
-        get() = state.load().attributeOverrides
+        get() = state.value.attributeOverrides
         set(value) = mutate { it.copy(attributeOverrides = value) }
 
     /**
      * List of user's attributes keys
      */
     var stickyBucketIdentifierAttributes: List<String>?
-        get() = state.load().stickyBucketIdentifierAttributes
+        get() = state.value.stickyBucketIdentifierAttributes
         set(value) = mutate { it.copy(stickyBucketIdentifierAttributes = value) }
 
     /**
      * Saved groups used by feature/experiment conditions
      */
     var savedGroups: Map<String, GBValue>?
-        get() = state.load().savedGroups
+        get() = state.value.savedGroups
         set(value) = mutate { it.copy(savedGroups = value) }
 
     // Keys are unique identifiers for the features and the values are Feature objects.
     // Feature definitions - To be pulled from API / Cache.
     internal var features: GBFeatures
-        get() = state.load().features
+        get() = state.value.features
         set(value) = mutate { it.copy(features = value) }
 }
 
