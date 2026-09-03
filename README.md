@@ -41,13 +41,13 @@ repositories {
 
 dependencies {
     // Add GrowthBook module:
-    implementation 'io.growthbook.sdk:GrowthBook:7.7.0'
+    implementation 'io.growthbook.sdk:GrowthBook:7.10.0'
 
     // Add Network Dispatcher you prefer:
     // 1) NetworkDispatcherKtor — supports Android, iOS, JVM, JS, Wasm
     implementation 'io.growthbook.sdk:NetworkDispatcherKtor:1.2.0'
     // 2) NetworkDispatcherOkHttp — supports Android and JVM only
-    implementation 'io.growthbook.sdk:NetworkDispatcherOkHttp:1.1.0'
+    implementation 'io.growthbook.sdk:NetworkDispatcherOkHttp:1.1.1'
 }
 ```
 
@@ -87,7 +87,7 @@ var sdkInstance: GrowthBookSDK = GBSDKBuilder(
 ```
 If you are accessing features the first time there will be no features right after `initialize()` method call because features are not got from Backend yet. If you need to access features as soon as possible, you need to use `GBCacheRefreshHandler`. You can pass your implementation of `GBCacheRefreshHandler` through `setRefreshHandler()` method.
 
-> **Threading:** the fetched payload is processed on a background dispatcher, so `GBCacheRefreshHandler` is invoked off the main thread. Marshal back to your UI thread yourself if the callback touches UI state. `feature()`/`run()` are safe to call from any thread and always evaluate against a single consistent snapshot of the loaded state.
+> **Threading:** the fetched payload is processed on a background dispatcher, so `GBCacheRefreshHandler` is invoked off the main thread. Marshal back to your UI thread yourself if the callback touches UI state. An exception thrown by your handler is caught and logged, not propagated (so it cannot crash the background scope). `feature()`/`run()` are safe to call from any thread and always evaluate against a single consistent snapshot of the loaded state.
 
 #### There are additional properties which can be setup at the time of initialization
 
@@ -164,7 +164,63 @@ var sdkInstance: GrowthBookSDK = GBSDKBuilder(
     .initialize()
 ```
 
-An explicit `refreshCache()` call always bypasses this window and hits the network regardless of how fresh the cache is.
+An explicit `refreshCache()` call always bypasses this window and hits the network regardless of how fresh the cache is. The window must be positive — `setCacheMaxAge` throws `IllegalArgumentException` for zero or negative values (as of 7.9.0; previously such a value was accepted and silently disabled the window).
+
+> **Not applicable in Remote Evaluation mode.** With `remoteEval = true` the feature cache is bypassed entirely — payloads are evaluated server-side against the current attributes, while the cache is keyed only by API key, so a cached payload could leak a previous user's evaluation to the next one on the same key. Every fetch goes to the network and nothing is persisted, which makes `setCacheMaxAge`, `setStaleTtl` and `setServeStaleOnError` no-ops in that mode.
+
+#### Stale-while-revalidate (`setStaleTtl` + `setCacheMaxAge`)
+
+`setStaleTtl(<ms>)` turns `setCacheMaxAge` into a full three-tier stale-while-revalidate policy, where `staleTtl` is the inner "fresh" window and `cacheMaxAge` is the outer hard ceiling:
+
+| Cache age | Behaviour |
+|---|---|
+| `age < staleTtl` | **fresh** — served from cache, network skipped |
+| `staleTtl ≤ age < cacheMaxAge` | **stale** — served immediately (never blocks) while a background refresh runs |
+| `age ≥ cacheMaxAge` | **expired** — NOT served; treated as a cache miss and refetched from the network |
+
+This lets you decouple *how often you revalidate* from *how old data may get before you refuse to serve it*:
+
+```kotlin
+    .setCacheMaxAge(24 * 60 * 60 * 1000) // never serve features older than 24h (hard ceiling)
+    .setStaleTtl(60 * 60 * 1000)         // revalidate in the background once older than 1h
+```
+
+The hard ceiling (third tier) is armed **only when `staleTtl` is set**. Used alone, `setCacheMaxAge` keeps its original two-tier behaviour: fresh within the window, and beyond it the cache is still served (non-authoritative) while the network revalidates — it is never dropped.
+
+`staleTtl` must be positive (`setStaleTtl` throws `IllegalArgumentException` otherwise) and, when `cacheMaxAge` is also set, smaller than it — that pairing is enforced at construction, so `initialize()` throws if it is violated.
+
+By default the expired (third) tier *fails closed*: past `cacheMaxAge` nothing stale is served, so an offline device falls back to code defaults. Opt into `setServeStaleOnError(true)` for HTTP `stale-if-error` semantics — an expired cache is then served as a last resort **only if** the revalidating network round fails, so an offline client keeps its (stale) flags instead of losing them:
+
+```kotlin
+    .setCacheMaxAge(24 * 60 * 60 * 1000)
+    .setStaleTtl(60 * 60 * 1000)
+    .setServeStaleOnError(true) // offline resilience: serve expired cache only when the network is unreachable
+```
+
+While the network is reachable the freshness ceiling still holds (fresh data is never bypassed); the stale fallback applies purely to network failure. Prefer the default (fail-closed) for kill-switch-style flags that must never be stale.
+
+> **Observability caveat:** when the stale fallback is served, it is applied as a non-authoritative payload and your `GBCacheRefreshHandler` is **not** invoked — neither as success nor as failure. The handler's `(Boolean, GBError?)` contract cannot express "stale fallback served", so signalling either side would mislead. Treat `setServeStaleOnError` as a best-effort offline safety net, not something you can observe through the refresh handler.
+
+> **Scope:** the fallback covers *automatic* refreshes (startup, background polling, the stale-while-revalidate round). An explicit `refreshCache()` does not serve an expired cache — it reports the failure through your refresh handler instead. The freshness ceiling itself holds on every path: nothing older than `cacheMaxAge` is ever applied, including on `refreshCache()`.
+
+#### Background polling (`setRefreshInterval`)
+
+For long-lived processes (JVM/backend) you can opt into periodic background refresh as an alternative to SSE. Configure the interval with `setRefreshInterval(<ms>)`, then start/stop the poller via the SDK:
+
+```kotlin
+val sdk = GBSDKBuilder(/* … */)
+    .setRefreshInterval(5 * 60 * 1000) // poll every 5 minutes
+    .initialize()
+
+sdk.startPolling()  // launches the background poller
+sdk.stopPolling()   // stops it
+```
+
+The poller is a coroutine (not a dedicated thread) on the SDK's background scope, so it is cheap while idle, and it retries failed rounds with capped exponential backoff plus random jitter (so many instances that fail together do not all retry in lockstep). Polling and SSE (`startAutoRefreshFeatures()`) are **mutually exclusive** — starting SSE stops the poller and `startPolling()` is a no-op while SSE is active. Stopping SSE with `stopAutoRefreshFeatures()` releases the slot, so `startPolling()` works again afterwards.
+
+`close()` stops the poller too (along with SSE and the background scope), so disposing the SDK instance is enough — you do not need to call `stopPolling()` first.
+
+> **Mobile note:** the SDK cannot observe app lifecycle, so tie `startPolling()` / `stopPolling()` to your foreground/background transitions to avoid keeping the radio awake in the background. On mobile prefer SSE or the pull-on-access cache window (`setCacheMaxAge` / `setStaleTtl`); background polling is intended mainly for JVM/backend usage.
 
 ## Usage
 
@@ -286,6 +342,13 @@ not of the requested type.
   fun setFeaturesChangeHandler(handler: GBFeaturesChangeHandler): GBSDKBuilder
   // GBFeaturesChangeHandler = (GBFeaturesDiff) -> Unit
   // GBFeaturesDiff(added, removed, changed) + hasChanges / changedKeys
+  ```
+
+- start / stop background polling (requires `setRefreshInterval(<ms>)` on the builder; mutually exclusive with SSE)
+
+  ```kotlin
+  fun startPolling()
+  fun stopPolling()
   ```
 
 - The isOn method takes a single string argument, which is the unique identifier for the feature and returns the feature

@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonObject
 import com.sdk.growthbook.evaluators.EvaluationContext
 import com.sdk.growthbook.network.NetworkDispatcher
+import com.sdk.growthbook.utils.BackoffPolicy
 import com.sdk.growthbook.utils.Crypto
 import com.sdk.growthbook.utils.Constants
 import com.sdk.growthbook.utils.GBCacheRefreshHandler
@@ -70,6 +71,17 @@ class GrowthBookSDK internal constructor(
     // compatibility, so the public constructor below preserves the pre-7.3.0 signature and
     // delegates here.
     private val cacheMaxAge: Long?,
+    // Opt-in background polling interval (ms) exposed via GBSDKBuilder.setRefreshInterval(); null
+    // disables polling. Stored so startPolling() can launch the loop on demand. Defaulted so the
+    // binary-compatible public constructor below can omit it.
+    private val refreshInterval: Long? = null,
+    // Inner stale-while-revalidate window (ms) from GBSDKBuilder.setStaleTtl(); forwarded to the
+    // view model. Defaulted for the same binary-compatibility reason as above.
+    staleTtl: Long? = null,
+    // stale-if-error toggle from GBSDKBuilder.setServeStaleOnError(); forwarded to the view model.
+    // When true, an expired cache (past cacheMaxAge, with staleTtl set) is served as a last resort
+    // if the revalidating network round fails. Defaulted for binary-compatibility, as above.
+    serveStaleOnError: Boolean = false,
     // Dispatcher on which the fetched payload is processed (sticky-bucket refresh + feature
     // application + refreshHandler invocation). Defaults to the platform IO dispatcher so that work
     // runs on a defined background context rather than an arbitrary thread. Overridable (e.g. with a
@@ -131,6 +143,8 @@ class GrowthBookSDK internal constructor(
         encryptionKey = gbContext.encryptionKey,
         cachingEnabled = cachingEnabled,
         cacheMaxAge = cacheMaxAge,
+        staleTtl = staleTtl,
+        serveStaleOnError = serveStaleOnError,
         cachingLayer = cachingLayer?.let { GBCachingLayerAdapter(it) } ?: CachingImpl.getLayer(),
         cacheKey = "${Constants.FEATURE_CACHE}_${gbContext.apiKey}",
         remoteEval = gbContext.remoteEval,
@@ -203,16 +217,44 @@ class GrowthBookSDK internal constructor(
 
     /** Fully stops the SSE connection. */
     fun stopAutoRefreshFeatures() {
-        featuresViewModel.sseController.stop()
+        featuresViewModel.stopAutoRefresh()
+    }
+
+    /**
+     * Starts background polling that revalidates features every interval configured via
+     * [GBSDKBuilder.setRefreshInterval]. No-op when no interval was configured or when SSE
+     * auto-refresh is already active (the two are mutually exclusive). Idempotent — a second call
+     * while polling runs does nothing.
+     *
+     * Tie this to your app's foreground lifecycle on mobile (and call [stopPolling] when
+     * backgrounded) so the poller does not keep the radio awake while the app is not visible.
+     */
+    fun startPolling() {
+        val interval = refreshInterval
+        if (interval == null) {
+            if (gbContext.enableLogging) {
+                GB.log("GrowthBookSDK: startPolling ignored — no refreshInterval configured")
+            }
+            return
+        }
+        val started = featuresViewModel.startPolling(interval)
+        if (!started && gbContext.enableLogging) {
+            GB.log("GrowthBookSDK: startPolling ignored — SSE active or polling already running")
+        }
+    }
+
+    /** Stops background polling started by [startPolling]. Safe to call when not polling. */
+    fun stopPolling() {
+        featuresViewModel.stopPolling()
     }
 
     /**
      * Releases resources held by this SDK instance: flushes registered plugins (including the
      * built-in tracking plugin) so any buffered events are sent, stops any active SSE auto-refresh
-     * connection, and cancels the background coroutine scope used to process fetched payloads. Call
-     * this when the instance is no longer needed (e.g. on logout, or before creating a replacement
-     * instance) to avoid leaking coroutines and threads. Safe to call multiple times. The instance
-     * must not be used after [close].
+     * connection or background polling, and cancels the background coroutine scope used to process
+     * fetched payloads. Call this when the instance is no longer needed (e.g. on logout, or before
+     * creating a replacement instance) to avoid leaking coroutines and threads. Safe to call
+     * multiple times. The instance must not be used after [close].
      */
     fun close() {
         pluginRegistry?.closeAll()
@@ -242,7 +284,7 @@ class GrowthBookSDK internal constructor(
         hasFeaturesPayload = true
         if (isRemote) {
             remoteSourceFeaturesFetchResult = FeaturesFetchResult.Success
-            this.refreshHandler?.invoke(true, null)
+            invokeRefreshHandler(true, null)
         }
 
         diff?.takeIf { it.hasChanges }?.let { featuresChangeHandler?.invoke(it) }
@@ -261,7 +303,7 @@ class GrowthBookSDK internal constructor(
                 )
             }
             remoteSourceFeaturesFetchResult = FeaturesFetchResult.Failed
-            refreshHandler?.invoke(
+            invokeRefreshHandler(
                 false,
                 GBError(Exception("304 received before any feature payload was loaded"))
             )
@@ -275,7 +317,7 @@ class GrowthBookSDK internal constructor(
                     "Invoking refreshHandler with success=true"
             )
         }
-        refreshHandler?.invoke(true, null)
+        invokeRefreshHandler(true, null)
     }
 
     /**
@@ -304,20 +346,20 @@ class GrowthBookSDK internal constructor(
 
         if (isRemote) {
             remoteSourceFeaturesFetchResult = FeaturesFetchResult.Failed
-            this.refreshHandler?.invoke(false, error)
+            invokeRefreshHandler(false, error)
         }
     }
 
     override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) {
         if (isRemote) {
-            this.refreshHandler?.invoke(false, error)
+            invokeRefreshHandler(false, error)
         }
     }
 
     override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) {
         gbContext.savedGroups = savedGroups.mapValues { GBValue.from(it.value) }
         if (isRemote) {
-            this.refreshHandler?.invoke(true, null)
+            invokeRefreshHandler(true, null)
         }
     }
 
@@ -335,8 +377,12 @@ class GrowthBookSDK internal constructor(
      * @returns a [GBFeatureResult] object
      */
     override suspend fun suspendFeature(id: String): GBFeatureResult {
+        val backOff = BackoffPolicy(
+            initialDelayMs = INITIAL_RETRY_DELAY_MILLIS,
+            maxDelayMs = MAX_RETRY_DELAY_MILLIS,
+            maxAttempts = MAX_RETRY_ATTEMPTS,
+        )
         var attempt = 0
-        var delaysMs = INITIAL_RETRY_DELAY_MILLIS
 
         while (true) {
             when (remoteSourceFeaturesFetchResult) {
@@ -348,18 +394,17 @@ class GrowthBookSDK internal constructor(
                 }
 
                 FeaturesFetchResult.Failed -> {
-                    if (attempt >= MAX_RETRY_ATTEMPTS) return feature(id)
+                    if (!backOff.shouldRetry(attempt)) return feature(id)
                     // A superseded round is not a failure (nothing went wrong, its payload was just
                     // discarded by a newer generation): re-join the latest generation without burning
                     // a retry attempt or applying backoff.
                     if (featuresViewModel.awaitRefresh() == FetchResult.Superseded) continue
                     if (remoteSourceFeaturesFetchResult != FeaturesFetchResult.Failed) continue
-
+                    val delaysMs = backOff.delayFor(attempt)
                     if (gbContext.enableLogging) {
                         GB.log("GrowthBookSDK: suspendFeature: retry attempt ${attempt + 1}/$MAX_RETRY_ATTEMPTS, waiting ${delaysMs}ms")
                     }
                     delay(delaysMs.milliseconds)
-                    delaysMs = minOf(delaysMs * 2, MAX_RETRY_DELAY_MILLIS)
                     attempt++
                 }
             }
@@ -661,6 +706,24 @@ class GrowthBookSDK internal constructor(
     private fun refreshForRemoteEval() {
         val payload = buildRemoteEvalParams() ?: return
         featuresViewModel.fetchFeatures(payload = payload)
+    }
+
+    /**
+     * Invokes the consumer [refreshHandler] defensively. Fetch results are reported from the SDK's
+     * background scope (and, when polling, repeatedly), so a handler that throws must never propagate:
+     * that would reach the scope's uncaught-exception path (crashing the app on Android) or abort the
+     * fetch pipeline mid-way. Mirrors the try/catch already guarding tracking subscriptions in
+     * [fireSubscriptions].
+     */
+    private fun invokeRefreshHandler(isSuccess: Boolean, error: GBError?) {
+        val handler = refreshHandler ?: return
+        try {
+            handler.invoke(isSuccess, error)
+        } catch (e: Exception) {
+            if (gbContext.enableLogging) {
+                GB.error("GrowthBook: refreshHandler threw and was ignored: ${e.message}", e)
+            }
+        }
     }
 
     private fun fireSubscriptions(experiment: GBExperiment, experimentResult: GBExperimentResult) {

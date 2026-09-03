@@ -12,11 +12,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pinned the JVM toolchain to JDK 17 (`jvmToolchain(17)`) so the published `-jvm`
   artifact always contains Java 17 bytecode (class file 61) regardless of the JDK used
   to build it (#250).
-
 ### Compatibility
 - **Java 17 is now the explicit minimum runtime floor for the JVM and Android artifacts.**
   Consumers must run on a Java 17-or-newer runtime; older runtimes fail at class load with
   `UnsupportedClassVersionError`. (This artifact supports Android and JVM only.)
+
+## [1.1.1] - 2026-09-03
+
+### Fixed
+- `OkHttpLruETagCache.get()` is now serialized under the write lock instead of the read
+  lock. The backing `LinkedHashMap` is access-ordered (LRU), so a `get` structurally
+  mutates it (re-links the entry to the tail); under the shared read lock, concurrent
+  `get`s could corrupt that linked list and desync the size/eviction bookkeeping (rarely
+  observable as the entry count exceeding the configured maximum). Reads are now exclusive,
+  so the cache is genuinely thread-safe under concurrent access.
 
 ---
 ## [1.1.0] - 2026-08-25

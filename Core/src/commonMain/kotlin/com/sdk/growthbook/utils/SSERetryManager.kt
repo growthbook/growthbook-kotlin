@@ -3,8 +3,6 @@ package com.sdk.growthbook.utils
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.incrementAndFetch
-import kotlin.math.min
-import kotlin.math.pow
 
 /**
  * Utility class responsible for handling retry logic for SSE reconnection attempts.
@@ -36,31 +34,34 @@ import kotlin.math.pow
  */
 @OptIn(ExperimentalAtomicApi::class)
 class SSERetryManager(
-    private val maxRetries: Int = 10,
-    private val initialRetryDelayMs: Long = 1000L,
-    private val maxRetryDelayMs: Long = 30_000L,
+    maxRetries: Int = 10,
+    initialRetryDelayMs: Long = 1000L,
+    maxRetryDelayMs: Long = 30_000L,
 ) {
+    // The backoff maths (exponential growth + cap + attempt limit) live in the shared
+    // [BackoffPolicy] so there is a single source of truth across the SDK (poller, suspendFeature,
+    // SSE reconnect). This class only owns the thread-safe reconnection counter and the
+    // SSE-specific reset/give-up semantics on top of it.
+    private val backoffPolicy = BackoffPolicy(
+        initialDelayMs = initialRetryDelayMs,
+        maxDelayMs = maxRetryDelayMs,
+        maxAttempts = maxRetries,
+    )
     private val retryCount = AtomicInt(0)
 
     /**
      * Calculates the delay before the next retry based on exponential backoff.
      *
-     * @return Delay in milliseconds, guaranteed not to exceed [maxRetryDelayMs].
+     * @return Delay in milliseconds, guaranteed not to exceed the configured maximum.
      */
-    fun getBackoffDelay(): Long {
-        val attempt = retryCount.load()
-        val exponentialDelay = initialRetryDelayMs * (2.0.pow(attempt.toDouble())).toLong()
-        return min(exponentialDelay, maxRetryDelayMs)
-    }
+    fun getBackoffDelay(): Long = backoffPolicy.delayFor(retryCount.load())
 
     /**
      * Indicates whether another retry attempt is allowed.
      *
-     * @return `true` if retry count is below [maxRetries], otherwise `false`.
+     * @return `true` if the retry count is below the configured limit, otherwise `false`.
      */
-    fun shouldRetry(): Boolean {
-        return retryCount.load() < maxRetries
-    }
+    fun shouldRetry(): Boolean = backoffPolicy.shouldRetry(retryCount.load())
 
     /**
      * Increments the retry attempt counter.
@@ -72,7 +73,7 @@ class SSERetryManager(
     /**
      * Checks if the retry attempts have reached the configured limit.
      */
-    fun isMaxRetriesReached(): Boolean = retryCount.load() >= maxRetries
+    fun isMaxRetriesReached(): Boolean = !backoffPolicy.shouldRetry(retryCount.load())
 
     /**
      * Returns the current retry attempt number.
