@@ -5,6 +5,7 @@ import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.GBTrackingCallback
 import com.sdk.growthbook.plugin.tracking.PluginRegistry
+import com.sdk.growthbook.model.GBContextualBandit
 import com.sdk.growthbook.model.StackContext
 import com.sdk.growthbook.model.StickyBucketAssignmentDocsType
 import com.sdk.growthbook.stickybucket.GBStickyBucketService
@@ -28,7 +29,8 @@ internal data class EvaluationContext(
     // docs map after evaluation, which could clobber a concurrent background refresh.
     val onStickyAssignmentChanged: ((GBStickyAttributeKey, GBStickyAssignmentsDocument) -> Unit)? = null,
     val stackContext: StackContext,
-    val pluginRegistry: PluginRegistry?
+    val pluginRegistry: PluginRegistry?,
+    val contextualBandits: Map<String, GBContextualBandit>? = null
 )
 
 internal data class UserContext(

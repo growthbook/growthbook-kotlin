@@ -3,6 +3,7 @@
 package com.sdk.growthbook.features
 
 import com.sdk.growthbook.logger.GB
+import com.sdk.growthbook.model.GBContextualBandit
 import com.sdk.growthbook.sandbox.CachingImpl
 import com.sdk.growthbook.sandbox.CachingLayer
 import com.sdk.growthbook.sandbox.getData
@@ -49,11 +50,24 @@ private const val NETWORK_ROUND_TIMEOUT_MILLIS = 30_000L
  * Interface for Feature API Completion Events
  */
 internal interface FeaturesFlowDelegate {
-    fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean)
+    /**
+     * A successfully decoded payload, delivered whole rather than field by field: the implementer is
+     * expected to publish everything it carries in a single atomic update (see
+     * [com.sdk.growthbook.model.GBContext.applyPayload]), so an evaluation running concurrently can
+     * never observe one field from this payload paired with another from the previous one.
+     *
+     * A null argument means the field was absent from the payload — keep the current value.
+     */
+    fun payloadFetchedSuccessfully(
+        features: GBFeatures?,
+        savedGroups: JsonObject?,
+        contextualBandits: Map<String, GBContextualBandit>?,
+        isRemote: Boolean,
+    )
+
     suspend fun onPayloadReady(model: FeaturesDataModel)
     fun featuresFetchFailed(error: GBError, isRemote: Boolean)
     fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean)
-    fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean)
     fun featuresNotModified()
 }
 
@@ -599,6 +613,8 @@ internal class FeaturesViewModel(
                     encryptedFeatures = null,
                     savedGroups = decoded.savedGroups,
                     encryptedSavedGroups = null,
+                    contextualBandits = decoded.contextualBandits,
+                    encryptedContextualBandits = null,
                 )
             )
 
@@ -640,18 +656,14 @@ internal class FeaturesViewModel(
 
     private fun dispatch(outcome: FetchOutcome) = when (outcome) {
         is FetchOutcome.Ready -> {
-            outcome.payload.features?.let {
-                delegate.featuresFetchedSuccessfully(
-                    features = it,
-                    isRemote = outcome.authoritative
-                )
-            }
-            outcome.payload.savedGroups?.let {
-                delegate.savedGroupsFetchedSuccessfully(
-                    savedGroups = it,
-                    isRemote = outcome.authoritative
-                )
-            }
+            // One call, not three: the delegate applies the whole payload atomically, so a concurrent
+            // reader never observes new features paired with stale bandits/saved groups.
+            delegate.payloadFetchedSuccessfully(
+                features = outcome.payload.features,
+                savedGroups = outcome.payload.savedGroups,
+                contextualBandits = outcome.payload.contextualBandits,
+                isRemote = outcome.authoritative
+            )
         }
 
         is FetchOutcome.Failed -> {

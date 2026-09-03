@@ -17,7 +17,8 @@ import com.sdk.growthbook.kotlinx.serialization.from
     Defines a single experiment
  */
 @Serializable
-data class SerializableGBExperiment(
+@ConsistentCopyVisibility
+data class SerializableGBExperiment internal constructor(
 
     /**
      * The globally unique tracking key for the experiment

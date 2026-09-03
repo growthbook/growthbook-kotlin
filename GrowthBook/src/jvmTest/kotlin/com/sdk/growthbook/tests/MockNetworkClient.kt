@@ -272,7 +272,7 @@ class MockResponse {
         """.trimIndent()
 
         // Has encryptedFeatures (triggers the "else" branch in features handling when encryptionKey
-        // is empty) and plain savedGroups, so savedGroupsFetchedSuccessfully is called
+        // is empty) and plain savedGroups, so payloadFetchedSuccessfully is called
         val successResponseWithSavedGroups = """
             {
                 "status": 200,
