@@ -22,6 +22,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       mirrors the Python SDK): a leaf missing `leafId` or `weights` cannot describe the assignment, so a match on it
       takes the `-1` aggregate-weight fallback — and never discards the rest of the payload; a leaf whose `condition`
       is not a JSON object is skipped (fails closed) rather than coerced into a match-everyone catch-all.
+    - Reported `variationWeights` are always the weights the bucketer actually used: a leaf vector the bucketer would
+      reject (wrong length, non-finite or negative entries, sum outside [0.99, 1.01]) takes the `-1` fallback, and the
+      fallback itself reports the rule's weights after the same substitution the bucketer applies. A rule with explicit
+      `ranges` buckets by those ranges and emits **no** bandit metadata, since no weight vector describes a
+      ranges-governed assignment (matches the Python SDK).
+- The built-in tracking plugin's `Experiment Viewed` event now carries `leafId`, `variationWeights` and `banditVersion`
+  for enrolled bandit exposures, so auto-tracking users keep bandit attribution without a manual `trackingCallback`.
+  The properties are additive and omitted for ordinary experiments, so non-bandit events keep the exact TS plugin shape
+  (the TS plugin does not send these fields yet).
     - Sticky bucketing recognises bandit rules — identifier attributes are now derived from `contextualVariations` as
       well as `variations`. Previously sticky bucketing silently did nothing on a bandit-driven feature.
 - `GBSDKBuilder.setInitialPayload(json)` seeds the SDK with a bundled **raw API payload** rather than just features:
