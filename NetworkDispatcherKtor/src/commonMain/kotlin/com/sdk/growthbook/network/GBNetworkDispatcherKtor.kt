@@ -16,6 +16,7 @@ import io.ktor.client.plugins.ServerResponseException
 import io.ktor.client.plugins.compression.ContentEncoding
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.sse.SSE
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.headers
 import io.ktor.client.request.post
@@ -41,6 +42,7 @@ import kotlinx.serialization.json.JsonElement
  * Creates default Ktor HTTP client configured for:
  * - SSE consumption
  * - unlimited request/socket timeout for streaming connections
+ *   (feature GET / POST requests are bounded per request by `fetchTimeoutMillis` instead)
  * - JSON parsing with lenient mode & unknown key ignore
  */
 internal fun createDefaultHttpClient(): HttpClient =
@@ -83,8 +85,22 @@ class GBNetworkDispatcherKtor(
     private var enableLogging: Boolean = false,
     private val maxRetries: Int = 10,
     private val initialRetryDelayMs: Long = 1000L,
-    private val maxRetryDelayMs: Long = 30_000L
+    private val maxRetryDelayMs: Long = 30_000L,
+
+    /**
+     * Total time budget for a single feature GET or POST request, in milliseconds.
+     * The default client's timeouts are infinite because the same client carries the SSE
+     * stream, so without this bound a stalled feature fetch would hang forever.
+     * `null` disables the per-request bound and leaves whatever the [client] is configured
+     * with. Requires the `HttpTimeout` plugin (installed on the default client); on a custom
+     * client without it, only the socket timeout is applied by engines that support it.
+     */
+    private val fetchTimeoutMillis: Long? = DEFAULT_FETCH_TIMEOUT_MILLIS,
 ) : NetworkDispatcherWithNotModified, TrackingNetworkDispatcher {
+
+    companion object {
+        const val DEFAULT_FETCH_TIMEOUT_MILLIS: Long = 30_000L
+    }
 
     // Regex to match the desired URL pattern: "/api/features/<clientKey>"
     private val featuresPathPattern = Regex(".*/api/features/[^/]+")
@@ -167,14 +183,18 @@ class GBNetworkDispatcherKtor(
     }
 
     /**
-     * Supportive method for preparing GET request for consuming SSE connection
+     * Supportive method for preparing a GET request, shared by the feature fetch and the SSE
+     * connection. [bounded] applies [fetchTimeoutMillis] and must be false for SSE, whose
+     * connection is long-lived by design.
      */
     private suspend fun prepareGetRequest(
         url: String,
         headers: Map<String, String> = emptyMap(),
         queryParams: Map<String, String> = emptyMap(),
+        bounded: Boolean = true,
     ): HttpStatement =
         client.prepareGet(url) {
+            if (bounded) applyFetchTimeout()
             headers {
                 headers.forEach { (key, value) -> append(key, value) }
 
@@ -257,7 +277,7 @@ class GBNetworkDispatcherKtor(
             connectionJob?.cancel()
             connectionJob = scope.launch(PlatformDependentIODispatcher) {
                 try {
-                    prepareGetRequest(url).execute { response ->
+                    prepareGetRequest(url, bounded = false).execute { response ->
                         val channel: ByteReadChannel = response.body()
                         channel.readSse(
                             onSseEvent = { sseEvent ->
@@ -330,6 +350,7 @@ class GBNetworkDispatcherKtor(
                     println("GrowthBook: POST $url (${payload.toString().length} chars)")
                 }
                 val response = client.post(url) {
+                    applyFetchTimeout()
                     headers {
                         append("Content-Type", "application/json")
                         append("Accept", "application/json")
@@ -384,6 +405,7 @@ class GBNetworkDispatcherKtor(
                     println("GrowthBook: POST $url (${serializedBody.length} chars)")
                 }
                 val response = client.post(url) {
+                    applyFetchTimeout()
                     headers {
                         append("Accept", "application/json")
                         headers.forEach { (key, value) ->
@@ -422,6 +444,19 @@ class GBNetworkDispatcherKtor(
 
     fun setLoggingEnabled(enabled: Boolean) {
         enableLogging = enabled
+    }
+
+    /**
+     * Bounds one GET/POST request by [fetchTimeoutMillis]. Per-request, so the client-level
+     * config — infinite on the default client, for the SSE stream's sake — stays untouched.
+     */
+    private fun HttpRequestBuilder.applyFetchTimeout() {
+        fetchTimeoutMillis?.let { millis ->
+            timeout {
+                requestTimeoutMillis = millis
+                socketTimeoutMillis = millis
+            }
+        }
     }
 
     /**
