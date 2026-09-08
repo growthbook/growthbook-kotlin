@@ -23,6 +23,7 @@ import com.sdk.growthbook.stickybucket.GBStickyBucketServiceImp
 import com.sdk.growthbook.utils.GBCacheRefreshHandler
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.utils.GBFeaturesChangeHandler
+import com.sdk.growthbook.utils.GBFetchStatsHandler
 
 /**
  * SDKBuilder - Root Class for SDK Initializers for GrowthBook SDK
@@ -115,6 +116,7 @@ class GBSDKBuilder(
 
     private var refreshHandler: GBCacheRefreshHandler? = null
     private var featuresChangeHandler: GBFeaturesChangeHandler? = null
+    private var fetchStatsHandler: GBFetchStatsHandler? = null
     private var stickyBucketService: GBStickyBucketService? = null
     // Deferred builder for the default sticky-bucket service. The caching layer is resolved
     // lazily at initialize() time (via resolveCachingLayer()) rather than when the setter is
@@ -158,6 +160,24 @@ class GBSDKBuilder(
 
     fun setFeaturesChangeHandler(featuresChangeHandler: GBFeaturesChangeHandler): GBSDKBuilder {
         this.featuresChangeHandler = featuresChangeHandler
+        return this
+    }
+
+    /**
+     * Set Fetch Stats Handler - Will be called once per feature fetch with how long it took and
+     * how large the payload was. Use it to measure what users actually experience on first
+     * launch; the edge completes a response before the device has received it, so fetch duration
+     * cannot be measured server-side.
+     *
+     * Invoked on the network callback's thread, before the payload is parsed.
+     *
+     * Scope: feature GET fetches only. Remote evaluation (`remoteEval = true`) goes through a
+     * POST that is not reported — a server-side evaluation and a CDN GET have very different
+     * latency profiles, so folding them into one stream would corrupt both averages. Reporting
+     * for remote eval (with a source discriminator) is a possible follow-up.
+     */
+    fun setFetchStatsHandler(fetchStatsHandler: GBFetchStatsHandler): GBSDKBuilder {
+        this.fetchStatsHandler = fetchStatsHandler
         return this
     }
 
@@ -418,7 +438,8 @@ class GBSDKBuilder(
             serveStaleOnError = serveStaleOnError,
             coroutineContext = coroutineContext,
             featuresChangeHandler = featuresChangeHandler,
-            cachingLayer = customCachingLayer
+            cachingLayer = customCachingLayer,
+            fetchStatsHandler = fetchStatsHandler
         )
     }
 
@@ -484,7 +505,8 @@ class GBSDKBuilder(
                 serveStaleOnError = serveStaleOnError,
                 coroutineContext = coroutineContext,
                 featuresChangeHandler = featuresChangeHandler,
-                cachingLayer = customCachingLayer
+                cachingLayer = customCachingLayer,
+                fetchStatsHandler = fetchStatsHandler
             )
         }
     }
