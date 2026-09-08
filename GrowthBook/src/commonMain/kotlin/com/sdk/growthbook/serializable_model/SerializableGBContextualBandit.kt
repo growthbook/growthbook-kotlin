@@ -34,8 +34,10 @@ data class SerializableGBBanditContext internal constructor(
 
     /**
      * Server-assigned id of this leaf (used for tracking which leaf a user landed in).
+     * Nullable so one malformed leaf degrades to the fallback path instead of a
+     * MissingFieldException discarding the entire payload — features included.
      */
-    val leafId: Int,
+    val leafId: Int? = null,
 
     /**
      * Targeting condition evaluated against user attributes to route users into this leaf.

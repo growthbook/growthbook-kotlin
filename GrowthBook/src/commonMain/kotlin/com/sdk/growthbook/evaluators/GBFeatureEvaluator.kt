@@ -2,6 +2,7 @@ package com.sdk.growthbook.evaluators
 
 import com.sdk.growthbook.kotlinx.serialization.from
 import com.sdk.growthbook.logger.GB
+import kotlin.coroutines.cancellation.CancellationException
 import com.sdk.growthbook.model.CBContext
 import com.sdk.growthbook.model.CONTEXTUAL_BANDIT_FALLBACK_LEAF_ID
 import com.sdk.growthbook.model.GBBanditContext
@@ -418,6 +419,9 @@ internal class GBFeatureEvaluator(
         // can surface as a plain Throwable, which would otherwise escape and kill the evaluation.
         val leaf = try {
             getContextualBanditLeaf(cbDefinition, attributeOverrides)
+        } catch (c: CancellationException) {
+            // Evaluations can run inside coroutines; swallowing cancellation would break it.
+            throw c
         } catch (e: Throwable) {
             if (evaluationContext.loggingEnabled) {
                 GB.warning("GBFeatureEvaluator: contextual bandit leaf selection threw, using fallback weights")
@@ -425,19 +429,25 @@ internal class GBFeatureEvaluator(
             null
         }
 
-        if (leaf != null) {
-            // Only override when the leaf actually carries weights — a malformed leaf must not wipe
-            // the rule's aggregate weights (in TS the field is required, so the case cannot arise).
-            leaf.weights?.let { experiment.weights = it }
+        val leafId = leaf?.leafId
+        val leafWeights = leaf?.weights
+        if (leaf != null && leafId != null && leafWeights != null) {
+            experiment.weights = leafWeights
             experiment.contextualBandit = CBContext(
-                leafId = leaf.leafId,
-                variationWeights = experiment.weights ?: GBUtils.getEqualWeights(experiment.variations.size),
+                leafId = leafId,
+                variationWeights = leafWeights,
                 banditVersion = cbDefinition.banditVersion
             )
         } else {
+            // Either no leaf matched, or the matched leaf is malformed (missing leafId or
+            // weights) and cannot describe the assignment. Both degrade the same way: the
+            // rule's aggregate weights under the fallback sentinel, so reported propensities
+            // never disagree with the weights that actually bucketed the user. (In TS both
+            // fields are required; this matches the Python SDK's malformed-leaf handling.)
             if (evaluationContext.loggingEnabled) {
+                val reason = if (leaf == null) "matched no leaf" else "matched a malformed leaf"
                 GB.log(
-                    "GBFeatureEvaluator: contextual bandit '$contextualBanditRef' matched no leaf, " +
+                    "GBFeatureEvaluator: contextual bandit '$contextualBanditRef' $reason, " +
                         "using fallback weights"
                 )
             }
@@ -454,9 +464,15 @@ internal class GBFeatureEvaluator(
         attributeOverrides: Map<String, GBValue>
     ): GBBanditContext? {
         return cbDefinition.contexts?.firstOrNull { ctx ->
-            val conditionObj = ctx.condition?.let {
-                GBValue.from(it)
-            } as? GBJson ?: GBJson(emptyMap())
+            // An absent condition is a catch-all; a present but non-object one is corrupt data
+            // and must fail closed — coercing it to a catch-all would make the broken leaf
+            // swallow every user and shadow all later leaves.
+            val condition = ctx.condition
+            val conditionObj = if (condition == null) {
+                GBJson(emptyMap())
+            } else {
+                GBValue.from(condition) as? GBJson ?: return@firstOrNull false
+            }
             GBConditionEvaluator().evalCondition(
                 attributes = getAttributes(
                     attributes = evaluationContext.userContext.attributes,

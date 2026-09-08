@@ -244,6 +244,101 @@ class GBContextualBanditPayloadTest {
     }
 
     @Test
+    fun malformedLeaf_degradesToFallbackWithoutDiscardingThePayload() = runTest {
+        // "bandit_bad"'s only leaf is missing leafId. With leafId required, this threw
+        // MissingFieldException out of the whole-payload decode — discarding the features too.
+        @Language("json")
+        val payload = """
+            {
+              "features": {
+                "plain_feature": { "defaultValue": "still here" },
+                "cb_feature": {
+                  "defaultValue": "default",
+                  "rules": [
+                    {
+                      "key": "cb_exp",
+                      "hashAttribute": "id",
+                      "coverage": 1,
+                      "weights": [1.0, 0.0],
+                      "contextualBanditRef": "bandit_bad",
+                      "contextualVariations": ["control", "variant"]
+                    }
+                  ]
+                }
+              },
+              "contextualBandits": {
+                "bandit_bad": {
+                  "banditVersion": 5,
+                  "contexts": [ { "condition": {}, "weights": [0.0, 1.0] } ]
+                }
+              }
+            }
+        """.trimIndent()
+
+        val sdk = seededSDK(
+            seed = payload,
+            key = "seed_malformed_leaf_key",
+            attributes = mapOf("id" to GBString("u1")),
+            dispatcher = UnconfinedTestDispatcher(testScheduler),
+        )
+
+        // The rest of the payload survives the malformed leaf...
+        assertEquals(GBString("still here"), sdk.feature("plain_feature").gbValue)
+
+        // ...and the leaf itself cannot describe the assignment, so the rule's aggregate
+        // weights apply under the fallback sentinel rather than the leaf's 0/1 weights.
+        val result = sdk.feature("cb_feature")
+        assertEquals(GBString("control"), result.gbValue)
+        assertEquals(-1, result.experimentResult?.leafId)
+        assertEquals(5, result.experimentResult?.banditVersion)
+    }
+
+    @Test
+    fun corruptLeafCondition_failsClosedInsteadOfMatchingEveryone() = runTest {
+        // Leaf 1's condition is a JSON array, not an object. Coercing it to an empty (catch-all)
+        // condition would route every user into the corrupt leaf and shadow the real catch-all.
+        @Language("json")
+        val payload = """
+            {
+              "features": {
+                "cb_feature": {
+                  "defaultValue": "default",
+                  "rules": [
+                    {
+                      "key": "cb_exp",
+                      "hashAttribute": "id",
+                      "coverage": 1,
+                      "contextualBanditRef": "bandit_corrupt",
+                      "contextualVariations": ["control", "variant"]
+                    }
+                  ]
+                }
+              },
+              "contextualBandits": {
+                "bandit_corrupt": {
+                  "contexts": [
+                    { "leafId": 1, "condition": ["not", "an", "object"], "weights": [0.0, 1.0] },
+                    { "leafId": 2, "condition": {}, "weights": [1.0, 0.0] }
+                  ]
+                }
+              }
+            }
+        """.trimIndent()
+
+        val sdk = seededSDK(
+            seed = payload,
+            key = "seed_corrupt_condition_key",
+            attributes = mapOf("id" to GBString("u1")),
+            dispatcher = UnconfinedTestDispatcher(testScheduler),
+        )
+
+        val result = sdk.feature("cb_feature")
+
+        assertEquals(2, result.experimentResult?.leafId)
+        assertEquals(GBString("control"), result.gbValue)
+    }
+
+    @Test
     fun initialPayload_malformedJsonIsIgnoredRatherThanFatal() = runTest {
         val sdk = seededSDK(
             seed = "{ not json at all",

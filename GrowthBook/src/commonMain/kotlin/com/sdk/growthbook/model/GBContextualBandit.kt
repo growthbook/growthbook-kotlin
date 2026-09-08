@@ -35,9 +35,10 @@ data class GBBanditContext internal constructor(
 
     /**
      * Server-assigned id of this leaf, surfaced on the experiment result so an exposure can be
-     * attributed to the exact leaf the user was routed into.
+     * attributed to the exact leaf the user was routed into. Null marks a malformed leaf; if
+     * such a leaf is the one that matches, evaluation degrades to the aggregate-weight fallback.
      */
-    val leafId: Int,
+    val leafId: Int? = null,
 
     /**
      * Targeting condition evaluated against the user's attributes to decide whether the user is
