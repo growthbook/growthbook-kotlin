@@ -12,6 +12,7 @@ import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -88,6 +89,9 @@ fun getFeaturesFromEncryptedFeatures(
     val encryptString: String =
         encrypt.decodeToString()
     encryptToFeaturesDataModel(encryptString)
+} catch (c: CancellationException) {
+    // These decrypts run inside coroutines; swallowing cancellation would break it.
+    throw c
 } catch (t: Throwable) {
     // Throwable, not Exception: a malformed payload (missing "." separator, non-base64 input) or a
     // rotated key throws out of split/decodeBase64/decrypt, and on the JS/wasm targets a WebCrypto
@@ -116,6 +120,8 @@ fun getSavedGroupFromEncryptedSavedGroup(
         encrypt.decodeToString()
 
     Json.decodeFromString(JsonObject.serializer(), encryptString)
+} catch (c: CancellationException) {
+    throw c
 } catch (t: Throwable) {
     GB.error(errorMessage = "Crypto: failed to decrypt saved groups", throwable = t)
     null
@@ -142,6 +148,8 @@ fun getBanditsFromEncryptedBandits(
             decrypted
         )
         .mapValues { it.value.gbDeserialize() }
+} catch (c: CancellationException) {
+    throw c
 } catch (t: Throwable) {
     GB.error(errorMessage = "Crypto: failed to decrypt contextual bandits", throwable = t)
     null
