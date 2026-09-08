@@ -76,6 +76,12 @@ class GBFeatureValueTests {
                         gbContext.features, attributes,
                         savedGroups = gbContext.savedGroups,
                         forcedVariations = gbContext.forcedVariations,
+                        // Several feature-section cases carry bandit definitions (e.g. the
+                        // "CB rule with empty contexts" family); without threading them
+                        // through, those cases exercise the dangling-ref branch instead of
+                        // the branch they were written for and pass vacuously.
+                        contextualBandits = testData.contextualBandits
+                            ?.mapValues { it.value.gbDeserialize() },
                     )
                 )
                 val result = evaluator.evaluateFeature(
