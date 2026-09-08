@@ -1,5 +1,6 @@
 package com.sdk.growthbook.model
 
+import com.sdk.growthbook.kotlinx.serialization.from
 import com.sdk.growthbook.serializable_model.SerializableGBBanditContext
 import com.sdk.growthbook.serializable_model.SerializableGBContextualBandit
 import com.sdk.growthbook.utils.GBCondition
@@ -50,7 +51,19 @@ data class GBBanditContext internal constructor(
      * How to weight traffic between variations for users in this leaf. Must add to 1.
      */
     val weights: List<Float>? = null
-)
+) {
+    /**
+     * The condition parsed once per payload: leaf conditions are re-checked on every evaluation
+     * of every bandit-driven feature, and converting JsonElement to GBJson in that hot path
+     * costs an allocation per leaf per call. An absent condition parses to an empty object
+     * (catch-all); a present but non-object condition parses to null — corrupt data the leaf
+     * selector fails closed on.
+     */
+    internal val parsedCondition: GBJson? by lazy {
+        if (condition == null) GBJson(emptyMap())
+        else GBValue.from(condition) as? GBJson
+    }
+}
 
 /**
  * Per-user resolved bandit context: the leaf the user was routed into plus the weights used.

@@ -493,21 +493,21 @@ internal class GBFeatureEvaluator(
         cbDefinition: GBContextualBandit,
         attributeOverrides: Map<String, GBValue>
     ): GBBanditContext? {
-        return cbDefinition.contexts?.firstOrNull { ctx ->
-            // An absent condition is a catch-all; a present but non-object one is corrupt data
-            // and must fail closed — coercing it to a catch-all would make the broken leaf
-            // swallow every user and shadow all later leaves.
-            val condition = ctx.condition
-            val conditionObj = if (condition == null) {
-                GBJson(emptyMap())
-            } else {
-                GBValue.from(condition) as? GBJson ?: return@firstOrNull false
-            }
-            GBConditionEvaluator().evalCondition(
-                attributes = getAttributes(
-                    attributes = evaluationContext.userContext.attributes,
-                    attributeOverrides = attributeOverrides
-                ),
+        val contexts = cbDefinition.contexts ?: return null
+        // Hoisted out of the leaf loop: attribute merging and the evaluator don't vary per leaf,
+        // and this runs on every evaluation of every bandit-driven feature.
+        val conditionEvaluator = GBConditionEvaluator()
+        val attributes = getAttributes(
+            attributes = evaluationContext.userContext.attributes,
+            attributeOverrides = attributeOverrides
+        )
+        return contexts.firstOrNull { ctx ->
+            // parsedCondition is cached on the leaf: an empty object for an absent condition
+            // (catch-all), null for a present but non-object one — corrupt data that must fail
+            // closed, or the broken leaf would swallow every user and shadow all later leaves.
+            val conditionObj = ctx.parsedCondition ?: return@firstOrNull false
+            conditionEvaluator.evalCondition(
+                attributes = attributes,
                 conditionObj = conditionObj,
                 savedGroups = evaluationContext.savedGroups
             )
