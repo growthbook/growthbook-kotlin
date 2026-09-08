@@ -113,9 +113,11 @@ The seeded features are applied immediately. The normal cache/network refresh st
 
 #### Bundled fallback payload (`setInitialPayload`)
 
-`setInitialFeatures` seeds features only. When the bundled snapshot carries more than that — saved groups, contextual
-bandit definitions, or encrypted variants of any of them — seed the **raw API payload** instead: the exact JSON body the
-features endpoint returns, snapshotted into your assets at build time.
+`setInitialFeatures` takes an already-decoded feature map, so bundling a snapshot means decrypting it at build time —
+shipping plaintext feature definitions inside the app even when payload encryption is on. When the snapshot is encrypted,
+or carries more than features — saved groups, contextual bandit definitions, or encrypted variants of any of them —
+seed the **raw API payload** instead: the exact JSON body the features endpoint returns, snapshotted into your assets
+at build time.
 
 ```kotlin
 var sdkInstance: GrowthBookSDK = GBSDKBuilder(
@@ -134,8 +136,9 @@ This matters for contextual bandits in particular: a bandit rule is inert withou
 for a bandit-driven feature must go through `setInitialPayload` — otherwise the rule falls back to its marginal weights
 until the network responds.
 
-Like `setInitialFeatures`, this is only a seed and the same precedence applies. A payload that cannot be parsed is
-ignored rather than failing initialization. If both setters are used, the explicit features win over the payload's.
+Like `setInitialFeatures`, this is only a seed and the same precedence applies. A payload that cannot be parsed or
+decrypted is logged and ignored rather than failing initialization. If both setters are used, the explicit features win
+over the payload's.
 
 > **Upgrading from 6.x:** Persistent caching is now implemented on every target — Android, Apple (iOS/macOS) and the JVM (on disk), and JS and wasmJs (browser `localStorage`). The legacy `FeatureCache.txt` → `FeatureCache_<clientKey>.txt` migration applies to Android only, so this upgrade note does not apply to the other targets.
 

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.0] - 2026-09-08
+
+### Added
+- `fetchTimeoutMillis` constructor parameter (default 30 000 ms): a per-request total time
+  budget for feature GET and POST requests. The default client's request/socket timeouts are
+  infinite because the same client carries the SSE stream, so a stalled feature fetch could
+  previously hang forever. The bound is applied per request, so SSE is unaffected. Pass `null`
+  to opt out and keep the injected client's own configuration. On a custom client without the
+  `HttpTimeout` plugin the request bound is inert; only the socket timeout is applied by
+  engines that support it
+
+---
 ## [1.2.0] - 2026-08-25
 
 ### Added

@@ -2,15 +2,17 @@ package com.sdk.growthbook
 
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.serialization.json.Json
 import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.EvalSnapshot
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBContextualBandit
 import com.sdk.growthbook.model.GBOptions
-import com.sdk.growthbook.plugin.tracking.GrowthBookPlugin
+import com.sdk.growthbook.features.DecodedPayload
 import com.sdk.growthbook.features.FeaturePayloadDecoder
 import com.sdk.growthbook.kotlinx.serialization.from
+import com.sdk.growthbook.plugin.tracking.GrowthBookPlugin
 import com.sdk.growthbook.network.NetworkDispatcher
 import com.sdk.growthbook.serializable_model.SerializableFeaturesDataModel
 import com.sdk.growthbook.serializable_model.gbDeserialize
@@ -23,7 +25,7 @@ import com.sdk.growthbook.stickybucket.GBStickyBucketServiceImp
 import com.sdk.growthbook.utils.GBCacheRefreshHandler
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.utils.GBFeaturesChangeHandler
-import kotlinx.serialization.json.Json
+import com.sdk.growthbook.utils.GBFetchStatsHandler
 
 /**
  * SDKBuilder - Root Class for SDK Initializers for GrowthBook SDK
@@ -116,6 +118,7 @@ class GBSDKBuilder(
 
     private var refreshHandler: GBCacheRefreshHandler? = null
     private var featuresChangeHandler: GBFeaturesChangeHandler? = null
+    private var fetchStatsHandler: GBFetchStatsHandler? = null
     private var stickyBucketService: GBStickyBucketService? = null
     // Deferred builder for the default sticky-bucket service. The caching layer is resolved
     // lazily at initialize() time (via resolveCachingLayer()) rather than when the setter is
@@ -167,10 +170,31 @@ class GBSDKBuilder(
     }
 
     /**
+     * Set Fetch Stats Handler - Will be called once per feature fetch with how long it took and
+     * how large the payload was. Use it to measure what users actually experience on first
+     * launch; the edge completes a response before the device has received it, so fetch duration
+     * cannot be measured server-side.
+     *
+     * Invoked on the network callback's thread, before the payload is parsed.
+     *
+     * Scope: feature GET fetches only. Remote evaluation (`remoteEval = true`) goes through a
+     * POST that is not reported — a server-side evaluation and a CDN GET have very different
+     * latency profiles, so folding them into one stream would corrupt both averages. Reporting
+     * for remote eval (with a source discriminator) is a possible follow-up.
+     */
+    fun setFetchStatsHandler(fetchStatsHandler: GBFetchStatsHandler): GBSDKBuilder {
+        this.fetchStatsHandler = fetchStatsHandler
+        return this
+    }
+
+    /**
      * Seed the SDK with a bundled fallback payload (e.g. snapshotted at build time).
      * Features are applied immediately so flags are available from the first millisecond,
      * and the normal cache/network refresh still runs on top — overwriting the seed as
      * fresher data arrives. Effective precedence: network > disk cache > seed > code defaults.
+     *
+     * Takes an already-decoded feature map; see [setInitialPayload] to seed straight from a
+     * payload as the API returns it.
      */
     fun setInitialFeatures(features: GBFeatures): GBSDKBuilder {
         this.initialFeatures = features
@@ -184,13 +208,15 @@ class GBSDKBuilder(
      * Use this instead of [setInitialFeatures] when the payload carries more than features:
      * `savedGroups` and `contextualBandits` are seeded too, and the encrypted variants
      * (`encryptedFeatures` / `encryptedSavedGroups` / `encryptedContextualBandits`) are decrypted
-     * with the builder's encryption key. Contextual bandit rules in particular are inert without
-     * their definitions, so a bundled payload for a bandit-driven feature must go through here.
+     * with the builder's encryption key — so an encrypted snapshot can be bundled without
+     * decrypting it at build time and shipping plaintext definitions inside the app. Contextual
+     * bandit rules in particular are inert without their definitions, so a bundled payload for a
+     * bandit-driven feature must go through here.
      *
      * Like [setInitialFeatures], this is only a seed: the normal cache/network refresh still runs on
      * top and overwrites it as fresher data arrives (network > disk cache > seed > code defaults).
-     * A payload that cannot be parsed is ignored (logged when logging is enabled) rather than
-     * failing initialization — the seed is a fallback, not a hard dependency.
+     * A payload that cannot be parsed or decrypted is ignored (logged when logging is enabled)
+     * rather than failing initialization — the seed is a fallback, not a hard dependency.
      *
      * If both this and [setInitialFeatures] are set, the explicit features win over the payload's.
      */
@@ -428,7 +454,8 @@ class GBSDKBuilder(
             serveStaleOnError = serveStaleOnError,
             coroutineContext = coroutineContext,
             featuresChangeHandler = featuresChangeHandler,
-            cachingLayer = customCachingLayer
+            cachingLayer = customCachingLayer,
+            fetchStatsHandler = fetchStatsHandler
         )
     }
 
@@ -491,7 +518,8 @@ class GBSDKBuilder(
                 serveStaleOnError = serveStaleOnError,
                 coroutineContext = coroutineContext,
                 featuresChangeHandler = featuresChangeHandler,
-                cachingLayer = customCachingLayer
+                cachingLayer = customCachingLayer,
+                fetchStatsHandler = fetchStatsHandler
             )
         }
     }
