@@ -60,11 +60,22 @@ typealias GBCacheRefreshHandler = (Boolean, GBError?) -> Unit
 typealias GBFeaturesChangeHandler = (GBFeaturesDiff) -> Unit
 
 /**
+ * How a single feature fetch ended. [NotModified] is its own outcome rather than a success
+ * with zero bytes: most fetches after the first are 304s, and anyone computing throughput
+ * from payloadBytes / durationMillis needs to be able to filter them out of the average.
+ */
+enum class GBFetchOutcome {
+    Success,
+    Failed,
+    NotModified,
+}
+
+/**
  * Timing and size of a single feature fetch. Reported before the payload is parsed, so the
  * numbers describe the network round trip rather than the SDK's own work.
  */
 data class GBFetchStats(
-    val success: Boolean,
+    val outcome: GBFetchOutcome,
     val durationMillis: Long,
     /**
      * Payload size as received, after any transport decompression — the decoded size, not the

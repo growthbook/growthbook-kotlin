@@ -160,6 +160,11 @@ class GBSDKBuilder(
      * cannot be measured server-side.
      *
      * Invoked on the network callback's thread, before the payload is parsed.
+     *
+     * Scope: feature GET fetches only. Remote evaluation (`remoteEval = true`) goes through a
+     * POST that is not reported — a server-side evaluation and a CDN GET have very different
+     * latency profiles, so folding them into one stream would corrupt both averages. Reporting
+     * for remote eval (with a source discriminator) is a possible follow-up.
      */
     fun setFetchStatsHandler(fetchStatsHandler: GBFetchStatsHandler): GBSDKBuilder {
         this.fetchStatsHandler = fetchStatsHandler

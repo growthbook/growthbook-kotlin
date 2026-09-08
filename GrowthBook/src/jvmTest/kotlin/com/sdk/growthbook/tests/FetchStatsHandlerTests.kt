@@ -5,6 +5,7 @@ import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.network.NetworkDispatcher
 import com.sdk.growthbook.sandbox.CachingJvm
+import com.sdk.growthbook.utils.GBFetchOutcome
 import com.sdk.growthbook.utils.GBFetchStats
 import com.sdk.growthbook.utils.Resource
 import com.sdk.growthbook.utils.SSEConnectionController
@@ -19,7 +20,6 @@ import org.junit.rules.TemporaryFolder
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -89,7 +89,7 @@ class FetchStatsHandlerTests {
         val stats = statsFrom(MockNetworkClient(payload, null))
 
         assertEquals(1, stats.size)
-        assertTrue(stats[0].success)
+        assertEquals(GBFetchOutcome.Success, stats[0].outcome)
         assertEquals(payload.encodeToByteArray().size, stats[0].payloadBytes)
         assertTrue(stats[0].durationMillis >= 0)
     }
@@ -99,16 +99,16 @@ class FetchStatsHandlerTests {
         val stats = statsFrom(MockNetworkClient(null, Exception("network down")))
 
         assertEquals(1, stats.size)
-        assertFalse(stats[0].success)
+        assertEquals(GBFetchOutcome.Failed, stats[0].outcome)
         assertNull(stats[0].payloadBytes)
     }
 
     @Test
-    fun notModified_reportsSuccessWithZeroSize() = runTest {
+    fun notModified_reportsItsOwnOutcomeWithZeroSize() = runTest {
         val stats = statsFrom(MockNetworkClient(null, null, notModified = true))
 
         assertEquals(1, stats.size)
-        assertTrue(stats[0].success)
+        assertEquals(GBFetchOutcome.NotModified, stats[0].outcome)
         assertEquals(0, stats[0].payloadBytes)
     }
 
@@ -117,8 +117,51 @@ class FetchStatsHandlerTests {
         val stats = statsFrom(PlainGetDispatcher(payload))
 
         assertEquals(1, stats.size)
-        assertTrue(stats[0].success)
+        assertEquals(GBFetchOutcome.Success, stats[0].outcome)
         assertEquals(payload.encodeToByteArray().size, stats[0].payloadBytes)
+    }
+
+    @Test
+    fun throwingHandler_doesNotDropTheFeatures() = runTest {
+        val sdk = GBSDKBuilder(
+            "test-key",
+            "https://cdn.growthbook.io",
+            attributes = emptyMap(),
+            encryptionKey = null,
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
+            networkDispatcher = MockNetworkClient(payload, null),
+            cachingEnabled = false,
+        )
+            .setCoroutineContext(UnconfinedTestDispatcher(testScheduler))
+            .setFetchStatsHandler { throw IllegalStateException("analytics pipeline broke") }
+            .initialize()
+
+        assertNotNull(sdk.getFeatures()["f1"])
+    }
+
+    @Test
+    fun malformedBody_reportsSuccessStatsButFailsTheRefresh() = runTest {
+        val seen = mutableListOf<GBFetchStats>()
+        var refreshedOk: Boolean? = null
+        GBSDKBuilder(
+            "test-key",
+            "https://cdn.growthbook.io",
+            attributes = emptyMap(),
+            encryptionKey = null,
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
+            networkDispatcher = MockNetworkClient("not json at all", null),
+            cachingEnabled = false,
+        )
+            .setCoroutineContext(UnconfinedTestDispatcher(testScheduler))
+            .setFetchStatsHandler { seen.add(it) }
+            .setRefreshHandler { isRefreshed, _ -> refreshedOk = isRefreshed }
+            .initialize()
+
+        // Stats describe the network round trip, which did succeed; the decode failure
+        // then surfaces through the refresh handler instead of escaping the callback.
+        assertEquals(1, seen.size)
+        assertEquals(GBFetchOutcome.Success, seen[0].outcome)
+        assertEquals(false, refreshedOk)
     }
 
     @Test

@@ -11,6 +11,7 @@ import com.sdk.growthbook.serializable_model.SerializableFeaturesDataModel
 import com.sdk.growthbook.serializable_model.gbDeserialize
 import com.sdk.growthbook.utils.FeatureRefreshStrategy
 import com.sdk.growthbook.utils.GBFeatures
+import com.sdk.growthbook.utils.GBFetchOutcome
 import com.sdk.growthbook.utils.GBFetchStats
 import com.sdk.growthbook.utils.GBFetchStatsHandler
 import com.sdk.growthbook.utils.GBRemoteEvalParams
@@ -58,24 +59,42 @@ internal class FeaturesDataSource(
     ) {
         val startedAt = TimeSource.Monotonic.markNow()
         // Reported before parsing, so the duration is the fetch and not the SDK's own decode work.
-        fun report(ok: Boolean, bytes: Int?) = onFetchStats?.invoke(
-            GBFetchStats(
-                success = ok,
-                durationMillis = startedAt.elapsedNow().inWholeMilliseconds,
-                payloadBytes = bytes,
-            )
-        )
+        // A throwing handler must not take the fetch down with it — its payload is telemetry.
+        fun report(outcome: GBFetchOutcome, bytes: Int?) {
+            val handler = onFetchStats ?: return
+            try {
+                handler.invoke(
+                    GBFetchStats(
+                        outcome = outcome,
+                        durationMillis = startedAt.elapsedNow().inWholeMilliseconds,
+                        payloadBytes = bytes,
+                    )
+                )
+            } catch (t: Throwable) {
+                GB.warning("fetch stats handler failed: $t")
+            }
+        }
 
-        val onSuccess: (String) -> Unit = { rawContent ->
-            report(ok = true, bytes = rawContent.encodeToByteArray().size)
-            val result = jsonParser.decodeFromString(
-                deserializer = SerializableFeaturesDataModel.serializer(),
-                string = rawContent
-            )
+        val onSuccess: (String) -> Unit = onSuccess@{ rawContent ->
+            // encodeToByteArray() copies the whole payload — only measure when someone is listening.
+            if (onFetchStats != null) {
+                report(GBFetchOutcome.Success, bytes = rawContent.encodeToByteArray().size)
+            }
+            // A malformed body must reach `failure`, not escape the dispatcher's callback
+            // (the OkHttp dispatcher invokes onSuccess outside any try). Mirrors autoRefreshRaw().
+            val result = try {
+                jsonParser.decodeFromString(
+                    deserializer = SerializableFeaturesDataModel.serializer(),
+                    string = rawContent
+                )
+            } catch (e: Exception) {
+                failure(e)
+                return@onSuccess
+            }
             success.invoke(result.gbDeserialize())
         }
         val onError: (Throwable) -> Unit = { apiTimeError ->
-            report(ok = false, bytes = null)
+            report(GBFetchOutcome.Failed, bytes = null)
             apiTimeError.also(failure)
         }
 
@@ -85,7 +104,7 @@ internal class FeaturesDataSource(
                 onSuccess = onSuccess,
                 onError = onError,
                 onNotModified = {
-                    report(ok = true, bytes = 0)
+                    report(GBFetchOutcome.NotModified, bytes = 0)
                     onNotModified()
                 }
             )
@@ -172,11 +191,18 @@ internal class FeaturesDataSource(
         dispatcher.consumePOSTRequest(
             url = getEndpoint(FeatureRefreshStrategy.SERVER_SENT_REMOTE_FEATURE_EVAL),
             bodyParams = payload,
-            onSuccess = { rawContent ->
-                val featureDataModel = jsonParser.decodeFromString(
-                    deserializer = SerializableFeaturesDataModel.serializer(),
-                    string = rawContent
-                )
+            onSuccess = onSuccess@{ rawContent ->
+                // Same guarded decode as fetchFeatures: a malformed body must reach `failure`,
+                // not escape the dispatcher's callback.
+                val featureDataModel = try {
+                    jsonParser.decodeFromString(
+                        deserializer = SerializableFeaturesDataModel.serializer(),
+                        string = rawContent
+                    )
+                } catch (e: Exception) {
+                    failure(Resource.Error(e))
+                    return@onSuccess
+                }
                 success.invoke(
                     Resource.Success(
                         featureDataModel.gbDeserialize()
