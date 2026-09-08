@@ -9,8 +9,10 @@ import com.sdk.growthbook.model.GBJson
 import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.plugin.tracking.SdkMetadata
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -44,6 +46,14 @@ data class TrackingEvent(
                 put("variationId", result.key)
                 result.hashAttribute?.let { put("hashAttribute", it) }
                 result.hashValue?.let { put("hashValue", it) }
+                // Contextual-bandit attribution. The TS plugin does not send these (yet) —
+                // additive extra properties, populated only for enrolled bandit exposures,
+                // so non-bandit events are byte-identical to the TS shape.
+                result.leafId?.let { put("leafId", it) }
+                result.variationWeights?.let { weights ->
+                    put("variationWeights", JsonArray(weights.map { JsonPrimitive(it) }))
+                }
+                result.banditVersion?.let { put("banditVersion", it) }
             }
             return build(EVENT_EXPERIMENT_VIEWED, properties, attributes)
         }
