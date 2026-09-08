@@ -415,6 +415,19 @@ internal class GBFeatureEvaluator(
                 return
             }
 
+        // Explicit ranges take precedence over weights in the bucketer, so no leaf's weight
+        // vector can describe this assignment: bucket on the ranges and emit no bandit
+        // metadata at all (matches the Python SDK; TS buckets the same way).
+        if (experiment.ranges != null) {
+            if (evaluationContext.loggingEnabled) {
+                GB.log(
+                    "GBFeatureEvaluator: contextual bandit '$contextualBanditRef' rule carries explicit " +
+                        "ranges; bucketing by ranges and omitting bandit metadata"
+                )
+            }
+            return
+        }
+
         // Throwable, not Exception: on the JS/wasm targets a failure inside the condition evaluator
         // can surface as a plain Throwable, which would otherwise escape and kill the evaluation.
         val leaf = try {
@@ -429,8 +442,9 @@ internal class GBFeatureEvaluator(
             null
         }
 
+        val numVariations = experiment.variations.size
         val leafId = leaf?.leafId
-        val leafWeights = leaf?.weights
+        val leafWeights = leaf?.weights?.takeIf { isValidWeightVector(it, numVariations) }
         if (leaf != null && leafId != null && leafWeights != null) {
             experiment.weights = leafWeights
             experiment.contextualBandit = CBContext(
@@ -439,11 +453,12 @@ internal class GBFeatureEvaluator(
                 banditVersion = cbDefinition.banditVersion
             )
         } else {
-            // Either no leaf matched, or the matched leaf is malformed (missing leafId or
-            // weights) and cannot describe the assignment. Both degrade the same way: the
-            // rule's aggregate weights under the fallback sentinel, so reported propensities
-            // never disagree with the weights that actually bucketed the user. (In TS both
-            // fields are required; this matches the Python SDK's malformed-leaf handling.)
+            // Either no leaf matched, or the matched leaf is malformed (missing leafId, or a
+            // weight vector the bucketer would reject) and cannot describe the assignment.
+            // Both degrade the same way: the rule's effective weights under the fallback
+            // sentinel — effective meaning after the same substitution the bucketer applies,
+            // so reported propensities never disagree with the weights that actually bucketed
+            // the user. (In TS these fields are required; matches Python's malformed handling.)
             if (evaluationContext.loggingEnabled) {
                 val reason = if (leaf == null) "matched no leaf" else "matched a malformed leaf"
                 GB.log(
@@ -453,10 +468,25 @@ internal class GBFeatureEvaluator(
             }
             experiment.contextualBandit = CBContext(
                 leafId = CONTEXTUAL_BANDIT_FALLBACK_LEAF_ID,
-                variationWeights = experiment.weights ?: GBUtils.getEqualWeights(experiment.variations.size),
+                variationWeights = experiment.weights
+                    ?.takeIf { isValidWeightVector(it, numVariations) }
+                    ?: GBUtils.getEqualWeights(numVariations),
                 banditVersion = cbDefinition.banditVersion
             )
         }
+    }
+
+    /**
+     * The acceptance rule the bucketer effectively applies — [GBUtils.getBucketRanges]
+     * substitutes equal weights for a wrong-length vector or one whose sum is outside
+     * [0.99, 1.01] — plus finite/non-negative, which the bucketer's sum check misses
+     * for NaN (NaN comparisons are false, so a NaN vector slips through it).
+     */
+    private fun isValidWeightVector(weights: List<Float>, numVariations: Int): Boolean {
+        if (weights.size != numVariations) return false
+        if (weights.any { !it.isFinite() || it < 0f }) return false
+        val sum = weights.sum()
+        return sum >= 0.99f && sum <= 1.01f
     }
 
     private fun getContextualBanditLeaf(

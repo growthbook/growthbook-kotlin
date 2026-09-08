@@ -339,6 +339,142 @@ class GBContextualBanditPayloadTest {
     }
 
     @Test
+    fun invalidLeafWeightVector_fallsBackAndReportsTheWeightsActuallyUsed() = runTest {
+        // The matched leaf's vector has the wrong length for 2 variations, so the bucketer
+        // would substitute equal weights while the metadata claimed [0,1,0] — corrupting
+        // training data. It must degrade to the -1 fallback reporting the rule's weights.
+        @Language("json")
+        val payload = """
+            {
+              "features": {
+                "cb_feature": {
+                  "defaultValue": "default",
+                  "rules": [
+                    {
+                      "key": "cb_exp",
+                      "hashAttribute": "id",
+                      "coverage": 1,
+                      "weights": [1.0, 0.0],
+                      "contextualBanditRef": "bandit_badvector",
+                      "contextualVariations": ["control", "variant"]
+                    }
+                  ]
+                }
+              },
+              "contextualBandits": {
+                "bandit_badvector": {
+                  "contexts": [ { "leafId": 4, "condition": {}, "weights": [0.0, 1.0, 0.0] } ]
+                }
+              }
+            }
+        """.trimIndent()
+
+        val sdk = seededSDK(
+            seed = payload,
+            key = "seed_bad_vector_key",
+            attributes = mapOf("id" to GBString("u1")),
+            dispatcher = UnconfinedTestDispatcher(testScheduler),
+        )
+
+        val result = sdk.feature("cb_feature")
+
+        assertEquals(GBString("control"), result.gbValue)
+        assertEquals(-1, result.experimentResult?.leafId)
+        assertEquals(listOf(1.0f, 0.0f), result.experimentResult?.variationWeights)
+    }
+
+    @Test
+    fun invalidRuleWeightsInFallback_reportEqualWeightsLikeTheBucketer() = runTest {
+        // Leaf weights sum to 10 (invalid) and the rule's own weights sum to 0.4 (also
+        // invalid), so the bucketer substitutes equal weights. The reported propensities
+        // must be that same substitution, not the raw invalid vector.
+        @Language("json")
+        val payload = """
+            {
+              "features": {
+                "cb_feature": {
+                  "defaultValue": "default",
+                  "rules": [
+                    {
+                      "key": "cb_exp",
+                      "hashAttribute": "id",
+                      "coverage": 1,
+                      "weights": [0.2, 0.2],
+                      "contextualBanditRef": "bandit_badsum",
+                      "contextualVariations": ["control", "variant"]
+                    }
+                  ]
+                }
+              },
+              "contextualBandits": {
+                "bandit_badsum": {
+                  "contexts": [ { "leafId": 4, "condition": {}, "weights": [5.0, 5.0] } ]
+                }
+              }
+            }
+        """.trimIndent()
+
+        val sdk = seededSDK(
+            seed = payload,
+            key = "seed_bad_sum_key",
+            attributes = mapOf("id" to GBString("u1")),
+            dispatcher = UnconfinedTestDispatcher(testScheduler),
+        )
+
+        val result = sdk.feature("cb_feature")
+
+        assertEquals(-1, result.experimentResult?.leafId)
+        assertEquals(listOf(0.5f, 0.5f), result.experimentResult?.variationWeights)
+    }
+
+    @Test
+    fun explicitRanges_takePrecedenceAndSuppressBanditMetadata() = runTest {
+        // Ranges override weights entirely in the bucketer, so no leaf's weight vector can
+        // describe the assignment — the exposure must carry no bandit metadata (matches Python).
+        // Ranges route everyone to variation 0; the leaf's 0/1 weights would have picked 1.
+        @Language("json")
+        val payload = """
+            {
+              "features": {
+                "cb_feature": {
+                  "defaultValue": "default",
+                  "rules": [
+                    {
+                      "key": "cb_exp",
+                      "hashAttribute": "id",
+                      "coverage": 1,
+                      "ranges": [[0.0, 1.0], [0.0, 0.0]],
+                      "contextualBanditRef": "bandit_1",
+                      "contextualVariations": ["control", "variant"]
+                    }
+                  ]
+                }
+              },
+              "contextualBandits": {
+                "bandit_1": {
+                  "banditVersion": 3,
+                  "contexts": [ { "leafId": 9, "condition": {}, "weights": [0.0, 1.0] } ]
+                }
+              }
+            }
+        """.trimIndent()
+
+        val sdk = seededSDK(
+            seed = payload,
+            key = "seed_ranges_key",
+            attributes = mapOf("id" to GBString("u1")),
+            dispatcher = UnconfinedTestDispatcher(testScheduler),
+        )
+
+        val result = sdk.feature("cb_feature")
+
+        assertEquals(GBString("control"), result.gbValue)
+        assertNull(result.experimentResult?.leafId)
+        assertNull(result.experimentResult?.variationWeights)
+        assertNull(result.experimentResult?.banditVersion)
+    }
+
+    @Test
     fun initialPayload_malformedJsonIsIgnoredRatherThanFatal() = runTest {
         val sdk = seededSDK(
             seed = "{ not json at all",
