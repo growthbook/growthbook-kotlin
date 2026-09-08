@@ -678,7 +678,10 @@ The three fields are populated only for users actually enrolled in a bandit expe
 experiments and for users the rule excluded. A `leafId` of `-1` means no leaf condition matched and the rule's aggregate
 weights were used instead.
 
-Sticky bucketing works with bandit rules as it does with any experiment rule. For offline-first setups, seed the
+Sticky bucketing works with bandit rules as it does with any experiment rule. One caveat for training pipelines: a
+sticky-bucketed user keeps their stored variation, but the exposure reports the *current* leaf's `variationWeights` —
+which may differ from the weights in force when they were originally bucketed. Check `result.stickyBucketUsed` before
+treating `variationWeights` as the assignment propensities. For offline-first setups, seed the
 definitions with [`setInitialPayload`](#bundled-fallback-payload-setinitialpayload) — `setInitialFeatures` does not carry
 them.
 

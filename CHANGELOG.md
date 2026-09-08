@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       were used.
     - Fallbacks mirror the reference SDK: a dangling `contextualBanditRef` keeps the rule's aggregate weights and emits
       no metadata; empty or non-matching contexts fall back to aggregate (or equal) weights with the `-1` sentinel.
+    - Malformed definitions degrade instead of failing (the reference TS SDK types these fields as required; handling
+      mirrors the Python SDK): a leaf missing `leafId` or `weights` cannot describe the assignment, so a match on it
+      takes the `-1` aggregate-weight fallback — and never discards the rest of the payload; a leaf whose `condition`
+      is not a JSON object is skipped (fails closed) rather than coerced into a match-everyone catch-all.
     - Sticky bucketing recognises bandit rules — identifier attributes are now derived from `contextualVariations` as
       well as `variations`. Previously sticky bucketing silently did nothing on a bandit-driven feature.
 - `GBSDKBuilder.setInitialPayload(json)` seeds the SDK with a bundled **raw API payload** rather than just features:
@@ -65,6 +69,14 @@ is unaffected — only creating instances is now the SDK's job.
 ### Known limitations
 - GrowthBook's querystring variation override is not implemented in this SDK, so the corresponding shared spec case
   (`querystring force overrides CB routing`) is skipped rather than ported. Use `setForcedVariations` instead.
+- Exposure deduplication keys on hash attribute/value, experiment key and variation id — the same key the reference
+  TS SDK uses. It does not include `leafId` or `banditVersion`, so a user re-routed into a different leaf (or a new
+  weight generation) with the same variation index does not fire a new tracking call. Matching the reference SDK is
+  deliberate; widening the key is an upstream spec question, not an SDK-local fix.
+- A sticky-bucketed user keeps their stored variation, but the exposure reports the *current* leaf's
+  `variationWeights`, which may differ from the weights in force when they were originally bucketed (matches the
+  reference SDK). Training pipelines should join on `stickyBucketUsed` before treating `variationWeights` as the
+  assignment propensities.
 
 ### Companion artifacts
 - `GrowthBookTest` **2.0.0** — no source changes, but it builds `GBExperimentResult` internally, so the 1.0.0 artifact
