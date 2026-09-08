@@ -83,6 +83,7 @@ If you are accessing features the first time there will be no features right aft
     .setQAMode(true) // Enable / Disable QA Mode
     .setForcedVariations(<HashMap>) // Pass Forced Variations
     .setInitialFeatures(<GBFeatures>) // Seed bundled fallback features (see below)
+    .setInitialPayload(<String>) // Seed a bundled raw API payload (see below)
     .setCacheMaxAge(<Long>) // Cache freshness window in ms (see below)
 .initialize()
 ```
@@ -109,6 +110,30 @@ var sdkInstance: GrowthBookSDK = GBSDKBuilder(
 ```
 
 The seeded features are applied immediately. The normal cache/network refresh still runs on top and overwrites the seed as fresher data arrives. Effective precedence: **network > disk cache > seed > code defaults**.
+
+#### Bundled fallback payload (`setInitialPayload`)
+
+`setInitialFeatures` takes an already-decoded feature map, so bundling a snapshot means decrypting it at build time —
+shipping plaintext feature definitions inside the app even when payload encryption is on. When the snapshot is encrypted,
+or carries more than features (saved groups, or encrypted variants of either), seed the **raw API payload** instead: the
+exact JSON body the features endpoint returns, snapshotted into your assets at build time.
+
+```kotlin
+var sdkInstance: GrowthBookSDK = GBSDKBuilder(
+    apiKey = <API_KEY>,
+    hostURL = <GrowthBook_URL>,
+    attributes = hashMapOf(),
+    trackingCallback = { _, _ -> },
+    encryptionKey = <String?>, // used to decrypt the seed's encrypted* fields too
+    networkDispatcher = GBNetworkDispatcherKtor(),
+)
+    .setInitialPayload(readBundledJsonFromAssets())
+    .initialize()
+```
+
+Like `setInitialFeatures`, this is only a seed and the same precedence applies. A payload that cannot be parsed or
+decrypted is logged and ignored rather than failing initialization. If both setters are used, the explicit features win
+over the payload's.
 
 > **Upgrading from 6.x:** Persistent caching is now implemented on every target — Android, Apple (iOS/macOS) and the JVM (on disk), and JS and wasmJs (browser `localStorage`). The legacy `FeatureCache.txt` → `FeatureCache_<clientKey>.txt` migration applies to Android only, so this upgrade note does not apply to the other targets.
 

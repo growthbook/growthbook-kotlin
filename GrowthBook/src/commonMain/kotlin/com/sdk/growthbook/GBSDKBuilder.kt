@@ -399,18 +399,22 @@ class GBSDKBuilder(
         initialFeatures?.let { gbContext.features = it }
     }
 
+    private val seedJsonParser = Json { isLenient = true; ignoreUnknownKeys = true }
+
     // A seed is a fallback by definition, so a bad one must not stop the SDK from starting.
     private fun decodeSeed(payload: String): DecodedPayload? =
         runCatching {
             FeaturePayloadDecoder(encryptionKey).decode(
-                Json { isLenient = true; ignoreUnknownKeys = true }
+                seedJsonParser
                     .decodeFromString(SerializableFeaturesDataModel.serializer(), payload)
                     .gbDeserialize()
             )
         }.onFailure {
-            GB.error(
-                errorMessage = "GBSDKBuilder: seeded payload could not be decoded, ignoring it",
-                throwable = it
-            )
+            if (enableLogging) {
+                GB.error(
+                    errorMessage = "GBSDKBuilder: seeded payload could not be decoded, ignoring it",
+                    throwable = it
+                )
+            }
         }.getOrNull()
 }
