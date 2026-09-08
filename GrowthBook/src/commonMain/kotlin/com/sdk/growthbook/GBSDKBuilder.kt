@@ -516,11 +516,13 @@ class GBSDKBuilder(
                 null
             }
 
-            decoded?.features?.let { gbContext.features = it }
-            decoded?.savedGroups?.let { groups ->
-                gbContext.savedGroups = groups.mapValues { (_, value) -> GBValue.from(value) }
+            decoded?.let {
+                gbContext.applyPayload(
+                    features = it.features,
+                    savedGroups = it.savedGroups?.mapValues { (_, value) -> GBValue.from(value) },
+                    contextualBandits = it.contextualBandits,
+                )
             }
-            decoded?.contextualBandits?.let { gbContext.contextualBandits = it }
         }
         initialFeatures?.let { gbContext.features = it }
     }
