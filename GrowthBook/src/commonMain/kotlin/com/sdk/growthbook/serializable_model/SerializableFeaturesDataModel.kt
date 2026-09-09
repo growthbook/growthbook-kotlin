@@ -13,6 +13,8 @@ internal data class SerializableFeaturesDataModel(
     val encryptedFeatures: String? = null,
     val savedGroups: JsonObject? = null,
     val encryptedSavedGroups: String? = null,
+    val contextualBandits: Map<String, SerializableGBContextualBandit>? = null,
+    val encryptedContextualBandits: String? = null,
     val cachedAt: Long? = null
 )
 
@@ -22,4 +24,6 @@ internal fun SerializableFeaturesDataModel.gbDeserialize() =
         encryptedFeatures = encryptedFeatures,
         savedGroups = savedGroups,
         encryptedSavedGroups = encryptedSavedGroups,
+        contextualBandits = contextualBandits?.mapValues { it.value.gbDeserialize() },
+        encryptedContextualBandits = encryptedContextualBandits,
     )

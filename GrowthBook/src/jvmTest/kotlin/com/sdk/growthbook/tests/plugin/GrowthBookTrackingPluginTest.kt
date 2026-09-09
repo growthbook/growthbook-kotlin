@@ -71,6 +71,53 @@ class GrowthBookTrackingPluginTest {
     )
 
     @Test
+    fun banditExposure_carriesAttributionInExperimentViewed() {
+        val dispatcher = CapturingDispatcher()
+        val plugin = GrowthBookTrackingPlugin(config(dispatcher))
+        plugin.init()
+
+        plugin.onExperimentViewed(
+            experiment("cb_exp"),
+            GBExperimentResult(
+                value = GBNull,
+                variationId = 1,
+                hashAttribute = "id",
+                hashValue = "u1",
+                leafId = 7,
+                variationWeights = listOf(0.25f, 0.75f),
+                banditVersion = 3,
+            ),
+            attributes = null,
+        )
+        plugin.close()
+
+        val batch = assertNotNull(dispatcher.waitForPost())
+        val properties = batch[0].jsonObject["properties_json"]!!.jsonObject
+        assertEquals("7", properties["leafId"]?.jsonPrimitive?.content)
+        assertEquals("3", properties["banditVersion"]?.jsonPrimitive?.content)
+        assertEquals(
+            listOf(0.25f, 0.75f),
+            (properties["variationWeights"] as JsonArray).map { it.jsonPrimitive.content.toFloat() }
+        )
+    }
+
+    @Test
+    fun ordinaryExposure_hasNoBanditProperties() {
+        val dispatcher = CapturingDispatcher()
+        val plugin = GrowthBookTrackingPlugin(config(dispatcher))
+        plugin.init()
+
+        plugin.onExperimentViewed(experiment("plain_exp"), experimentResult(), attributes = null)
+        plugin.close()
+
+        val batch = assertNotNull(dispatcher.waitForPost())
+        val properties = batch[0].jsonObject["properties_json"]!!.jsonObject
+        assertFalse("leafId" in properties)
+        assertFalse("variationWeights" in properties)
+        assertFalse("banditVersion" in properties)
+    }
+
+    @Test
     fun flushesWhenBatchSizeReached() {
         val dispatcher = CapturingDispatcher()
         val plugin = GrowthBookTrackingPlugin(

@@ -11,6 +11,7 @@ import com.sdk.growthbook.utils.Constants
 import com.sdk.growthbook.utils.GBCacheRefreshHandler
 import com.sdk.growthbook.utils.GBError
 import com.sdk.growthbook.utils.GBFeatures
+import com.sdk.growthbook.utils.GBFetchStatsHandler
 import com.sdk.growthbook.utils.GBRemoteEvalParams
 import com.sdk.growthbook.utils.Resource
 import com.sdk.growthbook.utils.getFeaturesFromEncryptedFeatures
@@ -36,6 +37,7 @@ import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.kotlinx.serialization.from
 import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.plugin.tracking.PluginRegistry
+import com.sdk.growthbook.model.GBContextualBandit
 import com.sdk.growthbook.model.StackContext
 import com.sdk.growthbook.utils.GBFeaturesChangeHandler
 import com.sdk.growthbook.sandbox.CachingImpl
@@ -91,7 +93,9 @@ class GrowthBookSDK internal constructor(
     // Internal seam only: the public way to plug a cache is GBSDKBuilder.setCachingLayer().
     // Adding this to the public constructor would break binary compatibility,
     // so the public constructor below preserves the pre-7.4.0 signature and delegates here.
-    cachingLayer: GBCachingLayer?
+    cachingLayer: GBCachingLayer?,
+    // Internal seam only, same reasoning: set via GBSDKBuilder.setFetchStatsHandler().
+    private val fetchStatsHandler: GBFetchStatsHandler? = null
     ) : FeaturesFlowDelegate, IGrowthBookSDK {
 
     /**
@@ -138,7 +142,7 @@ class GrowthBookSDK internal constructor(
     internal var featuresViewModel: FeaturesViewModel = FeaturesViewModel(
         delegate = this,
         dataSource = FeaturesDataSource(
-            networkDispatcher, gbContext, gbOptions
+            networkDispatcher, gbContext, gbOptions, onFetchStats = fetchStatsHandler
         ),
         encryptionKey = gbContext.encryptionKey,
         cachingEnabled = cachingEnabled,
@@ -269,28 +273,6 @@ class GrowthBookSDK internal constructor(
     }
 
     /**
-     * Delegate that set to Context successfully fetched features
-     */
-    override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
-        // Compute the diff only for authoritative results (network / SSE / fresh cache), against the
-        // features currently applied. The non-authoritative cache pre-load that precedes a network
-        // refresh must not notify, otherwise the handler double-fires on a warm start (cache, then
-        // network); the subsequent authoritative result reports the real delta.
-        val diff = if (isRemote) {
-            featuresChangeHandler?.let { diffFeatures(gbContext.features, features) }
-        } else null
-
-        gbContext.features = features
-        hasFeaturesPayload = true
-        if (isRemote) {
-            remoteSourceFeaturesFetchResult = FeaturesFetchResult.Success
-            invokeRefreshHandler(true, null)
-        }
-
-        diff?.takeIf { it.hasChanges }?.let { featuresChangeHandler?.invoke(it) }
-    }
-
-    /**
      * Delegate that fire refreshHandler with success = true when a 304 response occurs.
      * Only treated as success when the SDK instance has a loaded feature payload.
      * Without prior state a 304 cannot guarantee features are available
@@ -356,9 +338,44 @@ class GrowthBookSDK internal constructor(
         }
     }
 
-    override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) {
-        gbContext.savedGroups = savedGroups.mapValues { GBValue.from(it.value) }
-        if (isRemote) {
+    /**
+     * Applies a successfully fetched payload: every field it carries lands in the context in a
+     * single atomic update, then the refresh/features-change handlers fire.
+     *
+     * One update rather than one per field because payload application runs on a background
+     * dispatcher: a feature() call from the app thread could otherwise land mid-way and evaluate new
+     * features against the previous generation's bandit definitions or saved groups.
+     */
+    override fun payloadFetchedSuccessfully(
+        features: GBFeatures?,
+        savedGroups: JsonObject?,
+        contextualBandits: Map<String, GBContextualBandit>?,
+        isRemote: Boolean,
+    ) {
+        // Compute the diff only for authoritative results (network / SSE / fresh cache), against the
+        // features currently applied. The non-authoritative cache pre-load that precedes a network
+        // refresh must not notify, otherwise the handler double-fires on a warm start (cache, then
+        // network); the subsequent authoritative result reports the real delta.
+        val diff = if (isRemote && features != null) {
+            featuresChangeHandler?.let { diffFeatures(gbContext.features, features) }
+        } else null
+
+        gbContext.applyPayload(
+            features = features,
+            savedGroups = savedGroups?.mapValues { GBValue.from(it.value) },
+            contextualBandits = contextualBandits
+        )
+
+        if (features != null) {
+            hasFeaturesPayload = true
+            if (isRemote) {
+                remoteSourceFeaturesFetchResult = FeaturesFetchResult.Success
+                invokeRefreshHandler(true, null)
+            }
+            diff?.takeIf { it.hasChanges }?.let { featuresChangeHandler?.invoke(it) }
+        }
+
+        if (savedGroups != null && isRemote) {
             invokeRefreshHandler(true, null)
         }
     }
@@ -642,7 +659,7 @@ class GrowthBookSDK internal constructor(
 
     /**
      * Called after the full API payload is received, before features are applied to context.
-     * Awaits sticky bucket refresh so that context is consistent when featuresFetchedSuccessfully fires.
+     * Awaits sticky bucket refresh so that context is consistent when payloadFetchedSuccessfully fires.
      */
     override suspend fun onPayloadReady(model: FeaturesDataModel) {
         try {
@@ -795,7 +812,8 @@ class GrowthBookSDK internal constructor(
                     gbContext.mergeStickyAssignmentDoc(key, doc)
                 },
                 stackContext = StackContext(null, mutableSetOf()),
-                pluginRegistry = pluginRegistry
+                pluginRegistry = pluginRegistry,
+                contextualBandits = snapshot.contextualBandits
             )
         }
     }

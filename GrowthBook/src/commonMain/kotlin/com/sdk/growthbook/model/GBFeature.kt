@@ -160,7 +160,10 @@ data class GBFeatureRule(
     /**
      * Array of tracking calls to fire
      */
-    val tracks: ArrayList<GBTrackData>? = null
+    val tracks: ArrayList<GBTrackData>? = null,
+
+    val contextualBanditRef: String? = null,
+    val contextualVariations: List<GBValue>? = null
 ) {
     internal val conditionGB: GBJson? =
         condition?.toGBConditionJson()
@@ -195,6 +198,8 @@ data class GBFeatureRule(
                     tracks.map { it.gbSerialize() }
                 )
             },
+            contextualBanditRef = contextualBanditRef,
+            contextualVariations = contextualVariations?.map { it.gbSerialize() }
         )
 }
 

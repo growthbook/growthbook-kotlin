@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
-## [1.2.0] - Unreleased
+## [1.3.0] - Unreleased
 
 ### Fixed
 - Pinned the JVM toolchain to JDK 17 (`jvmToolchain(17)`) so the published `-jvm`
@@ -17,6 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Consumers must run on a Java 17-or-newer runtime; older runtimes fail at class load with
   `UnsupportedClassVersionError`. (This artifact supports Android and JVM only.)
 
+## [1.2.0] - 2026-09-08
+
+### Added
+- `fetchTimeoutMillis` constructor parameter (default 30 000 ms): a whole-call ceiling
+  (`callTimeout`) and matching `readTimeout` for feature GET and POST requests. Previously the
+  bare `OkHttpClient()` default applied a silent 10 s per-read timeout to the fetch — too
+  tight for a large payload on a slow network, and invisible to the caller. Applied via a
+  derived client that shares the injected client's pool and dispatcher; SSE keeps its own
+  streaming-tuned connection. Pass `null` to opt out and keep the injected client's own
+  configuration
+
+---
 ## [1.1.1] - 2026-09-03
 
 ### Fixed

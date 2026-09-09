@@ -7,7 +7,8 @@ import kotlinx.serialization.json.JsonElement
 import com.sdk.growthbook.kotlinx.serialization.from
 
 @Serializable
-data class SerializableGBFeature(
+@ConsistentCopyVisibility
+data class SerializableGBFeature internal constructor(
 
     /**
      * The default value (should use null if not specified)

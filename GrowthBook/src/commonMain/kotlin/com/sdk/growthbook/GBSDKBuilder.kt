@@ -2,12 +2,20 @@ package com.sdk.growthbook
 
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.serialization.json.Json
 import com.sdk.growthbook.logger.GB
+import com.sdk.growthbook.model.EvalSnapshot
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBContext
+import com.sdk.growthbook.model.GBContextualBandit
 import com.sdk.growthbook.model.GBOptions
+import com.sdk.growthbook.features.DecodedPayload
+import com.sdk.growthbook.features.FeaturePayloadDecoder
+import com.sdk.growthbook.kotlinx.serialization.from
 import com.sdk.growthbook.plugin.tracking.GrowthBookPlugin
 import com.sdk.growthbook.network.NetworkDispatcher
+import com.sdk.growthbook.serializable_model.SerializableFeaturesDataModel
+import com.sdk.growthbook.serializable_model.gbDeserialize
 import com.sdk.growthbook.sandbox.CachingImpl
 import com.sdk.growthbook.sandbox.CachingLayer
 import com.sdk.growthbook.sandbox.GBCachingLayer
@@ -17,6 +25,7 @@ import com.sdk.growthbook.stickybucket.GBStickyBucketServiceImp
 import com.sdk.growthbook.utils.GBCacheRefreshHandler
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.utils.GBFeaturesChangeHandler
+import com.sdk.growthbook.utils.GBFetchStatsHandler
 
 /**
  * SDKBuilder - Root Class for SDK Initializers for GrowthBook SDK
@@ -109,6 +118,7 @@ class GBSDKBuilder(
 
     private var refreshHandler: GBCacheRefreshHandler? = null
     private var featuresChangeHandler: GBFeaturesChangeHandler? = null
+    private var fetchStatsHandler: GBFetchStatsHandler? = null
     private var stickyBucketService: GBStickyBucketService? = null
     // Deferred builder for the default sticky-bucket service. The caching layer is resolved
     // lazily at initialize() time (via resolveCachingLayer()) rather than when the setter is
@@ -117,6 +127,7 @@ class GBSDKBuilder(
     private var featureUsageCallback: GBFeatureUsageCallback? = null
     private var plugins: List<GrowthBookPlugin>? = null
     private var initialFeatures: GBFeatures? = null
+    private var initialPayloadJson: String? = null
     private var cacheMaxAge: Long? = null
     private var refreshInterval: Long? = null
     private var staleTtl: Long? = null
@@ -127,6 +138,10 @@ class GBSDKBuilder(
     // StandardTestDispatcher) to drive the async pipeline synchronously.
     private var coroutineContext: CoroutineContext = PlatformDependentIODispatcher
     private var customCachingLayer: GBCachingLayer? = null
+
+    // Matches the parser the network path uses, so a bundled snapshot is accepted on exactly the
+    // same terms as a live response (unknown//future payload fields ignored rather than fatal).
+    private val seedJsonParser = Json { isLenient = true; ignoreUnknownKeys = true }
 
     /**
      * Override the dispatcher used to process fetched payloads. Intended for tests that need
@@ -155,13 +170,58 @@ class GBSDKBuilder(
     }
 
     /**
+     * Set Fetch Stats Handler - Will be called once per feature fetch with how long it took and
+     * how large the payload was. Use it to measure what users actually experience on first
+     * launch; the edge completes a response before the device has received it, so fetch duration
+     * cannot be measured server-side.
+     *
+     * Invoked on the network callback's thread, before the payload is parsed.
+     *
+     * Scope: feature GET fetches only. Remote evaluation (`remoteEval = true`) goes through a
+     * POST that is not reported — a server-side evaluation and a CDN GET have very different
+     * latency profiles, so folding them into one stream would corrupt both averages. Reporting
+     * for remote eval (with a source discriminator) is a possible follow-up.
+     */
+    fun setFetchStatsHandler(fetchStatsHandler: GBFetchStatsHandler): GBSDKBuilder {
+        this.fetchStatsHandler = fetchStatsHandler
+        return this
+    }
+
+    /**
      * Seed the SDK with a bundled fallback payload (e.g. snapshotted at build time).
      * Features are applied immediately so flags are available from the first millisecond,
      * and the normal cache/network refresh still runs on top — overwriting the seed as
      * fresher data arrives. Effective precedence: network > disk cache > seed > code defaults.
+     *
+     * Takes an already-decoded feature map; see [setInitialPayload] to seed straight from a
+     * payload as the API returns it.
      */
     fun setInitialFeatures(features: GBFeatures): GBSDKBuilder {
         this.initialFeatures = features
+        return this
+    }
+
+    /**
+     * Seed the SDK with a bundled fallback payload in its raw API form — the exact JSON body the
+     * features endpoint returns, e.g. snapshotted into your assets at build time.
+     *
+     * Use this instead of [setInitialFeatures] when the payload carries more than features:
+     * `savedGroups` and `contextualBandits` are seeded too, and the encrypted variants
+     * (`encryptedFeatures` / `encryptedSavedGroups` / `encryptedContextualBandits`) are decrypted
+     * with the builder's encryption key — so an encrypted snapshot can be bundled without
+     * decrypting it at build time and shipping plaintext definitions inside the app. Contextual
+     * bandit rules in particular are inert without their definitions, so a bundled payload for a
+     * bandit-driven feature must go through here.
+     *
+     * Like [setInitialFeatures], this is only a seed: the normal cache/network refresh still runs on
+     * top and overwrites it as fresher data arrives (network > disk cache > seed > code defaults).
+     * A payload that cannot be parsed or decrypted is ignored (logged when logging is enabled)
+     * rather than failing initialization — the seed is a fallback, not a hard dependency.
+     *
+     * If both this and [setInitialFeatures] are set, the explicit features win over the payload's.
+     */
+    fun setInitialPayload(json: String): GBSDKBuilder {
+        this.initialPayloadJson = json
         return this
     }
 
@@ -378,7 +438,7 @@ class GBSDKBuilder(
             )
         }
 
-        initialFeatures?.let { gbContext.features = it }
+        seedInitialState(gbContext)
 
         val gbOptions = GBOptions(apiHost, streamingHost)
 
@@ -394,7 +454,8 @@ class GBSDKBuilder(
             serveStaleOnError = serveStaleOnError,
             coroutineContext = coroutineContext,
             featuresChangeHandler = featuresChangeHandler,
-            cachingLayer = customCachingLayer
+            cachingLayer = customCachingLayer,
+            fetchStatsHandler = fetchStatsHandler
         )
     }
 
@@ -414,11 +475,8 @@ class GBSDKBuilder(
             // honoured regardless of whether it was set before or after the sticky-bucket setter.
             stickyBucketService = stickyBucketService
                 ?: stickyBucketServiceFactory?.invoke(resolveCachingLayer()),
-        ).also {
-            // Assigned rather than passed: keeping it out of GBContext's primary constructor
-            // preserves that constructor's signature for already-compiled consumers.
-            it.plugins = plugins
-        }
+            plugins = plugins,
+        )
 
     private inner class WaitForCallCaseHelper(
         gbContext: GBContext,
@@ -445,7 +503,7 @@ class GBSDKBuilder(
                 handleWaitForCallCallback = null
                 growthBookSDK = null
             }
-            initialFeatures?.let { gbContext.features = it }
+            seedInitialState(gbContext)
 
             val gbOptions = GBOptions(apiHost, streamingHost)
             growthBookSDK = GrowthBookSDK(
@@ -460,9 +518,41 @@ class GBSDKBuilder(
                 serveStaleOnError = serveStaleOnError,
                 coroutineContext = coroutineContext,
                 featuresChangeHandler = featuresChangeHandler,
-                cachingLayer = customCachingLayer
+                cachingLayer = customCachingLayer,
+                fetchStatsHandler = fetchStatsHandler
             )
         }
+    }
+
+    /**
+     * Applies the bundled seed to [gbContext] before the SDK starts its own fetch: first the raw
+     * payload from [setInitialPayload] (decrypted if needed), then the explicit features from
+     * [setInitialFeatures], which therefore take precedence. A seed that fails to parse is skipped —
+     * the SDK then simply starts empty and waits for cache/network, as it would without a seed.
+     */
+    private fun seedInitialState(gbContext: GBContext) {
+        initialPayloadJson?.let { json ->
+            val decoded = runCatching {
+                val model = seedJsonParser
+                    .decodeFromString(SerializableFeaturesDataModel.serializer(), json)
+                    .gbDeserialize()
+                FeaturePayloadDecoder(encryptionKey).decode(model)
+            }.getOrElse { error ->
+                if (enableLogging) {
+                    GB.error("GBSDKBuilder: setInitialPayload could not be parsed, ignoring seed", error)
+                }
+                null
+            }
+
+            decoded?.let {
+                gbContext.applyPayload(
+                    features = it.features,
+                    savedGroups = it.savedGroups?.mapValues { (_, value) -> GBValue.from(value) },
+                    contextualBandits = it.contextualBandits,
+                )
+            }
+        }
+        initialFeatures?.let { gbContext.features = it }
     }
 
     private fun resolveCachingLayer(): CachingLayer =

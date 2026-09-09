@@ -149,6 +149,10 @@ data class GBExperiment(
             return parsed
         }
 
+
+    /** Set during evaluation when this experiment came from a contextual bandit rule. Transient. */
+    internal var contextualBandit: CBContext? = null
+
     internal fun gbSerialize() =
         SerializableGBExperiment(
             key = key,
@@ -239,7 +243,23 @@ data class GBExperimentResult(
     /**
      * If sticky bucketing was used to assign a variation
      */
-    val stickyBucketUsed: Boolean? = null
+    val stickyBucketUsed: Boolean? = null,
+
+    /**
+     * Contextual bandit: id of the leaf the user was routed into. null if not a bandit or the user
+     * was not enrolled; -1 means no leaf matched and aggregate weights were used.
+     */
+    val leafId: Int? = null,
+
+    /**
+     * Contextual bandit: the per-variation weights used to bucket this user.
+     */
+    val variationWeights: List<Float>? = null,
+
+    /**
+     * Contextual bandit: which weight generation produced [variationWeights]
+     */
+    val banditVersion: Int? = null
 ) {
     internal fun gbSerialize() =
         SerializableGBExperimentResult(
@@ -255,6 +275,9 @@ data class GBExperimentResult(
             inExperiment = inExperiment,
             hashAttribute = hashAttribute,
             stickyBucketUsed = stickyBucketUsed,
+            leafId = leafId,
+            variationWeights = variationWeights,
+            banditVersion = banditVersion
         )
 }
 

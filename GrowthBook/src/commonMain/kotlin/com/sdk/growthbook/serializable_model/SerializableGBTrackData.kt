@@ -7,7 +7,8 @@ import kotlinx.serialization.Serializable
  * Used for remote feature evaluation to trigger the TrackingCallback. An object with 2 properties
  */
 @Serializable
-data class SerializableGBTrackData(
+@ConsistentCopyVisibility
+data class SerializableGBTrackData internal constructor(
 
     /**
      * experiment - Experiment

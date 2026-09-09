@@ -54,10 +54,34 @@ class GBNetworkDispatcherOkHttp(
     private val initialRetryDelayMs: Long = 1000L,
     private val maxRetryDelayMs: Long = 30_000L,
 
+    /**
+     * Total time budget for a single feature GET or POST request, in milliseconds. Applied as
+     * OkHttp's callTimeout (whole-call ceiling) and readTimeout. Without it, OkHttp's default
+     * 10s per-read timeout governs the fetch — too tight for a large payload on a slow
+     * network, and invisible to the caller. `null` leaves the [client]'s own configuration.
+     * SSE is unaffected: it uses its own connection with streaming-appropriate timeouts.
+     */
+    private val fetchTimeoutMillis: Long? = DEFAULT_FETCH_TIMEOUT_MILLIS,
+
     ) : NetworkDispatcherWithNotModified, TrackingNetworkDispatcher {
+
+    companion object {
+        const val DEFAULT_FETCH_TIMEOUT_MILLIS: Long = 30_000L
+    }
 
     // Regex to match the desired URL pattern: "/api/features/<clientKey>"
     private val featuresPathPattern = Regex(".*/api/features/[^/]+")
+
+    // Client for feature GET/POST: shares [client]'s pool and dispatcher, adds the bounded
+    // total deadline. Lazy so a `null` opt-out costs nothing.
+    private val fetchClient: OkHttpClient by lazy {
+        fetchTimeoutMillis?.let { millis ->
+            client.newBuilder()
+                .callTimeout(millis, TimeUnit.MILLISECONDS)
+                .readTimeout(millis, TimeUnit.MILLISECONDS)
+                .build()
+        } ?: client
+    }
 
     // Thread-safe LRU cache with max 100 entries to prevent unbounded growth
     private val eTagCache = OkHttpLruETagCache(maxSize = 100)
@@ -101,7 +125,7 @@ class GBNetworkDispatcherOkHttp(
                     .post(requestBody)
                     .build()
 
-                client.newCall(postRequest).enqueue(object : Callback {
+                fetchClient.newCall(postRequest).enqueue(object : Callback {
                     override fun onFailure(call: Call, e: IOException) {
                         onError(e)
                     }
@@ -151,7 +175,7 @@ class GBNetworkDispatcherOkHttp(
                     }
                 }
                 .build()
-            client.newCall(getRequest).enqueue(object : Callback {
+            fetchClient.newCall(getRequest).enqueue(object : Callback {
                 override fun onFailure(call: Call, e: IOException) {
                     onError(e)
                 }
@@ -361,7 +385,7 @@ class GBNetworkDispatcherOkHttp(
                     }
                     .post(requestBody)
                     .build()
-                client.newCall(postRequest).enqueue(object : Callback {
+                fetchClient.newCall(postRequest).enqueue(object : Callback {
                     override fun onFailure(call: Call, e: IOException) {
                         onError(e)
                     }

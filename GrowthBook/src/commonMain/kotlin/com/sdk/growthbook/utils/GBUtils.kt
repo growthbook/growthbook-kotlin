@@ -322,6 +322,7 @@ internal class GBUtils {
             hashVersion: Int?,
         ): Boolean {
             if (range == null && coverage == null) return true
+            if (range == null && coverage == 0f) return false
 
             val (_, hashValue) = getHashAttribute(
                 attr = hashAttribute,
@@ -329,6 +330,7 @@ internal class GBUtils {
                 attributes = attributes,
                 attributeOverrides = attributeOverrides,
             )
+            if (hashValue.isNullOrEmpty()) return false
 
             val hash = hash(
                 seed = seed,
@@ -415,7 +417,10 @@ internal class GBUtils {
             features.keys.forEach { id ->
                 val feature = features[id]
                 feature?.rules?.forEach { rule ->
-                    rule.variations?.let { _ ->
+                    // Contextual bandit rules carry their variations under `contextualVariations`
+                    // (so older SDKs skip them) — they still need their identifiers registered,
+                    // otherwise sticky bucket docs are never loaded for bandit-driven features.
+                    if (rule.variations != null || rule.contextualVariations != null) {
                         attributes.add(rule.hashAttribute ?: "id")
                         rule.fallbackAttribute?.let { fallbackAttribute ->
                             attributes.add(fallbackAttribute)

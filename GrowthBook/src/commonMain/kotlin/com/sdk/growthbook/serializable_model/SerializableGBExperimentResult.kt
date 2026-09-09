@@ -11,7 +11,8 @@ import com.sdk.growthbook.kotlinx.serialization.from
  * The result of running an Experiment given a specific Context
  */
 @Serializable
-data class SerializableGBExperimentResult(
+@ConsistentCopyVisibility
+data class SerializableGBExperimentResult internal constructor(
 
     /**
      * Whether or not the user is part of the experiment
@@ -72,7 +73,23 @@ data class SerializableGBExperimentResult(
     /**
      * If sticky bucketing was used to assign a variation
      */
-    val stickyBucketUsed: Boolean? = null
+    val stickyBucketUsed: Boolean? = null,
+
+    /**
+     * Contextual bandit: id of the leaf the user was routed into. null if not a bandit or the user
+     * was not enrolled; -1 means no leaf matched and aggregate weights were used.
+     */
+    val leafId: Int? = null,
+
+    /**
+     * Contextual bandit: the per-variation weights used to bucket this user.
+     */
+    val variationWeights: List<Float>? = null,
+
+    /**
+     * Contextual bandit: which weight generation produced [variationWeights]
+     */
+    val banditVersion: Int? = null
 )
 
 internal fun SerializableGBExperimentResult.gbDeserialize() =
@@ -89,4 +106,7 @@ internal fun SerializableGBExperimentResult.gbDeserialize() =
         inExperiment = inExperiment,
         hashAttribute = hashAttribute,
         stickyBucketUsed = stickyBucketUsed,
+        leafId = leafId,
+        variationWeights = variationWeights,
+        banditVersion = banditVersion
     )
