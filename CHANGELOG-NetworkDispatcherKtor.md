@@ -7,7 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.3.0] - 2026-09-08
+## [1.4.0] - Unreleased
+
+### Added
+- Honour the SDK's custom request headers (`apiHostRequestHeaders` /
+  `streamingHostRequestHeaders`): implemented the `headers`-carrying overloads of
+  `consumeGETRequest`, `consumeGETRequestWithNotModified`, `consumeSSEConnection` and
+  `consumePOSTRequest` added in `:Core` 1.7.0. On SSE the headers are re-sent on every reconnection
+  attempt. Requires `io.growthbook.sdk:Core:1.7.0`.
+
+### Changed
+- The SDK-managed `If-None-Match`, `Cache-Control`, `Content-Type` and `Accept` headers are now set
+  with `set()` instead of `append()`, so an SDK value replaces a consumer-supplied one rather than
+  adding a second, conflicting header value. Reserved names are also stripped from the consumer's
+  map before it is applied. Behaviour is unchanged when no custom headers are configured.
+
+---
+
+## [1.3.0] - 2026-09-09
 
 ### Added
 - `fetchTimeoutMillis` constructor parameter (default 30 000 ms): a per-request total time

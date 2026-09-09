@@ -28,13 +28,13 @@ repositories {
 
 dependencies {
     // Add GrowthBook module:
-    implementation 'io.growthbook.sdk:GrowthBook:7.9.0'
+    implementation 'io.growthbook.sdk:GrowthBook:8.1.0'
 
     // Add Network Dispatcher you prefer:
     // 1) NetworkDispatcherKtor — supports Android, iOS, JVM, JS, Wasm
-    implementation 'io.growthbook.sdk:NetworkDispatcherKtor:1.2.0'
+    implementation 'io.growthbook.sdk:NetworkDispatcherKtor:1.4.0'
     // 2) NetworkDispatcherOkHttp — supports Android and JVM only
-    implementation 'io.growthbook.sdk:NetworkDispatcherOkHttp:1.1.1'
+    implementation 'io.growthbook.sdk:NetworkDispatcherOkHttp:1.3.0'
 }
 ```
 
@@ -85,6 +85,8 @@ If you are accessing features the first time there will be no features right aft
     .setInitialFeatures(<GBFeatures>) // Seed bundled fallback features (see below)
     .setInitialPayload(<String>) // Seed a bundled raw API payload (see below)
     .setCacheMaxAge(<Long>) // Cache freshness window in ms (see below)
+    .setApiHostRequestHeaders(<Map<String, String>>) // Custom headers for API requests (see below)
+    .setStreamingHostRequestHeaders(<Map<String, String>>) // Custom headers for SSE (see below)
 .initialize()
 ```
 
@@ -238,6 +240,87 @@ The poller is a coroutine (not a dedicated thread) on the SDK's background scope
 `close()` stops the poller too (along with SSE and the background scope), so disposing the SDK instance is enough — you do not need to call `stopPolling()` first.
 
 > **Mobile note:** the SDK cannot observe app lifecycle, so tie `startPolling()` / `stopPolling()` to your foreground/background transitions to avoid keeping the radio awake in the background. On mobile prefer SSE or the pull-on-access cache window (`setCacheMaxAge` / `setStaleTtl`); background polling is intended mainly for JVM/backend usage.
+
+#### Custom request headers & a dedicated streaming host
+
+For a self-hosted GrowthBook behind an authenticated gateway/proxy — or GrowthBook Cloud's
+dedicated streaming domain — you can attach custom headers to the SDK's HTTP requests and point
+streaming at a different host than the API.
+
+```kotlin
+var sdkInstance: GrowthBookSDK = GBSDKBuilder(
+    apiKey = <API_KEY>,
+    apiHost = "https://gb-gateway.internal.example.com",
+    // Optional. When omitted, streaming uses apiHost.
+    streamingHost = "https://gb-stream.internal.example.com",
+    attributes = hashMapOf(),
+    trackingCallback = { _, _ -> },
+    networkDispatcher = GBNetworkDispatcherKtor(),
+)
+    // Sent on every API-host request: the features GET and the remote-evaluation POST.
+    .setApiHostRequestHeaders(
+        mapOf(
+            "Authorization" to "Bearer $gatewayToken",
+            "X-Tenant-Id" to tenantId,
+        )
+    )
+    // Sent on the SSE streaming request (re-sent on every reconnection attempt).
+    .setStreamingHostRequestHeaders(mapOf("Authorization" to "Bearer $streamToken"))
+    .initialize()
+```
+
+| Option | Applies to |
+| --- | --- |
+| `apiHostRequestHeaders` | features `GET` (`/api/features/<key>`), remote-eval `POST` (`/api/eval/<key>`) |
+| `streamingHost` | SSE endpoint (`/sub/<key>`); falls back to `apiHost` when unset |
+| `streamingHostRequestHeaders` | SSE request |
+
+The two header sets are independent and never merged, matching the TypeScript SDK. Note the
+consequence when `streamingHost` is unset: the SSE request goes to `apiHost` but still carries only
+`streamingHostRequestHeaders`. Behind a gateway that authenticates both endpoints, set both — a
+config with only `setApiHostRequestHeaders` yields a working features fetch and an SSE stream that
+is rejected on every reconnection attempt.
+
+**Reserved headers.** `If-None-Match` and `Cache-Control` are managed by the SDK — they drive
+ETag-based cache revalidation. Supplying one is rejected at startup with
+`GBInvalidOptionsException`, which lists every problem it found in `violations`:
+
+```kotlin
+try {
+    builder.setApiHostRequestHeaders(mapOf("Cache-Control" to "no-store"))
+} catch (e: GBInvalidOptionsException) {
+    // "Invalid GrowthBook options: apiHostRequestHeaders must not contain the reserved header
+    //  'Cache-Control'; If-None-Match and Cache-Control are managed by the SDK"
+    e.violations.forEach(::println)
+}
+```
+
+`User-Agent` is *not* reserved — the SDK does not set it on these requests, so you can supply one
+required by your gateway.
+
+Header names must be valid HTTP tokens and values must not contain control characters, line breaks
+or non-ASCII characters; both are rejected the same way. Surrounding whitespace is stripped, so a
+token read from a file or environment variable with a trailing newline still works. An invalid
+`apiHost` or `streamingHost` (a non-`http(s)` scheme, or no usable host) fails the same way at
+`initialize()`; a host without a scheme is resolved against `https`.
+
+> **Security:** header values may be credentials. The SDK never logs them, never puts them in an
+> error message (only header *names* appear) and never exposes them through diagnostics. Read them
+> from your secrets manager / environment rather than hardcoding them.
+
+> **Custom dispatchers:** both built-in dispatchers (Ktor ≥ 1.4.0 and OkHttp ≥ 1.3.0) apply these
+> headers — on an earlier dispatcher the SDK falls through to the header-less code path and your
+> headers are silently dropped, so bump both together. A custom `NetworkDispatcher` ignores them
+> until it overrides the `headers`-carrying overloads of `consumeGETRequest`,
+> `consumeGETRequestWithNotModified`, `consumeSSEConnection` and `consumePOSTRequest` — they have
+> default bodies that delegate to the header-less variants, so existing implementations keep
+> compiling. Use `GBRequestHeaders.sanitize()` from `:Core` to strip reserved names, and apply the
+> SDK's own headers *after* the custom ones so they win.
+>
+> **Implementing `NetworkDispatcher` in Swift:** Kotlin interfaces are exported to Objective-C with
+> every member `@required`, so a Swift conformance does *not* inherit these default bodies and will
+> not compile against `:Core` 1.7.0 until it implements the four new overloads. Kotlin and Java
+> implementations are unaffected.
 
 ## Usage
 

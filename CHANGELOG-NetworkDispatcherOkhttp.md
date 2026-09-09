@@ -7,7 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.2.0] - 2026-09-08
+## [1.3.0] - Unreleased
+
+### Added
+- Honour the SDK's custom request headers (`apiHostRequestHeaders` /
+  `streamingHostRequestHeaders`): implemented the `headers`-carrying overloads of
+  `consumeGETRequest`, `consumeGETRequestWithNotModified`, `consumeSSEConnection` and
+  `consumePOSTRequest` added in `:Core` 1.7.0. The SSE request is built once and reused, so the
+  headers are re-sent on every reconnection attempt. Requires `io.growthbook.sdk:Core:1.7.0`.
+
+### Changed
+- The SDK-managed `Cache-Control`, `Content-Type` and `Accept` headers are now set with `header()`
+  instead of `addHeader()`, so an SDK value replaces a consumer-supplied one rather than adding a
+  second, conflicting header value. Reserved names are also stripped from the consumer's map before
+  it is applied. Behaviour is unchanged when no custom headers are configured.
+
+### Fixed
+- A request that cannot be assembled — a URL without a scheme, for example — is now reported through
+  `onError` instead of escaping the dispatcher's `CoroutineScope`. Previously
+  `consumeGETRequest`/`consumeGETRequestWithNotModified` threw before the call was enqueued, so no
+  callback ever fired and the uncaught exception crashed the app on Android. `consumePOSTRequest`
+  already guarded this.
+- The SSE request is now built inside the returned `Flow`, so the same failure is emitted as
+  `Resource.Error` rather than thrown synchronously out of `consumeSSEConnection` — which used to
+  propagate all the way out of the SDK's public `autoRefreshFeatures()`.
+
+---
+
+## [1.2.0] - 2026-09-09
 
 ### Added
 - `fetchTimeoutMillis` constructor parameter (default 30 000 ms): a whole-call ceiling
