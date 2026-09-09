@@ -31,6 +31,7 @@ internal data class EvalSnapshot(
     val stickyBucketAssignmentDocs: StickyBucketAssignmentDocsType? = null,
     val stickyBucketIdentifierAttributes: List<String>? = null,
     val savedGroups: Map<String, GBValue>? = null,
+    val contextualBandits: Map<String, GBContextualBandit>? = null
 )
 
 /**
@@ -41,8 +42,13 @@ internal data class EvalSnapshot(
  * the current snapshot; writes atomically swap in a copy with the changed field (CAS loop, so
  * concurrent writers never lose each other's updates). For a consistent multi-field read during
  * evaluation, use [evalSnapshot] rather than reading the individual properties one by one.
+ *
+ * SDK-owned: assembled by [com.sdk.growthbook.GBSDKBuilder], never by consumer code — which is why
+ * the constructor is internal. The type itself stays public because [com.sdk.growthbook.GrowthBookSDK.getGBContext]
+ * returns it for reading. With no external caller bound to the constructor's JVM signature, new
+ * options can be added here directly instead of being smuggled in as body properties.
  */
-class GBContext(
+class GBContext internal constructor(
 
     /**
      * Registered API Key for GrowthBook SDK
@@ -113,23 +119,19 @@ class GBContext(
      * Saved Groups let you target the same group of users across multiple features and experiments.
      */
     savedGroups: Map<String, GBValue>? = null,
-) {
 
     /**
      * Plugins registered with the GrowthBook. See
      * [GrowthBookPlugin] and
      * [com.sdk.growthbook.plugin.tracking.GrowthBookTrackingPlugin].
      *
-     * Set this before constructing [com.sdk.growthbook.GrowthBookSDK] — normally via
-     * [com.sdk.growthbook.GBSDKBuilder.setPlugins]. The SDK reads it once while initialising its
-     * plugin registry, so assigning afterwards has no effect (the reference JS SDK consumes
-     * `options.plugins` in its constructor the same way).
-     *
-     * Declared here rather than as a constructor parameter: adding a parameter to the public
-     * primary constructor changes its JVM signature, so bytecode compiled against an earlier
-     * release would fail with `NoSuchMethodError`. A property is purely additive.
+     * Normally set via [com.sdk.growthbook.GBSDKBuilder.setPlugins]. The SDK reads it once while
+     * initialising its plugin registry (the reference JS SDK consumes `options.plugins` in its
+     * constructor the same way); as a `val` here that read-once contract is structural rather than
+     * merely documented.
      */
-    var plugins: List<GrowthBookPlugin>? = null
+    val plugins: List<GrowthBookPlugin>? = null,
+) {
 
     // Single source of truth for all cross-thread-shared evaluation inputs.
     private val state = AtomicReference(
@@ -138,7 +140,7 @@ class GBContext(
             forcedVariations = forcedVariations,
             stickyBucketAssignmentDocs = stickyBucketAssignmentDocs,
             stickyBucketIdentifierAttributes = stickyBucketIdentifierAttributes,
-            savedGroups = savedGroups,
+            savedGroups = savedGroups
         )
     )
 
@@ -189,7 +191,8 @@ class GBContext(
         doc: GBStickyAssignmentsDocument,
     ) = mutate {
         it.copy(
-            stickyBucketAssignmentDocs = (it.stickyBucketAssignmentDocs ?: emptyMap()) + (key to doc)
+            stickyBucketAssignmentDocs = (it.stickyBucketAssignmentDocs
+                ?: emptyMap()) + (key to doc)
         )
     }
 
@@ -219,6 +222,28 @@ class GBContext(
      */
     internal fun mergeAttributes(attributes: Map<String, GBValue>) = mutate {
         it.copy(attributes = it.attributes + attributes)
+    }
+
+    /**
+     * Atomically publish a freshly decoded payload: [features], [savedGroups] and [contextualBandits]
+     * land in a single swap. Done as one write (not three separate setters) because payload
+     * application runs on a background dispatcher while feature()/run() read from the app thread — a
+     * reader landing between the writes would otherwise see new features paired with the previous
+     * generation's bandit definitions or saved groups.
+     *
+     * A null argument means "absent from this payload, keep the current value", matching the
+     * per-field dispatch it replaces.
+     */
+    internal fun applyPayload(
+        features: GBFeatures?,
+        savedGroups: Map<String, GBValue>?,
+        contextualBandits: Map<String, GBContextualBandit>?,
+    ) = mutate {
+        it.copy(
+            features = features ?: it.features,
+            savedGroups = savedGroups ?: it.savedGroups,
+            contextualBandits = contextualBandits ?: it.contextualBandits,
+        )
     }
 
     /**
@@ -257,12 +282,23 @@ class GBContext(
     internal var features: GBFeatures
         get() = state.load().features
         set(value) = mutate { it.copy(features = value) }
+
+    /**
+     * Contextual bandit definitions keyed by bandit ref, pulled from the payload alongside
+     * [features]. Internal-only: consumers never need the raw definitions — only the leaf metadata
+     * (leafId / weights / version) surfaced on the experiment result. Written by the payload
+     * pipeline, read atomically via [evalSnapshot] during evaluation.
+     */
+    internal var contextualBandits: Map<String, GBContextualBandit>?
+        get() = state.load().contextualBandits
+        set(value) = mutate { it.copy(contextualBandits = value) }
 }
 
 /**
  * Model consist already evaluated features
  */
-data class StackContext(
+@ConsistentCopyVisibility
+data class StackContext internal constructor(
 
     /**
      * Unique feature identifier

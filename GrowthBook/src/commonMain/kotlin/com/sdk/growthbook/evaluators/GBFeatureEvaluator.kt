@@ -2,7 +2,12 @@ package com.sdk.growthbook.evaluators
 
 import com.sdk.growthbook.kotlinx.serialization.from
 import com.sdk.growthbook.logger.GB
+import kotlin.coroutines.cancellation.CancellationException
+import com.sdk.growthbook.model.CBContext
+import com.sdk.growthbook.model.CONTEXTUAL_BANDIT_FALLBACK_LEAF_ID
+import com.sdk.growthbook.model.GBBanditContext
 import com.sdk.growthbook.model.GBBoolean
+import com.sdk.growthbook.model.GBContextualBandit
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeature
@@ -13,7 +18,6 @@ import com.sdk.growthbook.model.GBNull
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBValue
-import com.sdk.growthbook.utils.Constants
 import com.sdk.growthbook.utils.GBTrackData
 import com.sdk.growthbook.utils.GBUtils
 import com.sdk.growthbook.utils.GBUtils.Companion.getAttributes
@@ -243,31 +247,6 @@ internal class GBFeatureEvaluator(
                             }
                         }
 
-                        if (rule.range == null) {
-                            if (rule.coverage != null) {
-                                val key = rule.hashAttribute ?: Constants.ID_ATTRIBUTE_KEY
-                                val attributeValue =
-                                    getAttributes(
-                                        attributeOverrides = attributeOverrides,
-                                        attributes = evaluationContext.userContext.attributes
-                                    )[key]
-                                        .toHashValue()
-
-                                if (attributeValue.isNullOrEmpty()) {
-                                    continue@ruleLoop
-                                }
-                                val hashFNV = GBUtils.hash(
-                                    seed = rule.seed,
-                                    stringValue = attributeValue,
-                                    hashVersion = rule.hashVersion,
-                                ) ?: 0f
-                                if (hashFNV > rule.coverage) {
-                                    continue@ruleLoop
-                                }
-                            }
-                        }
-
-
                         return prepareResult(
                             ruleId = rule.id,
                             featureKey = featureKey,
@@ -276,7 +255,7 @@ internal class GBFeatureEvaluator(
                         )
                     } else {
 
-                        val variation = rule.variations
+                        val variation = rule.contextualVariations ?: rule.variations
                         if (variation != null) {
 
                             /**
@@ -302,6 +281,13 @@ internal class GBFeatureEvaluator(
                                 filters = rule.filters,
                                 condition = rule.condition,
                             )
+
+                            /**
+                             * Contextual bandit rule: route the user to a leaf and apply its weights.
+                             */
+                            if (rule.contextualBanditRef != null) {
+                                buildContextualBanditExperiment(exp, rule.contextualBanditRef, attributeOverrides)
+                            }
 
                             /**
                              * Only return a value if the user is part of the experiment
@@ -405,5 +391,126 @@ internal class GBFeatureEvaluator(
         }
 
         return gbFeatureResult
+    }
+
+    /**
+     * Contextual bandit: pick the first leaf whose condition matches the user and apply its weights
+     * to [experiment], recording which leaf/weights/version were used so the result can carry them.
+     * Fallbacks mirror the TS SDK: ref missing -> keep the rule's aggregate weights, no metadata;
+     * no leaf matches -> aggregate (or equal) weights with a sentinel leafId.
+     */
+    private fun buildContextualBanditExperiment(
+        experiment: GBExperiment,
+        contextualBanditRef: String,
+        attributeOverrides: Map<String, GBValue>
+    ) {
+        val cbDefinition: GBContextualBandit = evaluationContext.contextualBandits?.get(contextualBanditRef)
+            ?: run {
+                if (evaluationContext.loggingEnabled) {
+                    GB.log(
+                        "GBFeatureEvaluator: contextual bandit ref '$contextualBanditRef' not found in payload, " +
+                            "using aggregate weights"
+                    )
+                }
+                return
+            }
+
+        // Explicit ranges take precedence over weights in the bucketer, so no leaf's weight
+        // vector can describe this assignment: bucket on the ranges and emit no bandit
+        // metadata at all (matches the Python SDK; TS buckets the same way).
+        if (experiment.ranges != null) {
+            if (evaluationContext.loggingEnabled) {
+                GB.log(
+                    "GBFeatureEvaluator: contextual bandit '$contextualBanditRef' rule carries explicit " +
+                        "ranges; bucketing by ranges and omitting bandit metadata"
+                )
+            }
+            return
+        }
+
+        // Throwable, not Exception: on the JS/wasm targets a failure inside the condition evaluator
+        // can surface as a plain Throwable, which would otherwise escape and kill the evaluation.
+        val leaf = try {
+            getContextualBanditLeaf(cbDefinition, attributeOverrides)
+        } catch (c: CancellationException) {
+            // Evaluations can run inside coroutines; swallowing cancellation would break it.
+            throw c
+        } catch (e: Throwable) {
+            if (evaluationContext.loggingEnabled) {
+                GB.warning("GBFeatureEvaluator: contextual bandit leaf selection threw, using fallback weights")
+            }
+            null
+        }
+
+        val numVariations = experiment.variations.size
+        val leafId = leaf?.leafId
+        val leafWeights = leaf?.weights?.takeIf { isValidWeightVector(it, numVariations) }
+        if (leaf != null && leafId != null && leafWeights != null) {
+            experiment.weights = leafWeights
+            experiment.contextualBandit = CBContext(
+                leafId = leafId,
+                variationWeights = leafWeights,
+                banditVersion = cbDefinition.banditVersion
+            )
+        } else {
+            // Either no leaf matched, or the matched leaf is malformed (missing leafId, or a
+            // weight vector the bucketer would reject) and cannot describe the assignment.
+            // Both degrade the same way: the rule's effective weights under the fallback
+            // sentinel — effective meaning after the same substitution the bucketer applies,
+            // so reported propensities never disagree with the weights that actually bucketed
+            // the user. (In TS these fields are required; matches Python's malformed handling.)
+            if (evaluationContext.loggingEnabled) {
+                val reason = if (leaf == null) "matched no leaf" else "matched a malformed leaf"
+                GB.log(
+                    "GBFeatureEvaluator: contextual bandit '$contextualBanditRef' $reason, " +
+                        "using fallback weights"
+                )
+            }
+            experiment.contextualBandit = CBContext(
+                leafId = CONTEXTUAL_BANDIT_FALLBACK_LEAF_ID,
+                variationWeights = experiment.weights
+                    ?.takeIf { isValidWeightVector(it, numVariations) }
+                    ?: GBUtils.getEqualWeights(numVariations),
+                banditVersion = cbDefinition.banditVersion
+            )
+        }
+    }
+
+    /**
+     * The acceptance rule the bucketer effectively applies — [GBUtils.getBucketRanges]
+     * substitutes equal weights for a wrong-length vector or one whose sum is outside
+     * [0.99, 1.01] — plus finite/non-negative, which the bucketer's sum check misses
+     * for NaN (NaN comparisons are false, so a NaN vector slips through it).
+     */
+    private fun isValidWeightVector(weights: List<Float>, numVariations: Int): Boolean {
+        if (weights.size != numVariations) return false
+        if (weights.any { !it.isFinite() || it < 0f }) return false
+        val sum = weights.sum()
+        return sum >= 0.99f && sum <= 1.01f
+    }
+
+    private fun getContextualBanditLeaf(
+        cbDefinition: GBContextualBandit,
+        attributeOverrides: Map<String, GBValue>
+    ): GBBanditContext? {
+        val contexts = cbDefinition.contexts ?: return null
+        // Hoisted out of the leaf loop: attribute merging and the evaluator don't vary per leaf,
+        // and this runs on every evaluation of every bandit-driven feature.
+        val conditionEvaluator = GBConditionEvaluator()
+        val attributes = getAttributes(
+            attributes = evaluationContext.userContext.attributes,
+            attributeOverrides = attributeOverrides
+        )
+        return contexts.firstOrNull { ctx ->
+            // parsedCondition is cached on the leaf: an empty object for an absent condition
+            // (catch-all), null for a present but non-object one — corrupt data that must fail
+            // closed, or the broken leaf would swallow every user and shadow all later leaves.
+            val conditionObj = ctx.parsedCondition ?: return@firstOrNull false
+            conditionEvaluator.evalCondition(
+                attributes = attributes,
+                conditionObj = conditionObj,
+                savedGroups = evaluationContext.savedGroups
+            )
+        }
     }
 }

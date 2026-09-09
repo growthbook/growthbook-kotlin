@@ -115,8 +115,9 @@ The seeded features are applied immediately. The normal cache/network refresh st
 
 `setInitialFeatures` takes an already-decoded feature map, so bundling a snapshot means decrypting it at build time —
 shipping plaintext feature definitions inside the app even when payload encryption is on. When the snapshot is encrypted,
-or carries more than features (saved groups, or encrypted variants of either), seed the **raw API payload** instead: the
-exact JSON body the features endpoint returns, snapshotted into your assets at build time.
+or carries more than features — saved groups, contextual bandit definitions, or encrypted variants of any of them —
+seed the **raw API payload** instead: the exact JSON body the features endpoint returns, snapshotted into your assets
+at build time.
 
 ```kotlin
 var sdkInstance: GrowthBookSDK = GBSDKBuilder(
@@ -130,6 +131,10 @@ var sdkInstance: GrowthBookSDK = GBSDKBuilder(
     .setInitialPayload(readBundledJsonFromAssets())
     .initialize()
 ```
+
+This matters for contextual bandits in particular: a bandit rule is inert without its definitions, so a bundled payload
+for a bandit-driven feature must go through `setInitialPayload` — otherwise the rule falls back to its marginal weights
+until the network responds.
 
 Like `setInitialFeatures`, this is only a seed and the same precedence applies. A payload that cannot be parsed or
 decrypted is logged and ignored rather than failing initialization. If both setters are used, the explicit features win
@@ -639,6 +644,52 @@ made any time a user attribute or other dependency changes — specifically on `
 
 > If you would like to implement Sticky Bucketing while using Remote Evaluation, you must configure your remote evaluation
 > backend to support Sticky Bucketing. You will not need to provide a StickyBucketService instance to the client side SDK.
+
+## Contextual Bandits
+
+A contextual bandit splits an experiment's audience into *contexts* (leaves) and gives each leaf its own variation
+weights, so traffic is allocated per segment instead of globally. The weight maths (Thompson sampling) runs
+server-side — the SDK neither learns nor updates anything. At evaluation time it simply picks the **first leaf whose
+condition matches** the user's attributes and buckets by that leaf's weights, using the ordinary experiment machinery.
+
+Nothing needs to be enabled in code. Bandit definitions arrive in the features payload (plain or encrypted, alongside
+`features` and `savedGroups`), and a bandit-driven rule is evaluated like any other experiment rule.
+
+What is new is the exposure metadata on `GBExperimentResult`, which lets your warehouse attribute an exposure to the
+exact leaf and weight generation that produced it:
+
+```kotlin
+val sdkInstance = GBSDKBuilder(
+    apiKey = <API_KEY>,
+    hostURL = <GrowthBook_URL>,
+    attributes = mapOf("id" to GBString("user-123"), "country" to GBString("UA")),
+    trackingCallback = { experiment, result ->
+        analytics.track(
+            event = "experiment_viewed",
+            experimentId = experiment.key,
+            variationId = result.variationId,
+            leafId = result.leafId,                     // which context the user was routed into
+            variationWeights = result.variationWeights, // the weights actually used to bucket them
+            banditVersion = result.banditVersion,       // which weight generation produced them
+        )
+    },
+    networkDispatcher = GBNetworkDispatcherKtor(),
+).initialize()
+```
+
+The three fields are populated only for users actually enrolled in a bandit experiment; they are `null` for ordinary
+experiments and for users the rule excluded. A `leafId` of `-1` means no leaf condition matched and the rule's aggregate
+weights were used instead.
+
+Sticky bucketing works with bandit rules as it does with any experiment rule. One caveat for training pipelines: a
+sticky-bucketed user keeps their stored variation, but the exposure reports the *current* leaf's `variationWeights` —
+which may differ from the weights in force when they were originally bucketed. Check `result.stickyBucketUsed` before
+treating `variationWeights` as the assignment propensities. For offline-first setups, seed the
+definitions with [`setInitialPayload`](#bundled-fallback-payload-setinitialpayload) — `setInitialFeatures` does not carry
+them.
+
+> **Note:** GrowthBook's querystring-based variation override (`?experiment-key=0`) is not implemented in this SDK, so it
+> does not apply to bandit rules either. Use `setForcedVariations` for the same effect.
 
 ## Sticky Bucketing
 

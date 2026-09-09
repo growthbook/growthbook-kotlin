@@ -18,7 +18,8 @@ import com.sdk.growthbook.kotlinx.serialization.from
  * Rule object consists of various definitions to apply to calculate feature value
  */
 @Serializable
-data class SerializableGBFeatureRule(
+@ConsistentCopyVisibility
+data class SerializableGBFeatureRule internal constructor(
     /**
      * Unique feature rule id
      */
@@ -139,7 +140,9 @@ data class SerializableGBFeatureRule(
     /**
      * Array of tracking calls to fire
      */
-    val tracks: ArrayList<SerializableGBTrackData>? = null
+    val tracks: ArrayList<SerializableGBTrackData>? = null,
+    val contextualBanditRef: String? = null,
+    val contextualVariations: List<JsonElement>? = null
 )
 
 internal fun SerializableGBFeatureRule.gbDeserialize() =
@@ -179,4 +182,6 @@ internal fun SerializableGBFeatureRule.gbDeserialize() =
         },
         disableStickyBucketing = disableStickyBucketing,
         variations = variations?.map { GBValue.from(it) },
+        contextualBanditRef = contextualBanditRef,
+        contextualVariations = contextualVariations?.map { GBValue.from(it) }
     )

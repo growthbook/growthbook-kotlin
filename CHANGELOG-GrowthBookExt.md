@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.0] - 2026-08-26
+
+No changes to `GrowthBookExt` itself. The major bump propagates the breaking changes in
+`GrowthBook` 8.0.0, which this artifact exposes as an `api` dependency — upgrading here pulls the
+new core in transitively. See the [core changelog](CHANGELOG.md#800---2026-08-26).
+
+---
+
 ## [1.0.0] - 2026-08-25
 
 Initial release of `GrowthBookExt` — a pure-Kotlin companion module with

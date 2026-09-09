@@ -5,6 +5,7 @@ import com.sdk.growthbook.features.FeaturesDataSource
 import com.sdk.growthbook.features.FeaturesFlowDelegate
 import com.sdk.growthbook.features.FeaturesViewModel
 import com.sdk.growthbook.model.GBContext
+import com.sdk.growthbook.model.GBContextualBandit
 import com.sdk.growthbook.model.GBOptions
 import com.sdk.growthbook.sandbox.CachingLayer
 import com.sdk.growthbook.utils.GBError
@@ -45,11 +46,15 @@ class FeaturesViewModelPollingTests {
     private val testGbOptions = GBOptions("https://example.com", null)
 
     private object NoopDelegate : FeaturesFlowDelegate {
-        override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) = Unit
+        override fun payloadFetchedSuccessfully(
+            features: GBFeatures?,
+            savedGroups: JsonObject?,
+            contextualBandits: Map<String, GBContextualBandit>?,
+            isRemote: Boolean,
+        ) = Unit
         override suspend fun onPayloadReady(model: FeaturesDataModel) = Unit
         override fun featuresFetchFailed(error: GBError, isRemote: Boolean) = Unit
         override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) = Unit
-        override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) = Unit
         override fun featuresNotModified() = Unit
     }
 
@@ -308,13 +313,17 @@ class FeaturesViewModelPollingTests {
 
     private fun cacheAppliedRecordingDelegate(record: () -> Unit): FeaturesFlowDelegate =
         object : FeaturesFlowDelegate {
-            override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
+            override fun payloadFetchedSuccessfully(
+                features: GBFeatures?,
+                savedGroups: JsonObject?,
+                contextualBandits: Map<String, GBContextualBandit>?,
+                isRemote: Boolean,
+            ) {
                 if (!isRemote) record()
             }
             override suspend fun onPayloadReady(model: FeaturesDataModel) = Unit
             override fun featuresFetchFailed(error: GBError, isRemote: Boolean) = Unit
             override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) = Unit
-            override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) = Unit
             override fun featuresNotModified() = Unit
         }
 
@@ -430,13 +439,17 @@ class FeaturesViewModelPollingTests {
         // preserving the pre-existing 7.3.0 behaviour.
         var appliedFromCache = false
         val recordingDelegate = object : FeaturesFlowDelegate {
-            override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
+            override fun payloadFetchedSuccessfully(
+                features: GBFeatures?,
+                savedGroups: JsonObject?,
+                contextualBandits: Map<String, GBContextualBandit>?,
+                isRemote: Boolean,
+            ) {
                 if (!isRemote) appliedFromCache = true
             }
             override suspend fun onPayloadReady(model: FeaturesDataModel) = Unit
             override fun featuresFetchFailed(error: GBError, isRemote: Boolean) = Unit
             override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) = Unit
-            override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) = Unit
             override fun featuresNotModified() = Unit
         }
         val client = CountingClient(response = null, error = Throwable("offline"))

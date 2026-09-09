@@ -3,11 +3,13 @@ package com.sdk.growthbook.tests
 import com.sdk.growthbook.evaluators.UserContext
 import com.sdk.growthbook.evaluators.EvaluationContext
 import com.sdk.growthbook.evaluators.GBExperimentHelper
+import com.sdk.growthbook.model.GBContextualBandit
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.StackContext
 import com.sdk.growthbook.model.StickyBucketAssignmentDocsType
+import com.sdk.growthbook.serializable_model.SerializableGBContextualBandit
 import com.sdk.growthbook.serializable_model.SerializableGBExperiment
 import com.sdk.growthbook.serializable_model.SerializableGBFeature
 import com.sdk.growthbook.stickybucket.GBStickyBucketService
@@ -88,6 +90,11 @@ class GBTestHelper {
             return array
         }
 
+        fun getContextualBanditData(): JsonArray {
+            val array = testData.jsonObject["contextualBandit"] as JsonArray
+            return array
+        }
+
         internal fun createTestScopeEvaluationContext(
             features: GBFeatures,
             attributes: Map<String, GBValue>,
@@ -96,9 +103,12 @@ class GBTestHelper {
             stickyBucketService: GBStickyBucketService? = null,
             onFeatureUsage: ((String, GBFeatureResult) -> Unit)? = null,
             stickyBucketAssignmentDocs: StickyBucketAssignmentDocsType? = null,
+            contextualBandits: Map<String, GBContextualBandit>? = null,
+            qaMode: Boolean = false,
+            enabled: Boolean = true
         ) =
             EvaluationContext(
-                enabled = true,
+                enabled = enabled,
                 features = features,
                 loggingEnabled = true,
                 savedGroups = savedGroups,
@@ -108,13 +118,13 @@ class GBTestHelper {
                 stickyBucketService = stickyBucketService,
                 gbExperimentHelper = GBExperimentHelper(),
                 userContext = UserContext(
-                    qaMode = false,
+                    qaMode = qaMode,
                     attributes = attributes,
                     stickyBucketAssignmentDocs = stickyBucketAssignmentDocs,
                 ),
                 stackContext = StackContext(null, mutableSetOf()),
-                pluginRegistry = null
-
+                pluginRegistry = null,
+                contextualBandits = contextualBandits
             )
     }
 }
@@ -137,6 +147,9 @@ class GBFeaturesTest(
     val savedGroups: JsonElement? = null,
     val attributes: JsonElement = JsonObject(HashMap()),
     val forcedVariations: JsonObject? = null,
+    val contextualBandits: Map<String, SerializableGBContextualBandit>? = null,
+    val qaMode: Boolean = false,
+    val enabled: Boolean = true
 )
 
 @Serializable
@@ -176,5 +189,8 @@ data class GBExperimentResultTest(
     // The id of the feature (if any) that the experiment came from
     val featureId: String? = null,
     // If sticky bucketing was used to assign a variation
-    val stickyBucketUsed: Boolean? = null
+    val stickyBucketUsed: Boolean? = null,
+    val leafId: Int? = null,
+    val variationWeights: List<Float>? = null,
+    val banditVersion: Int? = null
 )

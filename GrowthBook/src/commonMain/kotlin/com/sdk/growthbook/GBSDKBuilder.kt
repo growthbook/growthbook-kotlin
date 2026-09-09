@@ -4,8 +4,10 @@ import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.json.Json
 import com.sdk.growthbook.logger.GB
+import com.sdk.growthbook.model.EvalSnapshot
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBContext
+import com.sdk.growthbook.model.GBContextualBandit
 import com.sdk.growthbook.model.GBOptions
 import com.sdk.growthbook.features.DecodedPayload
 import com.sdk.growthbook.features.FeaturePayloadDecoder
@@ -125,7 +127,7 @@ class GBSDKBuilder(
     private var featureUsageCallback: GBFeatureUsageCallback? = null
     private var plugins: List<GrowthBookPlugin>? = null
     private var initialFeatures: GBFeatures? = null
-    private var initialPayload: String? = null
+    private var initialPayloadJson: String? = null
     private var cacheMaxAge: Long? = null
     private var refreshInterval: Long? = null
     private var staleTtl: Long? = null
@@ -136,6 +138,10 @@ class GBSDKBuilder(
     // StandardTestDispatcher) to drive the async pipeline synchronously.
     private var coroutineContext: CoroutineContext = PlatformDependentIODispatcher
     private var customCachingLayer: GBCachingLayer? = null
+
+    // Matches the parser the network path uses, so a bundled snapshot is accepted on exactly the
+    // same terms as a live response (unknown//future payload fields ignored rather than fatal).
+    private val seedJsonParser = Json { isLenient = true; ignoreUnknownKeys = true }
 
     /**
      * Override the dispatcher used to process fetched payloads. Intended for tests that need
@@ -196,16 +202,26 @@ class GBSDKBuilder(
     }
 
     /**
-     * Seed the SDK from a raw feature payload, byte for byte as the API returns it — encrypted
-     * or plain, and including saved groups. Decryption uses the same `encryptionKey` as network
-     * payloads, so an encrypted snapshot can be bundled without decrypting it at build time and
-     * shipping plaintext definitions inside the app.
+     * Seed the SDK with a bundled fallback payload in its raw API form — the exact JSON body the
+     * features endpoint returns, e.g. snapshotted into your assets at build time.
      *
-     * Seeding semantics match [setInitialFeatures], which wins if both are set. A payload that
-     * cannot be parsed or decrypted is logged and ignored rather than failing initialization.
+     * Use this instead of [setInitialFeatures] when the payload carries more than features:
+     * `savedGroups` and `contextualBandits` are seeded too, and the encrypted variants
+     * (`encryptedFeatures` / `encryptedSavedGroups` / `encryptedContextualBandits`) are decrypted
+     * with the builder's encryption key — so an encrypted snapshot can be bundled without
+     * decrypting it at build time and shipping plaintext definitions inside the app. Contextual
+     * bandit rules in particular are inert without their definitions, so a bundled payload for a
+     * bandit-driven feature must go through here.
+     *
+     * Like [setInitialFeatures], this is only a seed: the normal cache/network refresh still runs on
+     * top and overwrites it as fresher data arrives (network > disk cache > seed > code defaults).
+     * A payload that cannot be parsed or decrypted is ignored (logged when logging is enabled)
+     * rather than failing initialization — the seed is a fallback, not a hard dependency.
+     *
+     * If both this and [setInitialFeatures] are set, the explicit features win over the payload's.
      */
-    fun setInitialPayload(payload: String): GBSDKBuilder {
-        this.initialPayload = payload
+    fun setInitialPayload(json: String): GBSDKBuilder {
+        this.initialPayloadJson = json
         return this
     }
 
@@ -422,7 +438,7 @@ class GBSDKBuilder(
             )
         }
 
-        applySeed(gbContext)
+        seedInitialState(gbContext)
 
         val gbOptions = GBOptions(apiHost, streamingHost)
 
@@ -459,11 +475,8 @@ class GBSDKBuilder(
             // honoured regardless of whether it was set before or after the sticky-bucket setter.
             stickyBucketService = stickyBucketService
                 ?: stickyBucketServiceFactory?.invoke(resolveCachingLayer()),
-        ).also {
-            // Assigned rather than passed: keeping it out of GBContext's primary constructor
-            // preserves that constructor's signature for already-compiled consumers.
-            it.plugins = plugins
-        }
+            plugins = plugins,
+        )
 
     private inner class WaitForCallCaseHelper(
         gbContext: GBContext,
@@ -490,7 +503,7 @@ class GBSDKBuilder(
                 handleWaitForCallCallback = null
                 growthBookSDK = null
             }
-            applySeed(gbContext)
+            seedInitialState(gbContext)
 
             val gbOptions = GBOptions(apiHost, streamingHost)
             growthBookSDK = GrowthBookSDK(
@@ -511,36 +524,37 @@ class GBSDKBuilder(
         }
     }
 
-    private fun resolveCachingLayer(): CachingLayer =
-        customCachingLayer?.let { GBCachingLayerAdapter(it) } ?: CachingImpl.getLayer()
+    /**
+     * Applies the bundled seed to [gbContext] before the SDK starts its own fetch: first the raw
+     * payload from [setInitialPayload] (decrypted if needed), then the explicit features from
+     * [setInitialFeatures], which therefore take precedence. A seed that fails to parse is skipped —
+     * the SDK then simply starts empty and waits for cache/network, as it would without a seed.
+     */
+    private fun seedInitialState(gbContext: GBContext) {
+        initialPayloadJson?.let { json ->
+            val decoded = runCatching {
+                val model = seedJsonParser
+                    .decodeFromString(SerializableFeaturesDataModel.serializer(), json)
+                    .gbDeserialize()
+                FeaturePayloadDecoder(encryptionKey).decode(model)
+            }.getOrElse { error ->
+                if (enableLogging) {
+                    GB.error("GBSDKBuilder: setInitialPayload could not be parsed, ignoring seed", error)
+                }
+                null
+            }
 
-    /** Applies the raw payload seed first, so an explicit [setInitialFeatures] map wins. */
-    private fun applySeed(gbContext: GBContext) {
-        initialPayload?.let(::decodeSeed)?.let { seed ->
-            seed.features?.let { gbContext.features = it }
-            seed.savedGroups?.let { groups ->
-                gbContext.savedGroups = groups.mapValues { GBValue.from(it.value) }
+            decoded?.let {
+                gbContext.applyPayload(
+                    features = it.features,
+                    savedGroups = it.savedGroups?.mapValues { (_, value) -> GBValue.from(value) },
+                    contextualBandits = it.contextualBandits,
+                )
             }
         }
         initialFeatures?.let { gbContext.features = it }
     }
 
-    private val seedJsonParser = Json { isLenient = true; ignoreUnknownKeys = true }
-
-    // A seed is a fallback by definition, so a bad one must not stop the SDK from starting.
-    private fun decodeSeed(payload: String): DecodedPayload? =
-        runCatching {
-            FeaturePayloadDecoder(encryptionKey).decode(
-                seedJsonParser
-                    .decodeFromString(SerializableFeaturesDataModel.serializer(), payload)
-                    .gbDeserialize()
-            )
-        }.onFailure {
-            if (enableLogging) {
-                GB.error(
-                    errorMessage = "GBSDKBuilder: seeded payload could not be decoded, ignoring it",
-                    throwable = it
-                )
-            }
-        }.getOrNull()
+    private fun resolveCachingLayer(): CachingLayer =
+        customCachingLayer?.let { GBCachingLayerAdapter(it) } ?: CachingImpl.getLayer()
 }

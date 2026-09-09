@@ -10,6 +10,7 @@ import com.sdk.growthbook.features.FeaturesViewModel
 import com.sdk.growthbook.features.FetchResult
 import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.model.GBContext
+import com.sdk.growthbook.model.GBContextualBandit
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBOptions
 import kotlinx.coroutines.CompletableDeferred
@@ -331,13 +332,17 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         val client = DeferredPostNetworkClient()
         var appliedFeatures: GBFeatures? = null
         val delegate = object : FeaturesFlowDelegate {
-            override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
+            override fun payloadFetchedSuccessfully(
+                features: GBFeatures?,
+                savedGroups: JsonObject?,
+                contextualBandits: Map<String, GBContextualBandit>?,
+                isRemote: Boolean,
+            ) {
                 appliedFeatures = features
             }
             override suspend fun onPayloadReady(model: FeaturesDataModel) = Unit
             override fun featuresFetchFailed(error: GBError, isRemote: Boolean) = Unit
             override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) = Unit
-            override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) = Unit
             override fun featuresNotModified() = Unit
         }
         val viewModel = FeaturesViewModel(
@@ -426,8 +431,13 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         val oldApplyGate = CompletableDeferred<Unit>()
         val appliedOrder = mutableListOf<String>()
         val delegate = object : FeaturesFlowDelegate {
-            override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
-                features.keys.firstOrNull()?.let { appliedOrder.add(it) }
+            override fun payloadFetchedSuccessfully(
+                features: GBFeatures?,
+                savedGroups: JsonObject?,
+                contextualBandits: Map<String, GBContextualBandit>?,
+                isRemote: Boolean,
+            ) {
+                features?.keys?.firstOrNull()?.let { appliedOrder.add(it) }
             }
             override suspend fun onPayloadReady(model: FeaturesDataModel) {
                 // Hold the OLDER round inside its apply until the test releases the gate.
@@ -435,7 +445,6 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             }
             override fun featuresFetchFailed(error: GBError, isRemote: Boolean) = Unit
             override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) = Unit
-            override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) = Unit
             override fun featuresNotModified() = Unit
         }
         val viewModel = FeaturesViewModel(
@@ -484,7 +493,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         // then SUSPENDS mid-apply (inside onPayloadReady). A NEWER round bumps the generation DURING
         // that suspend (incrementAndFetch runs outside applyMutex). When the older round resumes it
         // must RE-VALIDATE the generation at the commit point and bail: it must NOT commit its now
-        // stale features (no featuresFetchedSuccessfully) and its awaiter must resolve as Superseded,
+        // stale features (no payloadFetchedSuccessfully) and its awaiter must resolve as Superseded,
         // not Success. Without the re-check the older round commits old_feature and reports Success
         // for a superseded round.
         //
@@ -494,8 +503,13 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         val oldApplyGate = CompletableDeferred<Unit>()
         val committed = mutableListOf<String>()
         val delegate = object : FeaturesFlowDelegate {
-            override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
-                features.keys.firstOrNull()?.let { committed.add(it) }
+            override fun payloadFetchedSuccessfully(
+                features: GBFeatures?,
+                savedGroups: JsonObject?,
+                contextualBandits: Map<String, GBContextualBandit>?,
+                isRemote: Boolean,
+            ) {
+                features?.keys?.firstOrNull()?.let { committed.add(it) }
             }
             override suspend fun onPayloadReady(model: FeaturesDataModel) {
                 // Hold the OLDER round inside its apply until the test releases the gate.
@@ -503,7 +517,6 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             }
             override fun featuresFetchFailed(error: GBError, isRemote: Boolean) = Unit
             override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) = Unit
-            override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) = Unit
             override fun featuresNotModified() = Unit
         }
         val viewModel = FeaturesViewModel(
@@ -565,11 +578,15 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         // failure — not swallowed by the coroutine machinery, and not rethrown into the caller.
         var failed = false
         val delegate = object : FeaturesFlowDelegate {
-            override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) = Unit
+            override fun payloadFetchedSuccessfully(
+                features: GBFeatures?,
+                savedGroups: JsonObject?,
+                contextualBandits: Map<String, GBContextualBandit>?,
+                isRemote: Boolean,
+            ) = Unit
             override suspend fun onPayloadReady(model: FeaturesDataModel) = Unit
             override fun featuresFetchFailed(error: GBError, isRemote: Boolean) { failed = true }
             override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) = Unit
-            override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) = Unit
             override fun featuresNotModified() = Unit
         }
         val viewModel = FeaturesViewModel(
@@ -794,7 +811,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
 
         assertTrue(
             receivedFromCache,
-            "Expected featuresFetchedSuccessfully(isRemote=false) from cache"
+            "Expected payloadFetchedSuccessfully(isRemote=false) from cache"
         )
         assertTrue(hasFeatures)
     }
@@ -820,7 +837,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
 
         assertTrue(
             receivedFromCache,
-            "Expected featuresFetchedSuccessfully(isRemote=false) from encrypted cache"
+            "Expected payloadFetchedSuccessfully(isRemote=false) from encrypted cache"
         )
         assertTrue(hasFeatures)
     }
@@ -1016,10 +1033,14 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 featuresSeenByPayloadReady = model.features
             }
 
-            override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) = Unit
+            override fun payloadFetchedSuccessfully(
+                features: GBFeatures?,
+                savedGroups: JsonObject?,
+                contextualBandits: Map<String, GBContextualBandit>?,
+                isRemote: Boolean,
+            ) = Unit
             override fun featuresFetchFailed(error: GBError, isRemote: Boolean) = Unit
             override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) = Unit
-            override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) = Unit
             override fun featuresNotModified() = Unit
         }
         val viewModel = FeaturesViewModel(
@@ -1142,7 +1163,12 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         // A delegate whose onPayloadReady actually suspends, mimicking sticky-bucket IO that
         // does not complete synchronously (real GBStickyBucketService reads from storage).
         val orderingDelegate = object : FeaturesFlowDelegate {
-            override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
+            override fun payloadFetchedSuccessfully(
+                features: GBFeatures?,
+                savedGroups: JsonObject?,
+                contextualBandits: Map<String, GBContextualBandit>?,
+                isRemote: Boolean,
+            ) {
                 events += "featuresApplied"
             }
 
@@ -1157,7 +1183,6 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             }
 
             override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) = Unit
-            override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) = Unit
             override fun featuresNotModified() = Unit
         }
 
@@ -1195,7 +1220,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         assertEquals(
             listOf("stickyRefreshStart", "stickyRefreshDone", "featuresApplied"),
             events,
-            "featuresFetchedSuccessfully must fire strictly after onPayloadReady completes"
+            "payloadFetchedSuccessfully must fire strictly after onPayloadReady completes"
         )
     }
 
@@ -1260,13 +1285,17 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 )
             }
 
-            override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
+            override fun payloadFetchedSuccessfully(
+                features: GBFeatures?,
+                savedGroups: JsonObject?,
+                contextualBandits: Map<String, GBContextualBandit>?,
+                isRemote: Boolean,
+            ) {
                 docsAtApplyTime = ctx.stickyBucketAssignmentDocs
             }
 
             override fun featuresFetchFailed(error: GBError, isRemote: Boolean) = Unit
             override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) = Unit
-            override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) = Unit
             override fun featuresNotModified() = Unit
         }
 
@@ -1287,7 +1316,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
 
         advanceUntilIdle()
 
-        // featuresFetchedSuccessfully fired only after the real refresh wrote the current user's docs.
+        // payloadFetchedSuccessfully fired only after the real refresh wrote the current user's docs.
         assertNotNull(
             docsAtApplyTime,
             "stickyBucketAssignmentDocs must be populated before features are applied",
@@ -1298,11 +1327,18 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         )
     }
 
-    override fun featuresFetchedSuccessfully(features: GBFeatures, isRemote: Boolean) {
+    override fun payloadFetchedSuccessfully(
+        features: GBFeatures?,
+        savedGroups: JsonObject?,
+        contextualBandits: Map<String, GBContextualBandit>?,
+        isRemote: Boolean,
+    ) {
         isSuccess = true
         isError = false
-        hasFeatures = features.isNotEmpty()
-        if (!isRemote) receivedFromCache = true
+        if (features != null) {
+            hasFeatures = features.isNotEmpty()
+            if (!isRemote) receivedFromCache = true
+        }
     }
 
     override fun featuresNotModified() {
@@ -1319,11 +1355,6 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
     override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) {
         isSuccess = false
         isError = true
-    }
-
-    override fun savedGroupsFetchedSuccessfully(savedGroups: JsonObject, isRemote: Boolean) {
-        isSuccess = true
-        isError = false
     }
 
     override suspend fun onPayloadReady(model: FeaturesDataModel) {

@@ -3,6 +3,7 @@ package com.sdk.growthbook.tests
 import com.sdk.growthbook.GBSDKBuilder
 import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.model.GBBoolean
+import com.sdk.growthbook.model.GBContextualBandit
 import com.sdk.growthbook.utils.GBCacheRefreshHandler
 import com.sdk.growthbook.utils.GBError
 import com.sdk.growthbook.utils.GBFeatures
@@ -657,14 +658,19 @@ class GrowthBookSDKBuilderTests {
     }
 
     @Test
-    fun test_savedGroupsFetchedSuccessfully_updatesSavedGroups() = runTest {
+    fun test_payloadFetchedSuccessfully_updatesSavedGroups() = runTest {
         val sdk = buildSdkWithHandler()
         val jsonGroups = buildJsonObject {
             put("premium", JsonPrimitive(true))
             put("beta", JsonPrimitive("yes"))
         }
 
-        sdk.savedGroupsFetchedSuccessfully(jsonGroups, isRemote = false)
+        sdk.payloadFetchedSuccessfully(
+            features = null,
+            savedGroups = jsonGroups,
+            contextualBandits = null,
+            isRemote = false
+        )
 
         val savedGroups = sdk.getGBContext().savedGroups
         assertNotNull(savedGroups)
@@ -673,7 +679,7 @@ class GrowthBookSDKBuilderTests {
     }
 
     @Test
-    fun test_savedGroupsFetchedSuccessfully_isRemoteTrue_callsRefreshHandlerWithTrue() = runTest {
+    fun test_payloadFetchedSuccessfully_isRemoteTrue_callsRefreshHandlerWithTrue() = runTest {
         var handlerSuccess: Boolean? = null
         var handlerError: GBError? = GBError(null)
         val sdk = buildSdkWithHandler(refreshHandler = { success, error ->
@@ -681,8 +687,10 @@ class GrowthBookSDKBuilderTests {
             handlerError = error
         })
 
-        sdk.savedGroupsFetchedSuccessfully(
-            buildJsonObject { put("g1", JsonPrimitive(1)) },
+        sdk.payloadFetchedSuccessfully(
+            features = null,
+            savedGroups = buildJsonObject { put("g1", JsonPrimitive(1)) },
+            contextualBandits = null,
             isRemote = true
         )
 
@@ -691,13 +699,15 @@ class GrowthBookSDKBuilderTests {
     }
 
     @Test
-    fun test_savedGroupsFetchedSuccessfully_isRemoteFalse_doesNotCallRefreshHandler() = runTest {
+    fun test_payloadFetchedSuccessfully_isRemoteFalse_doesNotCallRefreshHandler() = runTest {
         var handlerCallCount = 0
         val sdk = buildSdkWithHandler(refreshHandler = { _, _ -> handlerCallCount++ })
         val countAfterInit = handlerCallCount
 
-        sdk.savedGroupsFetchedSuccessfully(
-            buildJsonObject { put("g1", JsonPrimitive(1)) },
+        sdk.payloadFetchedSuccessfully(
+            features = null,
+            savedGroups = buildJsonObject { put("g1", JsonPrimitive(1)) },
+            contextualBandits = null,
             isRemote = false
         )
 
@@ -705,14 +715,64 @@ class GrowthBookSDKBuilderTests {
     }
 
     @Test
-    fun test_savedGroupsFetchedSuccessfully_withEmptyJson_setEmptySavedGroups() = runTest {
+    fun test_payloadFetchedSuccessfully_withEmptyJson_setEmptySavedGroups() = runTest {
         val sdk = buildSdkWithHandler()
 
-        sdk.savedGroupsFetchedSuccessfully(buildJsonObject { }, isRemote = false)
+        sdk.payloadFetchedSuccessfully(
+            features = null,
+            savedGroups = buildJsonObject { },
+            contextualBandits = null,
+            isRemote = false
+        )
 
         val savedGroups = sdk.getGBContext().savedGroups
         assertNotNull(savedGroups)
         assertTrue(savedGroups.isEmpty())
+    }
+
+    @Test
+    fun test_payloadFetchedSuccessfully_appliesEveryFieldInOneUpdate() = runTest {
+        val sdk = buildSdkWithHandler()
+        val features: GBFeatures = mapOf("feat" to GBFeature(defaultValue = GBBoolean(true)))
+        val bandits = mapOf("cb_1" to GBContextualBandit(banditVersion = 7))
+
+        sdk.payloadFetchedSuccessfully(
+            features = features,
+            savedGroups = buildJsonObject { put("premium", JsonPrimitive(true)) },
+            contextualBandits = bandits,
+            isRemote = true
+        )
+
+        // Read the snapshot once: all three fields must come from the same payload generation.
+        val snapshot = sdk.getGBContext().evalSnapshot()
+        assertTrue(snapshot.features.containsKey("feat"))
+        assertTrue(snapshot.savedGroups?.containsKey("premium") == true)
+        assertEquals(7, snapshot.contextualBandits?.get("cb_1")?.banditVersion)
+    }
+
+    @Test
+    fun test_payloadFetchedSuccessfully_withAbsentFields_keepsPreviousValues() = runTest {
+        val sdk = buildSdkWithHandler()
+        sdk.payloadFetchedSuccessfully(
+            features = mapOf("old" to GBFeature(defaultValue = GBBoolean(true))),
+            savedGroups = buildJsonObject { put("premium", JsonPrimitive(true)) },
+            contextualBandits = mapOf("cb_1" to GBContextualBandit(banditVersion = 1)),
+            isRemote = false
+        )
+
+        // A payload carrying only features must not drop the bandits/saved groups already applied.
+        sdk.payloadFetchedSuccessfully(
+            features = mapOf("new" to GBFeature(defaultValue = GBBoolean(true))),
+            savedGroups = null,
+            contextualBandits = null,
+            isRemote = false
+        )
+
+        val snapshot = sdk.getGBContext().evalSnapshot()
+        assertTrue(snapshot.features.containsKey("new"))
+        assertFalse(snapshot.features.containsKey("old"))
+        assertTrue(snapshot.savedGroups?.containsKey("premium") == true)
+        assertEquals(1, snapshot.contextualBandits?.get("cb_1")?.banditVersion)
     }
 
     @Test
