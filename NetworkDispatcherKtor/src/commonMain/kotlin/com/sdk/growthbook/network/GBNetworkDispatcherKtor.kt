@@ -117,23 +117,39 @@ class GBNetworkDispatcherKtor(
         onSuccess: (String) -> Unit,
         onError: (Throwable) -> Unit,
         onNotModified: () -> Unit
-    ): Job = handleGetRequest(request, onSuccess, onError, onNotModified)
+    ): Job = handleGetRequest(request, emptyMap(), onSuccess, onError, onNotModified)
+
+    override fun consumeGETRequestWithNotModified(
+        request: String,
+        headers: Map<String, String>,
+        onSuccess: (String) -> Unit,
+        onError: (Throwable) -> Unit,
+        onNotModified: () -> Unit
+    ): Job = handleGetRequest(request, headers, onSuccess, onError, onNotModified)
 
     override fun consumeGETRequest(
         request: String,
         onSuccess: (String) -> Unit,
         onError: (Throwable) -> Unit
-    ): Job = handleGetRequest(request, onSuccess, onError)
+    ): Job = handleGetRequest(request, emptyMap(), onSuccess, onError)
+
+    override fun consumeGETRequest(
+        request: String,
+        headers: Map<String, String>,
+        onSuccess: (String) -> Unit,
+        onError: (Throwable) -> Unit
+    ): Job = handleGetRequest(request, headers, onSuccess, onError)
 
     private fun handleGetRequest(
         request: String,
+        headers: Map<String, String>,
         onSuccess: (String) -> Unit,
         onError: (Throwable) -> Unit,
         onNotModified: (() -> Unit)? = null
     ): Job {
         return CoroutineScope(PlatformDependentIODispatcher).launch {
             try {
-                val result = prepareGetRequest(request).execute()
+                val result = prepareGetRequest(request, headers).execute()
                 try {
                     when (result.status) {
                         HttpStatusCode.OK -> {
@@ -186,6 +202,11 @@ class GBNetworkDispatcherKtor(
      * Supportive method for preparing a GET request, shared by the feature fetch and the SSE
      * connection. [bounded] applies [fetchTimeoutMillis] and must be false for SSE, whose
      * connection is long-lived by design.
+     *
+     * Consumer-supplied [headers] are applied first and stripped of SDK-managed names
+     * ([GBRequestHeaders.RESERVED]), so `If-None-Match` / `Cache-Control` below always win —
+     * `append` adds a second value rather than replacing, which would send two conflicting
+     * cache directives and break ETag revalidation.
      */
     private suspend fun prepareGetRequest(
         url: String,
@@ -196,15 +217,17 @@ class GBNetworkDispatcherKtor(
         client.prepareGet(url) {
             if (bounded) applyFetchTimeout()
             headers {
-                headers.forEach { (key, value) -> append(key, value) }
+                GBRequestHeaders.sanitize(headers)
+                    .forEach { (key, value) -> append(key, value) }
 
                 // Only add cache headers if URL matches featuresPathPattern
                 if (featuresPathPattern.matches(url)) {
-                    // Add If-None-Match header if ETag is present
+                    // set(), not append(): the SDK-managed value must replace any consumer-supplied
+                    // one rather than adding a second, conflicting header value.
                     eTagCache.get(url)?.let {
-                        append("If-None-Match", it)
+                        set("If-None-Match", it)
                     }
-                    append("Cache-Control", "max-age=3600")
+                    set("Cache-Control", "max-age=3600")
                 }
             }
             queryParams.forEach { (key, value) -> addOrReplaceParameter(key, value) }
@@ -219,6 +242,17 @@ class GBNetworkDispatcherKtor(
      */
     override fun consumeSSEConnection(
         url: String,
+        sseController: SSEConnectionController?
+    ) = consumeSSEConnection(url, emptyMap(), sseController)
+
+    /**
+     * Same as [consumeSSEConnection], with consumer-supplied [headers] (typically
+     * `streamingHostRequestHeaders`) applied to the streaming request — and re-applied to every
+     * reconnection attempt.
+     */
+    override fun consumeSSEConnection(
+        url: String,
+        headers: Map<String, String>,
         sseController: SSEConnectionController?
     ) = callbackFlow {
         val scope = this
@@ -277,7 +311,7 @@ class GBNetworkDispatcherKtor(
             connectionJob?.cancel()
             connectionJob = scope.launch(PlatformDependentIODispatcher) {
                 try {
-                    prepareGetRequest(url, bounded = false).execute { response ->
+                    prepareGetRequest(url, bounded = false, headers = headers).execute { response ->
                         val channel: ByteReadChannel = response.body()
                         channel.readSse(
                             onSseEvent = { sseEvent ->
@@ -336,6 +370,18 @@ class GBNetworkDispatcherKtor(
         bodyParams: Map<String, Any>,
         onSuccess: (String) -> Unit,
         onError: (Throwable) -> Unit
+    ) = consumePOSTRequest(url, emptyMap(), bodyParams, onSuccess, onError)
+
+    /**
+     * Same as [consumePOSTRequest], with consumer-supplied [headers] (typically
+     * `apiHostRequestHeaders`) applied to the remote-evaluation request.
+     */
+    override fun consumePOSTRequest(
+        url: String,
+        headers: Map<String, String>,
+        bodyParams: Map<String, Any>,
+        onSuccess: (String) -> Unit,
+        onError: (Throwable) -> Unit
     ) {
         CoroutineScope(PlatformDependentIODispatcher).launch {
             // Do NOT wrap in `client.use { }`: `client` is the shared, long-lived instance reused
@@ -351,9 +397,15 @@ class GBNetworkDispatcherKtor(
                 }
                 val response = client.post(url) {
                     applyFetchTimeout()
-                    headers {
-                        append("Content-Type", "application/json")
-                        append("Accept", "application/json")
+                    // `this.headers` — the bare name resolves to this function's `headers`
+                    // parameter, which shadows Ktor's HttpMessageBuilder.headers { } builder.
+                    this.headers {
+                        GBRequestHeaders.sanitize(headers)
+                            .forEach { (key, value) -> append(key, value) }
+                        // set(), not append(): the SDK-managed values replace any consumer-supplied
+                        // ones instead of adding a second, conflicting header value.
+                        set("Content-Type", "application/json")
+                        set("Accept", "application/json")
                     }
                     contentType(ContentType.Application.Json)
                     setBody(payload)

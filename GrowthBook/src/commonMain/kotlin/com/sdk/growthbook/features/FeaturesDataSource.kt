@@ -5,6 +5,7 @@ import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBOptions
 import com.sdk.growthbook.model.GBValue
+import com.sdk.growthbook.network.GBRequestHeaders
 import com.sdk.growthbook.network.NetworkDispatcher
 import com.sdk.growthbook.network.NetworkDispatcherWithNotModified
 import com.sdk.growthbook.serializable_model.SerializableFeaturesDataModel
@@ -37,6 +38,15 @@ internal class FeaturesDataSource(
 
     private val jsonParser: Json
         get() = Json { prettyPrint = true; isLenient = true; ignoreUnknownKeys = true }
+
+    // Sanitized once, not per request: GBOptions is fixed for the lifetime of the SDK instance.
+    // Sanitizing here as well as validating in GBSDKBuilder is defence in depth: GBOptions can be
+    // assembled inside the SDK (and in tests) without going through the builder's validation.
+    private val apiHostRequestHeaders: Map<String, String> =
+        GBRequestHeaders.sanitize(gbOptions.apiHostRequestHeaders)
+
+    private val streamingHostRequestHeaders: Map<String, String> =
+        GBRequestHeaders.sanitize(gbOptions.streamingHostRequestHeaders)
 
     /**
      * Supportive method for getting url based on feature refresh strategy
@@ -101,6 +111,7 @@ internal class FeaturesDataSource(
         if (dispatcher is NetworkDispatcherWithNotModified) {
             dispatcher.consumeGETRequestWithNotModified(
                 request = getEndpoint(),
+                headers = apiHostRequestHeaders,
                 onSuccess = onSuccess,
                 onError = onError,
                 onNotModified = {
@@ -111,6 +122,7 @@ internal class FeaturesDataSource(
         } else {
             dispatcher.consumeGETRequest(
                 request = getEndpoint(),
+                headers = apiHostRequestHeaders,
                 onSuccess = onSuccess,
                 onError = onError
             )
@@ -123,6 +135,7 @@ internal class FeaturesDataSource(
     fun autoRefreshRaw(): Flow<Resource<FeaturesDataModel>> =
         dispatcher.consumeSSEConnection(
             url = getEndpoint(FeatureRefreshStrategy.SERVER_SENT_EVENTS),
+            headers = streamingHostRequestHeaders,
             sseController = sseController
         ).transform { resource ->
             when (resource) {
@@ -190,6 +203,7 @@ internal class FeaturesDataSource(
          */
         dispatcher.consumePOSTRequest(
             url = getEndpoint(FeatureRefreshStrategy.SERVER_SENT_REMOTE_FEATURE_EVAL),
+            headers = apiHostRequestHeaders,
             bodyParams = payload,
             onSuccess = onSuccess@{ rawContent ->
                 // Same guarded decode as fetchFeatures: a malformed body must reach `failure`,
