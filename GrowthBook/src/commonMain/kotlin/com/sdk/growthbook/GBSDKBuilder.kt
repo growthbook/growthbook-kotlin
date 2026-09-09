@@ -26,12 +26,13 @@ import com.sdk.growthbook.utils.GBCacheRefreshHandler
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.utils.GBFeaturesChangeHandler
 import com.sdk.growthbook.utils.GBFetchStatsHandler
+import com.sdk.growthbook.utils.GBOptionsValidator
 
 /**
  * SDKBuilder - Root Class for SDK Initializers for GrowthBook SDK
  * APIKey - API Key
  * ApiHost - domain for features fetch
- * StreamingHost - domain for server sent events
+ * StreamingHost - domain for server sent events; falls back to ApiHost when not set
  * UserAttributes - User Attributes
  * Tracking Callback - Track Events for Experiments
  * EncryptionKey - Encryption key if you intend to use data encryption
@@ -92,7 +93,7 @@ abstract class SDKBuilder(
  * SDKBuilder - Initializer for GrowthBook SDK for Apps
  * APIKey - API Key
  * ApiHost - domain for features fetch
- * StreamingHost - domain for server sent events
+ * StreamingHost - domain for server sent events; falls back to ApiHost when not set
  * UserAttributes - User Attributes
  * Tracking Callback - Track Events for Experiments
  * EncryptionKey - Encryption key if you intend to use data encryption
@@ -132,6 +133,8 @@ class GBSDKBuilder(
     private var refreshInterval: Long? = null
     private var staleTtl: Long? = null
     private var serveStaleOnError: Boolean = false
+    private var apiHostRequestHeaders: Map<String, String> = emptyMap()
+    private var streamingHostRequestHeaders: Map<String, String> = emptyMap()
 
     // Dispatcher used to process fetched payloads. Defaults to the platform IO dispatcher in
     // production; tests inject a deterministic dispatcher (e.g. Dispatchers.Unconfined or a
@@ -324,6 +327,55 @@ class GBSDKBuilder(
     }
 
     /**
+     * Extra headers added to every request against the API host — the features `GET` and the
+     * remote-evaluation `POST`. Use this to reach a GrowthBook instance deployed behind an
+     * authenticated gateway or proxy.
+     *
+     * ```kotlin
+     * .setApiHostRequestHeaders(mapOf("Authorization" to "Bearer $gatewayToken"))
+     * ```
+     *
+     * Header values may contain credentials: they are never logged and never surfaced through
+     * diagnostics. Whether they are actually applied depends on the injected
+     * [NetworkDispatcher] — both built-in dispatchers (Ktor and OkHttp) honour them; a custom
+     * dispatcher must override the `headers`-carrying overloads of [NetworkDispatcher] to do so.
+     *
+     * @throws com.sdk.growthbook.utils.GBInvalidOptionsException when a header name is blank, is
+     *   not a valid HTTP token, is one of the SDK-managed names (`If-None-Match`, `Cache-Control`
+     *   — the SDK sets those itself and honouring an override would break ETag-based
+     *   revalidation), or when a value contains characters HTTP forbids (control characters, line
+     *   breaks, non-ASCII). The check runs here so the misconfiguration surfaces at the setter,
+     *   not at the first failed fetch. Violation messages never quote a header value.
+     */
+    fun setApiHostRequestHeaders(headers: Map<String, String>): GBSDKBuilder {
+        GBOptionsValidator.validate(
+            streamingHost = null,
+            apiHostRequestHeaders = headers,
+            streamingHostRequestHeaders = null,
+        )
+        this.apiHostRequestHeaders = headers.toMap()
+        return this
+    }
+
+    /**
+     * Extra headers added to the SSE streaming request (against the streaming host, or the API
+     * host when no streaming host is configured). Same reserved-name and secret-handling rules as
+     * [setApiHostRequestHeaders].
+     *
+     * @throws com.sdk.growthbook.utils.GBInvalidOptionsException when a header name is blank,
+     *   reserved or not a valid HTTP token, or when a value contains characters HTTP forbids.
+     */
+    fun setStreamingHostRequestHeaders(headers: Map<String, String>): GBSDKBuilder {
+        GBOptionsValidator.validate(
+            streamingHost = null,
+            apiHostRequestHeaders = null,
+            streamingHostRequestHeaders = headers,
+        )
+        this.streamingHostRequestHeaders = headers.toMap()
+        return this
+    }
+
+    /**
      * Registers plugins that receive lifecycle callbacks: [GrowthBookPlugin.init],
      * [GrowthBookPlugin.onExperimentViewed], [GrowthBookPlugin.onFeatureEvaluated], and [GrowthBookPlugin.close].
      */
@@ -413,10 +465,14 @@ class GBSDKBuilder(
      * Initialize the Kotlin SDK and provide it when ready
      */
     fun initialize(onResult: (GrowthBookSDK) -> Unit) {
+        // Validated first, before any context/service is built, so a misconfiguration throws
+        // without leaving half-initialized state behind.
+        val gbOptions = createGbOptions()
         val gbContext = createGbContext()
 
         WaitForCallCaseHelper(
             gbContext = gbContext,
+            gbOptions = gbOptions,
             onResult = onResult,
         )
     }
@@ -426,6 +482,9 @@ class GBSDKBuilder(
      * This init method takes less time than method above
      */
     override fun initialize(): GrowthBookSDK {
+        // Validated first, before any context/service is built, so a misconfiguration throws
+        // without leaving half-initialized state behind.
+        val gbOptions = createGbOptions()
         val gbContext = createGbContext()
 
         if (enableLogging && !cachingEnabled) {
@@ -439,8 +498,6 @@ class GBSDKBuilder(
         }
 
         seedInitialState(gbContext)
-
-        val gbOptions = GBOptions(apiHost, streamingHost)
 
         return GrowthBookSDK(
             gbContext,
@@ -456,6 +513,28 @@ class GBSDKBuilder(
             featuresChangeHandler = featuresChangeHandler,
             cachingLayer = customCachingLayer,
             fetchStatsHandler = fetchStatsHandler
+        )
+    }
+
+    /**
+     * Assembles (and validates) the host/header options. The hosts are validated here rather than
+     * in the constructor so an already-compiled consumer passing a malformed value still gets the
+     * same fail-fast error at `initialize()` regardless of which builder overload it uses.
+     * `apiHost` is checked too — it backs every feature fetch and remote-eval POST, so a typo
+     * there degrades into exactly the same opaque fetch failure as a bad `streamingHost`.
+     */
+    private fun createGbOptions(): GBOptions {
+        GBOptionsValidator.validate(
+            streamingHost = streamingHost,
+            apiHostRequestHeaders = apiHostRequestHeaders,
+            streamingHostRequestHeaders = streamingHostRequestHeaders,
+            apiHost = apiHost,
+        )
+        return GBOptions(
+            apiHost = apiHost,
+            streamingHost = streamingHost,
+            apiHostRequestHeaders = apiHostRequestHeaders,
+            streamingHostRequestHeaders = streamingHostRequestHeaders,
         )
     }
 
@@ -480,6 +559,7 @@ class GBSDKBuilder(
 
     private inner class WaitForCallCaseHelper(
         gbContext: GBContext,
+        gbOptions: GBOptions,
         private val onResult: (GrowthBookSDK) -> Unit
     ) {
         var growthBookSDK: GrowthBookSDK? = null
@@ -505,7 +585,6 @@ class GBSDKBuilder(
             }
             seedInitialState(gbContext)
 
-            val gbOptions = GBOptions(apiHost, streamingHost)
             growthBookSDK = GrowthBookSDK(
                 gbContext,
                 gbOptions,

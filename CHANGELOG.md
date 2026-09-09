@@ -6,7 +6,86 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
-## [8.0.0] - Unreleased
+## [8.1.0] - Unreleased
+
+### Added
+- `GBSDKBuilder.setApiHostRequestHeaders(Map<String, String>)` — custom headers added to every
+  request against the API host: the features `GET` and the remote-evaluation `POST`. Makes the SDK
+  usable in enterprise self-hosted setups where GrowthBook sits behind an authenticated
+  gateway/proxy. Matches the TypeScript SDK's `apiHostRequestHeaders`.
+- `GBSDKBuilder.setStreamingHostRequestHeaders(Map<String, String>)` — custom headers added to the
+  SSE streaming request. Matches the TypeScript SDK's `streamingHostRequestHeaders`.
+- `GBOptions.apiHostRequestHeaders` / `GBOptions.streamingHostRequestHeaders` — the resolved values,
+  readable from the options object the builder produces. Added as constructor parameters with
+  defaults, which is safe here because `GBOptions`' primary constructor has been `internal` since
+  8.0.0 — consumers configure these through the builder setters. `GBOptions.toString()` prints only
+  header *names*, never values, since a value may be a credential.
+- `GBInvalidOptionsException` (extends `IllegalArgumentException`) — thrown when host/header options
+  are invalid, with every problem found collected in `violations` so several misconfigurations
+  surface at once instead of one per restart. `apiHost` and `streamingHost` are validated at
+  `initialize()`; header maps are validated in their setters, so a reserved or unusable header name
+  — or a value HTTP cannot carry — is rejected at startup. A blank host means "not set" and is not
+  a violation.
+- `GBRequestHeaders` — new public helper in `:Core` (`io.growthbook.sdk:Core:1.7.0`) exposing the
+  set of SDK-managed (reserved) header names and a `sanitize()` pass. Useful when writing a custom
+  `NetworkDispatcher` that honours custom headers.
+- `NetworkDispatcher` / `NetworkDispatcherWithNotModified` gained `headers`-carrying overloads of
+  `consumeGETRequest`, `consumeGETRequestWithNotModified`, `consumeSSEConnection` and
+  `consumePOSTRequest`. Each has a default body that delegates to the header-less variant, so an
+  existing custom dispatcher keeps compiling and working unchanged — it simply ignores custom
+  headers until it overrides them. Both built-in dispatchers honour them
+  (`NetworkDispatcherKtor:1.4.0`, `NetworkDispatcherOkHttp:1.3.0` — an older dispatcher silently
+  drops the headers, so bump it alongside this release).
+
+### Breaking
+- **`initialize()` now throws on a malformed `apiHost` / `streamingHost`** instead of degrading.
+  A host with a non-`http(s)` scheme or no usable host part used to produce a URL the HTTP client
+  rejected, which surfaced as a fetch failure and left the SDK serving cached or default values; it
+  now fails fast with `GBInvalidOptionsException` at `initialize()`. An app that has been shipping
+  with such a value — a stray character from string-interpolated config, say — will start throwing
+  at startup on this upgrade rather than running degraded. A blank host still means "not set" and
+  is not a violation. Check `GBOptionsValidator`-style problems ahead of time by catching
+  `GBInvalidOptionsException` around `initialize()` and reading `violations`.
+
+### Changed
+- **SSE now falls back to `apiHost` when no `streamingHost` is configured**, matching the TypeScript
+  SDK's `getApiHosts()`. Previously the streaming URL fell through to `https://cdn.growthbook.io`,
+  so every self-hosted deployment without an explicit `streamingHost` opened its SSE connection
+  against GrowthBook Cloud while fetching features from its own `apiHost`. If you relied on the old
+  behaviour (features self-hosted, streaming from GrowthBook Cloud), set
+  `streamingHost = "https://cdn.growthbook.io"` explicitly.
+- Redundant trailing slashes on `apiHost` / `streamingHost` are now collapsed rather than only a
+  single one, as in the TypeScript SDK.
+- A host configured without a scheme (`cdn.example.com`) is now resolved against `https`, as in the
+  Java SDK. Previously it produced a URL every HTTP client rejects, surfacing as an opaque fetch
+  failure. A *blank* host is left scheme-less on purpose, so it still produces a relative URL the
+  client rejects — adding a scheme would turn an unset `apiHost` into a request against a host
+  literally named `api`.
+
+### Fixed
+- `GBNetworkDispatcherOkHttp` no longer lets a request-assembly failure escape its `CoroutineScope`.
+  A malformed URL made `consumeGETRequest`/`consumeGETRequestWithNotModified` throw before the call
+  was enqueued, so `onError` never fired — `initialize(onResult)` never completed and, on Android,
+  the uncaught exception crashed the app. The same failure on the SSE path is now emitted as
+  `Resource.Error` instead of propagating synchronously out of `autoRefreshFeatures()`.
+
+### Security
+- Custom header values may carry credentials: they are never logged, never included in a validation
+  error message (only header *names* are), and never exposed through diagnostics. Values HTTP cannot
+  carry (control characters, line breaks, non-ASCII) are rejected by the builder and dropped on the
+  request path rather than handed to the HTTP client, whose exception message would quote the value
+  back into the SDK's error log. CR/LF in a header value — the classic header-injection vector —
+  is therefore never sent. Surrounding whitespace is stripped, so a token read from a file or
+  environment variable with a trailing newline still works.
+- Consumer-supplied headers can never override the SDK-managed `If-None-Match` and `Cache-Control`
+  headers — overriding them would break ETag-based cache revalidation. They are rejected up front by
+  the builder and dropped again on the request path (defence in depth, for a `GBOptions` assembled
+  inside the SDK without the builder's validation). `User-Agent` is deliberately *not* reserved: the
+  SDK does not set it on these
+  requests, so consumers behind a gateway that requires a specific one can supply it.
+
+---
+## [8.0.0] - 2026-09-09
 
 ### Added
 - **Contextual bandits.** The SDK now understands contextual bandit rules and their definitions in the features payload

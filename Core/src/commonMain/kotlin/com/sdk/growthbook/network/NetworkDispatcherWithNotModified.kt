@@ -14,4 +14,18 @@ interface NetworkDispatcherWithNotModified : NetworkDispatcher {
         onError: (Throwable) -> Unit,
         onNotModified: () -> Unit
     ): Job
+
+    /**
+     * Same as [consumeGETRequestWithNotModified] with consumer-supplied [headers] applied to the
+     * request. Defaults to the header-less variant, so existing implementations keep working — they
+     * just ignore the custom headers. The SDK-managed `If-None-Match` / `Cache-Control` headers
+     * ([GBRequestHeaders.RESERVED]) always win over [headers].
+     */
+    fun consumeGETRequestWithNotModified(
+        request: String,
+        headers: Map<String, String>,
+        onSuccess: (String) -> Unit,
+        onError: (Throwable) -> Unit,
+        onNotModified: () -> Unit
+    ): Job = consumeGETRequestWithNotModified(request, onSuccess, onError, onNotModified)
 }
