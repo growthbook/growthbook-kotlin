@@ -28,7 +28,7 @@ repositories {
 
 dependencies {
     // Add GrowthBook module:
-    implementation 'io.growthbook.sdk:GrowthBook:8.0.0'
+    implementation 'io.growthbook.sdk:GrowthBook:9.1.0'
 
     // Add Network Dispatcher you prefer:
     // 1) NetworkDispatcherKtor — supports Android, iOS, JVM, JS, Wasm
@@ -307,6 +307,64 @@ not of the requested type.
   fun setRefreshHandler(handler: () -> Unit)
   ```
 
+- subscribe to refresh attempts at runtime, as many times as you like. Unlike the single refresh
+  handler above — which is fixed at build time and reports remote results only — listeners can be
+  added and cancelled at any point, and they **also hear the cache loads** the SDK starts a session
+  with. Exactly one event per payload, raised after everything that payload changed is applied, so
+  a listener may read back from the SDK. One that throws is logged and skipped without affecting
+  the others or the refresh. **No thread is guaranteed** — most events arrive on the SDK's
+  payload-processing dispatcher (a background thread, so marshal back to the UI thread yourself),
+  but a cache read is delivered synchronously on the thread calling `initialize()` / `refreshCache()`
+  and an SSE failure on the dispatcher collecting `startAutoRefreshFeatures()`. Keep the listener to
+  a cheap hand-off and never block in it.
+
+  ```kotlin
+  val subscription = sdk.addFeatureRefreshListener { event ->
+      when (event.source) {
+          GBFeatureRefreshSource.Network     -> render(event.features)  // fetched from the API
+          GBFeatureRefreshSource.Cache       -> render(event.features)  // loaded from the cache
+          GBFeatureRefreshSource.NotModified -> Unit                    // 304: nothing changed
+          GBFeatureRefreshSource.Stale       -> showOutdatedBanner()    // expired cache after a
+                                                                       // failed refresh
+      }
+      if (!event.success) log(event.error)
+  }
+
+  // later — e.g. in onCleared(); cancelling one subscription never affects another
+  subscription.cancel()
+
+  // or drop every registration at once, leaving the instance usable
+  sdk.clearFeatureRefreshListeners()
+  ```
+
+  `close()` also drops every registration, but it is terminal: `addFeatureRefreshListener` is a
+  no-op afterwards, and `sdk.isClosed` tells you so — useful when you hold an SDK whose lifetime
+  you do not own and would otherwise wait forever on a registration that can never fire.
+
+  **Register on the builder to catch the cold start.** The cached payload is applied
+  *synchronously from inside* `initialize()`, so a listener added right after it has already missed
+  that first load. `GBSDKBuilder.addFeatureRefreshListener { }` attaches before the instance exists
+  and therefore sees it; use the instance method for subscriptions tied to a screen's lifetime.
+
+  ```kotlin
+  val sdk = GBSDKBuilder(/* ... */)
+      .addFeatureRefreshListener { event -> if (event.source == GBFeatureRefreshSource.Cache) warmStart(event.features) }
+      .initialize()
+  ```
+
+  ```kotlin
+  fun GBSDKBuilder.addFeatureRefreshListener(listener: GBFeatureRefreshListener): GBSDKBuilder
+  fun addFeatureRefreshListener(listener: GBFeatureRefreshListener): GBFeatureRefreshSubscription
+  fun clearFeatureRefreshListeners()
+  // GBFeatureRefreshListener = (GBFeatureRefreshEvent) -> Unit
+  // GBFeatureRefreshEvent(success, source, features, error)
+  // GBFeatureRefreshSource = Network | Cache | NotModified | Stale
+  ```
+
+  `Stale` is the only source that arrives with `success = false` **and** applied features: it means
+  `setServeStaleOnError(true)` served an expired cache because the refresh failed, and `error`
+  carries that failure.
+
 - method for set prefix of filename in cache directory GrowthBook-KMM.
 
   ```kotlin
@@ -452,7 +510,7 @@ targets. It adds typed feature accessors, fallback strategies, a typed `Flag<T>`
 API, and DSLs for attributes and SDK configuration.
 
 ```groovy
-implementation 'io.growthbook.sdk:GrowthBookExt:2.0.0'
+implementation 'io.growthbook.sdk:GrowthBookExt:3.1.0'
 ```
 
 ### Typed feature accessors
@@ -580,7 +638,8 @@ builder: `streamingHost`, `encryptionKey`, `enableLogging`, `remoteEval`, `qaMod
 `enabled`, `forceVariations`, `trackingCallback`, `refreshHandler`,
 `featuresChangeHandler`, `featureUsageCallback`, `initialFeatures`, `plugins`,
 `cachingEnabled`, `cacheMaxAge`, `cachingLayer`, and sticky bucketing via either
-`stickyBucketService` or `stickyBucketScope` (+ optional `stickyBucketPrefix`).
+`stickyBucketService` or `stickyBucketScope` (+ optional `stickyBucketPrefix`), and
+`featureRefreshListeners`.
 
 ```kotlin
 val sdk = growthBook {
@@ -598,6 +657,34 @@ val sdk = growthBook {
     stickyBucketScope = viewModelScope
 }
 ```
+
+### Refresh events as a Flow
+
+`featureRefreshFlow()` wraps `addFeatureRefreshListener` so the subscription follows the collecting
+coroutine instead of a handle you have to cancel by hand:
+
+```kotlin
+viewModelScope.launch {
+    sdk.featureRefreshFlow()
+        .filter { it.success }
+        .collect { event -> render(event.features) }
+}
+```
+
+Cold and per-collector: each collection registers its own listener and removes it when the
+coroutine ends, for any reason. Nothing is replayed, and collection necessarily starts after
+`initialize()` has applied the cached payload, so the cold-start load is never in the stream —
+read `sdk.getFeatures()` for the state at start, or register on the builder when you must observe
+that first load. Events are emitted on whichever thread the SDK reports them from (see
+`addFeatureRefreshListener` above); add your own `flowOn` to move them. A slow collector never
+blocks a refresh: the producer only offers, and the buffer keeps only the latest event.
+
+Collecting an already-closed SDK completes immediately. Closing one *while* a collector is attached
+does not end the flow — there is no termination signal to deliver — so scope the collection
+(`viewModelScope`, a `SupervisorJob` you cancel) rather than relying on it to complete on its own.
+
+Kotlin-only — `Flow` has no usable Objective-C representation, so it is hidden from the iOS
+framework. iOS consumers use `addFeatureRefreshListener` directly.
 
 ## Models
 

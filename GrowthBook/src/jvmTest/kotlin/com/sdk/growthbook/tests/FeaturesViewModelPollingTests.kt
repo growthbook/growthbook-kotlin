@@ -23,6 +23,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 
@@ -51,6 +52,8 @@ class FeaturesViewModelPollingTests {
             savedGroups: JsonObject?,
             contextualBandits: Map<String, GBContextualBandit>?,
             isRemote: Boolean,
+            staleError: GBError?,
+            fromCache: Boolean,
         ) = Unit
         override suspend fun onPayloadReady(model: FeaturesDataModel) = Unit
         override fun featuresFetchFailed(error: GBError, isRemote: Boolean) = Unit
@@ -318,6 +321,8 @@ class FeaturesViewModelPollingTests {
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
                 isRemote: Boolean,
+                staleError: GBError?,
+                fromCache: Boolean,
             ) {
                 if (!isRemote) record()
             }
@@ -379,6 +384,50 @@ class FeaturesViewModelPollingTests {
 
         assertEquals(1, client.getCount, "Expired cache must still attempt the network first")
         assertTrue(appliedFromCache, "On network failure with serveStaleOnError, the expired cache must be served as fallback")
+    }
+
+    @Test
+    fun testStaleFallbackCarriesTheNetworkErrorToTheDelegate() = runTest {
+        // The stale-if-error payload must be distinguishable from an ordinary cache read: it is
+        // dispatched with the failure that forced it, which is what GrowthBookSDK turns into a
+        // GBFeatureRefreshSource.Stale event. An ordinary cache read carries no error.
+        var seenStaleError: GBError? = null
+        var applications = 0
+        val recordingDelegate = object : FeaturesFlowDelegate {
+            override fun payloadFetchedSuccessfully(
+                features: GBFeatures?,
+                savedGroups: JsonObject?,
+                contextualBandits: Map<String, GBContextualBandit>?,
+                isRemote: Boolean,
+                staleError: GBError?,
+                fromCache: Boolean,
+            ) {
+                applications++
+                seenStaleError = staleError
+            }
+            override suspend fun onPayloadReady(model: FeaturesDataModel) = Unit
+            override fun featuresFetchFailed(error: GBError, isRemote: Boolean) = Unit
+            override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) = Unit
+            override fun featuresNotModified() = Unit
+        }
+        val fiftyHoursAgo = Clock.System.now().toEpochMilliseconds() - (50 * 60 * 60 * 1000L)
+        val viewModel = buildViewModel(
+            CountingClient(response = null, error = Throwable("offline")),
+            testScheduler,
+            cachingLayer = MockCachingLayer.fromApiResponse(
+                MockResponse.successResponse,
+                cachedAt = fiftyHoursAgo
+            ),
+            cacheMaxAge = 48 * 60 * 60 * 1000L,
+            staleTtl = 60 * 60 * 1000L,
+            serveStaleOnError = true,
+            delegate = recordingDelegate,
+        )
+
+        viewModel.fetchFeatures()
+
+        assertEquals(1, applications, "the expired cache is applied exactly once, as the fallback")
+        assertNotNull(seenStaleError, "the fallback must carry the network failure that caused it")
     }
 
     @Test
@@ -444,6 +493,8 @@ class FeaturesViewModelPollingTests {
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
                 isRemote: Boolean,
+                staleError: GBError?,
+                fromCache: Boolean,
             ) {
                 if (!isRemote) appliedFromCache = true
             }

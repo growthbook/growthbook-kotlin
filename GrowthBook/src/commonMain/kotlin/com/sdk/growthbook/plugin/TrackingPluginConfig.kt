@@ -53,12 +53,16 @@ data class TrackingPluginConfig(
      */
     val dedupeCacheSize: Int? = null,
 ) {
+    /** [ingestorHost] without its trailing slash, or [DEFAULT_INGESTOR_HOST] when unset or blank. */
     fun resolvedIngestorHost(): String = TrackingOptionDefaults.ingestorHost(ingestorHost)
 
+    /** [batchSize], or [DEFAULT_BATCH_SIZE] when unset or not positive. */
     fun resolvedBatchSize(): Int = TrackingOptionDefaults.batchSize(batchSize)
 
+    /** [batchTimeout], or [DEFAULT_BATCH_TIMEOUT] when unset or not positive. */
     fun resolvedBatchTimeout(): Duration = TrackingOptionDefaults.batchTimeout(batchTimeout)
 
+    /** [dedupeCacheSize], or [DEFAULT_DEDUPE_CACHE_SIZE] when unset or not positive. */
     fun resolvedDedupeCacheSize(): Int = TrackingOptionDefaults.dedupeCacheSize(dedupeCacheSize)
 
     companion object {

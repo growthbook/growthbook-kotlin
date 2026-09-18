@@ -4,6 +4,7 @@ import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
+import com.sdk.growthbook.model.GBFeatureRefreshEvent
 import com.sdk.growthbook.model.GBFeaturesDiff
 import com.sdk.growthbook.serializable_model.SerializableGBTrackData
 import kotlinx.serialization.KSerializer
@@ -57,7 +58,44 @@ typealias GBCondition = JsonElement
  */
 typealias GBCacheRefreshHandler = (Boolean, GBError?) -> Unit
 
+/**
+ * Handler for a change in the feature definitions themselves, receiving the added / removed /
+ * changed keys. Fires only when the set actually changed, unlike [GBCacheRefreshHandler], which
+ * reports every refresh attempt. Registered through
+ * [com.sdk.growthbook.GBSDKBuilder.setFeaturesChangeHandler].
+ */
 typealias GBFeaturesChangeHandler = (GBFeaturesDiff) -> Unit
+
+/**
+ * Called after every feature refresh attempt, cache loads included. Register one with
+ * `GrowthBookSDK.addFeatureRefreshListener`, which hands back a subscription to cancel it again.
+ *
+ * Unlike [GBCacheRefreshHandler] there can be any number of these, registered and removed at any
+ * point in the SDK's life. A listener that throws is logged and skipped: it stops neither the
+ * other listeners nor the refresh itself.
+ */
+typealias GBFeatureRefreshListener = (GBFeatureRefreshEvent) -> Unit
+
+/**
+ * Handle for one listener registered through
+ * [com.sdk.growthbook.GrowthBookSDK.addFeatureRefreshListener]. Cancelling removes that
+ * registration and nothing else, so registering the same lambda twice yields two independent
+ * subscriptions.
+ */
+class GBFeatureRefreshSubscription internal constructor(
+    internal val listener: GBFeatureRefreshListener,
+    private val onCancel: (GBFeatureRefreshSubscription) -> Unit
+) {
+    /**
+     * Stops the listener behind this handle from being called again. Idempotent and safe from any
+     * thread: a second call finds nothing to remove and does nothing, so holding a stale handle
+     * can never cancel a later registration of the same lambda.
+     *
+     * Cancelling from inside a listener is allowed — the refresh in progress still finishes
+     * notifying everyone who was registered when it started.
+     */
+    fun cancel() = onCancel(this)
+}
 
 /**
  * How a single feature fetch ended. [NotModified] is its own outcome rather than a success
@@ -285,6 +323,10 @@ data class GBRemoteEvalParams(
  * from array of array of two elements ([[1,2]]) to List of Pairs format
  */
 object RangeSerializer {
+    /**
+     * Maps a JSON array of two-element arrays (`[[0, 0.5], [0.5, 1]]`) onto `List<GBBucketRange>`,
+     * i.e. a list of [Pair]s. Apply it with `@Serializable(with = ...)` on range-valued fields.
+     */
     object GBBucketRangeListSerializer : KSerializer<List<GBBucketRange>> {
         override val descriptor: SerialDescriptor =
             ListSerializer(PairSerializer(Float.serializer(), Float.serializer())).descriptor
@@ -350,7 +392,10 @@ object RangeSerializer {
  * Wrapper for deserialized model with optional field
  */
 sealed class OptionalProperty<out T> {
+    /** The field was absent from the JSON — distinct from present-and-null. */
     data object NotPresent : OptionalProperty<Nothing>()
+
+    /** The field was present, carrying [value] — which may itself be null. */
     data class Present<T>(val value: T) : OptionalProperty<T>()
 }
 

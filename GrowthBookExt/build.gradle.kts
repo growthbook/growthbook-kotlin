@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "3.0.0"
+version = "3.1.0"
 
 kotlin {
     androidTarget {
@@ -54,6 +54,8 @@ kotlin {
                 implementation(kotlin("test-junit"))
                 implementation("junit:junit:4.13.2")
                 implementation(libs.kotlinx.coroutines.core)
+                // Test-only: runTest / UnconfinedTestDispatcher for the Flow extensions.
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
                 implementation(libs.kotlinx.serialization.json)
 
             }
