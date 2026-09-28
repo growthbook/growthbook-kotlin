@@ -647,7 +647,12 @@ GrowthBook Proxy Server or custom remote evaluation backend.
 
 To use Remote Evaluation, set the `remoteEval = true` property to your SDK instance. A new evaluation API call will be
 made any time a user attribute or other dependency changes — specifically on `setAttributes` / `setAttributesSync` /
-`updateAttributes` / `updateAttributesSync`, `setAttributeOverrides`, `setForcedFeatures`, and `setForcedVariations`.
+`updateAttributes` / `updateAttributesSync`, `setAttributeOverrides`, `setForcedFeatures`, `setForcedVariations`, and
+`setUrl`.
+
+The page URL is part of the evaluation request body, because `experiment.urlPatterns` are matched by the remote
+evaluator rather than by the SDK. Setting the same URL twice is a no-op and costs no round trip. The per-call `url`
+argument of `getUrlRedirects` is evaluated locally and is never sent remotely.
 
 > If you would like to implement Sticky Bucketing while using Remote Evaluation, you must configure your remote evaluation
 > backend to support Sticky Bucketing. You will not need to provide a StickyBucketService instance to the client side SDK.
@@ -695,8 +700,79 @@ treating `variationWeights` as the assignment propensities. For offline-first se
 definitions with [`setInitialPayload`](#bundled-fallback-payload-setinitialpayload) — `setInitialFeatures` does not carry
 them.
 
-> **Note:** GrowthBook's querystring-based variation override (`?experiment-key=0`) is not implemented in this SDK, so it
-> does not apply to bandit rules either. Use `setForcedVariations` for the same effect.
+> **Note:** GrowthBook's querystring-based variation override (`?experiment-key=0`) applies to bandit rules as it does to
+> any experiment, but only once a URL is supplied — see [URL Targeting](#url-targeting--url-redirects).
+
+## URL Targeting & URL Redirects
+
+Two related features, both driven by the page URL:
+
+* **URL targeting** (`experiment.urlPatterns`) restricts an experiment to URLs matching a set of include/exclude
+  patterns (`simple` wildcard patterns or regular expressions).
+* **URL redirect** (split-URL) experiments assign each variation a destination URL (`variation.urlRedirect`), optionally
+  carrying the original query string across.
+
+Both are opt-in: an experiment without `urlPatterns` behaves exactly as before, and nothing changes if you never set a
+URL.
+
+Tell the SDK what the current URL is, either once at build time or whenever the route changes (under `remoteEval` this
+also triggers a fresh evaluation, since the remote evaluator is the one matching the patterns):
+
+```kotlin
+val sdkInstance = GBSDKBuilder(
+    apiKey = <API_KEY>,
+    hostURL = <GrowthBook_URL>,
+    attributes = mapOf("id" to GBString("user-123")),
+    trackingCallback = { _, _ -> },
+    networkDispatcher = GBNetworkDispatcherKtor(),
+).setUrl("https://example.com/home")
+    .initialize()
+
+sdkInstance.setUrl("https://example.com/pricing") // on navigation
+```
+
+Redirect experiments arrive in the features payload (`experiments` / `encryptedExperiments`) and are read with
+`getExperiments()`. `getUrlRedirects()` evaluates them and resolves the destination:
+
+```kotlin
+val redirect = sdkInstance.getUrlRedirects().firstOrNull()?.urlWithParams
+if (!redirect.isNullOrEmpty()) {
+    // Your app performs the navigation — the SDK only decides where to go.
+    navigateTo(redirect)
+}
+```
+
+The first experiment the user is enrolled in whose assigned variation carries a `urlRedirect` wins, and evaluation stops
+there. When the experiment sets `persistQueryString`, the current URL's query parameters are merged into the
+destination (parameters already on the destination win). If the destination is itself matched by the same patterns — the
+user is already there — no redirect is applied and `urlWithParams` is empty.
+
+Resolving a redirect is a question about one specific address, so `getUrlRedirects` also accepts the URL directly —
+usually clearer than setting it and then calling:
+
+```kotlin
+val redirects = sdkInstance.getUrlRedirects(url = request.url)
+```
+
+> **Server-side caveat.** That argument is a convenience, not a concurrency fix. The SDK holds one shared context, so
+> the attributes every targeting decision depends on are shared too — a single instance evaluates for one user at a
+> time. Serving several users concurrently needs an instance per user, not a URL per call.
+
+Setting a URL also enables GrowthBook's querystring variation override, so a QA link like
+`https://example.com/home?my-experiment=1` forces variation 1. It takes precedence over `setForcedVariations`, but it
+cannot pull a user into an experiment whose `urlPatterns` do not match the page.
+
+**Out of scope.** This SDK resolves the destination and stops there. It performs no navigation, and the browser-only
+parts of GrowthBook's auto-experiments — visual editor DOM mutations, injected CSS/JS, anti-flicker and cross-origin
+blocking — are not implemented.
+
+Accordingly, `getUrlRedirects()` evaluates redirect experiments only. A connection with "Enable Visual Editor
+experiments" turned on also ships those experiments in the same payload list; they are skipped *before* evaluation, so
+they never record an exposure for a change this SDK cannot apply. `getExperiments()` still returns the list as received.
+
+> **Note:** the GrowthBook API only sends redirect experiments to an SDK Connection with "Enable URL Redirect
+> experiments" turned on, and that option requires the SDK language to declare the `redirects` capability. Until the
+> Kotlin SDK is registered with it, supply the experiments yourself via `getUrlRedirects(experiments)`.
 
 ## Auto-tracking Plugin
 

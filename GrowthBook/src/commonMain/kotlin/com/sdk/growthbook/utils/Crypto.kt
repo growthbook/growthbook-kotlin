@@ -2,12 +2,15 @@ package com.sdk.growthbook.utils
 
 import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.GBContextualBandit
+import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.serializable_model.SerializableGBContextualBandit
+import com.sdk.growthbook.serializable_model.SerializableGBExperiment
 import com.sdk.growthbook.serializable_model.SerializableGBFeature
 import com.sdk.growthbook.serializable_model.gbDeserialize
 import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.DelicateCryptographyApi
 import dev.whyoleg.cryptography.algorithms.AES
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
@@ -152,5 +155,37 @@ fun getBanditsFromEncryptedBandits(
     throw c
 } catch (t: Throwable) {
     GB.error(errorMessage = "Crypto: failed to decrypt contextual bandits", throwable = t)
+    null
+}
+
+/**
+ * Decrypts the payload's `encryptedExperiments` — the auto-experiment list carrying URL-redirect
+ * and visual-editor experiments.
+ */
+fun getExperimentsFromEncryptedExperiments(
+    encryptedString: String,
+    encryptionKey: String,
+    subtleCrypto: Crypto? = null,
+): List<GBExperiment>? = try {
+    val parts = encryptedString.split(".")
+
+    val iv = decodeBase64(parts[0])
+    val key = decodeBase64(encryptionKey)
+    val stringToDecrypt = decodeBase64(parts[1])
+
+    val cryptoLocal = subtleCrypto ?: DefaultCrypto()
+
+    val decrypted = cryptoLocal.decrypt(stringToDecrypt, key, iv).decodeToString()
+    val jsonParser = Json { isLenient = true; ignoreUnknownKeys = true }
+    jsonParser
+        .decodeFromString(
+            ListSerializer(SerializableGBExperiment.serializer()),
+            decrypted
+        )
+        .map { it.gbDeserialize() }
+} catch (c: CancellationException) {
+    throw c
+} catch (t: Throwable) {
+    GB.error(errorMessage = "Crypto: failed to decrypt experiments", throwable = t)
     null
 }

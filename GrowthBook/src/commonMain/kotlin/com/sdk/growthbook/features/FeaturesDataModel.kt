@@ -1,6 +1,7 @@
 package com.sdk.growthbook.features
 
 import com.sdk.growthbook.model.GBContextualBandit
+import com.sdk.growthbook.model.GBExperiment
 import kotlinx.serialization.json.JsonObject
 import com.sdk.growthbook.model.gbSerialize
 import com.sdk.growthbook.utils.GBFeatures
@@ -21,7 +22,13 @@ data class FeaturesDataModel internal constructor(
     val savedGroups: JsonObject? = null,
     val encryptedSavedGroups: String? = null,
     val contextualBandits: Map<String, GBContextualBandit>? = null,
-    val encryptedContextualBandits: String? = null
+    val encryptedContextualBandits: String? = null,
+    /**
+     * Auto-experiments: URL-redirect (and, for browser SDKs, visual-editor) experiments. Only
+     * present when the SDK Connection has them enabled.
+     */
+    val experiments: List<GBExperiment>? = null,
+    val encryptedExperiments: String? = null
 )
 
 internal fun FeaturesDataModel.gbSerialize() =
@@ -31,5 +38,7 @@ internal fun FeaturesDataModel.gbSerialize() =
         savedGroups = savedGroups,
         encryptedSavedGroups = encryptedSavedGroups,
         contextualBandits = contextualBandits?.mapValues { it.value.gbSerialize() },
-        encryptedContextualBandits = encryptedContextualBandits
+        encryptedContextualBandits = encryptedContextualBandits,
+        experiments = experiments?.map { it.gbSerialize() },
+        encryptedExperiments = encryptedExperiments
     )
