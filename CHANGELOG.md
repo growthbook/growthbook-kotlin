@@ -63,6 +63,15 @@ where the corpus has no case for it, by a dedicated test suite.
   inside arrays and objects), `$eq` / `$ne`, `$in` / `$nin` and `$inGroup` / `$notInGroup` now compare numbers by
   value. `GBNumber`'s own `equals` is unchanged — this is a targeting rule, not a change to the value model. Large
   `$in` lists keep their constant-time lookup.
+- **Plain equality converts the attribute to the condition's type, as the reference SDK does.** A rule such as
+  `{"age": 25}` compares through `value * 1 === 25`, `{"id": "25"}` through `value + "" === "25"` and
+  `{"beta": true}` through `!!value === true`, so `{"age": 25}` now matches `"25"` and `{"beta": true}` matches `1`
+  or `"x"`. Values of different types never matched here. An absent attribute still never equals `false`, and the
+  string `"null"` now matches it, as in the reference SDK. Two numbers still compare exactly, so 19-digit ids are not
+  rounded into each other. This also fixes a primitive condition against an array or object attribute, which fell
+  through every branch and matched unconditionally: `{"t": "x"}` matched `t: ["y"]`. It now converts that attribute
+  too, so `["x"]` matches as `"x"` and an object never matches. The shared spec fixtures only pair different types
+  where the answer is false, which is why none of them caught this.
 - **`$exists` reads its value as JavaScript does.** The reference SDK treats the value in a boolean context, so
   `$exists: 1` asks for a present attribute and `$exists: 0` or `""` for an absent one. Only a JSON boolean was read
   here; any other value matched in neither direction. GrowthBook's UI only writes booleans, so this is reachable from

@@ -181,6 +181,60 @@ class EqualityOperatorTests {
         assertTrue(eval("""{"t": {"k": "v"}}""", """{"t": {"k": "v"}}"""))
     }
 
+    /**
+     * Plain equality converts the attribute to the condition's type, as the reference SDK does:
+     * `value + "" === condition`, `value * 1 === condition`, `!!value === condition`. The shared
+     * spec fixtures only pair different types where the answer is false, so this went unnoticed.
+     */
+    @Test
+    fun testPlainEqualityConvertsToAStringCondition() {
+        assertTrue(eval("""{"id": "25"}""", """{"id": 25}"""))
+        assertTrue(eval("""{"flag": "true"}""", """{"flag": true}"""))
+        assertTrue(eval("""{"c": "null"}""", """{"other": "x"}"""))
+        assertFalse(eval("""{"c": "US"}""", """{"other": "x"}"""))
+    }
+
+    @Test
+    fun testPlainEqualityConvertsToANumberCondition() {
+        assertTrue(eval("""{"age": 25}""", """{"age": "25"}"""))
+        assertTrue(eval("""{"age": 25}""", """{"age": " 25 "}"""))
+        assertTrue(eval("""{"n": 1}""", """{"n": true}"""))
+        assertTrue(eval("""{"n": 0}""", """{"other": "x"}"""))
+        assertFalse(eval("""{"age": 25}""", """{"age": "abc"}"""))
+    }
+
+    @Test
+    fun testPlainEqualityConvertsToABooleanCondition() {
+        assertTrue(eval("""{"beta": true}""", """{"beta": 1}"""))
+        assertTrue(eval("""{"beta": true}""", """{"beta": "x"}"""))
+        assertTrue(eval("""{"beta": false}""", """{"beta": 0}"""))
+        assertTrue(eval("""{"beta": false}""", """{"beta": ""}"""))
+        assertFalse(eval("""{"beta": true}""", """{"beta": 0}"""))
+        // `value !== null` comes first, so an absent attribute is never false-equal
+        assertFalse(eval("""{"beta": false}""", """{"other": "x"}"""))
+    }
+
+    /**
+     * An array or object attribute converts too: `["x"] + ""` is `"x"`, `[5] * 1` is 5, and an
+     * object's text is `"[object Object]"`. A primitive condition against such an attribute used to
+     * fall through every branch to the trailing `return true` and match unconditionally.
+     */
+    @Test
+    fun testPlainEqualityConvertsArrayAndObjectAttributes() {
+        assertTrue(eval("""{"t": "x"}""", """{"t": ["x"]}"""))
+        assertFalse(eval("""{"t": "x"}""", """{"t": ["y"]}"""))
+        assertTrue(eval("""{"t": 5}""", """{"t": [5]}"""))
+        assertFalse(eval("""{"t": 5}""", """{"t": {"k": 5}}"""))
+        assertFalse(eval("""{"t": "x"}""", """{"t": {"k": "x"}}"""))
+    }
+
+    /** Two numbers still compare exactly, so 19-digit ids are not rounded into each other. */
+    @Test
+    fun testPlainEqualityKeepsLargeIntegersExact() {
+        assertTrue(eval("""{"id": 1234567890123456789}""", """{"id": 1234567890123456789}"""))
+        assertFalse(eval("""{"id": 1234567890123456789}""", """{"id": 1234567890123456788}"""))
+    }
+
     @Test
     fun testPairIsAStrictInverseForNonPrimitiveAttributes() {
         assertStrictInverse("""["a"]""", """{"t": ["a"]}""", expectedEq = false)

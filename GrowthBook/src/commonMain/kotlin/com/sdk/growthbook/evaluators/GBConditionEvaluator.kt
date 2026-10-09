@@ -314,22 +314,33 @@ internal class GBConditionEvaluator {
         visited: Set<String> = emptySet()
     ): Boolean {
 
-        // Simple equality comparison with optional case-insensitivity
-        if (inSensitive && conditionValue is GBString && attributeValue is GBString) {
-            return conditionValue.value.equals(attributeValue.value, ignoreCase = true)
-        }
+        // A primitive condition converts the attribute to the condition's type before comparing,
+        // as the reference SDK does (`mongrule.ts`): `value + "" === condition` for a string,
+        // `value * 1 === condition` for a number, `!!value === condition` for a boolean. So
+        // `{"age": 25}` matches `"25"`, and `{"beta": true}` matches `1`.
+        val actual = attributeValue ?: GBNull
+        when (conditionValue) {
+            is GBString -> {
+                val text = actual.asJsText()
+                return if (inSensitive) {
+                    text.lowercase() == conditionValue.value.lowercase()
+                } else {
+                    text == conditionValue.value
+                }
+            }
 
-        // If conditionValue is a string, number, boolean, return true
-        // if it's "equal" to attributeValue and false if not.
-        if (
-            conditionValue.isPrimitiveValue() &&
-            (attributeValue == null || attributeValue.isPrimitiveValue())
-        ) {
-            return valueEquals(conditionValue, attributeValue)
-        }
+            // Two numbers keep the exact comparison, so ids past 2^53 are not rounded into each other
+            is GBNumber -> return if (actual is GBNumber) {
+                numberEquals(conditionValue, actual)
+            } else {
+                actual.asJsNumber() == conditionValue.value.toDouble()
+            }
 
-        if (conditionValue.isPrimitiveValue() && attributeValue == null) {
-            return false
+            is GBBoolean -> return actual != GBNull && actual.isJsTruthy() == conditionValue.value
+
+            GBNull -> return actual == GBNull
+
+            else -> Unit
         }
 
         // If conditionValue is array, return true if it's "equal" - "equal"
