@@ -518,7 +518,9 @@ class GrowthBookTrackingPlugin internal constructor(
          * keeps the two apart. Mirrors the TS plugin's `dedupeKeyAttributes`.
          */
         fun setDedupeKeyAttributes(keys: List<String>): Builder {
-            this.dedupeKeyAttributes = keys
+            // Copied: the caller may hold a mutable list, and mutating it afterwards would reshape
+            // the de-duplication key at runtime.
+            this.dedupeKeyAttributes = keys.toList()
             return this
         }
 
