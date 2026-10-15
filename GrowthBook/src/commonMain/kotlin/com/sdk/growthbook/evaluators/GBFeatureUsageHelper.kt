@@ -21,6 +21,11 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
  * path for a case that cannot change what the value *means*.
  *
  * Bounded by the number of distinct feature keys evaluated, like the reference implementation.
+ *
+ * There is deliberately no `reset()`. The history belongs to one user, and a user change publishes
+ * a whole new instance on the [com.sdk.growthbook.model.EvalSnapshot] instead of emptying this one
+ * — see [com.sdk.growthbook.model.EvalSnapshot.featureUsageHelper] for why clearing in place let a
+ * slow evaluation suppress the next user's first report.
  */
 @OptIn(ExperimentalAtomicApi::class)
 internal class GBFeatureUsageHelper {
@@ -49,10 +54,5 @@ internal class GBFeatureUsageHelper {
                 return true
             }
         }
-    }
-
-    /** Forgets everything reported so far, so the next evaluation of each feature reports again. */
-    fun reset() {
-        lastReported.store(emptyMap())
     }
 }

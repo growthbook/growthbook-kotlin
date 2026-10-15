@@ -51,15 +51,23 @@ class GBFeatureUsageHelperTests {
         assertFalse(helper.shouldReport("missing", GBNull))
     }
 
+    /**
+     * How a user change starts a fresh history: a new instance, not a cleared one. Writes to the
+     * instance the previous user's evaluations still hold must stay invisible to the replacement.
+     */
     @Test
-    fun resetMakesEveryKeyReportAgain() {
-        val helper = GBFeatureUsageHelper()
+    fun aFreshInstanceReportsEveryKeyAgainAndIsUnaffectedByTheOldOne() {
+        val previousUser = GBFeatureUsageHelper()
 
-        assertTrue(helper.shouldReport("flag", GBString("a")))
-        assertFalse(helper.shouldReport("flag", GBString("a")))
+        assertTrue(previousUser.shouldReport("flag", GBString("a")))
+        assertFalse(previousUser.shouldReport("flag", GBString("a")))
 
-        helper.reset()
+        val nextUser = GBFeatureUsageHelper()
 
-        assertTrue(helper.shouldReport("flag", GBString("a")))
+        // An evaluation that started before the change reports into the old history...
+        assertTrue(previousUser.shouldReport("flag", GBString("b")))
+        // ...and does not cost the next user their first report of that same value.
+        assertTrue(nextUser.shouldReport("flag", GBString("b")))
+        assertFalse(nextUser.shouldReport("flag", GBString("b")))
     }
 }

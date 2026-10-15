@@ -17,7 +17,6 @@ import com.sdk.growthbook.utils.Resource
 import com.sdk.growthbook.utils.getFeaturesFromEncryptedFeatures
 import com.sdk.growthbook.evaluators.GBExperimentHelper
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
-import com.sdk.growthbook.evaluators.GBFeatureUsageHelper
 import com.sdk.growthbook.evaluators.GBExperimentEvaluator
 import com.sdk.growthbook.evaluators.UserContext
 import com.sdk.growthbook.features.FeaturesDataModel
@@ -146,8 +145,10 @@ class GrowthBookSDK internal constructor(
     )
     private var remoteSourceFeaturesFetchResult: FeaturesFetchResult =
         FeaturesFetchResult.NoResultYet
+    // Counterpart of the feature-usage history on the EvalSnapshot, and deliberately not on it:
+    // its key carries hashAttribute/hashValue, so it tells users apart on its own and must survive
+    // a user change (A -> B -> A would otherwise re-fire A's exposure).
     private val gbExperimentHelper: GBExperimentHelper = GBExperimentHelper()
-    private val gbFeatureUsageHelper: GBFeatureUsageHelper = GBFeatureUsageHelper()
     private var subscriptions: MutableList<GBExperimentRunCallback> = mutableListOf()
     private var assigned: MutableMap<String, Pair<GBExperiment, GBExperimentResult>> =
         mutableMapOf()
@@ -318,8 +319,13 @@ class GrowthBookSDK internal constructor(
     fun close() {
         pluginRegistry?.closeAll()
         featuresViewModel.close()
-        // Release the per-feature usage history, mirroring the reference SDK's destroy().
-        gbFeatureUsageHelper.reset()
+        // Release the per-feature usage history, as the reference SDK's destroy() does. Its
+        // trackedExperiments counterpart is deliberately left alone: gbExperimentHelper holds a
+        // plain unsynchronized set read on the evaluation path, so clearing it while an evaluation
+        // is in flight would be a data race, bought for nothing — the instance is unusable after
+        // close(), so this is a memory release, not a semantic one. The usage history is safe to
+        // drop because it is swapped behind an AtomicReference.
+        gbContext.resetFeatureUsageHistory()
     }
 
     /**
@@ -746,12 +752,10 @@ class GrowthBookSDK internal constructor(
         // fresh read: with two setters racing, re-reading here would hand both observers the last
         // writer's attributes and lose the user that evaluations in between actually saw.
         if (published == null) return
-        // The next user's first evaluation of each feature is a fresh report, even when the value
-        // is the one the previous user saw. The reference SDK keeps its `trackedFeatureUsage` map
-        // across attribute changes and only clears it on destroy, which is why its own tracking
-        // plugin needs `dedupeKeyAttributes` to tell users apart; resetting here is a deliberate
-        // deviation that removes the failure at the source.
-        gbFeatureUsageHelper.reset()
+        // The feature-usage history is NOT reset here. The next user's empty history was published
+        // by the same CAS as these attributes (see EvalSnapshot.featureUsageHelper), which is what
+        // keeps an evaluation that started before the change from writing into it. Resetting from
+        // here instead would reopen exactly that race.
         pluginRegistry?.fireAttributesChanged(published)
     }
 
@@ -850,7 +854,7 @@ class GrowthBookSDK internal constructor(
 
     private fun createEvaluationContext(snapshot: EvalSnapshot = gbContext.evalSnapshot()) =
         createEvaluationContext(
-            gbContext, gbExperimentHelper, gbFeatureUsageHelper, snapshot, pluginRegistry
+            gbContext, gbExperimentHelper, snapshot, pluginRegistry
         )
 
     //@ThreadLocal
@@ -865,11 +869,11 @@ class GrowthBookSDK internal constructor(
         private fun createEvaluationContext(
             gbContext: GBContext,
             gbExperimentHelper: GBExperimentHelper,
-            gbFeatureUsageHelper: GBFeatureUsageHelper,
             // One atomic read of the whole shared state: features, savedGroups, attributes, forced
-            // features/variations, attribute overrides and the sticky-bucket docs come from the SAME
-            // snapshot, so the evaluation can never observe a torn mix (e.g. new features with stale
-            // sticky docs, or new attributes with old overrides). Callers pass the snapshot they read.
+            // features/variations, attribute overrides, the sticky-bucket docs and the feature-usage
+            // history come from the SAME snapshot, so the evaluation can never observe a torn mix
+            // (e.g. new features with stale sticky docs, or one user's attributes with another's
+            // usage history). Callers pass the snapshot they read.
             snapshot: EvalSnapshot,
             pluginRegistry: PluginRegistry?
         ): EvaluationContext {
@@ -878,7 +882,7 @@ class GrowthBookSDK internal constructor(
                 features = snapshot.features,
                 savedGroups = snapshot.savedGroups,
                 gbExperimentHelper = gbExperimentHelper,
-                gbFeatureUsageHelper = gbFeatureUsageHelper,
+                gbFeatureUsageHelper = snapshot.featureUsageHelper,
                 loggingEnabled = gbContext.enableLogging,
                 onFeatureUsage = gbContext.onFeatureUsage,
                 forcedVariations = snapshot.forcedVariations,

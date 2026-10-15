@@ -1,6 +1,10 @@
 package com.sdk.growthbook.tests.plugin
 
 import com.sdk.growthbook.GBSDKBuilder
+import com.sdk.growthbook.evaluators.EvaluationContext
+import com.sdk.growthbook.evaluators.GBExperimentHelper
+import com.sdk.growthbook.evaluators.GBFeatureEvaluator
+import com.sdk.growthbook.evaluators.UserContext
 import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
@@ -10,6 +14,7 @@ import com.sdk.growthbook.model.GBFeatureRule
 import com.sdk.growthbook.model.GBFeatureSource
 import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBValue
+import com.sdk.growthbook.model.StackContext
 import com.sdk.growthbook.plugin.GBTrackingEventNames
 import com.sdk.growthbook.plugin.tracking.AttributesChangeReceiver
 import com.sdk.growthbook.plugin.tracking.CustomEventReceiver
@@ -661,5 +666,63 @@ class PluginIntegrationTest {
         sdk.close()
 
         assertTrue(result.on, "evaluation must survive a throwing sink")
+    }
+
+    @Test
+    fun aStaleEvaluationDoesNotSuppressTheNextUsersFirstReport() {
+        // The interleaving a slow evaluation creates: it reads its snapshot before the user
+        // changes and reaches the usage gate after. Driving the evaluator with the snapshot
+        // captured beforehand reproduces it deterministically — that snapshot is exactly what
+        // such an evaluation still holds.
+        //
+        // The late report belongs to the previous user and is made, correctly, against the
+        // previous user's history. What must not happen is it landing in the *current* user's
+        // history, where it would suppress their first read of the same value for as long as the
+        // value stayed put.
+        val sinks = UsageSinks()
+        val sdk = sinks.build()
+
+        // The previous user's evaluation starts here.
+        val staleSnapshot = sdk.getGBContext().evalSnapshot()
+
+        sdk.setAttributes(mapOf("id" to GBString("u2")))
+
+        // ...and only now reaches getFeatureResult.
+        val staleReports = mutableListOf<GBValue?>()
+        GBFeatureEvaluator(
+            EvaluationContext(
+                enabled = true,
+                features = staleSnapshot.features,
+                savedGroups = staleSnapshot.savedGroups,
+                forcedVariations = staleSnapshot.forcedVariations,
+                trackingCallback = { _, _ -> },
+                gbExperimentHelper = GBExperimentHelper(),
+                gbFeatureUsageHelper = staleSnapshot.featureUsageHelper,
+                stickyBucketService = null,
+                loggingEnabled = false,
+                onFeatureUsage = { _, result -> staleReports.add(result.gbValue) },
+                userContext = UserContext(
+                    qaMode = false,
+                    attributes = staleSnapshot.attributes,
+                    stickyBucketAssignmentDocs = staleSnapshot.stickyBucketAssignmentDocs,
+                ),
+                stackContext = StackContext(null, mutableSetOf()),
+                pluginRegistry = null,
+            )
+        ).evaluateFeature("flag-a", staleSnapshot.attributeOverrides)
+
+        sdk.feature("flag-a")
+        sdk.close()
+
+        assertEquals(
+            listOf<GBValue?>(GBString("a")),
+            staleReports,
+            "the previous user's evaluation still reports",
+        )
+        assertEquals(
+            listOf<GBValue?>(GBString("a")),
+            sinks.callback,
+            "and does not cost the current user their first report of that value",
+        )
     }
 }

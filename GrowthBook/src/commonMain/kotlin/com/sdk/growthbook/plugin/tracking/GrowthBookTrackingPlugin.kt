@@ -178,6 +178,13 @@ class GrowthBookTrackingPlugin internal constructor(
      * clear is cheap and unconditional — an extra event costs a row, a dropped one costs an
      * exposure.
      *
+     * A clear is all this layer can do, and it is weaker than the SDK's own gate. The usage history
+     * on [com.sdk.growthbook.model.EvalSnapshot] is *swapped* per user, so an evaluation that began
+     * before the change writes into the previous user's history; this cache has no notion of whose
+     * event it holds, so the same late event does take a slot here and suppresses the next user's
+     * identical one. [Builder.setDedupeKeyAttributes] is the fix for that window — the late event
+     * carries the previous user's attributes and keys elsewhere.
+     *
      * `Experiment Viewed` would survive without this (it carries hashAttribute/hashValue), but the
      * cache is a single LRU, so it goes with the rest.
      */

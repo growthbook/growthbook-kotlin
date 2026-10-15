@@ -22,8 +22,11 @@ internal data class EvaluationContext(
     var forcedVariations: Map<String, Any>,
     val trackingCallback: GBTrackingCallback,
     val gbExperimentHelper: GBExperimentHelper,
-    // Instance-scoped, like gbExperimentHelper: usage is reported on a value change rather than on
-    // every evaluation, and the state that decides it must outlive the per-call context.
+    // User-scoped, unlike the instance-scoped gbExperimentHelper above: usage is reported on a value
+    // change rather than on every evaluation, so the state that decides it must outlive the per-call
+    // context but not the user. It comes off the same EvalSnapshot as userContext.attributes, which
+    // is what keeps an evaluation that started before a user change from writing into the next
+    // user's history (see EvalSnapshot.featureUsageHelper).
     val gbFeatureUsageHelper: GBFeatureUsageHelper,
     val stickyBucketService: GBStickyBucketService?,
     val onFeatureUsage: ((String, GBFeatureResult) -> Unit)?,
