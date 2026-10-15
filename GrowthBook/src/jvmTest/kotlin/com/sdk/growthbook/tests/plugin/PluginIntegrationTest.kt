@@ -18,12 +18,16 @@ import com.sdk.growthbook.model.StackContext
 import com.sdk.growthbook.plugin.GBTrackingEventNames
 import com.sdk.growthbook.plugin.tracking.AttributesChangeReceiver
 import com.sdk.growthbook.plugin.tracking.CustomEventReceiver
+import com.sdk.growthbook.plugin.tracking.FlushablePlugin
 import com.sdk.growthbook.plugin.tracking.GrowthBookPlugin
 import com.sdk.growthbook.tests.MockNetworkClient
 import com.sdk.growthbook.utils.GBTrackData
 import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class PluginIntegrationTest {
@@ -666,6 +670,80 @@ class PluginIntegrationTest {
         sdk.close()
 
         assertTrue(result.on, "evaluation must survive a throwing sink")
+    }
+
+    private class RecordingFlushable(private val fail: Boolean = false) :
+        GrowthBookPlugin, FlushablePlugin {
+        val flushes = AtomicInteger()
+        override suspend fun flush() {
+            flushes.incrementAndGet()
+            if (fail) throw RuntimeException("flush blew up")
+        }
+    }
+
+    @Test
+    fun sdkFlushDrainsEveryPluginThatOptedIn() = runBlocking {
+        // The point of the fan-out: a consumer who registered plugins through setPlugins(...) can
+        // drain them without having kept a reference to each one.
+        val first = RecordingFlushable()
+        val second = RecordingFlushable()
+        val sdk = buildSdk(plugins = listOf(first, second))
+
+        sdk.flush()
+        sdk.flush()
+        sdk.close()
+
+        assertEquals(2, first.flushes.get())
+        assertEquals(2, second.flushes.get())
+    }
+
+    @Test
+    fun sdkFlushSkipsPluginsThatDidNotOptIn() = runBlocking {
+        // A plugin with no buffer must not be dragged into the drain at all.
+        val plain = object : GrowthBookPlugin {
+            val calls = AtomicInteger()
+            override fun onFeatureEvaluated(featureKey: String, result: GBFeatureResult, attributes: Map<String, GBValue>?) {
+                calls.incrementAndGet()
+            }
+        }
+        val flushable = RecordingFlushable()
+        val sdk = buildSdk(plugins = listOf(plain, flushable))
+
+        sdk.flush()
+        sdk.close()
+
+        assertEquals(0, plain.calls.get(), "flush must not reach the evaluation callbacks")
+        assertEquals(1, flushable.flushes.get())
+    }
+
+    @Test
+    fun aThrowingFlushDoesNotCostTheOtherPluginsTheirs() = runBlocking {
+        // Same isolation the other fan-outs give: one plugin failing to send its buffer must not
+        // strand everyone else's.
+        val throwing = RecordingFlushable(fail = true)
+        val healthy = RecordingFlushable()
+        val sdk = buildSdk(plugins = listOf(throwing, healthy))
+
+        sdk.flush()
+        sdk.close()
+
+        assertEquals(1, throwing.flushes.get())
+        assertEquals(1, healthy.flushes.get(), "the throwing plugin must not block the next one")
+    }
+
+    @Test
+    fun aCancelledFlushPropagatesRatherThanBeingSwallowed() = runBlocking {
+        // Unlike the non-suspending fan-outs, this one can be cancelled with its caller. Treating
+        // that as a plugin failure would leave the caller's coroutine running past its cancel.
+        val cancelling = object : GrowthBookPlugin, FlushablePlugin {
+            override suspend fun flush() = throw CancellationException("caller went away")
+        }
+        val later = RecordingFlushable()
+        val sdk = buildSdk(plugins = listOf(cancelling, later))
+
+        assertFailsWith<CancellationException> { sdk.flush() }
+        assertEquals(0, later.flushes.get(), "cancellation stops the fan-out")
+        sdk.close()
     }
 
     @Test

@@ -55,7 +55,7 @@ import kotlin.time.Duration
 class GrowthBookTrackingPlugin internal constructor(
     private val options: TrackingOptions,
     private val coroutineScope: CoroutineScope = CoroutineScope(TrackingDispatcher)
-) : GrowthBookPlugin, CustomEventReceiver, AttributesChangeReceiver {
+) : GrowthBookPlugin, CustomEventReceiver, AttributesChangeReceiver, FlushablePlugin {
 
     /**
      * Builds the plugin from the frozen [TrackingPluginConfig]. Still functional, so existing code
@@ -255,11 +255,15 @@ class GrowthBookTrackingPlugin internal constructor(
      * is effectively single-worker, which is what keeps a flush from overtaking an event still being
      * enqueued (see [Builder.setCoroutineScope]).
      *
+     * Callable directly, as here, or through [com.sdk.growthbook.GrowthBookSDK.flush], which drains
+     * every registered [FlushablePlugin] at once — use that when the plugin went in through
+     * `setPlugins(...)` and no reference to it was kept.
+     *
      * The pending timer is cancelled *and* cleared rather than merely cancelled: [enqueue] only
      * starts a new one while `pendingFlush` is null, so leaving a dead job there would strand every
      * later event in the buffer until the next size-triggered flush.
      */
-    suspend fun flush() {
+    override suspend fun flush() {
         if (closed || disabled) return
         coroutineScope.launch {
             val toFlush = mutex.withLock {

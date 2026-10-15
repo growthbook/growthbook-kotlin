@@ -303,6 +303,29 @@ class GrowthBookSDK internal constructor(
         )
     }
 
+    /**
+     * Drains every registered plugin that implements
+     * [com.sdk.growthbook.plugin.tracking.FlushablePlugin] — the built-in
+     * [com.sdk.growthbook.plugin.tracking.GrowthBookTrackingPlugin] among them — and leaves them
+     * running, unlike [close].
+     *
+     * Call it when the app leaves the foreground: a process killed while backgrounded takes any
+     * buffered exposures with it, and nothing else covers that window. The SDK takes no dependency
+     * on any platform's lifecycle (the same reason [startPolling] / [stopPolling] are yours to
+     * call), so the moment is the host app's to pick — `ON_STOP` on Android via `lifecycleScope`,
+     * `applicationDidEnterBackground` or a `scenePhase` observer on Apple.
+     *
+     * Suspends until each plugin has handed its buffer to its transport, not until delivery; see
+     * [com.sdk.growthbook.plugin.tracking.FlushablePlugin.flush]. Plugins are drained in
+     * registration order and a plugin that throws cannot cost the others their flush.
+     *
+     * Not on [IGrowthBookSDK]: adding an abstract member to a public interface breaks every
+     * implementor, and a fake has nothing to drain. Same reasoning as [logEvent].
+     */
+    suspend fun flush() {
+        pluginRegistry?.flushAll()
+    }
+
     /** Stops background polling started by [startPolling]. Safe to call when not polling. */
     fun stopPolling() {
         featuresViewModel.stopPolling()
