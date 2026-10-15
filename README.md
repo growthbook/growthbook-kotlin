@@ -763,7 +763,10 @@ class App : Application(), DefaultLifecycleObserver {
         .setNetworkDispatcher(GBNetworkDispatcherKtor())
         .build()
 
-    override fun onStop(owner: LifecycleOwner) = tracking.flush()   // backgrounded, not dead
+    override fun onStop(owner: LifecycleOwner) {                    // backgrounded, not dead
+        owner.lifecycleScope.launch { tracking.flush() }
+    }
+
     override fun onTerminate() = tracking.close()
 }
 ```
@@ -773,9 +776,26 @@ The equivalent moment is `applicationDidEnterBackground` (or a `scenePhase` chan
 SDK does not: it takes no dependency on any platform's lifecycle, the same reason `startPolling` / `stopPolling` are
 yours to call. Hold the plugin in a field, as above, and pick the moment yourself.
 
-`flush()` is safe to call repeatedly and with an empty buffer, and it is a no-op after `close()`. It returns once the
-batch has been handed to the network layer, **not** once it has been delivered — no dispatcher reports delivery — so it
+`flush()` is a `suspend` function: it returns once the batch has been handed to the network layer, **not** once it has
+been delivered — no dispatcher reports delivery. Waiting for the hand-off is the point; a drain that merely schedules
+itself returns before the buffer has even been read, which against a process about to be killed is worth nothing. So it
 is worth something on the way into the background and nothing at all as the process is already dying.
+
+It is suspend rather than fire-and-forget so that not waiting is something you say explicitly — `scope.launch {
+plugin.flush() }` — and in your own scope rather than the plugin's. `ON_STOP` is not a suspend context, hence the
+`lifecycleScope` above; on Apple the function exports as `async`, so a `Task` inside `applicationDidEnterBackground` or
+a `scenePhase` observer calls it directly. Safe to call repeatedly and with an empty buffer, and a no-op after
+`close()`.
+
+If you registered the plugin through `setPlugins(...)` and kept no reference to it, call **`GrowthBookSDK.flush()`**
+instead: it drains every registered plugin implementing `FlushablePlugin` in registration order, with the same
+guarantee and the same per-plugin exception isolation as the evaluation callbacks.
+
+```kotlin
+override fun onStop(owner: LifecycleOwner) {
+    owner.lifecycleScope.launch { sdk.flush() }     // no reference to each plugin needed
+}
+```
 
 ### Turning off feature usage events
 
@@ -802,9 +822,11 @@ recomposition or a render loop produces one report for the first value and nothi
 moves. This gates all three sinks together — `setFeatureUsageCallback`, every plugin's `onFeatureEvaluated`, and the
 event logger (and so the tracking plugin's ingest path) — matching the reference SDK, which de-duplicates the same way.
 
-The history is per instance and is dropped when the user changes (`setAttributes` / `updateAttributes` and their
-`*Sync` variants) and on `close()`, so the next user's first read of a feature is always reported even when the value
-is the one the previous user saw.
+The history belongs to the user, not to the instance. A user change (`setAttributes` / `updateAttributes` and their
+`*Sync` variants) publishes a *new* history alongside the new attributes, in the same atomic swap the rest of the
+evaluation state uses; `close()` does the same. So the next user's first read of a feature is always reported even
+when the value is the one the previous user saw — and an evaluation that started before the change keeps writing to
+the history it started with, so it cannot suppress the new user's first report by finishing late.
 
 Two consequences worth knowing:
 
@@ -880,12 +902,20 @@ plugins, so adding one never costs another sink its events. It is invoked on the
 hand slow work to your own executor — and a logger that throws is logged and swallowed rather than surfacing to the
 caller or breaking evaluation.
 
-A custom plugin can receive custom events as typed callbacks by implementing `CustomEventReceiver` alongside
-`GrowthBookPlugin` — plugins that do not implement it are simply skipped. The same shape is used for
-`AttributesChangeReceiver`: implement it when your plugin holds per-user state, and `onAttributesChanged(attributes)`
-will fire whenever the instance starts serving a different user. Optional hooks are separate interfaces rather than new
-members on `GrowthBookPlugin` because Kotlin interfaces export to Objective-C with every member `@required`, so a new
-member would break existing Swift conformances even with a default body.
+Beyond `GrowthBookPlugin` itself there are three opt-in capability interfaces. Implement the ones your plugin needs
+alongside it; plugins that do not implement one are skipped for that hook entirely.
+
+| Interface | Implement it when | What you get |
+|---|---|---|
+| `CustomEventReceiver` | you want `logEvent(...)` calls | `onEvent(eventName, properties, attributes)` |
+| `AttributesChangeReceiver` | your plugin holds per-user state | `onAttributesChanged(attributes)` on a user change |
+| `FlushablePlugin` | your plugin buffers work | your `flush()` joins the `GrowthBookSDK.flush()` fan-out |
+
+They are separate interfaces rather than new members on `GrowthBookPlugin` because Kotlin interfaces export to
+Objective-C with every member `@required`, so a new member would break existing Swift conformances even with a default
+body — a brand-new interface breaks nobody. Every future optional hook follows the same shape. (This is the
+[Interface Segregation](https://en.wikipedia.org/wiki/Interface_segregation_principle) split the JDK makes between
+`Closeable` and `Flushable`, for the same reason: a plugin should not have to stub a hook it does not want.)
 
 > `logEvent` lives on `GrowthBookSDK`, not on `IGrowthBookSDK`: adding an abstract member would break every
 > implementor of that interface. Code written against the interface cannot log custom events, so hold the concrete type
@@ -900,8 +930,8 @@ evaluated it, so both are reset when the user changes:
 
 | Layer | Key | Reset on user change |
 |---|---|---|
-| SDK (see [Feature usage reporting](#feature-usage-reporting)) | feature key → last reported value | yes, synchronously |
-| Tracking plugin | event name + full properties, LRU of `setDedupeCacheSize(n)` | yes |
+| SDK (see [Feature usage reporting](#feature-usage-reporting)) | feature key → last reported value | yes — a fresh history is published with the new attributes |
+| Tracking plugin | event name + full properties, LRU of `setDedupeCacheSize(n)` | yes — the cache is cleared |
 
 A user change is `setAttributes` / `updateAttributes` or their `*Sync` variants actually changing the attribute map;
 re-setting an identical map is not one and leaves both layers alone. `setAttributeOverrides` is not one either — an
@@ -912,6 +942,13 @@ the one the previous user saw — no configuration needed. `setDedupeKeyAttribut
 reset does not cover: events still sitting in the plugin's buffer when the user switches, and `Experiment Viewed`
 (which already carries `hashAttribute` / `hashValue` in its properties, so it was never at risk). It is also what the
 JS plugin exposes, so a configuration written against that SDK keeps working here.
+
+The two layers differ in one respect. The SDK layer is swapped, not cleared, so an evaluation that began before the
+user changed reports into the previous user's history and cannot affect the new one. The plugin's cache is a single
+LRU with no notion of which user an event came from, so such a late event does take a slot in the cleared cache, and
+the new user's identical event is suppressed. `setDedupeKeyAttributes(listOf("id"))` closes that too: the late event
+carries the previous user's attributes, so it keys to a different slot. Worth setting if you switch users on a live
+instance while evaluations may be in flight.
 
 ```kotlin
 GrowthBookTrackingPlugin.Builder()

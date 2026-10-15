@@ -61,11 +61,22 @@ in a minor. See *Breaking changes* for what to check.
   `ON_STOP` on Android, `applicationDidEnterBackground` on Apple. The reference JS plugin hooks `visibilitychange` /
   `pagehide` itself; the SDK deliberately takes no dependency on any platform's lifecycle (the same reason
   `startPolling` / `stopPolling` are the consumer's to call), so it exposes the drain and the host app picks the moment.
-  Safe to call repeatedly, with an empty buffer, and after `close()` (a no-op). It returns once the batch reaches the
-  network layer, not once it is delivered — no dispatcher in the SDK reports delivery.
-  It is a plain method on the plugin rather than a third opt-in plugin interface: the consumer builds the plugin and so
-  already holds the type, and an interface earns its keep only once a second buffering plugin exists — at which point
-  adding one breaks nobody.
+  Safe to call repeatedly, with an empty buffer, and after `close()` (a no-op). It is a `suspend` function and returns
+  once the batch reaches the network layer, not once it is delivered — no dispatcher in the SDK reports delivery.
+  Waiting for the hand-off is the point: a fire-and-forget drain returns before the buffer has even been read, which
+  against a process about to be killed is worth nothing. Not waiting is therefore something the caller says explicitly
+  — `scope.launch { plugin.flush() }` — in their own scope rather than the plugin's. Android's `ON_STOP` is not a
+  suspend context, so go through `lifecycleScope`; on Apple the export is an `async` function.
+  - **`GrowthBookSDK.flush()`** drains every registered plugin that implements the new **`FlushablePlugin`**, in
+    registration order, so a consumer who passed plugins to `setPlugins(...)` does not have to keep a reference to each
+    one to drain it. Per-plugin exception isolation as everywhere else; `CancellationException` propagates rather than
+    being swallowed, since unlike the other fan-outs this one can be cancelled with its caller. The plugin's own
+    `flush()` stays directly callable. Not on `IGrowthBookSDK` — an abstract member breaks implementors, and a fake has
+    nothing to drain.
+  - `FlushablePlugin` is a third opt-in capability interface rather than a member on `GrowthBookPlugin`, for the reason
+    given for `CustomEventReceiver`: Kotlin interfaces export to Objective-C with every member `@required`, so adding
+    one would break existing Swift conformances even with a default body. It is also the sibling of
+    `GrowthBookPlugin.close()` — same drain, without ending the plugin — which is why the SDK now fans out both.
 - **Custom events.** `GrowthBookSDK.logEvent(eventName, properties)` sends your own analytics events through the same
   pipeline as exposures, closing the gap with the reference SDKs' `logEvent` / `log_event`. The instance's current
   attributes are attached automatically, and custom events are not de-duplicated, matching the JS plugin, which
@@ -98,6 +109,10 @@ in a minor. See *Breaking changes* for what to check.
     be suppressed as a duplicate of the previous user's and never reached the warehouse — the failure mode
     `setDedupeKeyAttributes` was added for. That option still matters (it separates users *within* the cache), but the
     default no longer loses an exposure.
+  - The plugin's cache can only be cleared, which is weaker than the SDK-level gate above: it holds no record of which
+    user an entry came from, so an evaluation finishing after the switch takes a slot in the freshly cleared cache and
+    suppresses the next user's identical event. `setDedupeKeyAttributes(listOf("id"))` covers that window, since the
+    late event carries the previous user's attributes.
 
 ### Changed
 - The tracking plugin's default ingest host is now `https://us-east-1.gb-ingest.com`, catching up with
@@ -105,6 +120,9 @@ in a minor. See *Breaking changes* for what to check.
   name across the SDK, the back end, the app and the docs. **Anyone who never set `ingestorHost` explicitly is now
   posting to a different hostname.** Both names address the us-east-1 region, so no configuration change is needed;
   override with `setIngestorHost(...)` if your Data Region is not us-east-1.
+  - `TrackingPluginConfig.DEFAULT_INGESTOR_HOST` is a `const val`, so its value is inlined into the bytecode of
+    anything that reads it. Code that referenced the constant explicitly keeps the old `us1.gb-ingest.com` string
+    until it is recompiled against this release; the SDK's own default resolves at runtime and is unaffected.
 
 ### Fixed
 - A throwing `trackingCallback` no longer costs plugins and the event logger a remote-eval exposure. On the `rule.tracks`
@@ -113,8 +131,10 @@ in a minor. See *Breaking changes* for what to check.
   The two are now separate, matching how `GBExperimentEvaluator`'s step 18 and `prepareResult` already handled it.
 
 ### Breaking changes
-Nothing here changes a signature; all three change what an existing call *means*, which is why this is a major rather
-than a minor. Recompilation is not enough — check the three behaviours below against what your code assumes.
+The first two change no signature at all — they change what an existing call *means*, which is what makes this a major
+rather than a minor: code written against 8.x keeps compiling and keeps running, it simply reports far less often, and
+nothing announces that. Recompilation is not enough; check both behaviours against what your code assumes. The third is
+an ordinary removal, caught by the compiler, and rides along.
 
 - **Feature usage is reported on a value change, not on every evaluation.** A feature read in a recomposition or a
   render loop reports once for its first value and stays quiet until the value actually moves. This gates all three
@@ -122,11 +142,13 @@ than a minor. Recompilation is not enough — check the three behaviours below a
   tracking plugin behind it — matching the reference SDK, which de-duplicates in exactly this place and gates the same
   set. **This is a silent behaviour change**: a callback used as a per-evaluation trace now fires far less often.
   Related notes:
-  - The history is per instance, keyed by feature key, and holds the last reported value. A value returning to an
-    earlier one reports again; a metadata-only change (same value, different rule or source) does not.
-  - It is dropped on a user change (`setAttributes` / `updateAttributes` and their `*Sync` variants) and on `close()`,
-    so the next user's first read is always reported. The reference SDK keeps its map across attribute changes and
-    clears it only on destroy — the deviation is deliberate, and removes the case its own tracking plugin needs
+  - The history is keyed by feature key and holds the last reported value. A value returning to an earlier one
+    reports again; a metadata-only change (same value, different rule or source) does not.
+  - It belongs to the user rather than to the instance. A user change (`setAttributes` / `updateAttributes` and their
+    `*Sync` variants) publishes a fresh history in the same atomic swap as the new attributes, so an evaluation that
+    started beforehand writes into the history it started with and cannot suppress the next user's first report by
+    finishing late. `close()` resets it too. The reference SDK keeps one instance-wide map across attribute changes
+    and clears it only on destroy — the deviation is deliberate, and removes the case its own tracking plugin needs
     `dedupeKeyAttributes` to work around.
   - Comparison is by `GBValue` equality rather than by serialized form, so a value alternating between `1` and `1.0`
     reports twice where the reference SDK reports once. Serializing on every evaluation to match would allocate on the
