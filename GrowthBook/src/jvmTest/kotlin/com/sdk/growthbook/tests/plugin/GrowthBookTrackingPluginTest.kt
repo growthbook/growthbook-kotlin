@@ -14,6 +14,7 @@ import com.sdk.growthbook.plugin.GBTrackingEventData
 import com.sdk.growthbook.plugin.GBTrackingEventNames
 import com.sdk.growthbook.plugin.TrackingPluginConfig
 import com.sdk.growthbook.network.TrackingNetworkDispatcher
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
@@ -202,7 +203,7 @@ class GrowthBookTrackingPluginTest {
     }
 
     @Test
-    fun flushSendsBufferedEventsAndLeavesThePluginUsable() {
+    fun flushSendsBufferedEventsAndLeavesThePluginUsable() = runBlocking {
         val dispatcher = CapturingDispatcher(expectedPosts = 2)
         // A timeout long enough that nothing but flush() can produce a batch.
         val plugin = plugin(dispatcher, batchSize = 100, batchTimeout = 60.seconds)
@@ -214,8 +215,10 @@ class GrowthBookTrackingPluginTest {
         plugin.onExperimentViewed(experiment("after_background"), experimentResult(1))
         plugin.flush()
 
-        assertNotNull(dispatcher.waitForPost(), "flush() should drain the buffer")
-        assertEquals(2, dispatcher.posts.size, "each flush() should send its own batch")
+        // No waiting: flush() suspends until the batch has reached the dispatcher, so the posts are
+        // already there. That is the guarantee the method exists for — a drain that merely schedules
+        // itself is worth nothing against a process about to be killed.
+        assertEquals(2, dispatcher.posts.size, "flush() must return only once the batch was sent")
         val experimentIds = dispatcher.posts.flatMap { batch ->
             (batch as JsonArray).map {
                 it.jsonObject["properties_json"]?.jsonObject?.get("experimentId")?.jsonPrimitive?.content
@@ -227,7 +230,7 @@ class GrowthBookTrackingPluginTest {
     }
 
     @Test
-    fun flushRearmsTheBatchTimerForLaterEvents() {
+    fun flushRearmsTheBatchTimerForLaterEvents() = runBlocking {
         val dispatcher = CapturingDispatcher(expectedPosts = 2)
         val plugin = plugin(dispatcher, batchSize = 100, batchTimeout = 300.milliseconds)
         plugin.init()
@@ -247,7 +250,7 @@ class GrowthBookTrackingPluginTest {
     }
 
     @Test
-    fun flushWithNothingBufferedSendsNothing() {
+    fun flushWithNothingBufferedSendsNothing() = runBlocking {
         val dispatcher = CapturingDispatcher()
         val plugin = plugin(dispatcher, batchSize = 100, batchTimeout = 60.seconds)
         plugin.init()
@@ -260,7 +263,7 @@ class GrowthBookTrackingPluginTest {
     }
 
     @Test
-    fun flushAfterCloseIsNoOp() {
+    fun flushAfterCloseIsNoOp() = runBlocking {
         val dispatcher = CapturingDispatcher()
         val plugin = plugin(dispatcher, batchSize = 100, batchTimeout = 60.seconds)
         plugin.init()
@@ -272,7 +275,7 @@ class GrowthBookTrackingPluginTest {
     }
 
     @Test
-    fun flushOnDisabledPluginSendsNothing() {
+    fun flushOnDisabledPluginSendsNothing() = runBlocking {
         val dispatcher = CapturingDispatcher()
         val plugin = plugin(dispatcher, enable = false, batchSize = 100, batchTimeout = 60.seconds)
         plugin.init()

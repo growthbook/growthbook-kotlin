@@ -238,20 +238,28 @@ class GrowthBookTrackingPlugin internal constructor(
      * reason `startPolling`/`stopPolling` are the consumer's to call), so the SDK exposes the drain
      * and the host app picks the moment.
      *
-     * Returns as soon as the batch has been handed to the network layer, **not** when it has been
-     * delivered — nothing in [com.sdk.growthbook.network.TrackingNetworkDispatcher] reports
-     * delivery. A process killed right after this returns can still lose the batch; calling it on
-     * the way into the background rather than as the process dies is what makes it worth anything.
+     * Suspends until the batch has been handed to
+     * [com.sdk.growthbook.network.TrackingNetworkDispatcher], **not** until it has been delivered —
+     * no dispatcher reports delivery. Waiting for the hand-off is the whole point: a fire-and-forget
+     * drain returns before the buffer has even been read, which against a process about to be killed
+     * is worth nothing. Call it on the way into the background rather than as the process dies.
      *
-     * Deliberately a plain method rather than another opt-in plugin interface: the plugin is built
-     * by the consumer, who therefore already holds this type. An interface would only earn its keep
-     * once a second buffering plugin exists, and adding one then breaks nobody.
+     * Suspend rather than a pair of blocking/awaiting variants: the operation has a completion worth
+     * waiting for, and a caller who does not want to wait says so explicitly with
+     * `scope.launch { plugin.flush() }` — which also makes it their scope rather than the plugin's.
+     * Android's `ON_STOP` is not a suspend context, so go through `lifecycleScope` there (see the
+     * README); on Apple the Objective-C export is an `async` function, usable straight from a `Task`
+     * in `applicationDidEnterBackground` / a `scenePhase` observer.
+     *
+     * The drain itself still runs on the plugin's scope rather than the caller's thread: that scope
+     * is effectively single-worker, which is what keeps a flush from overtaking an event still being
+     * enqueued (see [Builder.setCoroutineScope]).
      *
      * The pending timer is cancelled *and* cleared rather than merely cancelled: [enqueue] only
      * starts a new one while `pendingFlush` is null, so leaving a dead job there would strand every
      * later event in the buffer until the next size-triggered flush.
      */
-    fun flush() {
+    suspend fun flush() {
         if (closed || disabled) return
         coroutineScope.launch {
             val toFlush = mutex.withLock {
@@ -260,7 +268,7 @@ class GrowthBookTrackingPlugin internal constructor(
                 buffer.toList().also { buffer.clear() }
             }
             if (toFlush.isNotEmpty()) flushBatch(toFlush)
-        }
+        }.join()
     }
 
     override fun close() {
