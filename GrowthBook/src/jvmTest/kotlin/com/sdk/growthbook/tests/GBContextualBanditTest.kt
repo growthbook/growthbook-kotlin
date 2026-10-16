@@ -38,15 +38,8 @@ class GBContextualBanditTest {
     @Test
     fun testContextualBandits() {
         val failed = ArrayList<String>()
-        var skipped = 0
         for (item in cases) {
             if (item !is JsonArray) continue
-
-            // Kotlin (mobile-first) has no querystring/URL-based experiment override; skip that case.
-            if (item[0].jsonPrimitive.content == "querystring force overrides CB routing") {
-                skipped++
-                continue
-            }
 
             val testData = GBTestHelper.jsonParser
                 .decodeFromJsonElement(GBFeaturesTest.serializer(), item[1])
@@ -59,6 +52,7 @@ class GBContextualBanditTest {
                 contextualBandits = testData.contextualBandits?.mapValues { it.value.gbDeserialize() },
                 forcedVariations = testData.forcedVariations
                     ?.mapValues { it.value.jsonPrimitive.intOrNull ?: 0 } ?: emptyMap(),
+                url = testData.url,
                 qaMode = testData.qaMode,
                 enabled = testData.enabled,
             )
@@ -90,8 +84,8 @@ class GBContextualBanditTest {
                         "variationId=${actualExperimentResult?.variationId}")
             }
         }
-        println("CB TESTS: ${cases.size}, skipped(no URL override): $skipped, failed: ${failed.size}\n$failed")
-        assertTrue(failed.isEmpty())
+        println("CB TESTS: ${cases.size}, failed: ${failed.size}\n$failed")
+        assertTrue(failed.isEmpty(), failed.toString())
     }
 
     /**

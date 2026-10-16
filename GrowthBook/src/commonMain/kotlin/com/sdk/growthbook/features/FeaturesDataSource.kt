@@ -179,6 +179,9 @@ internal class FeaturesDataSource(
                 }
             )
             payload["forcedVariations"] = params.forcedVariations
+            // Always present, empty string when unset — `url: instance.getUrl()` in sdk-js, whose
+            // getUrl() falls back to "". The remote evaluator needs it to match urlPatterns.
+            payload["url"] = params.url ?: ""
         }
 
         if (gbContext.enableLogging) {

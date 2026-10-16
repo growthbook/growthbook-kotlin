@@ -6143,6 +6143,22 @@
       false
     ],
     [
+      "querystring force",
+      {
+        "attributes": {
+          "id": "1"
+        },
+        "url": "http://example.com?forced-test-qs=1#someanchor"
+      },
+      {
+        "key": "forced-test-qs",
+        "variations": [0, 1]
+      },
+      1,
+      true,
+      false
+    ],
+    [
       "run active experiments",
       {
         "attributes": {
@@ -6172,6 +6188,23 @@
       },
       0,
       false,
+      false
+    ],
+    [
+      "querystring force with inactive",
+      {
+        "attributes": {
+          "id": "1"
+        },
+        "url": "http://example.com/?my-test=1"
+      },
+      {
+        "key": "my-test",
+        "active": false,
+        "variations": [0, 1]
+      },
+      1,
+      true,
       false
     ],
     [

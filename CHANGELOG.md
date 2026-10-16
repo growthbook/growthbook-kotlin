@@ -6,6 +6,72 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [10.0.0] - Unreleased
+
+### Breaking changes
+- `GBExperiment` gains two constructor parameters, `urlPatterns` and `persistQueryString`. Source-compatible (both
+  default to `null`), but **binary-incompatible**: the constructor's JVM signature changed, so code compiled against
+  9.x must be recompiled. Nothing else about the type changed, and both fields now take part in
+  `equals`/`hashCode`/`copy()` as the rest of the experiment definition does.
+- `GBRemoteEvalParams` gains a fourth constructor parameter, `url` (defaulted to `null`). Same story: source-compatible,
+  binary-incompatible. It is the remote-eval request body, which application code does not normally construct.
+
+### Added
+- **URL targeting (`experiment.urlPatterns`).** An experiment can now be restricted to URLs matched by a set of
+  include/exclude rules — `simple` wildcard patterns or regular expressions — ported from the reference JS SDK
+  (`packages/sdk-js/src/util.ts`). Supply the page URL with `GBSDKBuilder.setUrl(...)` and `GrowthBookSDK.setUrl(...)`,
+  mirroring the reference SDKs — `run(experiment)` keeps its single-argument shape.
+    - The check sits ahead of the forced-variation check, matching the reference ordering: a forced variation must not
+      enrol a user — and fire an exposure — on a page the experiment was never meant to run on.
+    - An unrecognised targeting type never matches, so a future API type cannot fall through to `simple`.
+    - An experiment without `urlPatterns` is unaffected, and nothing changes if no URL is ever set.
+- **URL-redirect (split-URL) experiments.** `GrowthBookSDK.getUrlRedirects(...)` evaluates redirect experiments and
+  resolves the destination: the first enrolled experiment whose assigned variation carries a `urlRedirect` wins,
+  `persistQueryString` merges the original query string in, and a destination matched by the same patterns is treated as
+  "already there". Results carry the resolved URL as `GBUrlRedirectResult.urlWithParams`.
+    - The SDK computes the destination and nothing else. Performing the navigation is the application's job, and the
+      browser-only parts of GrowthBook's auto-experiments (visual-editor DOM mutations, injected CSS/JS, anti-flicker,
+      cross-origin blocking) are out of scope.
+    - Consequently only redirect experiments are evaluated; a non-redirect auto-experiment in the payload is skipped
+      *before* evaluation, never firing an exposure for a variation this SDK cannot apply. The reference SDK does the
+      same through `_isAutoExperimentBlockedByContext`. At most one result comes back, since evaluation stops at the
+      first redirect experiment the user is enrolled in.
+    - `persistQueryString` merging reproduces the query string rather than a de-duplicated view of it: the destination's
+      own parameters survive verbatim (a repeated key such as `?filter=red&filter=blue` stays whole), an empty key is a
+      legal pair, and from the original URL only the first pair per otherwise-unused key is carried over — the same
+      outcome as the reference's `has()`/`set()` pair on `URLSearchParams`.
+    - It optionally takes the URL directly (`getUrlRedirects(url = …)`), since resolving a redirect is a question about
+      one specific inbound address. This is a convenience, not a concurrency fix — the SDK holds one shared context, so
+      a single instance still evaluates for one user at a time.
+    - Unlike the reference SDKs there is no stateful `getRedirectUrl()`: caching the last resolved destination on the
+      SDK would be shared state that any concurrent call could overwrite between resolving and reading it.
+- The payload's auto-experiment list (`experiments` / `encryptedExperiments`) is now decoded, on the same terms as the
+  other encrypted fields, and published in the same single atomic update as features, saved groups and bandits.
+  `GrowthBookSDK.getExperiments()` exposes it, and `getUrlRedirects()` falls back to it when called with no argument.
+  Note that the GrowthBook API only sends *redirect* experiments to a connection whose SDK declares the `redirects`
+  capability; visual-editor experiments are gated on a connection setting instead, so the list is not redirect-only.
+- A `urlPatterns` entry the SDK cannot make sense of — an unknown `type`, or an explicit `null` `pattern`/`include` —
+  now degrades to a target that never matches, instead of aborting the decode of the whole payload and dropping every
+  feature to its code default. `GBUrlTarget.pattern` and `GBUrlTarget.include` are nullable for that reason; `null`
+  `include` counts as an include rule, as in the reference SDK, which excludes only on an explicit `false`.
+- **URL targeting works under `remoteEval`.** The page URL is now part of the `/api/eval` request body (`url`, always
+  present — an unset URL is sent as `""`, as in sdk-js), and `setUrl(...)` triggers a fresh remote evaluation, joining
+  `setAttributes` and friends. Without both, the remote evaluator matched every URL-targeted rule against no URL, so
+  none of them could ever match. A repeated `setUrl` with an unchanged value is a no-op, mirroring the reference SDK, so
+  navigation code that sets it unconditionally costs no extra round trip. The remote-eval cache key needs no change:
+  unlike JS/Python, this SDK bypasses the feature cache entirely in remote-eval mode.
+- **Querystring variation override.** A QA link such as `?my-experiment=1` now forces a variation, matching
+  `getQueryStringOverride` in the reference SDK. It takes precedence over `setForcedVariations` but cannot pull a user
+  into an experiment whose `urlPatterns` do not match. It has no effect until a URL is set, so existing setups are
+  unchanged. (This removes the README's previous note that the override was unimplemented.)
+- `GBExperiment.urlPatterns` and `GBExperiment.persistQueryString` describe a URL-targeted experiment. See the breaking
+  note above — they are constructor parameters, which is why this release is a major bump.
+
+The vendored `urlRedirect` and `getQueryStringOverride` conformance cases in `cases.json` now run instead of sitting
+unused, and the URL-matching suite lives in `commonTest` so it is exercised on JVM, Android, JS, wasmJs and Native —
+the URL parser is hand-rolled (Kotlin has no multiplatform `URL`) and the matching leans on platform `Regex`.
+
+---
 ## [9.0.0] - 2026-10-16
 
 A major because two public contracts change with no signature change and no compile error to

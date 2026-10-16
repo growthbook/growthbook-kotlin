@@ -6,6 +6,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import com.sdk.growthbook.utils.GBFilter
 import com.sdk.growthbook.utils.GBBucketRange
+import com.sdk.growthbook.utils.GBUrlTarget
 import com.sdk.growthbook.utils.GBVariationMeta
 import com.sdk.growthbook.utils.RangeSerializer
 import com.sdk.growthbook.utils.GBCondition
@@ -132,7 +133,19 @@ data class GBExperiment(
     /**
      * Any users with a sticky bucket version less than this will be excluded from the experiment
      */
-    val minBucketVersion: Int? = null
+    val minBucketVersion: Int? = null,
+
+    /**
+     * URL targeting rules. When set, the experiment only runs if the context URL is targeted by
+     * them — see [com.sdk.growthbook.GrowthBookSDK.setUrl].
+     */
+    val urlPatterns: List<GBUrlTarget>? = null,
+
+    /**
+     * For a URL-redirect experiment, whether the original URL's query string is carried over to the
+     * redirect target.
+     */
+    val persistQueryString: Boolean? = null
 ) {
     // One atomic publish: two @Volatile fields still tear regardless of write order.
     private val conditionGBCache = AtomicReference<ConditionGBCache?>(null)
@@ -150,11 +163,22 @@ data class GBExperiment(
         }
 
 
-    /** Set during evaluation when this experiment came from a contextual bandit rule. Transient. */
+    /**
+     * Set during evaluation when this experiment came from a contextual bandit rule, and read back
+     * a few frames later when the result is assembled.
+     *
+     * Deliberately *not* a constructor parameter, unlike [urlPatterns]: this is transient
+     * evaluation scratch rather than part of the experiment's definition. Its value is unknown at
+     * construction time (the leaf is chosen afterwards), it is never serialised, and putting it in
+     * the constructor would drag it into `equals`/`hashCode`/`copy`, making two otherwise identical
+     * experiments compare unequal because one happened to be routed through a bandit.
+     */
     internal var contextualBandit: CBContext? = null
 
     internal fun gbSerialize() =
         SerializableGBExperiment(
+            urlPatterns = urlPatterns,
+            persistQueryString = persistQueryString,
             key = key,
             meta = meta,
             seed = seed,

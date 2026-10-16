@@ -14,6 +14,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -190,6 +192,75 @@ data class GBVariationMeta(
 )
 
 /**
+ * How a [GBUrlTarget] pattern is matched against the page URL.
+ *
+ * [UNKNOWN] covers a type this SDK version does not recognise — a target carrying it never matches,
+ * so a future API targeting type can never silently behave like [SIMPLE] and enrol users into an
+ * experiment that was not meant to run.
+ */
+@Serializable(with = GBUrlTargetTypeSerializer::class)
+enum class GBUrlTargetType {
+    SIMPLE,
+    REGEX,
+    UNKNOWN,
+}
+
+internal object GBUrlTargetTypeSerializer : KSerializer<GBUrlTargetType> {
+
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("GBUrlTargetType", PrimitiveKind.STRING)
+
+    override fun deserialize(decoder: Decoder): GBUrlTargetType =
+        when (decoder.decodeString().lowercase()) {
+            "simple" -> GBUrlTargetType.SIMPLE
+            "regex" -> GBUrlTargetType.REGEX
+            else -> GBUrlTargetType.UNKNOWN
+        }
+
+    override fun serialize(encoder: Encoder, value: GBUrlTargetType) =
+        encoder.encodeString(
+            when (value) {
+                GBUrlTargetType.SIMPLE -> "simple"
+                GBUrlTargetType.REGEX -> "regex"
+                GBUrlTargetType.UNKNOWN -> ""
+            }
+        )
+}
+
+/**
+ * A single URL targeting rule of `experiment.urlPatterns`.
+ *
+ * A URL is targeted when no exclude rule matches and either at least one include rule matches or
+ * there are no include rules at all.
+ *
+ * Every field is nullable so that a malformed target degrades on its own, as the reference SDK's
+ * does: the parser rejects an explicit JSON `null` for a non-nullable property, and that error
+ * aborts the decode of the *whole* payload — one bad target would drop every feature to its code
+ * default. A target that cannot be understood simply never matches.
+ */
+@Serializable
+data class GBUrlTarget(
+
+    /**
+     * How [pattern] is matched. Null when the payload omitted it; such a target never matches.
+     */
+    val type: GBUrlTargetType? = null,
+
+    /**
+     * The pattern to match against the page URL — a wildcard pattern for [GBUrlTargetType.SIMPLE],
+     * a regular expression for [GBUrlTargetType.REGEX]. Null when the payload omitted it, or sent
+     * an explicit `null`; such a target never matches.
+     */
+    val pattern: String? = null,
+
+    /**
+     * True for an include rule, false for an exclude rule. Null counts as an include rule, matching
+     * the reference SDK, which only treats an explicit `false` as exclusion.
+     */
+    val include: Boolean? = null,
+)
+
+/**
  * Used for remote feature evaluation to trigger the TrackingCallback. An object with 2 properties
  */
 data class GBTrackData(
@@ -277,7 +348,14 @@ data class GBRemoteEvalParams(
     /**
      * Force specific experiments to always assign a specific variation (used for QA)
      */
-    val forcedVariations: Map<String, Any>
+    val forcedVariations: Map<String, Any>,
+
+    /**
+     * The page URL the remote evaluator matches `experiment.urlPatterns` against, as set by
+     * [com.sdk.growthbook.GrowthBookSDK.setUrl]. Without it the remote side evaluates every
+     * URL-targeted rule with no URL, so none of them can match.
+     */
+    val url: String? = null
 )
 
 /**

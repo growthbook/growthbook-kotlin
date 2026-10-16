@@ -92,6 +92,7 @@ class GBExperimentRunTests {
                         qaMode = gbContext.qaMode,
                         attributes = gbContext.attributes,
                         stickyBucketAssignmentDocs = gbContext.stickyBucketAssignmentDocs,
+                        url = testContext.url,
                     ),
                     stackContext = StackContext(null, mutableSetOf()),
                     pluginRegistry = null
@@ -104,13 +105,17 @@ class GBExperimentRunTests {
                 )
 
                 val resultJsonElement = result.value.gbSerialize()
+                // hashUsed is asserted too: a forced assignment (querystring, forcedVariations) must
+                // report false, which is what distinguishes it from a hashed one in the warehouse.
                 val status =
-                    item[0].toString() + "\nExpected Result - " + item[3] + " & " + item[4] +
+                    item[0].toString() +
+                        "\nExpected Result - " + item[3] + " & " + item[4] + " & " + item[5] +
                         "\nActual result - " + resultJsonElement.toString() + " & " +
-                        result.inExperiment + "\n\n"
+                        result.inExperiment + " & " + (result.hashUsed ?: false) + "\n\n"
 
                 if (item[3].toString() == resultJsonElement.toString()
                     && item[4].toString() == result.inExperiment.toString()
+                    && item[5].toString() == (result.hashUsed ?: false).toString()
                 ) {
                     passedScenarios.add(status)
                 } else {
@@ -164,6 +169,7 @@ class GBExperimentRunTests {
                     attributes = attributes,
                     qaMode = testContext.qaMode,
                     stickyBucketAssignmentDocs = null,
+                    url = testContext.url,
                 ),
                 stackContext = StackContext(null, mutableSetOf()),
                 pluginRegistry = null

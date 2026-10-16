@@ -8,6 +8,7 @@ import kotlinx.serialization.json.JsonElement
 import com.sdk.growthbook.utils.GBFilter
 import com.sdk.growthbook.utils.GBCondition
 import com.sdk.growthbook.utils.GBBucketRange
+import com.sdk.growthbook.utils.GBUrlTarget
 import com.sdk.growthbook.utils.RangeSerializer
 import com.sdk.growthbook.utils.GBVariationMeta
 import com.sdk.growthbook.utils.GBParentConditionInterface
@@ -130,7 +131,18 @@ data class SerializableGBExperiment internal constructor(
     /**
      * Any users with a sticky bucket version less than this will be excluded from the experiment
      */
-    val minBucketVersion: Int? = null
+    val minBucketVersion: Int? = null,
+
+    /**
+     * URL targeting rules. When present, the experiment only runs if the context URL is targeted.
+     */
+    val urlPatterns: List<GBUrlTarget>? = null,
+
+    /**
+     * For a URL-redirect experiment, whether the original URL's query string is carried over to the
+     * redirect target.
+     */
+    val persistQueryString: Boolean? = null
 )
 
 internal fun SerializableGBExperiment.gbDeserialize() =
@@ -156,4 +168,6 @@ internal fun SerializableGBExperiment.gbDeserialize() =
         fallBackAttribute = fallBackAttribute,
         disableStickyBucketing = disableStickyBucketing,
         variations = variations.map { GBValue.from(it) },
+        urlPatterns = urlPatterns,
+        persistQueryString = persistQueryString,
     )

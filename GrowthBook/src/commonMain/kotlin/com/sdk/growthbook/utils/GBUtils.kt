@@ -428,6 +428,18 @@ internal class GBUtils {
                     }
                 }
             }
+
+            // Auto-experiments (URL redirects) live at the payload root rather than inside a
+            // feature, so their identifiers have to be registered here too — otherwise
+            // getUrlRedirects() evaluates them with no sticky docs loaded and re-buckets the user
+            // on every session, sending them to a different destination than last time.
+            val experiments = data?.experiments ?: context.experiments ?: emptyList()
+            experiments.forEach { experiment ->
+                attributes.add(experiment.hashAttribute ?: "id")
+                experiment.fallBackAttribute?.let { fallbackAttribute ->
+                    attributes.add(fallbackAttribute)
+                }
+            }
             return attributes.toList()
         }
 
