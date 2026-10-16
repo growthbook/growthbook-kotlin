@@ -28,13 +28,13 @@ repositories {
 
 dependencies {
     // Add GrowthBook module:
-    implementation 'io.growthbook.sdk:GrowthBook:7.9.0'
+    implementation 'io.growthbook.sdk:GrowthBook:8.0.0'
 
     // Add Network Dispatcher you prefer:
     // 1) NetworkDispatcherKtor — supports Android, iOS, JVM, JS, Wasm
-    implementation 'io.growthbook.sdk:NetworkDispatcherKtor:1.2.0'
+    implementation 'io.growthbook.sdk:NetworkDispatcherKtor:1.3.0'
     // 2) NetworkDispatcherOkHttp — supports Android and JVM only
-    implementation 'io.growthbook.sdk:NetworkDispatcherOkHttp:1.1.1'
+    implementation 'io.growthbook.sdk:NetworkDispatcherOkHttp:1.2.0'
 }
 ```
 
@@ -65,7 +65,7 @@ all within the Growth Book App without deploying code changes to your site.
 ```kotlin
 var sdkInstance: GrowthBookSDK = GBSDKBuilder(
     apiKey = <API_KEY>,
-    hostURL = <GrowthBook_URL>,
+    apiHost = <GrowthBook_URL>,
     attributes = < Hashmap >,
     trackingCallback = { gbExperiment, gbExperimentResult -> },
     encryptionKey = <String?>,
@@ -100,7 +100,7 @@ val bundledFeatures: GBFeatures = mapOf(
 
 var sdkInstance: GrowthBookSDK = GBSDKBuilder(
     apiKey = <API_KEY>,
-    hostURL = <GrowthBook_URL>,
+    apiHost = <GrowthBook_URL>,
     attributes = hashMapOf(),
     trackingCallback = { _, _ -> },
     networkDispatcher = GBNetworkDispatcherKtor(),
@@ -122,7 +122,7 @@ at build time.
 ```kotlin
 var sdkInstance: GrowthBookSDK = GBSDKBuilder(
     apiKey = <API_KEY>,
-    hostURL = <GrowthBook_URL>,
+    apiHost = <GrowthBook_URL>,
     attributes = hashMapOf(),
     trackingCallback = { _, _ -> },
     encryptionKey = <String?>, // used to decrypt the seed's encrypted* fields too
@@ -154,7 +154,7 @@ class MyCachingLayer : GBCachingLayer {
 
 var sdkInstance: GrowthBookSDK = GBSDKBuilder(
     apiKey = <API_KEY>,
-    hostURL = <GrowthBook_URL>,
+    apiHost = <GrowthBook_URL>,
     attributes = hashMapOf(),
     trackingCallback = { _, _ -> },
     networkDispatcher = GBNetworkDispatcherKtor(),
@@ -172,7 +172,7 @@ By default the SDK refetches features from the network on every `initialize()`. 
 ```kotlin
 var sdkInstance: GrowthBookSDK = GBSDKBuilder(
     apiKey = <API_KEY>,
-    hostURL = <GrowthBook_URL>,
+    apiHost = <GrowthBook_URL>,
     attributes = hashMapOf(),
     trackingCallback = { _, _ -> },
     networkDispatcher = GBNetworkDispatcherKtor(),
@@ -452,7 +452,7 @@ targets. It adds typed feature accessors, fallback strategies, a typed `Flag<T>`
 API, and DSLs for attributes and SDK configuration.
 
 ```groovy
-implementation 'io.growthbook.sdk:GrowthBookExt:1.0.0'
+implementation 'io.growthbook.sdk:GrowthBookExt:2.0.0'
 ```
 
 ### Typed feature accessors
@@ -668,7 +668,7 @@ exact leaf and weight generation that produced it:
 ```kotlin
 val sdkInstance = GBSDKBuilder(
     apiKey = <API_KEY>,
-    hostURL = <GrowthBook_URL>,
+    apiHost = <GrowthBook_URL>,
     attributes = mapOf("id" to GBString("user-123"), "country" to GBString("UA")),
     trackingCallback = { experiment, result ->
         analytics.track(

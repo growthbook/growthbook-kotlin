@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
-## [9.0.0] - Unreleased
+## [9.0.0] - 2026-10-16
 
 A major because two public contracts change with no signature change and no compile error to
 announce them: **feature usage is reported on a value change rather than on every evaluation**, and
