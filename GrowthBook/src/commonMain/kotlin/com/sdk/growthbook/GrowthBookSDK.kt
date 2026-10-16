@@ -36,6 +36,7 @@ import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.kotlinx.serialization.from
 import com.sdk.growthbook.logger.GB
+import com.sdk.growthbook.plugin.GBEventDispatch
 import com.sdk.growthbook.plugin.tracking.PluginRegistry
 import com.sdk.growthbook.model.GBContextualBandit
 import com.sdk.growthbook.model.StackContext
@@ -54,6 +55,26 @@ import kotlin.time.Duration.Companion.milliseconds
 typealias GBTrackingCallback = (GBExperiment, GBExperimentResult) -> Unit
 typealias GBFeatureUsageCallback = (featureKey: String, gbFeatureResult: GBFeatureResult) -> Unit
 typealias GBExperimentRunCallback = (GBExperiment, GBExperimentResult) -> Unit
+
+/**
+ * Receives every event the SDK produces as one structured stream: `Experiment Viewed` and
+ * `Feature Evaluated` from evaluation, and whatever [GrowthBookSDK.logEvent] is called with.
+ * Registered with [GBSDKBuilder.setEventLogger].
+ *
+ * Event names are the [com.sdk.growthbook.plugin.GBTrackingEventNames] constants and the property
+ * keys of the two built-in events match the other GrowthBook SDKs, so one sink can feed a
+ * warehouse without per-SDK mapping. It fires *in addition to* `trackingCallback`,
+ * [GBSDKBuilder.setFeatureUsageCallback] and any registered plugins — none of them replace each
+ * other.
+ *
+ * Invoked on the evaluating thread. Return quickly and hand slow work (network, disk) to your own
+ * executor; a thrown exception is logged and swallowed.
+ */
+typealias GBEventLogger = (
+    eventName: String,
+    properties: Map<String, GBValue>,
+    attributes: Map<String, GBValue>?
+) -> Unit
 
 /**
  * The main export of the libraries is a simple GrowthBook wrapper class
@@ -124,6 +145,9 @@ class GrowthBookSDK internal constructor(
     )
     private var remoteSourceFeaturesFetchResult: FeaturesFetchResult =
         FeaturesFetchResult.NoResultYet
+    // Counterpart of the feature-usage history on the EvalSnapshot, and deliberately not on it:
+    // its key carries hashAttribute/hashValue, so it tells users apart on its own and must survive
+    // a user change (A -> B -> A would otherwise re-fire A's exposure).
     private val gbExperimentHelper: GBExperimentHelper = GBExperimentHelper()
     private var subscriptions: MutableList<GBExperimentRunCallback> = mutableListOf()
     private var assigned: MutableMap<String, Pair<GBExperiment, GBExperimentResult>> =
@@ -247,6 +271,61 @@ class GrowthBookSDK internal constructor(
         }
     }
 
+    /**
+     * Logs a custom analytics event through the same pipeline the SDK's own events use: the
+     * [GBSDKBuilder.setEventLogger] sink, and every registered plugin that implements
+     * [com.sdk.growthbook.plugin.tracking.CustomEventReceiver] — including the built-in
+     * [com.sdk.growthbook.plugin.tracking.GrowthBookTrackingPlugin], which batches it to the ingest
+     * endpoint alongside exposures. Mirrors the reference JS SDK's `logEvent`.
+     *
+     * The instance's current attributes are attached automatically, so the event lands with the
+     * same identity as an evaluation made at the same moment. Custom events are not de-duplicated:
+     * logging the same event twice means it happened twice.
+     *
+     * The one exception, which follows the JS plugin: de-duplication branches on the event *name*
+     * alone, so naming a custom event after one of the SDK's own —
+     * [com.sdk.growthbook.plugin.GBTrackingEventNames.FEATURE_EVALUATED] or
+     * [com.sdk.growthbook.plugin.GBTrackingEventNames.EXPERIMENT_VIEWED] — puts it under their LRU
+     * and a repeat with identical properties is dropped. Pick a different name if every call must
+     * be recorded.
+     *
+     * Returns immediately — delivery is the logger's/plugin's concern — and never throws: a
+     * failing consumer callback is logged and swallowed, exactly as evaluation callbacks are, so
+     * analytics can't take down the caller.
+     */
+    fun logEvent(eventName: String, properties: Map<String, GBValue> = emptyMap()) {
+        GBEventDispatch.customEvent(
+            plugins = pluginRegistry,
+            eventLogger = gbContext.eventLogger,
+            eventName = eventName,
+            properties = properties,
+            attributes = gbContext.evalSnapshot().attributes,
+        )
+    }
+
+    /**
+     * Drains every registered plugin that implements
+     * [com.sdk.growthbook.plugin.tracking.FlushablePlugin] — the built-in
+     * [com.sdk.growthbook.plugin.tracking.GrowthBookTrackingPlugin] among them — and leaves them
+     * running, unlike [close].
+     *
+     * Call it when the app leaves the foreground: a process killed while backgrounded takes any
+     * buffered exposures with it, and nothing else covers that window. The SDK takes no dependency
+     * on any platform's lifecycle (the same reason [startPolling] / [stopPolling] are yours to
+     * call), so the moment is the host app's to pick — `ON_STOP` on Android via `lifecycleScope`,
+     * `applicationDidEnterBackground` or a `scenePhase` observer on Apple.
+     *
+     * Suspends until each plugin has handed its buffer to its transport, not until delivery; see
+     * [com.sdk.growthbook.plugin.tracking.FlushablePlugin.flush]. Plugins are drained in
+     * registration order and a plugin that throws cannot cost the others their flush.
+     *
+     * Not on [IGrowthBookSDK]: adding an abstract member to a public interface breaks every
+     * implementor, and a fake has nothing to drain. Same reasoning as [logEvent].
+     */
+    suspend fun flush() {
+        pluginRegistry?.flushAll()
+    }
+
     /** Stops background polling started by [startPolling]. Safe to call when not polling. */
     fun stopPolling() {
         featuresViewModel.stopPolling()
@@ -263,6 +342,13 @@ class GrowthBookSDK internal constructor(
     fun close() {
         pluginRegistry?.closeAll()
         featuresViewModel.close()
+        // Release the per-feature usage history, as the reference SDK's destroy() does. Its
+        // trackedExperiments counterpart is deliberately left alone: gbExperimentHelper holds a
+        // plain unsynchronized set read on the evaluation path, so clearing it while an evaluation
+        // is in flight would be a data race, bought for nothing — the instance is unusable after
+        // close(), so this is a memory release, not a semantic one. The usage history is safe to
+        // drop because it is swapped behind an AtomicReference.
+        gbContext.resetFeatureUsageHistory()
     }
 
     /**
@@ -521,7 +607,7 @@ class GrowthBookSDK internal constructor(
     override fun setAttributes(attributes: Map<String, GBValue>) {
         // Single atomic update so a concurrent feature()/run() never sees the new attributes paired
         // with the previous user's stale sticky docs (the docs are repopulated by the refresh below).
-        gbContext.setAttributesClearingStickyDocs(attributes)
+        notifyAttributesChanged(gbContext.setAttributesClearingStickyDocs(attributes))
         refreshStickyBucketService()
         refreshForRemoteEval()
     }
@@ -541,7 +627,7 @@ class GrowthBookSDK internal constructor(
     fun updateAttributes(attributes: Map<String, GBValue>) {
         // Merge inside the context's atomic CAS loop (not read-then-setAttributes), so two concurrent
         // updateAttributes calls can't lose each other's keys. Side effects mirror setAttributes.
-        gbContext.mergeAttributesClearingStickyDocs(attributes)
+        notifyAttributesChanged(gbContext.mergeAttributesClearingStickyDocs(attributes))
         refreshStickyBucketService()
         refreshForRemoteEval()
     }
@@ -562,7 +648,7 @@ class GrowthBookSDK internal constructor(
      * ```
      */
     override suspend fun setAttributesSync(attributes: Map<String, GBValue>) {
-        gbContext.attributes = attributes
+        notifyAttributesChanged(gbContext.setAttributesReportingChange(attributes))
 
         if (gbContext.stickyBucketService != null) {
             refreshStickyBuckets(
@@ -584,7 +670,7 @@ class GrowthBookSDK internal constructor(
      */
     suspend fun updateAttributesSync(attributes: Map<String, GBValue>) {
         // Atomic merge (see updateAttributes); side effects mirror setAttributesSync.
-        gbContext.mergeAttributes(attributes)
+        notifyAttributesChanged(gbContext.mergeAttributes(attributes))
 
         if (gbContext.stickyBucketService != null) {
             refreshStickyBuckets(
@@ -673,6 +759,27 @@ class GrowthBookSDK internal constructor(
                 GB.error("GrowthBook: Failed to refresh sticky buckets on payload ready: ${e.message}", e)
             }
         }
+    }
+
+    /**
+     * Tells plugins that the instance now serves a different user, so the ones holding per-user
+     * state can reset it. Fires only when the attributes actually changed — the attribute setters
+     * are commonly called with an unchanged map on every screen, and a plugin that resets a
+     * de-duplication cache on each of those would re-send events it correctly suppressed.
+     *
+     * Deliberately not fired for [setAttributeOverrides]: overrides adjust sticky-bucket
+     * identity for the *same* user, they do not make it a different one.
+     */
+    private fun notifyAttributesChanged(published: Map<String, GBValue>?) {
+        // Null means the write changed nothing. The map is the one the winning CAS published, not a
+        // fresh read: with two setters racing, re-reading here would hand both observers the last
+        // writer's attributes and lose the user that evaluations in between actually saw.
+        if (published == null) return
+        // The feature-usage history is NOT reset here. The next user's empty history was published
+        // by the same CAS as these attributes (see EvalSnapshot.featureUsageHelper), which is what
+        // keeps an evaluation that started before the change from writing into it. Resetting from
+        // here instead would reopen exactly that race.
+        pluginRegistry?.fireAttributesChanged(published)
     }
 
     private fun refreshStickyBucketService(dataModel: FeaturesDataModel? = null) {
@@ -769,7 +876,9 @@ class GrowthBookSDK internal constructor(
     }
 
     private fun createEvaluationContext(snapshot: EvalSnapshot = gbContext.evalSnapshot()) =
-        createEvaluationContext(gbContext, gbExperimentHelper, snapshot, pluginRegistry)
+        createEvaluationContext(
+            gbContext, gbExperimentHelper, snapshot, pluginRegistry
+        )
 
     //@ThreadLocal
     internal companion object {
@@ -784,9 +893,10 @@ class GrowthBookSDK internal constructor(
             gbContext: GBContext,
             gbExperimentHelper: GBExperimentHelper,
             // One atomic read of the whole shared state: features, savedGroups, attributes, forced
-            // features/variations, attribute overrides and the sticky-bucket docs come from the SAME
-            // snapshot, so the evaluation can never observe a torn mix (e.g. new features with stale
-            // sticky docs, or new attributes with old overrides). Callers pass the snapshot they read.
+            // features/variations, attribute overrides, the sticky-bucket docs and the feature-usage
+            // history come from the SAME snapshot, so the evaluation can never observe a torn mix
+            // (e.g. new features with stale sticky docs, or one user's attributes with another's
+            // usage history). Callers pass the snapshot they read.
             snapshot: EvalSnapshot,
             pluginRegistry: PluginRegistry?
         ): EvaluationContext {
@@ -795,6 +905,7 @@ class GrowthBookSDK internal constructor(
                 features = snapshot.features,
                 savedGroups = snapshot.savedGroups,
                 gbExperimentHelper = gbExperimentHelper,
+                gbFeatureUsageHelper = snapshot.featureUsageHelper,
                 loggingEnabled = gbContext.enableLogging,
                 onFeatureUsage = gbContext.onFeatureUsage,
                 forcedVariations = snapshot.forcedVariations,
@@ -813,6 +924,7 @@ class GrowthBookSDK internal constructor(
                 },
                 stackContext = StackContext(null, mutableSetOf()),
                 pluginRegistry = pluginRegistry,
+                eventLogger = gbContext.eventLogger,
                 contextualBandits = snapshot.contextualBandits
             )
         }
