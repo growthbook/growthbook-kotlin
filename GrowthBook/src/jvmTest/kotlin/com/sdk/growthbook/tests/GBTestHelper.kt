@@ -3,6 +3,7 @@ package com.sdk.growthbook.tests
 import com.sdk.growthbook.evaluators.UserContext
 import com.sdk.growthbook.evaluators.EvaluationContext
 import com.sdk.growthbook.evaluators.GBExperimentHelper
+import com.sdk.growthbook.evaluators.GBFeatureUsageHelper
 import com.sdk.growthbook.model.GBContextualBandit
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.model.GBValue
@@ -117,6 +118,7 @@ class GBTestHelper {
                 forcedVariations = forcedVariations,
                 stickyBucketService = stickyBucketService,
                 gbExperimentHelper = GBExperimentHelper(),
+                gbFeatureUsageHelper = GBFeatureUsageHelper(),
                 userContext = UserContext(
                     qaMode = qaMode,
                     attributes = attributes,

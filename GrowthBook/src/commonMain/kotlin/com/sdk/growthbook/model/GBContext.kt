@@ -2,7 +2,9 @@
 
 package com.sdk.growthbook.model
 
+import com.sdk.growthbook.GBEventLogger
 import com.sdk.growthbook.GBTrackingCallback
+import com.sdk.growthbook.evaluators.GBFeatureUsageHelper
 import com.sdk.growthbook.plugin.tracking.GrowthBookPlugin
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.utils.GBStickyAssignmentsDocument
@@ -31,7 +33,31 @@ internal data class EvalSnapshot(
     val stickyBucketAssignmentDocs: StickyBucketAssignmentDocsType? = null,
     val stickyBucketIdentifierAttributes: List<String>? = null,
     val savedGroups: Map<String, GBValue>? = null,
-    val contextualBandits: Map<String, GBContextualBandit>? = null
+    val contextualBandits: Map<String, GBContextualBandit>? = null,
+    /**
+     * Per-feature usage history for the user these [attributes] describe.
+     *
+     * The only mutable object on the snapshot, and it is here rather than beside it on [GBContext]
+     * for the reason the whole snapshot exists: an evaluation must not pair one user's attributes
+     * with another user's history. A user change swaps in a *fresh* helper through the same CAS
+     * that publishes the new attributes (see [GBContext.mutateReportingAttributeChange]), so the
+     * two can never be read apart.
+     *
+     * Swapping rather than resetting in place is what makes a slow evaluation safe. An evaluation
+     * that started before the user changed still holds the previous helper through its
+     * [com.sdk.growthbook.evaluators.EvaluationContext]; it reports against — and writes into —
+     * that now-orphaned history, which no one reads again. Resetting a shared helper instead let
+     * the late write land in the *new* user's history and suppress their first report of the same
+     * value, for as long as that value stayed put. Deliberately unlike the reference SDK, which
+     * keeps one instance-wide map (`trackedFeatureUsage`, GrowthBook.ts) and compensates in its
+     * tracking plugin with `dedupeKeyAttributes`.
+     *
+     * [com.sdk.growthbook.evaluators.GBExperimentHelper] stays off the snapshot on purpose: its key
+     * already carries `hashAttribute`/`hashValue`, so it distinguishes users by itself, and handing
+     * it a fresh instance per user change would re-fire an exposure the previous history correctly
+     * remembered (A -> B -> A).
+     */
+    val featureUsageHelper: GBFeatureUsageHelper = GBFeatureUsageHelper()
 )
 
 /**
@@ -131,6 +157,13 @@ class GBContext internal constructor(
      * merely documented.
      */
     val plugins: List<GrowthBookPlugin>? = null,
+
+    /**
+     * Structured sink for every event the SDK produces — the two evaluation events and explicit
+     * [com.sdk.growthbook.GrowthBookSDK.logEvent] calls. Set via
+     * [com.sdk.growthbook.GBSDKBuilder.setEventLogger].
+     */
+    val eventLogger: GBEventLogger? = null,
 ) {
 
     // Single source of truth for all cross-thread-shared evaluation inputs.
@@ -158,11 +191,60 @@ class GBContext internal constructor(
     }
 
     /**
-     * Map of user attributes that are used to assign variations
+     * [mutate] for the attribute writes, returning the attributes this write published, or null
+     * when it changed nothing.
+     *
+     * Both the verdict and the map come off the same CAS iteration that won, so they describe the
+     * write that happened rather than a state sampled around it: two concurrent writers would
+     * otherwise each compare against — and hand observers — a map neither of them published.
+     * Callers notify observers only on a real change (see
+     * [com.sdk.growthbook.GrowthBookSDK.setAttributes]); re-setting the same map must stay silent.
+     *
+     * A real change also starts the next user's [EvalSnapshot.featureUsageHelper], in this same
+     * swap: the new attributes and the empty history they belong to become visible to readers as
+     * one value, so no evaluation can pair the two users. The helper is built inside the loop
+     * because it has to be part of the snapshot the CAS publishes — a losing iteration throws its
+     * instance away, which costs an allocation only under write contention on a user change.
      */
-    internal var attributes: Map<String, GBValue>
+    private fun mutateReportingAttributeChange(
+        transform: (EvalSnapshot) -> EvalSnapshot
+    ): Map<String, GBValue>? {
+        while (true) {
+            val current = state.load()
+            val transformed = transform(current)
+            val changed = current.attributes != transformed.attributes
+            val next = if (changed) {
+                transformed.copy(featureUsageHelper = GBFeatureUsageHelper())
+            } else {
+                transformed
+            }
+            if (state.compareAndSet(current, next)) {
+                return if (changed) next.attributes else null
+            }
+        }
+    }
+
+    /**
+     * Drops the feature-usage history, so every feature reports again on its next evaluation.
+     *
+     * Only [com.sdk.growthbook.GrowthBookSDK.close] needs this — a user change gets a fresh history
+     * from [mutateReportingAttributeChange] as part of publishing the new attributes. Swaps in a new
+     * helper rather than clearing the current one for the same reason: an evaluation still in flight
+     * holds the old instance and must not be able to write into the replacement.
+     */
+    internal fun resetFeatureUsageHistory() =
+        mutate { it.copy(featureUsageHelper = GBFeatureUsageHelper()) }
+
+    /**
+     * Map of user attributes that are used to assign variations.
+     *
+     * Read-only on purpose. A plain setter here would write through [mutate], which publishes the
+     * new attributes while leaving the previous user's [EvalSnapshot.featureUsageHelper] and
+     * skipping the change report the plugins need — the exact pair of bugs the dedicated writers
+     * below exist to prevent. Every attribute write goes through one of them.
+     */
+    internal val attributes: Map<String, GBValue>
         get() = state.load().attributes
-        set(value) = mutate { it.copy(attributes = value) }
 
     /**
      * Force specific experiments to always assign a specific variation (used for QA)
@@ -200,29 +282,45 @@ class GBContext internal constructor(
      * Atomically replace the user [attributes] and clear the sticky-bucket docs in a single update.
      * Done as one swap (not two separate writes) so a concurrent reader never observes the new
      * attributes paired with the previous user's stale sticky docs.
+     *
+     * @return the attributes this write published, or null when nothing changed.
      */
-    internal fun setAttributesClearingStickyDocs(attributes: Map<String, GBValue>) = mutate {
-        it.copy(attributes = attributes, stickyBucketAssignmentDocs = null)
-    }
+    internal fun setAttributesClearingStickyDocs(attributes: Map<String, GBValue>) =
+        mutateReportingAttributeChange {
+            it.copy(attributes = attributes, stickyBucketAssignmentDocs = null)
+        }
+
+    /**
+     * Atomically replace the user [attributes], leaving the sticky-bucket docs alone — the caller
+     * (`setAttributesSync`) awaits a sticky refresh of its own right after.
+     *
+     * @return the attributes this write published, or null when nothing changed.
+     */
+    internal fun setAttributesReportingChange(attributes: Map<String, GBValue>) =
+        mutateReportingAttributeChange { it.copy(attributes = attributes) }
 
     /**
      * Atomically shallow-merge [attributes] into the current attributes (new keys added, existing
      * overwritten, others preserved). The read-merge-write happens inside the CAS loop, so two
      * concurrent merges can never lose each other's keys — unlike a read-then-[attributes]-set from
      * the caller. Mirrors the intent of [setAttributesClearingStickyDocs] for the merge case.
+     *
+     * @return the attributes this write published, or null when nothing changed.
      */
-    internal fun mergeAttributesClearingStickyDocs(attributes: Map<String, GBValue>) = mutate {
-        it.copy(attributes = it.attributes + attributes, stickyBucketAssignmentDocs = null)
-    }
+    internal fun mergeAttributesClearingStickyDocs(attributes: Map<String, GBValue>) =
+        mutateReportingAttributeChange {
+            it.copy(attributes = it.attributes + attributes, stickyBucketAssignmentDocs = null)
+        }
 
     /**
      * Atomically shallow-merge [attributes] into the current attributes without touching the
      * sticky-bucket docs (mirrors the plain [attributes] setter used by `setAttributesSync`). The
      * merge is inside the CAS loop, so concurrent merges never lose keys.
+     *
+     * @return the attributes this write published, or null when nothing changed.
      */
-    internal fun mergeAttributes(attributes: Map<String, GBValue>) = mutate {
-        it.copy(attributes = it.attributes + attributes)
-    }
+    internal fun mergeAttributes(attributes: Map<String, GBValue>) =
+        mutateReportingAttributeChange { it.copy(attributes = it.attributes + attributes) }
 
     /**
      * Atomically publish a freshly decoded payload: [features], [savedGroups] and [contextualBandits]

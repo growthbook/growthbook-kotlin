@@ -66,6 +66,7 @@ class FakeGrowthBook : IGrowthBookSDK {
     private val forcedVariations: MutableMap<String, Int> = mutableMapOf()
     private var attributes: Map<String, GBValue> = emptyMap()
     private val queried: MutableList<String> = mutableListOf()
+    private val logged: MutableList<Pair<String, Map<String, GBValue>>> = mutableListOf()
 
     /** Forces [id] on by assigning it a boolean `true`. */
     fun enable(id: String): FakeGrowthBook = setValue(id, GBBoolean(true))
@@ -211,6 +212,20 @@ class FakeGrowthBook : IGrowthBookSDK {
 
     /** Feature keys queried via [feature]/[isOn]/[suspendFeature], in call order. */
     fun queriedFeatures(): List<String> = queried.toList()
+
+    /**
+     * Records a custom event instead of dispatching it, mirroring
+     * [com.sdk.growthbook.GrowthBookSDK.logEvent]. Assert on [loggedEvents].
+     */
+    fun logEvent(eventName: String, properties: Map<String, GBValue> = emptyMap()) {
+        logged.add(eventName to properties)
+    }
+
+    /** Events recorded via [logEvent], in call order, as `(eventName, properties)` pairs. */
+    fun loggedEvents(): List<Pair<String, Map<String, GBValue>>> = logged.toList()
+
+    /** Whether an event named [eventName] was logged via [logEvent]. */
+    fun wasLogged(eventName: String): Boolean = logged.any { it.first == eventName }
 
     /** Whether [id] was ever queried via [feature]/[isOn]/[suspendFeature]. */
     fun wasQueried(id: String): Boolean = id in queried

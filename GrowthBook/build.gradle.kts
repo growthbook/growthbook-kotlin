@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "8.1.0"
+version = "9.1.0"
 
 val generateSdkMeta by tasks.registering {
     val outputDir = layout.buildDirectory.dir("generated/sdk-meta/commonMain/kotlin")
@@ -169,6 +169,13 @@ android {
     buildTypes {
         debug {}
         release {}
+    }
+    testOptions {
+        // commonTest also runs as an Android unit test, where the android.jar on the classpath is
+        // stubbed: every method throws "not mocked" by default. Anything in commonTest that reaches
+        // the logger goes through android.util.Log and fails there for a reason unrelated to what is
+        // under test. Returning defaults instead makes those stubs inert.
+        unitTests.isReturnDefaultValues = true
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8

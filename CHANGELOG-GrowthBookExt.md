@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
-## [2.1.0] - Unreleased
+## [3.1.0] - Unreleased
 
 ### Fixed
 - Pinned the JVM toolchain to JDK 17 (`jvmToolchain(17)`) so the published `-jvm`
@@ -19,6 +19,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `UnsupportedClassVersionError`.
 
 ---
+
+## [3.0.0] - 2026-10-16
+
+`GrowthBookExt`'s own API only gains below. The major bump propagates the breaking changes in
+`GrowthBook` 9.0.0, which this artifact exposes as an `api` dependency — upgrading here pulls the
+new core in transitively, including the silent change to how feature usage is reported. See the
+[core changelog](CHANGELOG.md#900---unreleased).
+
+### Added
+- `eventLogger` in the configuration DSL, mirroring `GBSDKBuilder.setEventLogger`. Receives explicit
+  `GrowthBookSDK.logEvent` calls; see the [core changelog](CHANGELOG.md#900---unreleased).
+
+  ```kotlin
+  val sdk = growthBook {
+      apiKey = "sdk-abc"
+      networkDispatcher = GBNetworkDispatcherKtor()
+      eventLogger = { eventName, properties, _ -> analytics.track(eventName, properties) }
+  }
+  ```
+
+---
+
 ## [2.0.0] - 2026-08-26
 
 No changes to `GrowthBookExt` itself. The major bump propagates the breaking changes in

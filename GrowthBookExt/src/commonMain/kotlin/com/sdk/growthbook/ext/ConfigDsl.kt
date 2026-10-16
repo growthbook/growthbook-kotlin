@@ -1,5 +1,6 @@
 package com.sdk.growthbook.ext
 
+import com.sdk.growthbook.GBEventLogger
 import com.sdk.growthbook.GBFeatureUsageCallback
 import com.sdk.growthbook.GBSDKBuilder
 import com.sdk.growthbook.GBTrackingCallback
@@ -85,6 +86,13 @@ class GrowthBookConfigBuilder {
 
     /** Optional callback invoked when the set of feature definitions changes. */
     var featuresChangeHandler: GBFeaturesChangeHandler? = null
+
+    /**
+     * Optional structured sink for every event the SDK produces: `Experiment Viewed`,
+     * `Feature Evaluated` and explicit [com.sdk.growthbook.GrowthBookSDK.logEvent] calls. Fires in
+     * addition to [featureUsageCallback], [trackingCallback] and [plugins], never instead of them.
+     */
+    var eventLogger: GBEventLogger? = null
 
     /**
      * Plugins receiving lifecycle callbacks (init / experiment viewed / feature evaluated /
@@ -189,6 +197,7 @@ class GrowthBookConfigBuilder {
         refreshHandler?.let { builder.setRefreshHandler(it) }
         featuresChangeHandler?.let { builder.setFeaturesChangeHandler(it) }
         featureUsageCallback?.let { builder.setFeatureUsageCallback(it) }
+        eventLogger?.let { builder.setEventLogger(it) }
         cacheMaxAge?.let { builder.setCacheMaxAge(it) }
         cachingLayer?.let { builder.setCachingLayer(it) }
         if (plugins.isNotEmpty()) {

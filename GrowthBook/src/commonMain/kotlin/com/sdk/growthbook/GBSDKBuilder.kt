@@ -125,6 +125,7 @@ class GBSDKBuilder(
     // called, so setCachingLayer() and the sticky-bucket setters can be called in any order.
     private var stickyBucketServiceFactory: ((CachingLayer) -> GBStickyBucketService)? = null
     private var featureUsageCallback: GBFeatureUsageCallback? = null
+    private var eventLogger: GBEventLogger? = null
     private var plugins: List<GrowthBookPlugin>? = null
     private var initialFeatures: GBFeatures? = null
     private var initialPayloadJson: String? = null
@@ -324,6 +325,21 @@ class GBSDKBuilder(
     }
 
     /**
+     * Registers a single structured sink for **every** event the SDK produces — `Experiment Viewed`
+     * and `Feature Evaluated` from evaluation plus explicit [GrowthBookSDK.logEvent] calls — using
+     * the same event names and property keys as the JS/Java SDKs. Use it to feed your own analytics
+     * pipeline without writing a plugin.
+     *
+     * It fires *in addition to* [setFeatureUsageCallback], `trackingCallback` and the plugins
+     * registered via [setPlugins]; none of them replace each other, so a sink here and the built-in
+     * tracking plugin can coexist without either losing events.
+     */
+    fun setEventLogger(eventLogger: GBEventLogger): GBSDKBuilder {
+        this.eventLogger = eventLogger
+        return this
+    }
+
+    /**
      * Registers plugins that receive lifecycle callbacks: [GrowthBookPlugin.init],
      * [GrowthBookPlugin.onExperimentViewed], [GrowthBookPlugin.onFeatureEvaluated], and [GrowthBookPlugin.close].
      */
@@ -476,6 +492,7 @@ class GBSDKBuilder(
             stickyBucketService = stickyBucketService
                 ?: stickyBucketServiceFactory?.invoke(resolveCachingLayer()),
             plugins = plugins,
+            eventLogger = eventLogger,
         )
 
     private inner class WaitForCallCaseHelper(
