@@ -337,6 +337,8 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
                 isRemote: Boolean,
+                staleError: GBError?,
+                fromCache: Boolean,
             ) {
                 appliedFeatures = features
             }
@@ -436,6 +438,8 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
                 isRemote: Boolean,
+                staleError: GBError?,
+                fromCache: Boolean,
             ) {
                 features?.keys?.firstOrNull()?.let { appliedOrder.add(it) }
             }
@@ -508,6 +512,8 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
                 isRemote: Boolean,
+                staleError: GBError?,
+                fromCache: Boolean,
             ) {
                 features?.keys?.firstOrNull()?.let { committed.add(it) }
             }
@@ -583,6 +589,8 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
                 isRemote: Boolean,
+                staleError: GBError?,
+                fromCache: Boolean,
             ) = Unit
             override suspend fun onPayloadReady(model: FeaturesDataModel) = Unit
             override fun featuresFetchFailed(error: GBError, isRemote: Boolean) { failed = true }
@@ -1038,6 +1046,8 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
                 isRemote: Boolean,
+                staleError: GBError?,
+                fromCache: Boolean,
             ) = Unit
             override fun featuresFetchFailed(error: GBError, isRemote: Boolean) = Unit
             override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) = Unit
@@ -1168,6 +1178,8 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
                 isRemote: Boolean,
+                staleError: GBError?,
+                fromCache: Boolean,
             ) {
                 events += "featuresApplied"
             }
@@ -1290,6 +1302,8 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
                 isRemote: Boolean,
+                staleError: GBError?,
+                fromCache: Boolean,
             ) {
                 docsAtApplyTime = ctx.stickyBucketAssignmentDocs
             }
@@ -1332,6 +1346,8 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         savedGroups: JsonObject?,
         contextualBandits: Map<String, GBContextualBandit>?,
         isRemote: Boolean,
+        staleError: GBError?,
+        fromCache: Boolean,
     ) {
         isSuccess = true
         isError = false
