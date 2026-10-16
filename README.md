@@ -28,7 +28,7 @@ repositories {
 
 dependencies {
     // Add GrowthBook module:
-    implementation 'io.growthbook.sdk:GrowthBook:8.0.0'
+    implementation 'io.growthbook.sdk:GrowthBook:9.1.0'
 
     // Add Network Dispatcher you prefer:
     // 1) NetworkDispatcherKtor — supports Android, iOS, JVM, JS, Wasm
@@ -239,6 +239,76 @@ The poller is a coroutine (not a dedicated thread) on the SDK's background scope
 
 > **Mobile note:** the SDK cannot observe app lifecycle, so tie `startPolling()` / `stopPolling()` to your foreground/background transitions to avoid keeping the radio awake in the background. On mobile prefer SSE or the pull-on-access cache window (`setCacheMaxAge` / `setStaleTtl`); background polling is intended mainly for JVM/backend usage.
 
+#### Reactive feature updates (`featuresStateFlow` / `featureFlow`)
+
+Instead of polling `getFeatures()` yourself, you can observe features as a coroutine `Flow`. Both streams update on **every** feature change — network fetch, disk cache, `setInitialFeatures` seed, `setEncryptedFeatures`, and SSE.
+
+```kotlin
+// The whole feature map, as a StateFlow (current value always readable via .value):
+scope.launch {
+    sdk.featuresStateFlow.collect { features ->
+        // re-render, refresh derived state, etc.
+    }
+}
+
+// A single feature's evaluated result, de-duplicated:
+scope.launch {
+    sdk.featureFlow("new-checkout").collect { result ->
+        showNewCheckout(result.on)
+    }
+}
+```
+
+> **Reacts to every evaluation input:** `featureFlow(id)` re-evaluates whenever anything that can change the result changes — feature definitions **and** attributes, attribute overrides, forced features or saved groups — so it re-fires on its own after `setAttributes()` / `setAttributeOverrides()`.
+
+> **No analytics pollution:** the reactive re-evaluations pass through a fully silent evaluation — they fire **neither** the `featureUsageCallback` **nor** the experiment `trackingCallback`, so streaming a feature inflates neither usage analytics nor experiment exposures. Only explicit `feature(id)` access counts as usage and fires exposures.
+
+> **Apple/ObjC:** `featuresStateFlow` and `featureFlow(id)` are hidden from Objective-C/Swift (`@HiddenFromObjC`) because Kotlin `Flow` has no native ObjC representation. Apple consumers should read `getFeatures()` or bridge the flow with [SKIE](https://skie.touchlab.co/).
+
+You can also await a manual refresh instead of firing it and forgetting:
+
+```kotlin
+// Suspends until the network round completes; returns true on success. A 304 Not Modified counts
+// as success only once a payload is loaded (false if it arrives before any payload); false on a
+// failed round. In remote-eval mode it issues the personalized remote-eval POST (same path as
+// suspendFeature), so it never surfaces non-personalized definitions.
+val refreshed: Boolean = sdk.refreshCacheSuspend()
+```
+
+#### Experiment assignment changes (`subscribe`)
+
+`subscribe` notifies you when an experiment assignment **changes** — the variation differs from the last one reported for that experiment key, or the user entered or left the experiment. It works from Kotlin, Java and Swift alike.
+
+```kotlin
+val subscription = sdk.subscribe { experiment, result ->
+    // The variation this user is in has changed — re-render, or update an analytics user property:
+    analytics.setUserProperty("exp_${experiment.key}", result.variationId)
+}
+
+// In onDestroy / onDisappear:
+subscription.cancel()
+```
+
+It fires again whenever the assignment moves: after `setAttributes()` on login, a new payload from SSE or polling, or `setForcedVariations()`. It also fires when an experiment is still evaluated but now reports `inExperiment == false` — a user who no longer matches the targeting — so an applied variation can be rolled back. An experiment that is *stopped* and disappears from the payload raises no event, because nothing evaluates it any more.
+
+For diagnostics — a debug overlay, or attaching assignments to a crash report — read the whole picture at once:
+
+```kotlin
+val assignments: Map<String, Pair<GBExperiment, GBExperimentResult>> = sdk.getAllResults()
+```
+
+`subscribe` and `setTrackingCallback` share the exact same `(GBExperiment, GBExperimentResult)` signature, and `featureFlow(id)` is easy to reach for instead of either — but the three answer different questions:
+
+| | Question | Fires | Typical use |
+|---|---|---|---|
+| `setTrackingCallback` | "Have I already told analytics about this exposure?" | once per unique hashAttribute/hashValue/key/variation | sending `Experiment Viewed` |
+| `subscribe` | "Has what I'm showing changed?" | on every assignment change, including leaving the experiment | re-rendering, user properties, debug overlay |
+| `featureFlow(id)` | "What value should I render?" | on every change to any evaluation input | Compose / coroutine UI state |
+
+> **Observational, never a trigger:** `subscribe` reports the evaluations your app already performs — it re-evaluates nothing on its own. An experiment nothing has evaluated yet is never reported, and the silent re-evaluations behind `featureFlow` do not raise assignment events, so collecting a flow cannot announce a variation for a screen the user has not seen.
+
+> **Threading:** the callback runs synchronously on the thread that evaluated, like `setFeatureUsageCallback` — keep it short, don't block, and dispatch to the main thread yourself if you touch UI. A callback that throws is logged and ignored: it can neither break evaluation nor suppress the other subscribers.
+
 ## Usage
 
 - Initialization returns SDK instance - GrowthBookSDK
@@ -299,6 +369,22 @@ not of the requested type.
 
   ```kotlin
   fun refreshCache()
+  ```
+
+- refreshCacheSuspend is the coroutine variant of refreshCache: it awaits the network round and returns
+  `true` on success. A 304 Not Modified counts as success only once a payload has been loaded (the
+  cached payload stays valid); a 304 before any payload, or a failed round, returns `false`.
+
+  ```kotlin
+  suspend fun refreshCacheSuspend(): Boolean
+  ```
+
+- observe features reactively as a coroutine Flow (see the "Reactive feature updates" section above).
+  Both are hidden from Objective-C/Swift.
+
+  ```kotlin
+  val featuresStateFlow: StateFlow<GBFeatures>
+  fun featureFlow(id: String): Flow<GBFeatureResult>
   ```
 
 - use setRefreshHandler to set a callback that will be called whenever the cache is refreshed.

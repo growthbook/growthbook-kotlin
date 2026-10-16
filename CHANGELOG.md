@@ -6,6 +6,69 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [9.1.0] - Unreleased
+
+### Added
+- Reactive feature-observation API. `GrowthBookSDK.featuresStateFlow: StateFlow<GBFeatures>` exposes
+  the current feature map as a coroutine flow, and `GrowthBookSDK.featureFlow(id): Flow<GBFeatureResult>`
+  streams a single feature's evaluated result (de-duplicated via `distinctUntilChanged`). Both derive
+  from a single observable state snapshot on the context, so they can never diverge from the evaluated
+  state under concurrent writers. `featuresStateFlow` emits on every feature change — network fetch,
+  disk cache, `setInitialFeatures` seed, `setEncryptedFeatures`, and SSE. `featureFlow(id)`
+  re-evaluates on any change that can affect the result — feature definitions **and** attributes,
+  attribute overrides, forced features and saved groups — and its reactive re-evaluations use a fully
+  silent evaluation: they fire **neither** the `featureUsageCallback` **nor** the experiment
+  `trackingCallback`, do not notify registered `GrowthBookPlugin`s (so the built-in tracking plugin
+  sends nothing), and do not touch the tracking-dedup state. Observing a feature via the flow
+  therefore inflates neither usage analytics nor experiment exposures — only explicit `feature()`
+  access reports usage and fires exposures. Both are `@HiddenFromObjC` (Kotlin `Flow` has no native Objective-C
+  representation); Apple consumers read `getFeatures()` or bridge via SKIE.
+- **Experiment assignment subscriptions.** `IGrowthBookSDK.subscribe(callback): GBSubscription`
+  notifies a consumer when an experiment assignment *changes* — the variation differs from the last
+  one reported for that key, or the user entered or left the experiment — and
+  `GrowthBookSDK.getAllResults()` exposes the latest assignment per experiment key for diagnostics
+  (debug overlay, crash-report context). Matches the reference TS SDK's `subscribe` / `getAllResults`.
+  The registry, the previous-assignment memory and the dedup existed internally since earlier
+  releases but were unreachable: there was no way to register a callback, and the change check
+  guarded only the bookkeeping, not the callbacks, so every evaluation would have fired.
+    - Reported from both evaluation paths, matching the reference SDK: `run()` and — new — experiments
+      reached through a **feature rule**, which previously reported nothing. The assignment is
+      reported before the in-experiment check, so leaving an experiment is observable and an applied
+      variation can be rolled back.
+    - Purely observational: subscriptions report the evaluations the app already performs and trigger
+      none of their own. The silent re-evaluations behind `featureFlow(id)` do not report, so
+      collecting a flow neither announces a variation for a screen the user has not seen nor
+      suppresses the report for the evaluation that actually renders it.
+    - A subscription is keyed by an id rather than by callback identity, so subscribing the same
+      lambda twice yields two independent subscriptions (the reference TS SDK's `Set` collapses them,
+      letting one caller's cancel silently kill another's). `GBSubscription.cancel()` is idempotent,
+      and `close()` releases all subscriptions and recorded assignments.
+    - Thread-safe: the registry and the assignment history are immutable snapshots behind atomics
+      updated by CAS, so concurrent evaluations of the same experiment report it exactly once and a
+      subscription added during a fan-out cannot corrupt the iteration.
+    - Not to be confused with `setTrackingCallback`, which shares the signature but has the opposite
+      contract: tracking reports an **exposure**, deduped per unique
+      hashAttribute/hashValue/key/variation and therefore at most once; `subscribe` reports a
+      **change**, as often as the assignment moves.
+    - `subscribe` is added to `IGrowthBookSDK` with a default no-op body, so existing Kotlin and Java
+      implementors stay source- and binary-compatible. Note that Kotlin interfaces export to
+      Objective-C with every member `@required`: a **Swift** type conforming to `IGrowthBookSDK` does
+      not inherit the default and must implement it. `FakeGrowthBook` implements it for real, with one
+      deliberate difference from production — a throwing subscriber is not swallowed, so an assertion
+      inside a subscriber fails its test.
+- `GrowthBookSDK.refreshCacheSuspend(): Boolean` — coroutine variant of `refreshCache()` that awaits
+  the network round and returns `true` on success. A 304 Not Modified counts as success only when a
+  payload has already been loaded (cached payload stays valid); a 304 before any payload exists returns
+  `false`, as does a failed round. In remote-eval mode it issues the personalized remote-eval POST
+  (same path as `suspendFeature()`), so it never surfaces non-personalized definitions.
+
+### Companion artifacts
+- `GrowthBookTest` **3.1.0** — `FakeGrowthBook` implements `subscribe` and gains `getAllResults()`,
+  so assignment-driven UI code can be tested against the fake.
+- `Core`, `GrowthBookExt`, `GrowthBookKotlinxSerialization`, `NetworkDispatcherKtor` and
+  `NetworkDispatcherOkHttp` are unaffected and keep their current versions.
+
+---
 ## [9.0.0] - 2026-10-16
 
 A major because two public contracts change with no signature change and no compile error to

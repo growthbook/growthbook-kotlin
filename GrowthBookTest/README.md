@@ -101,6 +101,32 @@ evaluator would build: `key` is the *variation* key (`meta[index].key`, falling 
 index), and an index outside `experiment.variations` falls back to the baseline with
 `inExperiment = false` rather than reporting a result production cannot produce.
 
+### Assignment subscriptions
+
+`subscribe` behaves as it does in production — it reports an assignment the first
+time an experiment runs, and afterwards only when the variation or the
+in-experiment flag actually changes:
+
+```kotlin
+val gb = FakeGrowthBook()
+val seen = mutableListOf<Int>()
+val subscription = gb.subscribe { _, result -> seen.add(result.variationId) }
+
+gb.run(experiment)                          // reports variation 0
+gb.run(experiment)                          // unchanged -> silent
+gb.setForcedVariation("exp", 1)
+gb.run(experiment)                          // reports variation 1
+
+subscription.cancel()
+gb.getAllResults()                          // latest result per experiment key
+```
+
+Two differences from the real SDK, both deliberate: the fake evaluates no feature
+rules, so only `run` reports assignments (in production an experiment reached
+through a feature rule reports too); and a throwing subscriber is **not**
+swallowed, so an assertion made inside a subscriber fails its test instead of
+being logged and ignored.
+
 ### Interaction assertions
 
 ```kotlin

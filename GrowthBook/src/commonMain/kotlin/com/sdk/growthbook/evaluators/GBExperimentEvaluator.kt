@@ -470,9 +470,10 @@ internal class GBExperimentEvaluator(
             if (experimentMeta.size > targetVariationIndex)
                 experimentMeta[targetVariationIndex] else null
 
-        // Bandit metadata is gated to enrolled users here. Kotlin has no unconditional experiment-eval
-        // hook (cf. TS onExperimentEval), so we don't need to strip exp.contextualBandit. If such a hook
-        // is ever added, revisit: exp would leak bandit metadata for non-enrolled users.
+        // Bandit metadata is gated to enrolled users here. The experiment object carries it too, and
+        // it is handed to the onExperimentEval hook (subscriptions), so GBFeatureEvaluator strips
+        // exp.contextualBandit under the same condition right before invoking the hook — mirroring
+        // the reference SDK. Keep both gates in step.
         val cb = experiment.contextualBandit?.takeIf { hashUsed && inExperiment }
         return GBExperimentResult(
             inExperiment = inExperiment,
