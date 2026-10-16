@@ -18,6 +18,8 @@ import com.sdk.growthbook.model.GBNull
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBValue
+import com.sdk.growthbook.plugin.fireExperimentViewed
+import com.sdk.growthbook.plugin.fireFeatureEvaluated
 import com.sdk.growthbook.utils.GBTrackData
 import com.sdk.growthbook.utils.GBUtils
 import com.sdk.growthbook.utils.GBUtils.Companion.getAttributes
@@ -232,17 +234,22 @@ internal class GBFeatureEvaluator(
                                             track.experiment,
                                             track.result
                                         )
-                                        evaluationContext.pluginRegistry?.fireExperimentViewed(
-                                            track.experiment,
-                                            track.result,
-                                            evaluationContext.userContext.attributes
-                                        )
                                     } catch (e: Exception) {
                                         GB.error(
                                             "FeatureEvaluator: trackingCallback exception for '${featureKey}'",
                                             e
                                         )
                                     }
+                                    // Outside that try on purpose: isTracked() has already marked
+                                    // this exposure, so it is never offered again. Sharing the block
+                                    // means a throwing consumer callback costs the plugins and the
+                                    // event logger a remote-eval exposure permanently. Same split as
+                                    // GBExperimentEvaluator's step 18 and prepareResult below; the
+                                    // fan-out isolates each sink itself, so it needs no try here.
+                                    evaluationContext.fireExperimentViewed(
+                                        track.experiment,
+                                        track.result
+                                    )
                                 }
                             }
                         }
@@ -415,15 +422,33 @@ internal class GBFeatureEvaluator(
             experimentResult = experimentResult
         )
 
-        try {
-            evaluationContext.onFeatureUsage?.invoke(featureKey, gbFeatureResult)
-            evaluationContext.pluginRegistry?.fireFeatureEvaluated(
-                featureKey,
-                gbFeatureResult,
-                evaluationContext.userContext.attributes
-            )
-        } catch (e: Exception) {
-            GB.error("FeatureEvaluator: onFeatureUsage exception for '$featureKey'", e)
+        // A forced feature is a dev/QA override, not a real exposure: the value was handed to the
+        // SDK by the caller, so reporting it would attribute to the user a value they were never
+        // bucketed into — and the built-in tracking plugin would ship it to the ingest endpoint as
+        // a "Feature Evaluated" event. Mirrors the reference SDK, which skips the whole usage
+        // fan-out for `source === "override"` (core.ts, getFeatureResult). Only this source is
+        // skipped — unknownFeature, cyclicPrerequisite and the rule sources are genuine
+        // evaluations and still report.
+        //
+        // The override check comes first so a forced evaluation leaves no trace in the usage helper
+        // either: the reference SDK returns before touching `trackedFeatureUsage`, so un-forcing a
+        // feature whose real value equals the forced one still reports.
+        if (source != GBFeatureSource.override &&
+            evaluationContext.gbFeatureUsageHelper.shouldReport(featureKey, gbValue)
+        ) {
+            // Each sink is guarded separately. The value change is consumed by shouldReport above,
+            // so one throwing sink must not swallow the others' turn: they would never be told
+            // about this value again, not just miss this one call.
+            try {
+                evaluationContext.onFeatureUsage?.invoke(featureKey, gbFeatureResult)
+            } catch (e: Exception) {
+                GB.error("FeatureEvaluator: onFeatureUsage exception for '$featureKey'", e)
+            }
+            try {
+                evaluationContext.fireFeatureEvaluated(featureKey, gbFeatureResult)
+            } catch (e: Exception) {
+                GB.error("FeatureEvaluator: event dispatch failed for '$featureKey'", e)
+            }
         }
 
         return gbFeatureResult

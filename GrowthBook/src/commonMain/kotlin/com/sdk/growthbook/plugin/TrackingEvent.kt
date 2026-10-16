@@ -5,14 +5,14 @@ import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBFeatureSource
+import com.sdk.growthbook.model.GBArray
 import com.sdk.growthbook.model.GBJson
+import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.plugin.tracking.SdkMetadata
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -22,68 +22,89 @@ import kotlinx.serialization.json.put
  *
  * [payload] is the exact JSON sent on the wire (TS `EventPayload` shape). [dedupeKey] is internal —
  * non-null only for the auto-tracked feature/experiment events; it is never serialized.
+ *
+ * Internal: [payload] is a `kotlinx.serialization` type, and the SDK does not expose those in its
+ * public API. Nothing public ever accepted or returned this class, so it stays where it belongs —
+ * inside the plugin's wire path. The event names callers may legitimately need are published
+ * separately as [GBTrackingEventNames].
  */
-data class TrackingEvent(
+internal data class TrackingEvent(
     val payload: JsonObject,
     val dedupeKey: String? = null,
 ) {
     companion object {
-        const val EVENT_EXPERIMENT_VIEWED = "Experiment Viewed"
-        const val EVENT_FEATURE_EVALUATED = "Feature Evaluated"
+        const val EVENT_EXPERIMENT_VIEWED = GBTrackingEventNames.EXPERIMENT_VIEWED
+        const val EVENT_FEATURE_EVALUATED = GBTrackingEventNames.FEATURE_EVALUATED
 
         private val TOP_LEVEL_ATTR_KEYS = setOf(
             "user_id", "device_id", "anonymous_id", "id", "page_id", "session_id", "utmCampaign",
             "utmContent", "utmMedium", "utmSource", "utmTerm", "pageTitle"
         )
 
-        fun forExperiment(
+        /**
+         * `Experiment Viewed` properties, as data rather than JSON: the same map is handed to a
+         * consumer's event filter, to [com.sdk.growthbook.GBEventLogger] via [GBEventDispatch],
+         * and then serialized into the payload — so a filter or a sink can never see something
+         * other than what is sent. Insertion order is preserved, which keeps the serialized form —
+         * and therefore the de-duplication key — stable.
+         */
+        fun experimentProperties(
             experiment: GBExperiment,
-            result: GBExperimentResult,
-            attributes: Map<String, GBValue>? = null
-        ): TrackingEvent {
-            val properties = buildJsonObject {
-                put("experimentId", experiment.key)
-                put("variationId", result.key)
-                result.hashAttribute?.let { put("hashAttribute", it) }
-                result.hashValue?.let { put("hashValue", it) }
-                // Contextual-bandit attribution. The TS plugin does not send these (yet) —
-                // additive extra properties, populated only for enrolled bandit exposures,
-                // so non-bandit events are byte-identical to the TS shape.
-                result.leafId?.let { put("leafId", it) }
-                result.variationWeights?.let { weights ->
-                    put("variationWeights", JsonArray(weights.map { JsonPrimitive(it) }))
-                }
-                result.banditVersion?.let { put("banditVersion", it) }
+            result: GBExperimentResult
+        ): Map<String, GBValue> = buildMap {
+            put("experimentId", GBString(experiment.key))
+            put("variationId", GBString(result.key))
+            result.hashAttribute?.let { put("hashAttribute", GBString(it)) }
+            result.hashValue?.let { put("hashValue", GBString(it)) }
+            // Contextual-bandit attribution. The TS plugin does not send these (yet) —
+            // additive extra properties, populated only for enrolled bandit exposures,
+            // so non-bandit events are byte-identical to the TS shape.
+            result.leafId?.let { put("leafId", GBNumber(it)) }
+            result.variationWeights?.let { weights ->
+                put("variationWeights", GBArray(weights.map { GBNumber(it) }))
             }
-            return build(EVENT_EXPERIMENT_VIEWED, properties, attributes)
+            result.banditVersion?.let { put("banditVersion", GBNumber(it)) }
         }
 
-        fun forFeature(
+        /** `Feature Evaluated` properties; see [experimentProperties] for why this is a map. */
+        fun featureProperties(
             featureKey: String,
-            result: GBFeatureResult,
-            attributes: Map<String, GBValue>? = null
-        ): TrackingEvent {
-            val properties = buildJsonObject {
-                put("feature", featureKey)
-                put("source", result.source.name)
-                result.gbValue?.gbSerialize()?.let { put("value", it) }
-                put("ruleId", featureRuleId(result))
-                put("variationId", result.experimentResult?.key ?: "")
-            }
-            return build(EVENT_FEATURE_EVALUATED, properties, attributes)
+            result: GBFeatureResult
+        ): Map<String, GBValue> = buildMap {
+            put("feature", GBString(featureKey))
+            put("source", GBString(result.source.name))
+            result.gbValue?.let { put("value", it) }
+            put("ruleId", GBString(featureRuleId(result)))
+            put("variationId", GBString(result.experimentResult?.key ?: ""))
         }
 
-        private fun build(
+        /**
+         * Serializes [properties] into the wire payload.
+         *
+         * Whether the event gets a [dedupeKey] follows from [eventName], exactly as in the
+         * reference JS plugin: only the SDK's own two events are de-duplicated, because a caller
+         * who logs the same custom event twice means it twice. Deriving it here rather than taking
+         * it as a parameter keeps the rule in one place and keeps parity even when a caller names
+         * a custom event after one of ours.
+         */
+        fun from(
             eventName: String,
-            properties: JsonObject,
+            properties: Map<String, GBValue>,
             attributes: Map<String, GBValue>?
         ): TrackingEvent {
-            val payload = buildPayload(eventName, properties, attributes)
-            val dedupeKey = buildJsonObject {
-                put("eventName", eventName)
-                put("properties", properties)
-            }.toString()
-            return TrackingEvent(payload, dedupeKey)
+            val propertiesJson = buildJsonObject {
+                properties.forEach { (key, value) -> put(key, value.gbSerialize()) }
+            }
+            val dedupeKey =
+                if (eventName == EVENT_FEATURE_EVALUATED || eventName == EVENT_EXPERIMENT_VIEWED) {
+                    buildJsonObject {
+                        put("eventName", eventName)
+                        put("properties", propertiesJson)
+                    }.toString()
+                } else {
+                    null
+                }
+            return TrackingEvent(buildPayload(eventName, propertiesJson, attributes), dedupeKey)
         }
 
         private fun buildPayload(

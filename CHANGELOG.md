@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
-## [8.1.0] - Unreleased
+## [9.1.0] - Unreleased
 
 ### Added
 - Reactive feature-observation API. `GrowthBookSDK.featuresStateFlow: StateFlow<GBFeatures>` exposes
@@ -63,13 +63,202 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (same path as `suspendFeature()`), so it never surfaces non-personalized definitions.
 
 ### Companion artifacts
-- `GrowthBookTest` **2.1.0** — `FakeGrowthBook` implements `subscribe` and gains `getAllResults()`,
+- `GrowthBookTest` **3.1.0** — `FakeGrowthBook` implements `subscribe` and gains `getAllResults()`,
   so assignment-driven UI code can be tested against the fake.
 - `Core`, `GrowthBookExt`, `GrowthBookKotlinxSerialization`, `NetworkDispatcherKtor` and
   `NetworkDispatcherOkHttp` are unaffected and keep their current versions.
 
 ---
-## [8.0.0] - 2026-09-09
+## [9.0.0] - 2026-10-16
+
+A major because two public contracts change with no signature change and no compile error to
+announce them: **feature usage is reported on a value change rather than on every evaluation**, and
+**forced features report nothing at all**. Code written against 8.x keeps compiling and keeps
+running — it simply reports far less often, which a consumer discovers by noticing their numbers
+dropped. A silent contract change is worse than a signature break, not better, so it does not ship
+in a minor. See *Breaking changes* for what to check.
+
+### Added
+- **`GrowthBookTrackingPlugin.Builder`** — a fluent builder that is now the recommended way to configure the built-in
+  tracking plugin:
+  ```kotlin
+  GrowthBookTrackingPlugin.Builder()
+      .setClientKey("sdk-abc")
+      .setNetworkDispatcher(GBNetworkDispatcherKtor())
+      .setEnableFeatureUsageEvents(false)
+      .build()
+  ```
+  Passing a `TrackingPluginConfig` keeps working unchanged. That class has a public constructor, so every option added
+  to it would break binary compatibility and leave behind a permanent constructor overload. New options live on the
+  builder and in an internal options type instead, so the plugin's configuration can keep growing in minor releases.
+  A config built the old way simply takes the defaults for options it cannot express.
+- **`setEnableFeatureUsageEvents(false)`** suppresses `Feature Evaluated` events while keeping `Experiment Viewed`
+  exposures (and their contextual-bandit attribution) flowing. Feature evaluations outnumber exposures by orders of
+  magnitude, so they dominate ingest cost and warehouse quota; suppressed events are dropped before the de-dupe cache
+  and the buffer, so they cost nothing. Mirrors the TS SDK's `enableFeatureUsageEvents`
+  ([growthbook#6798](https://github.com/growthbook/growthbook/pull/6798)). It does not affect
+  `GBSDKBuilder.setFeatureUsageCallback`, which reports evaluations locally and never leaves the process.
+
+- **`setEventFilter { event -> … }`** drops the events a predicate rejects, closing the last gap with the TS plugin's
+  option set. The predicate receives a `GBTrackingEventData` — `eventName`, the `properties` that become
+  `properties_json` and the `attributes` that become `context_json`, all as `GBValue`s — *before* serialization and
+  *before* de-duplication, so a rejected event leaves nothing behind, not even an LRU slot. Intended for consent gates
+  (unlike `setEnable` it is consulted per event, so it can read runtime state), for keeping attributes off the network,
+  for cost control and for sampling. It cannot redact individual fields — the decision is per event — and a filter that
+  throws drops the event, since sending is the only outcome that can leak.
+- **`setEnable(false)`** silences the tracking plugin entirely: every event method returns immediately, nothing is
+  buffered, de-duplicated or sent, and `close()` still completes cleanly. Lets a debug build, an environment without an
+  ingest quota, or an ungranted consent gate keep the plugin registered instead of assembling a different plugin list.
+  Mirrors the TS plugin's `enable`. Note it is the plugin's switch, not the SDK's `setEnabled`.
+- **`setDedupeKeyAttributes(keys)`** folds the listed attributes into the tracking plugin's de-duplication key, on top of
+  the event name and properties. A `Feature Evaluated` event carries no unit identity of its own, so a single SDK
+  instance that serves several users over its lifetime (login, logout, account switching via `setAttributes`) would drop
+  the next user's identical evaluation as a duplicate of the previous user's. Listing the identifier attribute — usually
+  `"id"` — keeps them apart. Empty by default, which preserves the previous behaviour. `Experiment Viewed` was never
+  affected, since its properties already carry `hashAttribute`/`hashValue`, but configured attributes apply to both event
+  types, matching the TS plugin's `dedupeKeyAttributes`.
+
+- **`GrowthBookTrackingPlugin.flush()`** sends whatever is buffered and leaves the plugin running, which `close()` does
+  not. Until now events left the buffer only at `setBatchSize`, on the `setBatchTimeout` timer, or on `close()` — so a
+  process killed while backgrounded took up to a batch timeout's worth of exposures with it, silently. Call it from
+  `ON_STOP` on Android, `applicationDidEnterBackground` on Apple. The reference JS plugin hooks `visibilitychange` /
+  `pagehide` itself; the SDK deliberately takes no dependency on any platform's lifecycle (the same reason
+  `startPolling` / `stopPolling` are the consumer's to call), so it exposes the drain and the host app picks the moment.
+  Safe to call repeatedly, with an empty buffer, and after `close()` (a no-op). It is a `suspend` function and returns
+  once the batch reaches the network layer, not once it is delivered — no dispatcher in the SDK reports delivery.
+  Waiting for the hand-off is the point: a fire-and-forget drain returns before the buffer has even been read, which
+  against a process about to be killed is worth nothing. Not waiting is therefore something the caller says explicitly
+  — `scope.launch { plugin.flush() }` — in their own scope rather than the plugin's. Android's `ON_STOP` is not a
+  suspend context, so go through `lifecycleScope`; on Apple the export is an `async` function.
+  - **`GrowthBookSDK.flush()`** drains every registered plugin that implements the new **`FlushablePlugin`**, in
+    registration order, so a consumer who passed plugins to `setPlugins(...)` does not have to keep a reference to each
+    one to drain it. Per-plugin exception isolation as everywhere else; `CancellationException` propagates rather than
+    being swallowed, since unlike the other fan-outs this one can be cancelled with its caller. The plugin's own
+    `flush()` stays directly callable. Not on `IGrowthBookSDK` — an abstract member breaks implementors, and a fake has
+    nothing to drain.
+  - `FlushablePlugin` is a third opt-in capability interface rather than a member on `GrowthBookPlugin`, for the reason
+    given for `CustomEventReceiver`: Kotlin interfaces export to Objective-C with every member `@required`, so adding
+    one would break existing Swift conformances even with a default body. It is also the sibling of
+    `GrowthBookPlugin.close()` — same drain, without ending the plugin — which is why the SDK now fans out both.
+- **Custom events.** `GrowthBookSDK.logEvent(eventName, properties)` sends your own analytics events through the same
+  pipeline as exposures, closing the gap with the reference SDKs' `logEvent` / `log_event`. The instance's current
+  attributes are attached automatically, and custom events are not de-duplicated, matching the JS plugin, which
+  de-duplicates only `Feature Evaluated` and `Experiment Viewed` — a custom event *named* after one of those follows
+  their rule, again as in the JS plugin. The built-in tracking plugin batches them to the ingest
+  endpoint in the same envelope as the auto-tracked events.
+    - `GBSDKBuilder.setEventLogger { eventName, properties, attributes -> … }` registers one structured sink for
+      **every** event the SDK produces — `Experiment Viewed` and `Feature Evaluated` from evaluation plus explicit
+      `logEvent` calls — using the event names in `GBTrackingEventNames` and the same property keys as the JS and Java
+      SDKs, so a warehouse pipeline needs no per-SDK mapping. It is additive rather than a replacement: `trackingCallback`,
+      `setFeatureUsageCallback` and registered plugins all keep firing, unlike the JS SDK's single overwritable slot,
+      where the tracking plugin silently displaces a logger the consumer set. It runs on the evaluating thread, and a
+      throwing logger is logged and swallowed rather than surfacing to the caller or breaking evaluation.
+    - Plugins opt in by implementing the new `CustomEventReceiver` interface alongside `GrowthBookPlugin`; plugins that
+      do not are skipped. It is deliberately a separate interface rather than another member on `GrowthBookPlugin`:
+      Kotlin interfaces export to Objective-C with every member `@required`, so a new member would break existing Swift
+      conformances even with a default body. Future optional hooks should follow the same shape.
+    - `FakeGrowthBook` records `logEvent` calls; assert on them with `loggedEvents()` / `wasLogged(name)`. Note that
+      `logEvent` is on `GrowthBookSDK` and `FakeGrowthBook` but **not** on `IGrowthBookSDK` — adding an abstract member
+      would break every implementor — so code written against the interface cannot log custom events. Hold the concrete
+      type where you need them.
+- **`AttributesChangeReceiver`** — a second opt-in plugin capability, in the same shape as `CustomEventReceiver`: a
+  plugin implementing it is told when the instance starts serving a different user, so it can reset per-user state.
+  `onAttributesChanged(attributes)` fires from `setAttributes`, `updateAttributes` and their `*Sync` variants, and only
+  when the resulting map actually differs — re-setting an identical map is silent, since attribute setters are called
+  routinely on screens where nothing changed. `setAttributeOverrides` does not fire it: overrides adjust sticky-bucket
+  identity for the same user.
+  - The built-in tracking plugin implements it and **clears its de-duplication cache on a user change**. A
+    `Feature Evaluated` event carries no unit identity, so on login/logout the next user's identical evaluation used to
+    be suppressed as a duplicate of the previous user's and never reached the warehouse — the failure mode
+    `setDedupeKeyAttributes` was added for. That option still matters (it separates users *within* the cache), but the
+    default no longer loses an exposure.
+  - The plugin's cache can only be cleared, which is weaker than the SDK-level gate above: it holds no record of which
+    user an entry came from, so an evaluation finishing after the switch takes a slot in the freshly cleared cache and
+    suppresses the next user's identical event. `setDedupeKeyAttributes(listOf("id"))` covers that window, since the
+    late event carries the previous user's attributes.
+
+### Changed
+- The tracking plugin's default ingest host is now `https://us-east-1.gb-ingest.com`, catching up with
+  [growthbook#6608](https://github.com/growthbook/growthbook/pull/6608), which replaced the legacy `us1.gb-ingest.com`
+  name across the SDK, the back end, the app and the docs. **Anyone who never set `ingestorHost` explicitly is now
+  posting to a different hostname.** Both names address the us-east-1 region, so no configuration change is needed;
+  override with `setIngestorHost(...)` if your Data Region is not us-east-1.
+  - `TrackingPluginConfig.DEFAULT_INGESTOR_HOST` is a `const val`, so its value is inlined into the bytecode of
+    anything that reads it. Code that referenced the constant explicitly keeps the old `us1.gb-ingest.com` string
+    until it is recompiled against this release; the SDK's own default resolves at runtime and is unaffected.
+
+### Fixed
+- A throwing `trackingCallback` no longer costs plugins and the event logger a remote-eval exposure. On the `rule.tracks`
+  path the consumer callback and the plugin/logger fan-out shared one `try`, so a callback that threw skipped the
+  fan-out — and because `gbExperimentHelper.isTracked(...)` had already marked the exposure, it was never offered again.
+  The two are now separate, matching how `GBExperimentEvaluator`'s step 18 and `prepareResult` already handled it.
+
+### Breaking changes
+The first two change no signature at all — they change what an existing call *means*, which is what makes this a major
+rather than a minor: code written against 8.x keeps compiling and keeps running, it simply reports far less often, and
+nothing announces that. Recompilation is not enough; check both behaviours against what your code assumes. The third is
+an ordinary removal, caught by the compiler, and rides along.
+
+- **Feature usage is reported on a value change, not on every evaluation.** A feature read in a recomposition or a
+  render loop reports once for its first value and stays quiet until the value actually moves. This gates all three
+  sinks together — `setFeatureUsageCallback`, every plugin's `onFeatureEvaluated`, and the event logger with the
+  tracking plugin behind it — matching the reference SDK, which de-duplicates in exactly this place and gates the same
+  set. **This is a silent behaviour change**: a callback used as a per-evaluation trace now fires far less often.
+  Related notes:
+  - The history is keyed by feature key and holds the last reported value. A value returning to an earlier one
+    reports again; a metadata-only change (same value, different rule or source) does not.
+  - It belongs to the user rather than to the instance. A user change (`setAttributes` / `updateAttributes` and their
+    `*Sync` variants) publishes a fresh history in the same atomic swap as the new attributes, so an evaluation that
+    started beforehand writes into the history it started with and cannot suppress the next user's first report by
+    finishing late. `close()` resets it too. The reference SDK keeps one instance-wide map across attribute changes
+    and clears it only on destroy — the deviation is deliberate, and removes the case its own tracking plugin needs
+    `dedupeKeyAttributes` to work around.
+  - Comparison is by `GBValue` equality rather than by serialized form, so a value alternating between `1` and `1.0`
+    reports twice where the reference SDK reports once. Serializing on every evaluation to match would allocate on the
+    evaluation path for a distinction that cannot change what the value means.
+- **Forced features no longer report feature usage.** A feature served from `setForcedFeatures(...)` — i.e. a result
+  whose `source` is `GBFeatureSource.override` — no longer fires `setFeatureUsageCallback`, `GrowthBookPlugin
+  .onFeatureEvaluated` or the event logger, so it never reaches the tracking plugin's ingest path either. A forced
+  value is a dev/QA override rather than an exposure: reporting it attributes to the user a value they were never
+  bucketed into. This matches the reference JS SDK, which skips the whole usage fan-out for
+  `source === "override"`. Every other source —
+  `defaultValue`, `force`, `experiment`, `prerequisite`, `cyclicPrerequisite`, `unknownFeature` — reports as before,
+  and the forced value itself is still served unchanged. **This is a silent behaviour change**: if you relied on the
+  usage callback to observe forced features (a local debug log, for instance), read `getForcedFeatures()` instead.
+- **`TrackingEvent` is removed from the public API** (now `internal`), along with its constructor, its
+  `payload: JsonObject` property and the `forExperiment` / `forFeature` factories. Two reasons, and the second is why it
+  could not simply be frozen and deprecated the way `TrackingPluginConfig` was: `payload` is a `kotlinx.serialization`
+  type, which the SDK does not expose in its public API (this one slipped through in 7.8.0); and the event properties
+  are now carried as `Map<String, GBValue>` so the *same* map feeds the event filter, the event logger and the
+  serializer — which is what guarantees a filter sees exactly what gets sent. That reshaped both factories into
+  `experimentProperties` / `featureProperties`, so the old signatures no longer describe anything the SDK does.
+  - **Migration:** the only part of it a caller could put to use was the two event names. Replace
+    `TrackingEvent.EVENT_EXPERIMENT_VIEWED` with `GBTrackingEventNames.EXPERIMENT_VIEWED` and
+    `TrackingEvent.EVENT_FEATURE_EVALUATED` with `GBTrackingEventNames.FEATURE_EVALUATED`. Nothing public ever accepted
+    or returned the class, so there is nothing else to port.
+
+### Deprecated
+- `TrackingPluginConfig` and the `GrowthBookTrackingPlugin(config, coroutineScope)` constructor that takes it. Both
+  still work and are unchanged at the bytecode level — this is a warning, not a break — but they are frozen and will be
+  removed no earlier than 10.0.0. Migrate to the builder:
+  ```kotlin
+  // before
+  GrowthBookTrackingPlugin(TrackingPluginConfig(clientKey = "sdk-abc", batchSize = 50))
+  // after
+  GrowthBookTrackingPlugin.Builder().setClientKey("sdk-abc").setBatchSize(50).build()
+  ```
+  The `TrackingPluginConfig.DEFAULT_*` constants are deprecated along with their owner; the values themselves are
+  unchanged and the builder applies them to any option left unset.
+
+### Companion artifacts
+- `GrowthBookTest` **3.0.0** — `FakeGrowthBook` gained `logEvent(eventName, properties)` plus `loggedEvents()` and
+  `wasLogged(name)` so custom events can be asserted on without a network or a plugin.
+- `GrowthBookExt` **3.0.0** — `eventLogger` added to the configuration DSL, mirroring the new builder setter.
+- `Core`, `GrowthBookKotlinxSerialization`, `NetworkDispatcherKtor` and `NetworkDispatcherOkHttp` are unaffected and
+  keep their current versions.
+
+---
+## [8.0.0] - 2026-09-08
 
 ### Added
 - **Contextual bandits.** The SDK now understands contextual bandit rules and their definitions in the features payload

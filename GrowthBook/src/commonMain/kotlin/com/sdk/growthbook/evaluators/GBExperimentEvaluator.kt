@@ -7,6 +7,7 @@ import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBFeatureSource
 import com.sdk.growthbook.model.GBExperimentResult
+import com.sdk.growthbook.plugin.fireExperimentViewed
 import com.sdk.growthbook.utils.GBUtils
 import com.sdk.growthbook.kotlinx.serialization.from
 import com.sdk.growthbook.utils.GBUtils.Companion.getAttributes
@@ -419,11 +420,7 @@ internal class GBExperimentEvaluator(
             } catch (e: Exception) {
                 GB.error("ExperimentEvaluator: trackingCallback exception for '${experiment.key}'", e)
             }
-            evaluationContext.pluginRegistry?.fireExperimentViewed(
-                experiment,
-                result,
-                evaluationContext.userContext.attributes
-            )
+            evaluationContext.fireExperimentViewed(experiment, result)
         }
 
         /**

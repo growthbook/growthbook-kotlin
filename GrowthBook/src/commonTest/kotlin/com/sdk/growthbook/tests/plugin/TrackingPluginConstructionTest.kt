@@ -18,8 +18,10 @@ import kotlin.test.Test
  */
 class TrackingPluginConstructionTest {
 
+    /** Guards the legacy constructor on every target, so it stays usable until it is removed. */
+    @Suppress("DEPRECATION")
     @Test
-    fun pluginIsConstructibleWithTheDefaultScope() {
+    fun pluginIsConstructibleFromTheLegacyConfig() {
         val plugin = GrowthBookTrackingPlugin(TrackingPluginConfig(clientKey = "test-key"))
 
         plugin.init()
@@ -27,8 +29,19 @@ class TrackingPluginConstructionTest {
     }
 
     @Test
+    fun builderBuiltPluginIsConstructibleWithTheDefaultScope() {
+        val plugin = GrowthBookTrackingPlugin.Builder()
+            .setClientKey("test-key")
+            .setEnableFeatureUsageEvents(false)
+            .build()
+
+        plugin.init()
+        plugin.close()
+    }
+
+    @Test
     fun pluginAcceptsEventsWithTheDefaultScope() {
-        val plugin = GrowthBookTrackingPlugin(TrackingPluginConfig(clientKey = "test-key"))
+        val plugin = GrowthBookTrackingPlugin.Builder().setClientKey("test-key").build()
         plugin.init()
 
         // No network dispatcher is configured, so nothing leaves the process; this only has to

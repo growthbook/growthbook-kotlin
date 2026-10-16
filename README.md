@@ -28,13 +28,13 @@ repositories {
 
 dependencies {
     // Add GrowthBook module:
-    implementation 'io.growthbook.sdk:GrowthBook:7.10.0'
+    implementation 'io.growthbook.sdk:GrowthBook:9.1.0'
 
     // Add Network Dispatcher you prefer:
     // 1) NetworkDispatcherKtor — supports Android, iOS, JVM, JS, Wasm
-    implementation 'io.growthbook.sdk:NetworkDispatcherKtor:1.2.0'
+    implementation 'io.growthbook.sdk:NetworkDispatcherKtor:1.3.0'
     // 2) NetworkDispatcherOkHttp — supports Android and JVM only
-    implementation 'io.growthbook.sdk:NetworkDispatcherOkHttp:1.1.1'
+    implementation 'io.growthbook.sdk:NetworkDispatcherOkHttp:1.2.0'
 }
 ```
 
@@ -65,7 +65,7 @@ all within the Growth Book App without deploying code changes to your site.
 ```kotlin
 var sdkInstance: GrowthBookSDK = GBSDKBuilder(
     apiKey = <API_KEY>,
-    hostURL = <GrowthBook_URL>,
+    apiHost = <GrowthBook_URL>,
     attributes = < Hashmap >,
     trackingCallback = { gbExperiment, gbExperimentResult -> },
     encryptionKey = <String?>,
@@ -100,7 +100,7 @@ val bundledFeatures: GBFeatures = mapOf(
 
 var sdkInstance: GrowthBookSDK = GBSDKBuilder(
     apiKey = <API_KEY>,
-    hostURL = <GrowthBook_URL>,
+    apiHost = <GrowthBook_URL>,
     attributes = hashMapOf(),
     trackingCallback = { _, _ -> },
     networkDispatcher = GBNetworkDispatcherKtor(),
@@ -122,7 +122,7 @@ at build time.
 ```kotlin
 var sdkInstance: GrowthBookSDK = GBSDKBuilder(
     apiKey = <API_KEY>,
-    hostURL = <GrowthBook_URL>,
+    apiHost = <GrowthBook_URL>,
     attributes = hashMapOf(),
     trackingCallback = { _, _ -> },
     encryptionKey = <String?>, // used to decrypt the seed's encrypted* fields too
@@ -154,7 +154,7 @@ class MyCachingLayer : GBCachingLayer {
 
 var sdkInstance: GrowthBookSDK = GBSDKBuilder(
     apiKey = <API_KEY>,
-    hostURL = <GrowthBook_URL>,
+    apiHost = <GrowthBook_URL>,
     attributes = hashMapOf(),
     trackingCallback = { _, _ -> },
     networkDispatcher = GBNetworkDispatcherKtor(),
@@ -172,7 +172,7 @@ By default the SDK refetches features from the network on every `initialize()`. 
 ```kotlin
 var sdkInstance: GrowthBookSDK = GBSDKBuilder(
     apiKey = <API_KEY>,
-    hostURL = <GrowthBook_URL>,
+    apiHost = <GrowthBook_URL>,
     attributes = hashMapOf(),
     trackingCallback = { _, _ -> },
     networkDispatcher = GBNetworkDispatcherKtor(),
@@ -467,6 +467,10 @@ not of the requested type.
   fun setForcedFeatures(forcedFeatures: Map<String, GBValue>) {}
   ```
 
+  A forced feature is a local override, not an exposure: its evaluations report no feature usage — no
+  `setFeatureUsageCallback`, no plugin `onFeatureEvaluated`, no event logger, and nothing sent by the tracking plugin.
+  The same is true in the reference JS SDK.
+
 - The getForcedFeatures method returns the Map of currently set forced features
 
   ```kotlin
@@ -534,7 +538,7 @@ targets. It adds typed feature accessors, fallback strategies, a typed `Flag<T>`
 API, and DSLs for attributes and SDK configuration.
 
 ```groovy
-implementation 'io.growthbook.sdk:GrowthBookExt:1.0.0'
+implementation 'io.growthbook.sdk:GrowthBookExt:2.0.0'
 ```
 
 ### Typed feature accessors
@@ -671,7 +675,10 @@ val sdk = growthBook {
     networkDispatcher = GBNetworkDispatcherKtor()
 
     plugins = listOf(
-        GrowthBookTrackingPlugin(TrackingPluginConfig(clientKey = "sdk-abc"))
+        GrowthBookTrackingPlugin.Builder()
+            .setClientKey("sdk-abc")
+            .setNetworkDispatcher(GBNetworkDispatcherKtor())
+            .build()
     )
     cacheMaxAge = 60_000
     stickyBucketScope = viewModelScope
@@ -747,7 +754,7 @@ exact leaf and weight generation that produced it:
 ```kotlin
 val sdkInstance = GBSDKBuilder(
     apiKey = <API_KEY>,
-    hostURL = <GrowthBook_URL>,
+    apiHost = <GrowthBook_URL>,
     attributes = mapOf("id" to GBString("user-123"), "country" to GBString("UA")),
     trackingCallback = { experiment, result ->
         analytics.track(
@@ -776,6 +783,271 @@ them.
 
 > **Note:** GrowthBook's querystring-based variation override (`?experiment-key=0`) is not implemented in this SDK, so it
 > does not apply to bandit rules either. Use `setForcedVariations` for the same effect.
+
+## Auto-tracking Plugin
+
+`GrowthBookTrackingPlugin` batches experiment exposures and feature evaluations and POSTs them to the GrowthBook ingest
+endpoint, so you get tracking without writing a `trackingCallback`. Register it with `setPlugins(...)`:
+
+```kotlin
+val sdkInstance = GBSDKBuilder(
+    apiKey = <API_KEY>,
+    apiHost = <GrowthBook_URL>,
+    attributes = mapOf("id" to GBString("user-123")),
+    trackingCallback = { _, _ -> },
+    networkDispatcher = GBNetworkDispatcherKtor(),
+)
+    .setPlugins(
+        listOf(
+            GrowthBookTrackingPlugin.Builder()
+                .setClientKey("sdk-abc")
+                .setNetworkDispatcher(GBNetworkDispatcherKtor())
+                .build()
+        )
+    )
+    .initialize()
+```
+
+> **The plugin does not inherit the SDK's network dispatcher.** It is configured separately, which is why the snippet
+> above passes one to both. Omit it and the plugin buffers events and discards every batch — it warns about this at
+> init, but nothing else signals it. The dispatcher must implement `TrackingNetworkDispatcher`, a separate interface
+> from `NetworkDispatcher`: the bundled ones satisfy it from **NetworkDispatcherKtor 1.2.0** and
+> **NetworkDispatcherOkHttp 1.1.0** onward, while a custom `NetworkDispatcher` has to implement it explicitly.
+
+Builder options. `setClientKey` and `setNetworkDispatcher` are both **required**: without a key the plugin is a no-op,
+and without a dispatcher it buffers events and discards them. Both cases are logged at init:
+
+| Setter | Default | Meaning |
+|---|---|---|
+| `setClientKey(key)` | **required** | SDK connection key; sent as `?client_key=` |
+| `setEnable(bool)` | `true` | master switch; `false` silences the plugin entirely |
+| `setIngestorHost(url)` | `https://us-east-1.gb-ingest.com` | ingest base URL; events go to `{host}/track` |
+| `setBatchSize(n)` | 100 | events buffered before an eager flush |
+| `setBatchTimeout(duration)` | 10 s | how long an event may sit in the buffer |
+| `setDedupeCacheSize(n)` | 1000 | LRU window for dropping identical repeated events |
+| `setDedupeKeyAttributes(keys)` | `[]` | attributes folded into the de-duplication key |
+| `setNetworkDispatcher(d)` | **required** | dispatcher used to POST events |
+| `setEnableFeatureUsageEvents(bool)` | `true` | whether `Feature Evaluated` events are sent |
+| `setEventFilter(predicate)` | — | drops events the predicate rejects |
+| `setCoroutineScope(scope)` | platform tracking dispatcher | where batching and flushing run |
+
+> The default ingest host serves the **us-east-1** Data Region. If your Event Forwarder or Managed Warehouse was created
+> in another region, override it — `setIngestorHost("https://eu-west-1.gb-ingest.com")` — otherwise events reach the
+> wrong cluster and are dropped.
+
+### Flushing when the app leaves the foreground
+
+Events are sent when the buffer reaches `setBatchSize(n)`, when `setBatchTimeout(duration)` expires, or on `close()`.
+That leaves one gap: a process killed while backgrounded takes its buffer with it, so up to a batch timeout's worth of
+exposures disappear without a trace. Call `flush()` on the way out to close it — it drains the buffer and leaves the
+plugin running, unlike `close()`, which shuts it down for good:
+
+```kotlin
+class App : Application(), DefaultLifecycleObserver {
+    private val tracking = GrowthBookTrackingPlugin.Builder()
+        .setClientKey("sdk-abc")
+        .setNetworkDispatcher(GBNetworkDispatcherKtor())
+        .build()
+
+    override fun onStop(owner: LifecycleOwner) {                    // backgrounded, not dead
+        owner.lifecycleScope.launch { tracking.flush() }
+    }
+
+    override fun onTerminate() = tracking.close()
+}
+```
+
+The equivalent moment is `applicationDidEnterBackground` (or a `scenePhase` change) on Apple targets, and
+`visibilitychange` / `pagehide` in the browser — which is where the reference JS plugin hooks itself automatically. The
+SDK does not: it takes no dependency on any platform's lifecycle, the same reason `startPolling` / `stopPolling` are
+yours to call. Hold the plugin in a field, as above, and pick the moment yourself.
+
+`flush()` is a `suspend` function: it returns once the batch has been handed to the network layer, **not** once it has
+been delivered — no dispatcher reports delivery. Waiting for the hand-off is the point; a drain that merely schedules
+itself returns before the buffer has even been read, which against a process about to be killed is worth nothing. So it
+is worth something on the way into the background and nothing at all as the process is already dying.
+
+It is suspend rather than fire-and-forget so that not waiting is something you say explicitly — `scope.launch {
+plugin.flush() }` — and in your own scope rather than the plugin's. `ON_STOP` is not a suspend context, hence the
+`lifecycleScope` above; on Apple the function exports as `async`, so a `Task` inside `applicationDidEnterBackground` or
+a `scenePhase` observer calls it directly. Safe to call repeatedly and with an empty buffer, and a no-op after
+`close()`.
+
+If you registered the plugin through `setPlugins(...)` and kept no reference to it, call **`GrowthBookSDK.flush()`**
+instead: it drains every registered plugin implementing `FlushablePlugin` in registration order, with the same
+guarantee and the same per-plugin exception isolation as the evaluation callbacks.
+
+```kotlin
+override fun onStop(owner: LifecycleOwner) {
+    owner.lifecycleScope.launch { sdk.flush() }     // no reference to each plugin needed
+}
+```
+
+### Turning off feature usage events
+
+A `Feature Evaluated` event fires when a feature's value changes, not on every read (see
+[Feature usage reporting](#feature-usage-reporting)) — but a flag that flips regularly still outnumbers
+`Experiment Viewed` by a wide margin, and it is usually what consumes an ingest or warehouse quota. Drop them and keep
+exposures (including contextual-bandit attribution) with:
+
+```kotlin
+GrowthBookTrackingPlugin.Builder()
+    .setClientKey("sdk-abc")
+    .setNetworkDispatcher(GBNetworkDispatcherKtor())
+    .setEnableFeatureUsageEvents(false)
+    .build()
+```
+
+This affects only what the plugin sends over the network. `GBSDKBuilder.setFeatureUsageCallback` keeps reporting
+locally.
+
+### Feature usage reporting
+
+Feature usage is reported on a **value change**, not on every evaluation. Reading a feature in a Compose
+recomposition or a render loop produces one report for the first value and nothing after it, until the value actually
+moves. This gates all three sinks together — `setFeatureUsageCallback`, every plugin's `onFeatureEvaluated`, and the
+event logger (and so the tracking plugin's ingest path) — matching the reference SDK, which de-duplicates the same way.
+
+The history belongs to the user, not to the instance. A user change (`setAttributes` / `updateAttributes` and their
+`*Sync` variants) publishes a *new* history alongside the new attributes, in the same atomic swap the rest of the
+evaluation state uses; `close()` does the same. So the next user's first read of a feature is always reported even
+when the value is the one the previous user saw — and an evaluation that started before the change keeps writing to
+the history it started with, so it cannot suppress the new user's first report by finishing late.
+
+Two consequences worth knowing:
+
+- A value returning to an earlier one reports again — the comparison is against the last reported value, not against
+  everything ever seen.
+- Metadata-only changes do not report: the same value arriving from a different rule or source is not a new usage.
+  `GBFeatureResult.source` and `ruleId` are still correct on the value you get back from `feature(id)`; they just do
+  not trigger a report on their own.
+
+Forced features report nothing at all, de-duplication aside: a value set through `setForcedFeatures` is a local
+override rather than an exposure.
+
+### Filtering events
+
+`setEventFilter` decides per event whether it is sent at all. The predicate receives the event before it is serialized
+or de-duplicated, so a rejected event leaves no trace — it does not occupy a slot in the de-duplication cache either:
+
+```kotlin
+GrowthBookTrackingPlugin.Builder()
+    .setClientKey("sdk-abc")
+    .setNetworkDispatcher(GBNetworkDispatcherKtor())
+    .setEventFilter { event ->
+        event.attributes?.get("internalUser") != GBBoolean(true) &&
+            event.eventName != GBTrackingEventNames.FEATURE_EVALUATED
+    }
+    .build()
+```
+
+`event` carries `eventName`, `properties` (exactly what becomes `properties_json`) and `attributes` (what becomes
+`context_json` and the promoted identity fields), all as `GBValue`s. Use it for consent gates — unlike `setEnable`, it
+is consulted per event, so it can read state that changes at runtime — for keeping attributes off the network, for cost
+control, or for sampling.
+
+Two limits worth knowing: the decision is all-or-nothing, so it cannot redact individual fields from an otherwise
+acceptable event; and it runs on the evaluation path, so it must be cheap and non-blocking. A filter that throws drops
+the event — sending is the only outcome that can leak.
+
+### Custom events
+
+`logEvent` sends your own analytics events through the same pipeline as exposures, so they arrive at the ingest endpoint
+batched alongside them:
+
+```kotlin
+sdkInstance.logEvent("Checkout Completed", mapOf("plan" to GBString("pro"), "amount" to GBNumber(42)))
+```
+
+The instance's current attributes are attached automatically, so the event carries the same identity as an evaluation
+made at the same moment. Custom events are not de-duplicated — logging the same event twice means it happened twice.
+The one exception is a custom event named after one of the SDK's own (`Feature Evaluated`, `Experiment Viewed`): the
+de-duplication rule follows the event name, so such an event is treated as the SDK's, exactly as in the JS plugin.
+
+### Structured event logger
+
+To route events somewhere other than GrowthBook, register a logger instead of (or alongside) the plugin:
+
+```kotlin
+GBSDKBuilder(/* … */)
+    .setEventLogger { eventName, properties, attributes -> analytics.track(eventName, properties) }
+    .initialize()
+```
+
+It receives **every** event the SDK produces as one flat stream — `Experiment Viewed` and `Feature Evaluated` from
+evaluation, plus explicit `logEvent` calls — under the names in `GBTrackingEventNames` and with the same property keys
+as the JS and Java SDKs, so a warehouse pipeline needs no per-SDK mapping:
+
+| Event | Properties |
+|---|---|
+| `Experiment Viewed` | `experimentId`, `variationId`, `hashAttribute`, `hashValue` (+ `leafId`, `variationWeights`, `banditVersion` for contextual-bandit exposures) |
+| `Feature Evaluated` | `feature`, `source`, `value`, `ruleId`, `variationId` |
+
+The logger is additive: it fires *in addition to* `trackingCallback`, `setFeatureUsageCallback` and any registered
+plugins, so adding one never costs another sink its events. It is invoked on the evaluating thread — return quickly and
+hand slow work to your own executor — and a logger that throws is logged and swallowed rather than surfacing to the
+caller or breaking evaluation.
+
+Beyond `GrowthBookPlugin` itself there are three opt-in capability interfaces. Implement the ones your plugin needs
+alongside it; plugins that do not implement one are skipped for that hook entirely.
+
+| Interface | Implement it when | What you get |
+|---|---|---|
+| `CustomEventReceiver` | you want `logEvent(...)` calls | `onEvent(eventName, properties, attributes)` |
+| `AttributesChangeReceiver` | your plugin holds per-user state | `onAttributesChanged(attributes)` on a user change |
+| `FlushablePlugin` | your plugin buffers work | your `flush()` joins the `GrowthBookSDK.flush()` fan-out |
+
+They are separate interfaces rather than new members on `GrowthBookPlugin` because Kotlin interfaces export to
+Objective-C with every member `@required`, so a new member would break existing Swift conformances even with a default
+body — a brand-new interface breaks nobody. Every future optional hook follows the same shape. (This is the
+[Interface Segregation](https://en.wikipedia.org/wiki/Interface_segregation_principle) split the JDK makes between
+`Closeable` and `Flushable`, for the same reason: a plugin should not have to stub a hook it does not want.)
+
+> `logEvent` lives on `GrowthBookSDK`, not on `IGrowthBookSDK`: adding an abstract member would break every
+> implementor of that interface. Code written against the interface cannot log custom events, so hold the concrete type
+> where you need them. `FakeGrowthBook` mirrors the method (with `loggedEvents()` / `wasLogged(name)` to assert on),
+> which is likewise reachable only through the concrete type.
+
+### Reusing one instance across users
+
+One instance commonly serves several users in turn — login, logout, account switching. Two layers of de-duplication
+sit between an evaluation and the ingest endpoint, and both are keyed on what was evaluated rather than on who
+evaluated it, so both are reset when the user changes:
+
+| Layer | Key | Reset on user change |
+|---|---|---|
+| SDK (see [Feature usage reporting](#feature-usage-reporting)) | feature key → last reported value | yes — a fresh history is published with the new attributes |
+| Tracking plugin | event name + full properties, LRU of `setDedupeCacheSize(n)` | yes — the cache is cleared |
+
+A user change is `setAttributes` / `updateAttributes` or their `*Sync` variants actually changing the attribute map;
+re-setting an identical map is not one and leaves both layers alone. `setAttributeOverrides` is not one either — an
+override adjusts sticky-bucket identity for the same user.
+
+With both layers resetting, the next user's first evaluation of a feature is always reported, even when the value is
+the one the previous user saw — no configuration needed. `setDedupeKeyAttributes` remains available for the cases the
+reset does not cover: events still sitting in the plugin's buffer when the user switches, and `Experiment Viewed`
+(which already carries `hashAttribute` / `hashValue` in its properties, so it was never at risk). It is also what the
+JS plugin exposes, so a configuration written against that SDK keeps working here.
+
+The two layers differ in one respect. The SDK layer is swapped, not cleared, so an evaluation that began before the
+user changed reports into the previous user's history and cannot affect the new one. The plugin's cache is a single
+LRU with no notion of which user an event came from, so such a late event does take a slot in the cleared cache, and
+the new user's identical event is suppressed. `setDedupeKeyAttributes(listOf("id"))` closes that too: the late event
+carries the previous user's attributes, so it keys to a different slot. Worth setting if you switch users on a live
+instance while evaluations may be in flight.
+
+```kotlin
+GrowthBookTrackingPlugin.Builder()
+    .setClientKey("sdk-abc")
+    .setNetworkDispatcher(GBNetworkDispatcherKtor())
+    .setDedupeKeyAttributes(listOf("id"))
+    .build()
+```
+
+> **Migrating from `TrackingPluginConfig`.** `GrowthBookTrackingPlugin(TrackingPluginConfig(clientKey = "sdk-abc"))`
+> still behaves exactly as before, but the config class and the constructor that takes it are deprecated as of 9.0.0 and
+> will be removed in a future major release. They are frozen at the options they shipped with, so anything added later
+> (starting with `enableFeatureUsageEvents`) is available through the builder only.
 
 ## Sticky Bucketing
 
