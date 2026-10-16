@@ -96,6 +96,24 @@ class GBTestHelper {
             return array
         }
 
+        /**
+         * The spec's `savedGroupReferencesV2` section, which is gated behind the capability of
+         * the same name: an SDK that has not implemented `$savedGroup` skips the whole key, the
+         * way it would skip `stickyBucket`. It is the only section holding an object of case
+         * lists rather than a single list, hence the extra level here.
+         */
+        private fun getSavedGroupReferencesV2Data(section: String): JsonArray =
+            testData.jsonObject["savedGroupReferencesV2"]!!.jsonObject[section] as JsonArray
+
+        fun getSavedGroupReferencesV2ConditionData(): JsonArray =
+            getSavedGroupReferencesV2Data("evalCondition")
+
+        fun getSavedGroupReferencesV2FeatureData(): JsonArray =
+            getSavedGroupReferencesV2Data("feature")
+
+        fun getSavedGroupReferencesV2RunData(): JsonArray =
+            getSavedGroupReferencesV2Data("run")
+
         internal fun createTestScopeEvaluationContext(
             features: GBFeatures,
             attributes: Map<String, GBValue>,

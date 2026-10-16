@@ -28,7 +28,7 @@ repositories {
 
 dependencies {
     // Add GrowthBook module:
-    implementation 'io.growthbook.sdk:GrowthBook:8.0.0'
+    implementation 'io.growthbook.sdk:GrowthBook:9.1.0'
 
     // Add Network Dispatcher you prefer:
     // 1) NetworkDispatcherKtor — supports Android, iOS, JVM, JS, Wasm
@@ -452,7 +452,7 @@ targets. It adds typed feature accessors, fallback strategies, a typed `Flag<T>`
 API, and DSLs for attributes and SDK configuration.
 
 ```groovy
-implementation 'io.growthbook.sdk:GrowthBookExt:2.0.0'
+implementation 'io.growthbook.sdk:GrowthBookExt:3.0.1'
 ```
 
 ### Typed feature accessors
@@ -651,6 +651,54 @@ made any time a user attribute or other dependency changes — specifically on `
 
 > If you would like to implement Sticky Bucketing while using Remote Evaluation, you must configure your remote evaluation
 > backend to support Sticky Bucketing. You will not need to provide a StickyBucketService instance to the client side SDK.
+
+## Saved Groups
+
+A saved group is a reusable audience defined once in GrowthBook and targeted from many rules — either an **ID list**
+(a set of attribute values) or a **condition group** (a targeting condition). Nothing needs to be enabled in code:
+groups arrive in the features payload alongside `features`, plain or encrypted, and the SDK resolves them while
+evaluating targeting.
+
+How they reach the SDK depends on the **Saved Groups** setting on the SDK Connection, which is negotiated against the
+capabilities of the SDK version registered for that connection — a format the SDK cannot read steps down to the next
+one. There are three:
+
+- **Inline** — no `savedGroups` field; the group's contents are copied into every rule that uses it.
+- **References (ID lists only)** — rules carry `$inGroup` / `$notInGroup`, and `savedGroups` holds one shared array
+  per group. Condition groups are still inlined.
+- **References (all types)** — every group travels by reference, through a single `$savedGroup` operator.
+
+The third is the one added in 9.1.0. Its `savedGroups` entries are typed, and rules point at them by id:
+
+```json
+{
+  "savedGroups": {
+    "grp_beta": { "type": "list", "attributeKey": "id", "values": ["u_1", "u_2"] },
+    "grp_pro":  { "type": "condition", "condition": { "plan": "pro" } }
+  },
+  "features": {
+    "new-checkout": {
+      "defaultValue": false,
+      "rules": [
+        { "condition": { "$and": [ { "$savedGroup": { "id": "grp_pro" } }, { "country": "US" } ] }, "force": true }
+      ]
+    }
+  }
+}
+```
+
+Unlike `$inGroup`, `$savedGroup` is not attached to an attribute — it sits alongside `$and` / `$or` / `$not` — so the
+entry decides what membership means. A condition group is evaluated in full and may reference further groups; an
+optional `attributeKey` on the reference overrides the attribute a list entry names.
+
+Reference resolution is deliberately conservative. A reference the SDK cannot make sense of — an id absent from the
+payload, a group type introduced after your SDK version, a malformed entry — matches nobody rather than throwing, so
+a payload may safely be newer than the SDK reading it. A group that references itself, directly or around a cycle,
+resolves the same way instead of recursing.
+
+Reference formats reduce payload size by shipping each group once instead of per rule. They do **not** keep a group's
+members off the client: the contents still travel in the payload. Only [Remote Evaluation](#remote-evaluation) does
+that.
 
 ## Contextual Bandits
 
