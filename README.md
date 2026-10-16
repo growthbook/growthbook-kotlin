@@ -28,7 +28,7 @@ repositories {
 
 dependencies {
     // Add GrowthBook module:
-    implementation 'io.growthbook.sdk:GrowthBook:8.0.0'
+    implementation 'io.growthbook.sdk:GrowthBook:9.0.0'
 
     // Add Network Dispatcher you prefer:
     // 1) NetworkDispatcherKtor — supports Android, iOS, JVM, JS, Wasm
@@ -263,6 +263,25 @@ not of the requested type.
   The same function is available as an extension on `IGrowthBookSDK`, with identical behavior, so code written
   against the interface reads values the same way.
 
+  `suspendFeatureValue` is its awaiting counterpart: it waits for feature definitions to be loaded (see
+  `suspendFeature`) before mapping the value, which is what you want on a first read at startup — until the first
+  payload is applied every feature is unknown and `featureValue` returns `null`. Like `suspendFeature`, it is not a
+  guarantee of fresh data: if every fetch attempt fails it falls back to the locally evaluated result.
+
+    ```kotlin
+  suspend inline fun <reified V> IGrowthBookSDK.suspendFeatureValue(id: String): V?
+    ```
+
+- The getFeatures method returns the currently loaded feature definitions. It is part of `IGrowthBookSDK`, so code
+  written against the interface can tell a feature absent from the payload from one that is present but off.
+
+    ```kotlin
+  fun getFeatures(): GBFeatures
+    ```
+
+  The interface declares it with a default returning an empty map, so existing implementations keep compiling;
+  implementations that hold definitions should override it.
+
 - The `decodeAs` extension (in the `GrowthBookKotlinxSerialization` module) decodes a `GBValue` — for example a
   `GBJson` feature value — into your own `@Serializable` model via kotlinx.serialization. It returns `null` if the
   value cannot be decoded into the requested type.
@@ -449,11 +468,16 @@ not of the requested type.
 `GrowthBookExt` is a pure-Kotlin companion module with quality-of-life helpers
 over the core SDK — no extra runtime dependencies, all Kotlin Multiplatform
 targets. It adds typed feature accessors, fallback strategies, a typed `Flag<T>`
-API, and DSLs for attributes and SDK configuration.
+API, awaiting accessors for the startup window, and DSLs for attributes and SDK
+configuration.
 
 ```groovy
-implementation 'io.growthbook.sdk:GrowthBookExt:2.0.0'
+implementation 'io.growthbook.sdk:GrowthBookExt:4.0.0'
 ```
+
+Every helper takes `IGrowthBookSDK` as its receiver, so it works against the real
+SDK and against `FakeGrowthBook` from the `GrowthBookTest` artifact alike — a
+ViewModel typed on the interface keeps the helpers in tests.
 
 ### Typed feature accessors
 
@@ -492,8 +516,37 @@ for a missing feature, so `FAIL_OPEN` cannot flip a kill switch on.
 > **Startup window.** Feature definitions are fetched asynchronously, so until the
 > first payload (or cached payload) is applied *every* feature is unknown, and
 > `FAIL_OPEN` reports all of them as enabled — permanently so if the fetch fails and
-> no cache exists. Use `suspendFeature`, or seed a bundled payload with
-> `initialFeatures`, when a flag must not be read before the SDK is ready.
+> no cache exists. Use the awaiting accessors below, or seed a bundled payload with
+> `initialFeatures` / `initialPayload`, when a flag must not be read before the SDK
+> is ready.
+
+### Awaiting accessors
+
+Suspend until feature definitions are loaded, then evaluate — for a first read at
+startup, where the synchronous accessors would still return their defaults:
+
+```kotlin
+suspend fun onSplash() {
+    if (sdk.awaitEnabled("new-onboarding")) showNewOnboarding() else showLegacy()
+
+    val copy = sdk.awaitString("welcome-copy", default = "Welcome")
+    val items = sdk.await(Flags.MAX_ITEMS)
+}
+```
+
+Available: `awaitEnabled(id)`, `awaitEnabled(id, fallback)`, `awaitBoolean`,
+`awaitString`, `awaitInt`, `awaitLong`, `awaitDouble`, `awaitJson`, and
+`await(flag)` for typed flags.
+
+They are **not** a guarantee of fresh data. The underlying `suspendFeature` retries
+with backoff and, once it runs out of attempts, evaluates whatever is loaded — so a
+total fetch failure still yields the default. What they remove is reading a knowably
+empty state.
+
+Named `await*` rather than overloads of `get*` because `suspend` takes no part in
+signature resolution, so same-name overloads would conflict. Property delegates have
+no awaiting form at all: `ReadOnlyProperty.getValue` is not `suspend`, so a property
+cannot wait.
 
 ### Typed flags — `Flag<T>`
 
@@ -578,9 +631,14 @@ val sdk = growthBook {
 The DSL covers the whole of `GBSDKBuilder`, so nothing forces you back to the
 builder: `streamingHost`, `encryptionKey`, `enableLogging`, `remoteEval`, `qaMode`,
 `enabled`, `forceVariations`, `trackingCallback`, `refreshHandler`,
-`featuresChangeHandler`, `featureUsageCallback`, `initialFeatures`, `plugins`,
-`cachingEnabled`, `cacheMaxAge`, `cachingLayer`, and sticky bucketing via either
-`stickyBucketService` or `stickyBucketScope` (+ optional `stickyBucketPrefix`).
+`featuresChangeHandler`, `featureUsageCallback`, `fetchStatsHandler`,
+`initialFeatures`, `initialPayload`, `plugins`, `cachingEnabled`, `cacheMaxAge`,
+`staleTtl`, `serveStaleOnError`, `refreshInterval`, `cachingLayer`, and sticky
+bucketing via either `stickyBucketService` or `stickyBucketScope` (+ optional
+`stickyBucketPrefix`).
+
+That coverage is enforced by a test: a new `set*` on the builder without a DSL
+counterpart fails the build, so the DSL cannot quietly fall behind the core again.
 
 ```kotlin
 val sdk = growthBook {

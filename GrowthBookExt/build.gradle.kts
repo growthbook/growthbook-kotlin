@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "3.0.0"
+version = "4.0.0"
 
 kotlin {
     androidTarget {
@@ -51,6 +51,9 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
+                // Test-only, so the testing utilities never reach consumers of this artifact.
+                // No cycle: :GrowthBookTest depends on :GrowthBook, not on this module.
+                implementation(project(":GrowthBookTest"))
                 implementation(kotlin("test-junit"))
                 implementation("junit:junit:4.13.2")
                 implementation(libs.kotlinx.coroutines.core)

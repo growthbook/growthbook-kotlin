@@ -1,17 +1,18 @@
 package com.sdk.growthbook.ext
 
-import com.sdk.growthbook.GrowthBookSDK
+import com.sdk.growthbook.IGrowthBookSDK
+import com.sdk.growthbook.featureValue
 import com.sdk.growthbook.model.GBFeatureSource
 import com.sdk.growthbook.model.GBJson
 
 /**
  * Returns whether the feature [id] is enabled (on).
  *
- * Alias for [GrowthBookSDK.isOn] using the more conventional `isEnabled` naming.
+ * Alias for [IGrowthBookSDK.isOn] using the more conventional `isEnabled` naming.
  *
  * @param id unique feature identifier
  */
-fun GrowthBookSDK.isEnabled(id: String): Boolean =
+fun IGrowthBookSDK.isEnabled(id: String): Boolean =
     isOn(id)
 
 /**
@@ -24,8 +25,7 @@ fun GrowthBookSDK.isEnabled(id: String): Boolean =
  * **The fallback also covers the startup window.** Feature definitions are fetched
  * asynchronously, so until the first payload (or cached payload) is applied *every*
  * feature is unknown — [FallbackStrategy.FAIL_OPEN] then reports all of them as enabled,
- * permanently so if the fetch fails and no cache exists. Use
- * [com.sdk.growthbook.GrowthBookSDK.suspendFeature] (or seed
+ * permanently so if the fetch fails and no cache exists. Use [awaitEnabled] (or seed
  * `GBSDKBuilder.setInitialFeatures`) when a flag must not be read before the SDK is ready.
  *
  * This is the ad-hoc, string-id counterpart to the declared-flag style: for a typed
@@ -36,7 +36,7 @@ fun GrowthBookSDK.isEnabled(id: String): Boolean =
  * @param id unique feature identifier
  * @param fallback strategy for the unknown-feature case
  */
-fun GrowthBookSDK.isEnabled(id: String, fallback: FallbackStrategy): Boolean {
+fun IGrowthBookSDK.isEnabled(id: String, fallback: FallbackStrategy): Boolean {
     val result = feature(id)
     // `unknownFeature` is also what the evaluator reports when evaluating a *loaded* feature
     // threw (malformed condition, prerequisite/sticky-bucket failure), so the source alone
@@ -58,7 +58,7 @@ fun GrowthBookSDK.isEnabled(id: String, fallback: FallbackStrategy): Boolean {
  *
  * @param id unique feature identifier
  */
-fun GrowthBookSDK.isDisabled(id: String): Boolean =
+fun IGrowthBookSDK.isDisabled(id: String): Boolean =
     !isOn(id)
 
 /**
@@ -74,7 +74,7 @@ fun GrowthBookSDK.isDisabled(id: String): Boolean =
  *
  * @param id unique feature identifier
  */
-fun GrowthBookSDK.isFeatureKnown(id: String): Boolean =
+fun IGrowthBookSDK.isFeatureKnown(id: String): Boolean =
     // Checked first so a loaded feature short-circuits without evaluating it — evaluation
     // is observable (feature-usage callback, experiment tracking) and merely asking whether
     // a feature exists should not trigger it.
@@ -86,7 +86,7 @@ fun GrowthBookSDK.isFeatureKnown(id: String): Boolean =
  *
  * @param id unique feature identifier
  */
-fun GrowthBookSDK.getStringOrNull(id: String): String? =
+fun IGrowthBookSDK.getStringOrNull(id: String): String? =
     featureValue<String>(id)
 
 /**
@@ -98,7 +98,7 @@ fun GrowthBookSDK.getStringOrNull(id: String): String? =
  * @param id unique feature identifier
  * @param default lazily-computed fallback value
  */
-inline fun GrowthBookSDK.getStringOrElse(id: String, default: () -> String): String =
+inline fun IGrowthBookSDK.getStringOrElse(id: String, default: () -> String): String =
     getStringOrNull(id) ?: default()
 
 /**
@@ -108,7 +108,7 @@ inline fun GrowthBookSDK.getStringOrElse(id: String, default: () -> String): Str
  * @param id unique feature identifier
  * @param default value returned when no usable String is present
  */
-fun GrowthBookSDK.getString(id: String, default: String): String =
+fun IGrowthBookSDK.getString(id: String, default: String): String =
     getStringOrNull(id) ?: default
 
 /**
@@ -117,7 +117,7 @@ fun GrowthBookSDK.getString(id: String, default: String): String =
  *
  * @param id unique feature identifier
  */
-fun GrowthBookSDK.getBooleanOrNull(id: String): Boolean? =
+fun IGrowthBookSDK.getBooleanOrNull(id: String): Boolean? =
     featureValue<Boolean>(id)
 
 /**
@@ -127,7 +127,7 @@ fun GrowthBookSDK.getBooleanOrNull(id: String): Boolean? =
  * @param id unique feature identifier
  * @param default value returned when no usable Boolean is present
  */
-fun GrowthBookSDK.getBoolean(id: String, default: Boolean): Boolean =
+fun IGrowthBookSDK.getBoolean(id: String, default: Boolean): Boolean =
     getBooleanOrNull(id) ?: default
 
 /**
@@ -139,7 +139,7 @@ fun GrowthBookSDK.getBoolean(id: String, default: Boolean): Boolean =
  * @param id unique feature identifier
  * @param default lazily-computed fallback value
  */
-fun GrowthBookSDK.getBooleanOrElse(id: String, default: () -> Boolean): Boolean =
+fun IGrowthBookSDK.getBooleanOrElse(id: String, default: () -> Boolean): Boolean =
     getBooleanOrNull(id) ?: default()
 
 /**
@@ -152,7 +152,7 @@ fun GrowthBookSDK.getBooleanOrElse(id: String, default: () -> Boolean): Boolean 
  *
  * @param id unique feature identifier
  */
-fun GrowthBookSDK.getIntOrNull(id: String): Int? =
+fun IGrowthBookSDK.getIntOrNull(id: String): Int? =
     featureValue<Number>(id)?.toInt()
 
 /**
@@ -164,7 +164,7 @@ fun GrowthBookSDK.getIntOrNull(id: String): Int? =
  * @param id unique feature identifier
  * @param default value returned when no usable number is present
  */
-fun GrowthBookSDK.getInt(id: String, default: Int): Int =
+fun IGrowthBookSDK.getInt(id: String, default: Int): Int =
     getIntOrNull(id) ?: default
 
 /**
@@ -177,7 +177,7 @@ fun GrowthBookSDK.getInt(id: String, default: Int): Int =
  * @param id unique feature identifier
  * @param default lazily-computed fallback value
  */
-fun GrowthBookSDK.getIntOrElse(id: String, default: () -> Int): Int =
+fun IGrowthBookSDK.getIntOrElse(id: String, default: () -> Int): Int =
     getIntOrNull(id) ?: default()
 
 /**
@@ -190,7 +190,7 @@ fun GrowthBookSDK.getIntOrElse(id: String, default: () -> Int): Int =
  *
  * @param id unique feature identifier
  */
-fun GrowthBookSDK.getLongOrNull(id: String): Long? =
+fun IGrowthBookSDK.getLongOrNull(id: String): Long? =
     featureValue<Number>(id)?.toLong()
 
 /**
@@ -202,7 +202,7 @@ fun GrowthBookSDK.getLongOrNull(id: String): Long? =
  * @param id unique feature identifier
  * @param default value returned when no usable number is present
  */
-fun GrowthBookSDK.getLong(id: String, default: Long): Long =
+fun IGrowthBookSDK.getLong(id: String, default: Long): Long =
     getLongOrNull(id) ?: default
 
 /**
@@ -215,7 +215,7 @@ fun GrowthBookSDK.getLong(id: String, default: Long): Long =
  * @param id unique feature identifier
  * @param default lazily-computed fallback value
  */
-fun GrowthBookSDK.getLongOrElse(id: String, default: () -> Long): Long =
+fun IGrowthBookSDK.getLongOrElse(id: String, default: () -> Long): Long =
     getLongOrNull(id) ?: default()
 
 /**
@@ -228,7 +228,7 @@ fun GrowthBookSDK.getLongOrElse(id: String, default: () -> Long): Long =
  *
  * @param id unique feature identifier
  */
-fun GrowthBookSDK.getFloatOrNull(id: String): Float? =
+fun IGrowthBookSDK.getFloatOrNull(id: String): Float? =
     featureValue<Number>(id)?.toFloat()
 
 /**
@@ -240,7 +240,7 @@ fun GrowthBookSDK.getFloatOrNull(id: String): Float? =
  * @param id unique feature identifier
  * @param default value returned when no usable number is present
  */
-fun GrowthBookSDK.getFloat(id: String, default: Float): Float =
+fun IGrowthBookSDK.getFloat(id: String, default: Float): Float =
     getFloatOrNull(id) ?: default
 
 /**
@@ -253,7 +253,7 @@ fun GrowthBookSDK.getFloat(id: String, default: Float): Float =
  * @param id unique feature identifier
  * @param default lazily-computed fallback value
  */
-fun GrowthBookSDK.getFloatOrElse(id: String, default: () -> Float): Float =
+fun IGrowthBookSDK.getFloatOrElse(id: String, default: () -> Float): Float =
     getFloatOrNull(id) ?: default()
 
 /**
@@ -266,7 +266,7 @@ fun GrowthBookSDK.getFloatOrElse(id: String, default: () -> Float): Float =
  *
  * @param id unique feature identifier
  */
-fun GrowthBookSDK.getDoubleOrNull(id: String): Double? =
+fun IGrowthBookSDK.getDoubleOrNull(id: String): Double? =
     featureValue<Number>(id)?.toDouble()
 
 /**
@@ -278,7 +278,7 @@ fun GrowthBookSDK.getDoubleOrNull(id: String): Double? =
  * @param id unique feature identifier
  * @param default value returned when no usable number is present
  */
-fun GrowthBookSDK.getDouble(id: String, default: Double): Double =
+fun IGrowthBookSDK.getDouble(id: String, default: Double): Double =
     getDoubleOrNull(id) ?: default
 
 /**
@@ -291,7 +291,7 @@ fun GrowthBookSDK.getDouble(id: String, default: Double): Double =
  * @param id unique feature identifier
  * @param default lazily-computed fallback value
  */
-fun GrowthBookSDK.getDoubleOrElse(id: String, default: () -> Double): Double =
+fun IGrowthBookSDK.getDoubleOrElse(id: String, default: () -> Double): Double =
     getDoubleOrNull(id) ?: default()
 
 /**
@@ -300,7 +300,7 @@ fun GrowthBookSDK.getDoubleOrElse(id: String, default: () -> Double): Double =
  *
  * @param id unique feature identifier
  */
-fun GrowthBookSDK.getJson(id: String): GBJson? =
+fun IGrowthBookSDK.getJson(id: String): GBJson? =
     featureValue<GBJson>(id)
 
 /**
