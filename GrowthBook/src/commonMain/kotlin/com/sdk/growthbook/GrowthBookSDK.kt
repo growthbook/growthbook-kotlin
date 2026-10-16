@@ -1034,9 +1034,9 @@ class GrowthBookSDK internal constructor(
     private fun createEvaluationContext(
         snapshot: EvalSnapshot = gbContext.evalSnapshot(),
         urlOverride: String? = null,
-        ) = createEvaluationContext(
-            gbContext, gbExperimentHelper, snapshot, pluginRegistry, urlOverride
-        )
+    ) = createEvaluationContext(
+        gbContext, gbExperimentHelper, snapshot, pluginRegistry, urlOverride
+    )
 
     //@ThreadLocal
     internal companion object {

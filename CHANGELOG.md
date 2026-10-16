@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Breaking changes
 - `GBExperiment` gains two constructor parameters, `urlPatterns` and `persistQueryString`. Source-compatible (both
   default to `null`), but **binary-incompatible**: the constructor's JVM signature changed, so code compiled against
-  8.x must be recompiled. Nothing else about the type changed, and both fields now take part in
+  9.x must be recompiled. Nothing else about the type changed, and both fields now take part in
   `equals`/`hashCode`/`copy()` as the rest of the experiment definition does.
 - `GBRemoteEvalParams` gains a fourth constructor parameter, `url` (defaulted to `null`). Same story: source-compatible,
   binary-incompatible. It is the remote-eval request body, which application code does not normally construct.
