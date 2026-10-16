@@ -668,7 +668,7 @@ one. There are three:
   per group. Condition groups are still inlined.
 - **References (all types)** — every group travels by reference, through a single `$savedGroup` operator.
 
-The third is the one added in 8.1.0. Its `savedGroups` entries are typed, and rules point at them by id:
+The third is the one added in 9.1.0. Its `savedGroups` entries are typed, and rules point at them by id:
 
 ```json
 {

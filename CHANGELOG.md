@@ -129,10 +129,10 @@ A defect of the same shape, in the attribute lookup rather than an operator:
   in the reference only because an index is `in` an array in JavaScript, alongside `length`.
 
 ### Companion artifacts
-- `GrowthBookExt` **2.0.1** and `GrowthBookTest` **2.0.1** — no source changes. Both declare `GrowthBook` as an `api`
-  dependency, so the published 2.0.0 artifacts pin the transitive version to 8.0.0 and a consumer who depends only on
-  one of them would keep evaluating with the operators fixed above. Republished so the dependency resolves to 8.1.0;
-  staying on 2.0.0 works too, but then `io.growthbook.sdk:GrowthBook:8.1.0` has to be declared explicitly.
+- `GrowthBookExt` **3.0.1** and `GrowthBookTest` **3.0.1** — no source changes. Both declare `GrowthBook` as an `api`
+  dependency, so the published 3.0.0 artifacts pin the transitive version to 9.0.0 and a consumer who depends only on
+  one of them would keep evaluating with the operators fixed above. Republished so the dependency resolves to 9.1.0;
+  staying on 3.0.0 works too, but then `io.growthbook.sdk:GrowthBook:9.1.0` has to be declared explicitly.
 - `Core`, `GrowthBookKotlinxSerialization`, `NetworkDispatcherKtor` and `NetworkDispatcherOkHttp` do not depend on
   `GrowthBook` at all and are unaffected; they keep their current versions.
 
