@@ -120,7 +120,7 @@ class GBContextualBanditPayloadTest {
         val definition = assertNotNull(bandits["bandit_1"])
         assertEquals(3, definition.banditVersion)
         assertEquals(listOf(7, 9), definition.contexts?.map { it.leafId })
-        assertEquals(listOf(0f, 1f), definition.contexts?.first()?.weights)
+        assertEquals(listOf(0.0, 1.0), definition.contexts?.first()?.weights)
     }
 
     @Test
@@ -169,7 +169,7 @@ class GBContextualBanditPayloadTest {
         assertEquals(GBString("variant"), result.gbValue)
         assertEquals(7, result.experimentResult?.leafId)
         assertEquals(3, result.experimentResult?.banditVersion)
-        assertEquals(listOf(0f, 1f), result.experimentResult?.variationWeights)
+        assertEquals(listOf(0.0, 1.0), result.experimentResult?.variationWeights)
     }
 
     @Test
@@ -380,7 +380,7 @@ class GBContextualBanditPayloadTest {
 
         assertEquals(GBString("control"), result.gbValue)
         assertEquals(-1, result.experimentResult?.leafId)
-        assertEquals(listOf(1.0f, 0.0f), result.experimentResult?.variationWeights)
+        assertEquals(listOf(1.0, 0.0), result.experimentResult?.variationWeights)
     }
 
     @Test
@@ -424,7 +424,7 @@ class GBContextualBanditPayloadTest {
         val result = sdk.feature("cb_feature")
 
         assertEquals(-1, result.experimentResult?.leafId)
-        assertEquals(listOf(0.5f, 0.5f), result.experimentResult?.variationWeights)
+        assertEquals(listOf(0.5, 0.5), result.experimentResult?.variationWeights)
     }
 
     @Test

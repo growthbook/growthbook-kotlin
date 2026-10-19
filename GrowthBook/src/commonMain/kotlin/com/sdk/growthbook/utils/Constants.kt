@@ -19,7 +19,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.floatOrNull
+import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
@@ -94,12 +94,12 @@ typealias GBFetchStatsHandler = (GBFetchStats) -> Unit
  * Triple Tuple for GrowthBook Namespaces
  * It has ID, StartRange & EndRange
  */
-typealias GBNameSpace = Triple<String, Float, Float>
+typealias GBNameSpace = Triple<String, Double, Double>
 
 /**
  * Double Tuple for GrowthBook Ranges
  */
-typealias GBBucketRange = Pair<Float, Float>
+typealias GBBucketRange = Pair<Double, Double>
 
 /**
  * Type Alias for map's key in Sticky Bucket documents of Context's property
@@ -287,7 +287,7 @@ data class GBRemoteEvalParams(
 object RangeSerializer {
     object GBBucketRangeListSerializer : KSerializer<List<GBBucketRange>> {
         override val descriptor: SerialDescriptor =
-            ListSerializer(PairSerializer(Float.serializer(), Float.serializer())).descriptor
+            ListSerializer(PairSerializer(Double.serializer(), Double.serializer())).descriptor
 
         override fun serialize(encoder: Encoder, value: List<GBBucketRange>) {
             val jsonArray = JsonArray(value.map {
@@ -304,8 +304,8 @@ object RangeSerializer {
         override fun deserialize(decoder: Decoder): List<GBBucketRange> {
             val jsonArray = decoder.decodeSerializableValue(JsonArray.serializer())
             return jsonArray.map {
-                val first = it.jsonArray[0].jsonPrimitive.floatOrNull
-                val second = it.jsonArray[1].jsonPrimitive.floatOrNull
+                val first = it.jsonArray[0].jsonPrimitive.doubleOrNull
+                val second = it.jsonArray[1].jsonPrimitive.doubleOrNull
                 if (first != null && second != null) {
                     first to second
                 } else {
@@ -322,8 +322,8 @@ object RangeSerializer {
     object GBBucketRangeSerializer : KSerializer<GBBucketRange> {
         override fun deserialize(decoder: Decoder): GBBucketRange {
             val array = decoder.decodeSerializableValue(JsonArray.serializer())
-            val first = array[0].jsonPrimitive.floatOrNull
-            val second = array[1].jsonPrimitive.floatOrNull
+            val first = array[0].jsonPrimitive.doubleOrNull
+            val second = array[1].jsonPrimitive.doubleOrNull
             return if (first != null && second != null) {
                 first to second
             } else {
@@ -332,7 +332,7 @@ object RangeSerializer {
         }
 
         override val descriptor: SerialDescriptor =
-            PairSerializer(Float.serializer(), Float.serializer()).descriptor
+            PairSerializer(Double.serializer(), Double.serializer()).descriptor
 
         override fun serialize(encoder: Encoder, value: GBBucketRange) {
             val jsonArray = JsonArray(

@@ -47,7 +47,7 @@ data class SerializableGBBanditContext internal constructor(
     /**
      * How to weight traffic between variations for users in this leaf. Must add to 1.
      */
-    val weights: List<Float>? = null
+    val weights: List<Double>? = null
 )
 
 internal fun SerializableGBContextualBandit.gbDeserialize(): GBContextualBandit =
