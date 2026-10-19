@@ -45,7 +45,7 @@ data class GBExperiment(
     /**
      * How to weight traffic between variations. Must add to 1.
      */
-    var weights: List<Float>? = null,
+    var weights: List<Double>? = null,
 
     /**
      * If set to false, always return the control (first variation)
@@ -55,7 +55,7 @@ data class GBExperiment(
     /**
      * What percent of users should be included in the experiment (between 0 and 1, inclusive)
      */
-    var coverage: Float? = null,
+    var coverage: Double? = null,
 
     /**
      * Optional targeting condition
@@ -221,9 +221,9 @@ data class GBExperimentResult(
     var name: String? = null,
 
     /**
-     * The hash value used to assign a variation (float from 0 to 1)
+     * The hash value used to assign a variation (between 0 and 1)
      */
-    var bucket: Float? = null,
+    var bucket: Double? = null,
 
     /**
      * Used for holdout groups
@@ -254,7 +254,7 @@ data class GBExperimentResult(
     /**
      * Contextual bandit: the per-variation weights used to bucket this user.
      */
-    val variationWeights: List<Float>? = null,
+    val variationWeights: List<Double>? = null,
 
     /**
      * Contextual bandit: which weight generation produced [variationWeights]

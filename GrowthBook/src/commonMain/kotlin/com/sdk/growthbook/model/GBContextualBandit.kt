@@ -50,7 +50,7 @@ data class GBBanditContext internal constructor(
     /**
      * How to weight traffic between variations for users in this leaf. Must add to 1.
      */
-    val weights: List<Float>? = null
+    val weights: List<Double>? = null
 ) {
     /**
      * The condition parsed once per payload: leaf conditions are re-checked on every evaluation
@@ -72,7 +72,7 @@ data class GBBanditContext internal constructor(
  */
 internal data class CBContext(
     val leafId: Int,
-    val variationWeights: List<Float>,
+    val variationWeights: List<Double>,
     val banditVersion: Int? = null
 )
 

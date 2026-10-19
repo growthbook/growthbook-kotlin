@@ -182,8 +182,8 @@ data class GBExperimentResultTest(
     val key: String = "",
     // The human-readable name of the assigned variation
     var name: String? = null,
-    // The hash value used to assign a variation (float from 0 to 1)
-    var bucket: Float? = null,
+    // The hash value used to assign a variation (double from 0 to 1)
+    var bucket: Double? = null,
     // Used for holdout groups
     var passthrough: Boolean? = null,
     // If a hash was used to assign a variation
@@ -193,6 +193,6 @@ data class GBExperimentResultTest(
     // If sticky bucketing was used to assign a variation
     val stickyBucketUsed: Boolean? = null,
     val leafId: Int? = null,
-    val variationWeights: List<Float>? = null,
+    val variationWeights: List<Double>? = null,
     val banditVersion: Int? = null
 )

@@ -51,9 +51,9 @@ data class SerializableGBExperimentResult internal constructor(
     var name: String? = null,
 
     /**
-     * The hash value used to assign a variation (float from 0 to 1)
+     * The hash value used to assign a variation (between 0 and 1)
      */
-    var bucket: Float? = null,
+    var bucket: Double? = null,
 
     /**
      * Used for holdout groups
@@ -84,7 +84,7 @@ data class SerializableGBExperimentResult internal constructor(
     /**
      * Contextual bandit: the per-variation weights used to bucket this user.
      */
-    val variationWeights: List<Float>? = null,
+    val variationWeights: List<Double>? = null,
 
     /**
      * Contextual bandit: which weight generation produced [variationWeights]
