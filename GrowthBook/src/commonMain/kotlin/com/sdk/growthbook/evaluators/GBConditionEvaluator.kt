@@ -8,6 +8,12 @@ import com.sdk.growthbook.utils.GBUtils
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBBoolean
+import com.sdk.growthbook.utils.isJsNull
+import com.sdk.growthbook.utils.isJsTruthy
+import com.sdk.growthbook.utils.toJsDouble
+import com.sdk.growthbook.utils.toJsJson
+import com.sdk.growthbook.utils.toJsNumber
+import com.sdk.growthbook.utils.toJsString
 
 /**
  * Both experiments and features can define targeting conditions using a syntax modeled
@@ -258,9 +264,18 @@ internal class GBConditionEvaluator {
 
         var element: GBValue = attributes[paths[0]] ?: GBNull
 
+        // Like JS getPath: arrays are indexable, anything else that isn't an object ends in null
         for (path in paths.subList(1, paths.size)) {
-            if (element is GBJson) {
-                element = element[path] ?: GBNull
+            element = when (element) {
+                is GBJson -> element[path] ?: return GBNull
+                is GBArray -> when {
+                    path == "length" -> GBNumber(element.size)
+                    else -> path.toIntOrNull()
+                        ?.takeIf { it.toString() == path && it in element.indices }
+                        ?.let { element[it] }
+                        ?: return GBNull
+                }
+                else -> return GBNull
             }
         }
 
@@ -272,32 +287,24 @@ internal class GBConditionEvaluator {
      */
     fun evalConditionValue(conditionValue: GBValue, attributeValue: GBValue?, savedGroups: Map<String, GBValue>?, inSensitive: Boolean = false): Boolean {
 
-        // Simple equality comparison with optional case-insensitivity
-        if (inSensitive && conditionValue is GBString && attributeValue is GBString) {
-            return conditionValue.value.equals(attributeValue.value, ignoreCase = true)
-        }
-
-        // If conditionValue is a string, number, boolean, return true
-        // if it's "equal" to attributeValue and false if not.
-        if (
-            conditionValue.isPrimitiveValue() &&
-            (attributeValue == null || attributeValue.isPrimitiveValue())
-        ) {
-            return conditionValue == attributeValue
-        }
-
-        if (conditionValue.isPrimitiveValue() && attributeValue == null) {
-            return false
-        }
-
-        // If conditionValue is array, return true if it's "equal" - "equal"
-        // should do a deep comparison for arrays.
-        if (conditionValue is GBArray) {
-            return if (attributeValue is GBArray) {
-                arraysEqual(conditionValue, attributeValue)
-            } else {
-                false
+        // Simple equality comparisons, coercing like JS (a missing attribute is null)
+        when (conditionValue) {
+            is GBString -> {
+                if (inSensitive) {
+                    return if (attributeValue is GBString) {
+                        conditionValue.value.equals(attributeValue.value, ignoreCase = true)
+                    } else {
+                        attributeValue.toJsString().lowercase() == conditionValue.value.lowercase()
+                    }
+                }
+                return attributeValue.toJsString() == conditionValue.value
             }
+            is GBNumber -> return attributeValue.toJsNumber() == conditionValue.toJsDouble()
+            is GBBoolean -> return !attributeValue.isJsNull() &&
+                attributeValue.isJsTruthy() == conditionValue.value
+            is GBNull -> return attributeValue.isJsNull()
+            is GBArray -> return attributeValue.toJsJson() == conditionValue.toJsJson()
+            else -> Unit
         }
 
         // If conditionValue is an object, loop over each key/value pair:
@@ -316,28 +323,12 @@ internal class GBConditionEvaluator {
                         return false
                     }
                 }
-            } else if (attributeValue != null) {
-                return conditionValue == attributeValue
             } else {
-                return false
+                return attributeValue.toJsJson() == conditionValue.toJsJson()
             }
         }
 
         // Return true
-        return true
-    }
-
-    private fun arraysEqual(arr1: GBArray, arr2: GBArray): Boolean {
-        if (arr1.size == arr2.size) {
-            for (i in arr1.indices) {
-                if (arr1[i] != arr2[i]) {
-                    return false
-                }
-            }
-        } else {
-            return false
-        }
-
         return true
     }
 
