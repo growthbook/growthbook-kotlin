@@ -4,6 +4,7 @@ import com.sdk.growthbook.evaluators.EvaluationContext
 import com.sdk.growthbook.evaluators.UserContext
 import com.sdk.growthbook.features.FeaturesDataModel
 import com.sdk.growthbook.model.GBContext
+import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.StickyBucketAssignmentDocsType
@@ -603,6 +604,7 @@ internal class GBUtils {
                 is GBValue.Unknown -> ""
                 is GBNull -> ""
                 null -> ""
+                is GBNumber -> this.toJsString()
                 else -> this.gbSerialize().toString()
             }
     }
