@@ -106,11 +106,13 @@ class GBExperimentRunTests {
                 val resultJsonElement = result.value.gbSerialize()
                 val status =
                     item[0].toString() + "\nExpected Result - " + item[3] + " & " + item[4] +
+                        " & " + item[5] +
                         "\nActual result - " + resultJsonElement.toString() + " & " +
-                        result.inExperiment + "\n\n"
+                        result.inExperiment + " & " + result.hashUsed + "\n\n"
 
                 if (item[3].toString() == resultJsonElement.toString()
                     && item[4].toString() == result.inExperiment.toString()
+                    && item[5].toString() == result.hashUsed.toString()
                 ) {
                     passedScenarios.add(status)
                 } else {

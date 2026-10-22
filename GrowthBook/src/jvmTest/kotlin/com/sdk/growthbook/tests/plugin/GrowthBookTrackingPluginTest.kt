@@ -108,7 +108,7 @@ class GrowthBookTrackingPluginTest {
                 hashAttribute = "id",
                 hashValue = "u1",
                 leafId = 7,
-                variationWeights = listOf(0.25f, 0.75f),
+                variationWeights = listOf(0.25, 0.75),
                 banditVersion = 3,
             ),
             attributes = null,
@@ -120,8 +120,8 @@ class GrowthBookTrackingPluginTest {
         assertEquals("7", properties["leafId"]?.jsonPrimitive?.content)
         assertEquals("3", properties["banditVersion"]?.jsonPrimitive?.content)
         assertEquals(
-            listOf(0.25f, 0.75f),
-            (properties["variationWeights"] as JsonArray).map { it.jsonPrimitive.content.toFloat() }
+            listOf(0.25, 0.75),
+            (properties["variationWeights"] as JsonArray).map { it.jsonPrimitive.content.toDouble() }
         )
     }
 

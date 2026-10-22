@@ -6,6 +6,56 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [10.0.0] - 2026-10-22
+
+A major because bucketing now runs in 64-bit `Double` instead of 32-bit `Float`, so it matches the
+reference JS SDK and the other SDKs bit for bit. The public numeric types change with it, and a small
+set of users are re-bucketed on upgrade. See *Breaking changes*.
+
+### Fixed
+- **Bucketing matches the JS SDK exactly.** The hash, equal weights, coverage, weights and bucket
+  ranges were `Float`, and both ends of every range went through `roundTo(4)`. JS uses doubles and
+  never rounds, so range ends differed (`0.019999999552965164` vs `0.020000000000000004`) and a user
+  whose hash landed exactly on one got a different variation. Bucketing now runs in `Double` with no
+  rounding, and the 7 range-end `run` cases and 2 rollout-boundary `feature` cases from the shared
+  spec pass.
+- `equals`/`hashCode` on `GBExperiment`, `GBFeatureRule`, `GBExperimentResult` and `GBBanditContext`
+  now see weight and coverage changes below `Float` precision, so `setFeaturesChangeHandler` fires for
+  them. `GBExperimentResult.bucket` and `variationWeights` also keep full precision through
+  serialization.
+
+### Breaking changes
+- **These public types change from `Float` to `Double`:**
+  - `GBBucketRange` is now `Pair<Double, Double>` and `GBNameSpace` is now
+    `Triple<String, Double, Double>` (the names stay the same).
+  - `GBExperiment.coverage` and `weights`
+  - `GBFeatureRule.coverage` and `weights` (`range`/`ranges` are `GBBucketRange`)
+  - `GBExperimentResult.bucket` and `variationWeights`
+  - `GBBanditContext.weights`
+  - `GBFilter.ranges` (a `List<GBBucketRange>`)
+
+  Code that only reads these values or passes them along keeps compiling. Code that writes `Float`
+  literals or calls `toFloat()` on them needs updating:
+  ```kotlin
+  // 9.x
+  GBExperiment(key = "exp", coverage = 0.5f, weights = listOf(0.5f, 0.5f))
+  // 10.0
+  GBExperiment(key = "exp", coverage = 0.5, weights = listOf(0.5, 0.5))
+  ```
+- **Users whose hash lands exactly on a bucket range end may move to a different variation.** This
+  brings them in line with the JS SDK and the other GrowthBook SDKs. Only a hash equal to a range
+  end is affected, and hashes have 4 decimal places (3 with hash v1), so this is a small fraction of
+  traffic. With sticky bucketing enabled, users who already have an assignment keep it.
+
+### Companion artifacts
+- `GrowthBookTest` **4.0.0**: no source changes, but it builds `GBExperimentResult` internally, so the
+  3.0.0 artifact is not binary-compatible with this release and must be upgraded alongside it.
+- `GrowthBookExt` **4.0.0**: no source changes. The major bump propagates this release through its
+  `api` dependency.
+- `Core`, `GrowthBookKotlinxSerialization`, `NetworkDispatcherKtor` and `NetworkDispatcherOkHttp` are
+  unaffected and keep their current versions.
+
+---
 ## [9.0.0] - 2026-10-16
 
 A major because two public contracts change with no signature change and no compile error to

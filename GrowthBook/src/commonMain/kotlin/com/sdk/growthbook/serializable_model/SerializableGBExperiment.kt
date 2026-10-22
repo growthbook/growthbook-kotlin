@@ -43,7 +43,7 @@ data class SerializableGBExperiment internal constructor(
     /**
      * How to weight traffic between variations. Must add to 1.
      */
-    var weights: List<Float>? = null,
+    var weights: List<Double>? = null,
 
     /**
      * If set to false, always return the control (first variation)
@@ -53,7 +53,7 @@ data class SerializableGBExperiment internal constructor(
     /**
      * What percent of users should be included in the experiment (between 0 and 1, inclusive)
      */
-    var coverage: Float? = null,
+    var coverage: Double? = null,
 
     /**
      * Optional targeting condition
