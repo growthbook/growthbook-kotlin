@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [4.0.0] - 2026-10-22
+
+No source changes. The major bump propagates the breaking changes in `GrowthBook` 10.0.0, which this
+artifact exposes as an `api` dependency: bucketing types change from `Float` to `Double`, and users
+whose hash lands exactly on a bucket range end may move variation. See the
+[core changelog](CHANGELOG.md#1000---2026-10-22).
+
 ## [3.0.0] - 2026-10-16
 
 `GrowthBookExt`'s own API only gains below. The major bump propagates the breaking changes in
