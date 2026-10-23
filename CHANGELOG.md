@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
-## [Unreleased]
+## [10.0.0] - Unreleased
 
 ### Fixed
 - A prerequisite (`parentConditions`) with a malformed condition, such as `{"$not": null}`, no longer
@@ -16,17 +16,109 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Strict types in condition evaluation** (shared spec 0.10.0, growthbook/growthbook#7379). Conditions no
   longer coerce attribute types. When the attribute's type differs from the condition's, the positive
   operator fails and its negation matches:
-  - `"10"` does not equal `10`, `0` does not match null or a missing attribute, and `false` does not match `""`.
-  - Two strings compare as text (`"10" < "9"` is true); a string never compares with a number.
-  - Booleans are not ordered: `$gt`, `$gte`, `$lt` and `$lte` always fail on them.
-  - Version operators (`$veq`, `$vgt`, …) need both sides to be strings, or both numbers. A missing, null,
-    boolean, array or float attribute against a version string fails; `$vne` matches.
-  - A missing attribute fails comparison operators.
-  - `$exists` and `$type` are unchanged.
+    - `"10"` does not equal `10`, `0` does not match null or a missing attribute, and `false` does not match `""`.
+    - Two strings compare as text (`"10" < "9"` is true); a string never compares with a number.
+    - Booleans are not ordered: `$gt`, `$gte`, `$lt` and `$lte` always fail on them.
+    - Version operators (`$veq`, `$vgt`, …) need both sides to be strings, or both numbers. A missing, null,
+      boolean, array or float attribute against a version string fails; `$vne` matches.
+    - A missing attribute fails comparison operators.
+    - `$exists` and `$type` are unchanged.
 
   Targeting that relied on coercion, such as a numeric attribute sent as a string, stops matching. Send
   attributes with the type the condition uses.
+- **`$notRegex` / `$notRegexi` are no longer evaluated.** They are authoring operators of the GrowthBook UI, which
+  saves them as `{"$not": {"$regex": …}}`; no other GrowthBook SDK implements them, and a payload from GrowthBook never
+  contains them. Like any unknown operator they now match nobody. Use `{"$not": {"$regex": …}}` in hand-written
+  conditions.
 
+### Added
+- **Saved groups of every type can now be sent by reference (`savedGroupReferencesV2`).** Until now only ID lists
+  could travel as a reference; a saved group defined by a condition was copied into every rule that used it, so a
+  group shared by fifty features was serialized fifty times. The payload's `savedGroups` map may now hold a typed
+  entry — `{"type": "list", "attributeKey": …, "values": […]}` or `{"type": "condition", "condition": {…}}` — beside
+  the bare arrays it has always carried, and rules reference one through a new top-level `$savedGroup` operator:
+
+  ```json
+  { "$savedGroup": { "id": "grp_beta" } }
+  { "$savedGroup": { "id": "grp_beta", "attributeKey": "backup_id" } }
+  ```
+
+  Unlike `$inGroup`, the operator is not bound to an attribute — it sits alongside `$and` / `$or` / `$not` — so the
+  entry decides what membership means: a list entry names the attribute to test, and a condition entry is evaluated
+  in full and may itself reference further groups. The optional `attributeKey` overrides the attribute a list entry
+  names; it is ignored for a condition entry, which has no single attribute.
+
+  Anything the SDK cannot make sense of matches nobody rather than throwing — an id absent from the payload, a group
+  type added after this release, a malformed entry, a non-string `id` or `attributeKey`. A payload is allowed to be
+  newer than the SDK reading it. References may chain, and a group that references itself, directly or around a
+  cycle, resolves to "no match" instead of recursing until the host app dies.
+
+  Nothing changes for an existing integration: the format is chosen per SDK Connection and requires the
+  `savedGroupReferencesV2` capability, which no published Kotlin release declares yet. A connection serving bare
+  arrays and `$inGroup` keeps doing exactly that.
+
+- **`$inGroup` / `$notInGroup` fail closed against an entry they cannot read.** Both operators can now take their
+  values from a typed list entry. Anything else with no values to offer — a condition entry, an unknown type, a
+  missing `values` field, an entry that is not an object at all — makes **both** answer false. Previously such an
+  entry was read as an empty list, which is the loud failure: `$notInGroup` passed every user through an exclusion
+  rule. An id merely absent from the payload still resolves to an empty list, so `$notInGroup` keeps passing for one;
+  that is documented behaviour shared by every GrowthBook SDK. Only reachable from a payload carrying typed entries,
+  so no v1 connection changes behaviour.
+
+### Fixed
+Targeting-condition operators that silently answered "no match" for whole classes of attribute value. Each was
+found by diffing the evaluator against the reference SDK and is pinned by the shared spec corpus (now 0.10.1) or,
+where the corpus has no case for it, by a dedicated test suite.
+
+- **`$eq` now works for every attribute type, not just strings.** The operator narrowed both operands to a string
+  before comparing, so it answered false for every number and boolean: `{"age": {"$eq": 25}}` did not match an age of
+  25, and `$eq` and `$ne` both reported false for the same pair. It now compares values directly, matching the
+  reference SDK and the plain-equality path (`{"age": 25}`), which were never affected. This also fixes `$elemMatch`
+  bodies such as `{"$elemMatch": {"$eq": 0}}`, which could not match a numeric or boolean element.
+  `$eq` and `$ne` are now also a strict negation of each other for array and object operands, where both used to
+  answer false. They follow the reference SDK's `===`, which is reference identity for those: a condition and an
+  attribute are decoded separately, so `$eq` is false and `$ne` true whatever the contents. Plain equality
+  (`{"tags": ["a"]}`) still compares contents, in this SDK and the reference alike.
+- **Targeting compares numbers by value, so `25` matches `25.0`.** JavaScript has a single number type, so in the
+  reference SDK — and every other GrowthBook SDK — `{"age": 25}`, `$eq: 25` and `$in: [25]` all match an age of
+  `25.0`. Here they did not: targeting used `GBNumber`'s own equality, which keeps integer and floating-point values
+  distinct, so a rule missed every user whose app set the attribute as a `Double`. Plain equality (including numbers
+  inside arrays and objects), `$eq` / `$ne`, `$in` / `$nin` and `$inGroup` / `$notInGroup` now compare numbers by
+  value. `GBNumber`'s own `equals` is unchanged — this is a targeting rule, not a change to the value model. Large
+  `$in` lists keep their constant-time lookup.
+- **`$exists` reads its value as JavaScript does.** The reference SDK treats the value in a boolean context, so
+  `$exists: 1` asks for a present attribute and `$exists: 0` or `""` for an absent one. Only a JSON boolean was read
+  here; any other value matched in neither direction. GrowthBook's UI only writes booleans, so this is reachable from
+  hand-written conditions only.
+- **`$inGroup` / `$notInGroup` now work for multi-value attributes.** Both operators were only reachable for a
+  primitive attribute, so an array attribute such as `tags: ["a", "b"]` made *both* of them answer false — a rule
+  written as "everyone except this saved group" matched nobody, and its inclusion twin matched nobody either. They are
+  now dispatched on the operator alone, matching the reference SDK: an array attribute is a member of the group when
+  the two intersect. Scalar, absent and null attributes are unchanged.
+- **`$elemMatch` no longer tests null array elements.** Every element was evaluated against the condition, so an array
+  that merely contained a null satisfied any negation-flavoured body — `$ne`, `$nin`, `$exists: false`, `$eq: null`.
+  Null elements are now skipped, matching the reference SDK. Falsy-but-present members (`0`, `false`, `""`) are still
+  tested, so `{"$elemMatch": {"$eq": 0}}` continues to match `[0]`.
+
+A defect of the same shape, in the attribute lookup rather than an operator:
+
+- **A dot-separated attribute path no longer resolves to a value it does not name.** The walk skipped a segment it
+  could not descend into instead of stopping, and returned the last value it reached: `user.id` against
+  `{"user": "u_1"}` answered `"u_1"`, and `a.b.c` against `{"a": {"b": "x"}}` answered `"x"`. A rule targeting
+  `user.id` therefore matched a user who has no such attribute, `$exists` reported the attribute as present, and a
+  saved group keyed on a path could place a user inside it rather than outside — always in the direction that grants
+  access. The walk now stops, as the reference SDK's does. Array indices are still not traversed: they are reachable
+  in the reference only because an index is `in` an array in JavaScript, alongside `length`.
+
+### Companion artifacts
+- `GrowthBookExt` **3.0.1** and `GrowthBookTest` **3.0.1** — no source changes. Both declare `GrowthBook` as an `api`
+  dependency, so the published 3.0.0 artifacts pin the transitive version to 9.0.0 and a consumer who depends only on
+  one of them would keep evaluating with the operators fixed above. Republished so the dependency resolves to 10.0.0;
+  staying on 3.0.0 works too, but then `io.growthbook.sdk:GrowthBook:10.0.0` has to be declared explicitly.
+- `Core`, `GrowthBookKotlinxSerialization`, `NetworkDispatcherKtor` and `NetworkDispatcherOkHttp` do not depend on
+  `GrowthBook` at all and are unaffected; they keep their current versions.
+
+---
 ## [9.0.0] - 2026-10-16
 
 A major because two public contracts change with no signature change and no compile error to
