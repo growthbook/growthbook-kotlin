@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rules. As with `suspendFeature`, a total fetch failure still falls back to the locally evaluated
   result.
 
-The companion `GrowthBookTest` artifact is bumped to 2.1.0: `FakeGrowthBook` overrides
+The companion `GrowthBookTest` artifact is bumped to 3.1.0: `FakeGrowthBook` overrides
 `getFeatures()` rather than inheriting the empty default, so helpers that use it to detect an
 unknown feature behave against the fake as they do against the real SDK.
 
