@@ -9,6 +9,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import com.sdk.growthbook.GBSDKBuilder
 import com.sdk.growthbook.integration.buildSDK
 import com.sdk.growthbook.stickybucket.GBStickyBucketServiceImp
@@ -44,12 +45,12 @@ class GBExperimentRunTests {
     fun testExperiments() {
         val failedScenarios: ArrayList<String> = ArrayList()
         val passedScenarios: ArrayList<String> = ArrayList()
-        var skipped = 0
+        val skippedScenarios: ArrayList<String> = ArrayList()
         for (item in evalConditions) {
             if (item is JsonArray) {
-                // Kotlin (mobile-first) has no querystring/URL-based experiment override; skip those cases.
-                if (item[1].jsonObject.containsKey("url")) {
-                    skipped++
+                val caseName = item[0].jsonPrimitive.content
+                if (caseName in UNSUPPORTED_URL_CASES) {
+                    skippedScenarios.add(caseName)
                     continue
                 }
 
@@ -129,11 +130,16 @@ class GBExperimentRunTests {
         print("\nTOTAL TESTS - " + evalConditions.size)
         print("\nPassed TESTS - " + passedScenarios.size)
         print("\nFailed TESTS - " + failedScenarios.size)
-        print("\nSkipped TESTS (no URL override) - " + skipped)
+        print("\nSkipped TESTS - " + skippedScenarios.size + " " + skippedScenarios)
         print("\n")
         print(failedScenarios)
 
         assertEquals(failedScenarios.size, 0)
+        assertEquals(
+            UNSUPPORTED_URL_CASES, skippedScenarios.toSet(),
+            "The skip list must match the corpus: a renamed or removed case would otherwise be " +
+                "silently dropped from the run, or silently stop being skipped.",
+        )
     }
 
     @Test
@@ -313,5 +319,25 @@ class GBExperimentRunTests {
         val doc = docs["id||1"]
         assertNotNull(doc)
         assertTrue(doc.assignments.containsKey("key-576__0"))
+    }
+
+    private companion object {
+        /**
+         * Cases from the shared corpus that this SDK cannot satisfy, skipped by name rather than
+         * deleted from `cases.json` — that file is a verbatim copy of the reference SDK's fixture,
+         * so the next person to refresh it would silently undo an edit and face a red suite with
+         * no record of why.
+         *
+         * These two force a variation from a query parameter in the context's `url`. The SDK has
+         * no URL dimension at all: no `url` on the context, no `getQueryStringOverride`, and no
+         * `urlRedirect` support, which is also why the corpus sections of those names are not
+         * exercised anywhere. It is not a platform limitation — the JS and wasmJs targets are
+         * browser-only and could read `window.location.href` — but an unimplemented input, so
+         * these will start passing if the SDK ever accepts a URL.
+         */
+        val UNSUPPORTED_URL_CASES = setOf(
+            "querystring force",
+            "querystring force with inactive",
+        )
     }
 }
