@@ -144,6 +144,42 @@ internal class GBConditionEvaluator {
     }
 
     /**
+     * Evaluates a prerequisite (`parentConditions`) condition.
+     * A malformed condition, such as `{"$not": null}`, never matches, so the gated rule
+     * or experiment is skipped. Attribute targeting conditions are unaffected.
+     */
+    fun evalParentCondition(
+        attributes: Map<String, GBValue>,
+        conditionObj: GBJson,
+        savedGroups: Map<String, GBValue>?
+    ): Boolean = !isMalformed(conditionObj) && evalCondition(attributes, conditionObj, savedGroups)
+
+    // The shapes the JS SDK cannot evaluate: a null where a condition object is required
+    private fun isMalformed(conditionObj: GBJson): Boolean =
+        conditionObj.any { (key, value) ->
+            when (key) {
+                "\$or", "\$nor", "\$and" -> value is GBArray &&
+                    value.any { it is GBNull || (it is GBJson && isMalformed(it)) }
+                "\$not" -> value is GBNull || (value is GBJson && isMalformed(value))
+                "\$savedGroup" -> false
+                else -> isMalformedValue(value)
+            }
+        }
+
+    private fun isMalformedValue(conditionValue: GBValue): Boolean =
+        conditionValue is GBJson && isOperatorObject(conditionValue) &&
+            conditionValue.any { (operator, value) ->
+                when (operator) {
+                    "\$elemMatch" -> value is GBNull || (
+                        value is GBJson &&
+                            if (isOperatorObject(value)) isMalformedValue(value) else isMalformed(value)
+                        )
+                    "\$not", "\$size" -> isMalformedValue(value)
+                    else -> false
+                }
+            }
+
+    /**
      * Evaluate OR conditions against given attributes
      */
     private fun evalOr(
@@ -272,22 +308,19 @@ internal class GBConditionEvaluator {
      */
     fun evalConditionValue(conditionValue: GBValue, attributeValue: GBValue?, savedGroups: Map<String, GBValue>?, inSensitive: Boolean = false): Boolean {
 
-        // Simple equality comparison with optional case-insensitivity
-        if (inSensitive && conditionValue is GBString && attributeValue is GBString) {
-            return conditionValue.value.equals(attributeValue.value, ignoreCase = true)
-        }
-
-        // If conditionValue is a string, number, boolean, return true
-        // if it's "equal" to attributeValue and false if not.
-        if (
-            conditionValue.isPrimitiveValue() &&
-            (attributeValue == null || attributeValue.isPrimitiveValue())
-        ) {
+        // A string, number or boolean only equals an attribute of the same type: no coercion
+        if (conditionValue is GBString || conditionValue is GBNumber || conditionValue is GBBoolean) {
+            if (getType(attributeValue) != getType(conditionValue)) {
+                return false
+            }
+            if (inSensitive && conditionValue is GBString && attributeValue is GBString) {
+                return conditionValue.value.equals(attributeValue.value, ignoreCase = true)
+            }
             return conditionValue == attributeValue
         }
 
-        if (conditionValue.isPrimitiveValue() && attributeValue == null) {
-            return false
+        if (conditionValue is GBNull) {
+            return attributeValue == GBNull
         }
 
         // If conditionValue is array, return true if it's "equal" - "equal"
@@ -421,6 +454,16 @@ internal class GBConditionEvaluator {
             }
         }
 
+        // Equality, ordering and version operators never coerce types: on a type mismatch the
+        // positive operator fails and its negation ($ne, $vne) matches
+        when (operator) {
+            "\$eq" -> return isStrictlyEqual(attributeValue, conditionValue)
+            "\$ne" -> return !isStrictlyEqual(attributeValue, conditionValue)
+            "\$lt", "\$lte", "\$gt", "\$gte" -> return evalComparison(operator, attributeValue, conditionValue)
+            "\$veq", "\$vne", "\$vgt", "\$vgte", "\$vlt", "\$vlte" ->
+                return evalVersion(operator, attributeValue, conditionValue)
+        }
+
         /// There are three operators where conditionValue is an array
         if (conditionValue is GBArray) {
             when (operator) {
@@ -478,74 +521,8 @@ internal class GBConditionEvaluator {
         } else if (attributeValue?.isPrimitiveValue() == true) {
             val targetPrimitiveValue = conditionValue as? GBString
             val sourcePrimitiveValue = attributeValue as? GBString
-            val paddedVersionTarget =
-                GBUtils.paddedVersionString(targetPrimitiveValue?.value.orEmpty())
-            val paddedVersionSource =
-                GBUtils.paddedVersionString(sourcePrimitiveValue?.value ?: "0")
-
-            fun template(
-                stringComparator: (String, String) -> Boolean,
-                numberComparator: (Double, Double) -> Boolean,
-            ) = comparisonTemplate(
-                attributeValue, conditionValue,
-                stringComparator, numberComparator
-            )
 
             when (operator) {
-                // Evaluate EQ operator - whether condition equals to attribute
-                "\$eq" -> {
-                    if (sourcePrimitiveValue == null || getType(attributeValue) == GBAttributeType.GbNull) return false
-                    return sourcePrimitiveValue == targetPrimitiveValue
-                }
-                // Evaluate NE operator - whether condition doesn't equal to attribute
-                "\$ne" -> {
-                    // return sourcePrimitiveValue != targetPrimitiveValue
-                    return conditionValue != attributeValue
-                }
-                // Evaluate LT operator - whether attribute less than to condition
-                "\$lt" -> {
-                    return template(
-                        stringComparator = { actual, expected ->
-                            actual < expected
-                        },
-                        numberComparator = { actual, expected ->
-                            actual < expected
-                        },
-                    )
-                }
-                // Evaluate LTE operator - whether attribute less than or equal to condition
-                "\$lte" -> {
-                    return template(
-                        stringComparator = { actual, expected ->
-                            actual <= expected
-                        },
-                        numberComparator = { actual, expected ->
-                            actual <= expected
-                        },
-                    )
-                }
-                // Evaluate GT operator - whether attribute greater than to condition
-                "\$gt" -> {
-                    return template(
-                        stringComparator = { actual, expected ->
-                            actual > expected
-                        },
-                        numberComparator = { actual, expected ->
-                            actual > expected
-                        },
-                    )
-                }
-                // Evaluate GTE operator - whether attribute greater than or equal to condition
-                "\$gte" -> {
-                    return template(
-                        stringComparator = { actual, expected ->
-                            actual >= expected
-                        },
-                        numberComparator = { actual, expected ->
-                            actual >= expected
-                        },
-                    )
-                }
                 // Evaluate REGEX operator - whether attribute contains condition regex
                 "\$regex" -> {
                     return evalRegex(conditionValue = targetPrimitiveValue,
@@ -578,22 +555,6 @@ internal class GBConditionEvaluator {
                         negate = true
                     )
                 }
-                // Evaluate VEQ operator - whether versions are equals
-                "\$veq" -> return paddedVersionSource == paddedVersionTarget
-                // Evaluate VNE operator - whether versions are not equals to attribute
-                "\$vne" -> return paddedVersionSource != paddedVersionTarget
-                // Evaluate VGT operator - whether the first version is greater
-                // than the second version
-                "\$vgt" -> return paddedVersionSource > paddedVersionTarget
-                // Evaluate VGTE operator - whether the first version is greater
-                // than or equal the second version
-                "\$vgte" -> return paddedVersionSource >= paddedVersionTarget
-                // Evaluate VLT operator - whether the first version is lesser
-                // than the second version
-                "\$vlt" -> return paddedVersionSource < paddedVersionTarget
-                // Evaluate VLTE operator - whether the first version is lesser
-                // than or equal the second version
-                "\$vlte" -> return paddedVersionSource <= paddedVersionTarget
                 "\$inGroup" -> {
                     val gbArray =
                         savedGroups?.get(conditionValue.asKey()) as? GBArray ?: GBArray(emptyList())
@@ -676,32 +637,71 @@ internal class GBConditionEvaluator {
         return true
     }
 
-    private fun comparisonTemplate(
-        actualGbValue: GBValue?,
-        expectedGbValue: GBValue,
-        stringComparator: (String, String) -> Boolean,
-        numberComparator: (Double, Double) -> Boolean,
-    ): Boolean {
-        val isAlphabeticComparison = actualGbValue is GBString && expectedGbValue is GBString
+    /** Mirrors JS `===`: only a string, number, boolean or null can be equal. */
+    private fun isStrictlyEqual(attributeValue: GBValue?, conditionValue: GBValue): Boolean =
+        attributeValue != null && attributeValue.isPrimitiveValue() && attributeValue == conditionValue
 
-        return if (isAlphabeticComparison) {
-            stringComparator.invoke(
-                (actualGbValue as? GBString)?.value.orEmpty(),
-                (expectedGbValue as? GBString)?.value.orEmpty(),
-            )
-        } else {
-            numberComparator.invoke(
-                actualGbValue?.tryRetrieveDouble() ?: 0.0,
-                expectedGbValue.tryRetrieveDouble(),
-            )
+    /**
+     * Two strings compare as text and two numbers numerically.
+     * Anything else, including booleans and mixed types, is not ordered.
+     */
+    private fun evalComparison(operator: String, attributeValue: GBValue?, conditionValue: GBValue): Boolean {
+        if (attributeValue is GBString && conditionValue is GBString) {
+            val order = attributeValue.value.compareTo(conditionValue.value)
+            return when (operator) {
+                "\$lt" -> order < 0
+                "\$lte" -> order <= 0
+                "\$gt" -> order > 0
+                else -> order >= 0
+            }
+        }
+        if (attributeValue is GBNumber && conditionValue is GBNumber) {
+            val actual = attributeValue.value.toDouble()
+            val expected = conditionValue.value.toDouble()
+            return when (operator) {
+                "\$lt" -> actual < expected
+                "\$lte" -> actual <= expected
+                "\$gt" -> actual > expected
+                else -> actual >= expected
+            }
+        }
+        return false
+    }
+
+    /**
+     * Version operators need both sides to be strings, or both numbers.
+     * On a type mismatch only `$vne` matches, as the negation of `$veq`.
+     */
+    private fun evalVersion(operator: String, attributeValue: GBValue?, conditionValue: GBValue): Boolean {
+        val actual = versionInput(attributeValue)
+        val expected = versionInput(conditionValue)
+        val sameType = (attributeValue is GBString && conditionValue is GBString) ||
+            (attributeValue is GBNumber && conditionValue is GBNumber)
+        if (!sameType || actual == null || expected == null) {
+            return operator == "\$vne"
+        }
+        val order = GBUtils.paddedVersionString(actual)
+            .compareTo(GBUtils.paddedVersionString(expected))
+        return when (operator) {
+            "\$veq" -> order == 0
+            "\$vne" -> order != 0
+            "\$vgt" -> order > 0
+            "\$vgte" -> order >= 0
+            "\$vlt" -> order < 0
+            else -> order <= 0
         }
     }
 
-    private fun GBValue.tryRetrieveDouble(): Double =
-        when (this) {
-            is GBNumber -> this.value.toDouble()
-            is GBString -> this.value.toDoubleOrNull() ?: 0.0
-            else -> 0.0
+    /** The version string for a string or number, using JS number formatting; "" means version 0. */
+    private fun versionInput(value: GBValue?): String? =
+        when (value) {
+            is GBString -> value.value.ifEmpty { "0" }
+            is GBNumber -> {
+                val number = value.value.toDouble()
+                if (number % 1.0 == 0.0 && number.isFinite()) number.toLong().toString()
+                else value.value.toString()
+            }
+            else -> null
         }
 
     private fun evalRegex(conditionValue: GBString?, attributeValue: GBString?, ignoreCase: Boolean, negate: Boolean): Boolean {
