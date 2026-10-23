@@ -354,7 +354,7 @@ class GrowthBookSDK internal constructor(
     /**
      * Get Cached Features
      */
-    fun getFeatures(): GBFeatures {
+    override fun getFeatures(): GBFeatures {
         return gbContext.features
     }
 

@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [9.1.0] - Unreleased
+
+### Added
+- `IGrowthBookSDK.getFeatures()` — the currently loaded feature definitions are now part of the
+  interface, so code written against it can tell "feature absent from the payload" from "feature
+  present but off" without holding a concrete `GrowthBookSDK`. It ships with a default body
+  returning an empty map, so existing Kotlin/Java implementors keep compiling; implementations that
+  hold definitions should override it. Note the default does not extend to Swift, where Kotlin
+  interfaces export with every member `@required`; the interface is an SDK-owned seam for
+  substituting a test double, not an extension point for third-party implementations, so members
+  may be added to it in a minor release.
+- `suspendFeatureValue<V>(id)` — the awaiting counterpart of `featureValue<V>(id)`: suspends until
+  feature definitions are loaded (via `suspendFeature`) and only then maps the value onto `V`. It
+  lets callers outside this module await *and* map without reimplementing the internal mapping
+  rules. As with `suspendFeature`, a total fetch failure still falls back to the locally evaluated
+  result.
+
+The companion `GrowthBookTest` artifact is bumped to 3.1.0: `FakeGrowthBook` overrides
+`getFeatures()` rather than inheriting the empty default, so helpers that use it to detect an
+unknown feature behave against the fake as they do against the real SDK.
+
+---
 ## [9.0.0] - 2026-10-16
 
 A major because two public contracts change with no signature change and no compile error to
