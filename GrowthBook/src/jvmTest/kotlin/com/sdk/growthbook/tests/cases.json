@@ -1,5 +1,5 @@
 {
-  "specVersion": "0.8.0",
+  "specVersion": "0.10.1",
   "evalCondition": [
     [
       "$not - pass",
@@ -833,7 +833,7 @@
         }
       },
       {},
-      true
+      false
     ],
     [
       "comparing numbers and strings",
@@ -846,7 +846,7 @@
       {
         "n": "8"
       },
-      true
+      false
     ],
     [
       "comparing numbers and strings - v2",
@@ -859,7 +859,7 @@
       {
         "n": 8
       },
-      true
+      false
     ],
     [
       "empty $or - pass",
@@ -1164,6 +1164,156 @@
         "word": "AZL"
       },
       false
+    ],
+    [
+      "$gt/$lt numeric strings - \"10\" < \"9\"",
+      { "n": { "$lt": "9" } },
+      { "n": "10" },
+      true
+    ],
+    [
+      "$gt/$lt numeric strings - \"10\" not > \"9\"",
+      { "n": { "$gt": "9" } },
+      { "n": "10" },
+      false
+    ],
+    [
+      "$gt/$lt numeric strings - \"10\" not > \"2\"",
+      { "n": { "$gt": "2" } },
+      { "n": "10" },
+      false
+    ],
+    [
+      "$gt/$lt numeric strings - \"1.10\" < \"1.5\"",
+      { "n": { "$lt": "1.5" } },
+      { "n": "1.10" },
+      true
+    ],
+    [
+      "$gt/$lt numeric strings - \"10\" >= \"10\"",
+      { "n": { "$gte": "10" } },
+      { "n": "10" },
+      true
+    ],
+    [
+      "$gt/$lt numeric strings - \"10.0\" not <= \"10\"",
+      { "n": { "$lte": "10" } },
+      { "n": "10.0" },
+      false
+    ],
+    [
+      "$gt/$lt ISO dates - later date > earlier date",
+      { "d": { "$gt": "2026-09-01" } },
+      { "d": "2026-10-20" },
+      true
+    ],
+    [
+      "$gt/$lt ISO dates - later date not < earlier date",
+      { "d": { "$lt": "2026-09-01" } },
+      { "d": "2026-10-20" },
+      false
+    ],
+    [
+      "$gt/$lt ISO dates - same date >= and <=",
+      { "d": { "$gte": "2026-10-20", "$lte": "2026-10-20" } },
+      { "d": "2026-10-20" },
+      true
+    ],
+    [
+      "$gt/$lt ISO dates - date range pass",
+      { "d": { "$gt": "2026-01-01", "$lt": "2027-01-01" } },
+      { "d": "2026-10-20" },
+      true
+    ],
+    [
+      "$gt/$lt ISO dates - date range fail",
+      { "d": { "$gt": "2026-01-01", "$lt": "2027-01-01" } },
+      { "d": "2027-01-01" },
+      false
+    ],
+    [
+      "$gt/$lt ISO dates - datetime < later datetime",
+      { "d": { "$lt": "2026-10-20T13:00:00Z" } },
+      { "d": "2026-10-20T12:00:00Z" },
+      true
+    ],
+    [
+      "$gt/$lt ISO dates - datetime > its date",
+      { "d": { "$gt": "2026-10-20" } },
+      { "d": "2026-10-20T00:00:00Z" },
+      true
+    ],
+    [
+      "$gt/$lt booleans - true not > false",
+      { "b": { "$gt": false } },
+      { "b": true },
+      false
+    ],
+    [
+      "$gt/$lt booleans - false not < true",
+      { "b": { "$lt": true } },
+      { "b": false },
+      false
+    ],
+    [
+      "$gt/$lt booleans - true not > true",
+      { "b": { "$gt": true } },
+      { "b": true },
+      false
+    ],
+    [
+      "$gt/$lt booleans - false not < false",
+      { "b": { "$lt": false } },
+      { "b": false },
+      false
+    ],
+    [
+      "$gt/$lt booleans - $not $gt",
+      { "b": { "$not": { "$gt": false } } },
+      { "b": true },
+      true
+    ],
+    [
+      "$gt/$lt booleans - $not $lt",
+      { "b": { "$not": { "$lt": true } } },
+      { "b": false },
+      true
+    ],
+    [
+      "$gte/$lte booleans - true not >= false",
+      { "b": { "$gte": false } },
+      { "b": true },
+      false
+    ],
+    [
+      "$gte/$lte booleans - false not <= true",
+      { "b": { "$lte": true } },
+      { "b": false },
+      false
+    ],
+    [
+      "$gte/$lte booleans - true not >= true",
+      { "b": { "$gte": true } },
+      { "b": true },
+      false
+    ],
+    [
+      "$gte/$lte booleans - false not <= false",
+      { "b": { "$lte": false } },
+      { "b": false },
+      false
+    ],
+    [
+      "$gte/$lte booleans - $not $gte",
+      { "b": { "$not": { "$gte": true } } },
+      { "b": true },
+      true
+    ],
+    [
+      "$gte/$lte booleans - $not $lte",
+      { "b": { "$not": { "$lte": false } } },
+      { "b": false },
+      true
     ],
     [
       "nested value is null",
@@ -3127,6 +3277,298 @@
       true
     ],
     [
+      "$vgt - date-based version",
+      {
+        "version": {
+          "$vgt": "20260909.9.9"
+        }
+      },
+      {
+        "version": "20260910.1.1"
+      },
+      true
+    ],
+    [
+      "$vlt - oversized condition operand",
+      {
+        "version": {
+          "$vlt": "123456789"
+        }
+      },
+      {
+        "version": "1.0.0"
+      },
+      true
+    ],
+    [
+      "$veq - oversized on both sides",
+      {
+        "version": {
+          "$veq": "123456789"
+        }
+      },
+      {
+        "version": "123456789"
+      },
+      true
+    ],
+    [
+      "$vgt - oversized pre-release segment",
+      {
+        "version": {
+          "$vgt": "1.2.3-rc.123455"
+        }
+      },
+      {
+        "version": "1.2.3-rc.123456"
+      },
+      true
+    ],
+    [
+      "$vlte - oversized equal segments",
+      {
+        "version": {
+          "$vlte": "20260910.1.0"
+        }
+      },
+      {
+        "version": "20260910.1.0"
+      },
+      true
+    ],
+    [
+      "$vlt - absent attribute is not a version",
+      {
+        "version": {
+          "$vlt": "0.0.1"
+        }
+      },
+      {},
+      false
+    ],
+    [
+      "$vgt - absent attribute is not above a release",
+      {
+        "version": {
+          "$vgt": "0.0.1"
+        }
+      },
+      {},
+      false
+    ],
+    [
+      "$veq - absent attribute is not a version",
+      {
+        "version": {
+          "$veq": "0"
+        }
+      },
+      {},
+      false
+    ],
+    [
+      "$vne - absent attribute differs from a real version",
+      {
+        "version": {
+          "$vne": "1.2.3"
+        }
+      },
+      {},
+      true
+    ],
+    [
+      "$vgt - numeric attribute is not a version",
+      {
+        "version": {
+          "$vgt": "1.0.0"
+        }
+      },
+      {
+        "version": 2
+      },
+      false
+    ],
+    [
+      "$veq - numeric attribute equals numeric condition",
+      {
+        "version": {
+          "$veq": 2
+        }
+      },
+      {
+        "version": 2
+      },
+      true
+    ],
+    [
+      "$veq - float attribute is not a version string",
+      {
+        "version": {
+          "$veq": "1.5"
+        }
+      },
+      {
+        "version": 1.5
+      },
+      false
+    ],
+    [
+      "$veq - empty string attribute is version 0",
+      {
+        "version": {
+          "$veq": "0"
+        }
+      },
+      {
+        "version": ""
+      },
+      true
+    ],
+    [
+      "$veq - boolean attribute is not a version",
+      {
+        "version": {
+          "$veq": "0"
+        }
+      },
+      {
+        "version": true
+      },
+      false
+    ],
+    [
+      "$veq - array attribute is not a version",
+      {
+        "version": {
+          "$veq": "0"
+        }
+      },
+      {
+        "version": ["1.0.0"]
+      },
+      false
+    ],
+    [
+      "$veq - null attribute is not a version",
+      {
+        "version": {
+          "$veq": "0"
+        }
+      },
+      {
+        "version": null
+      },
+      false
+    ],
+    [
+      "$veq - leading v is ignored",
+      {
+        "version": {
+          "$veq": "1.2.3"
+        }
+      },
+      {
+        "version": "v1.2.3"
+      },
+      true
+    ],
+    [
+      "$veq - v inside a pre-release tag is kept",
+      {
+        "version": {
+          "$veq": "1.2.3-dev"
+        }
+      },
+      {
+        "version": "1.2.3-dev"
+      },
+      true
+    ],
+    [
+      "$vne - 1.2.3-dev is not 1.2.3-de",
+      {
+        "version": {
+          "$vne": "1.2.3-de"
+        }
+      },
+      {
+        "version": "1.2.3-dev"
+      },
+      true
+    ],
+    [
+      "$veq - v inside a dotted pre-release is kept",
+      {
+        "version": {
+          "$veq": "1.0.0-alpha.v1"
+        }
+      },
+      {
+        "version": "1.0.0-alpha.v1"
+      },
+      true
+    ],
+    [
+      "$veq - empty middle segment",
+      {
+        "version": {
+          "$veq": "1..2"
+        }
+      },
+      {
+        "version": "1..2"
+      },
+      true
+    ],
+    [
+      "$vne - empty segment changes the part count",
+      {
+        "version": {
+          "$vne": "1.2"
+        }
+      },
+      {
+        "version": "1..2"
+      },
+      true
+    ],
+    [
+      "$veq - leading separator",
+      {
+        "version": {
+          "$veq": "-1.2.3"
+        }
+      },
+      {
+        "version": "-1.2.3"
+      },
+      true
+    ],
+    [
+      "$vne - non-ASCII digit is not the ASCII digit",
+      {
+        "version": {
+          "$vne": "1.2.3-3"
+        }
+      },
+      {
+        "version": "1.2.3-٣"
+      },
+      true
+    ],
+    [
+      "$veq - non-ASCII digits compare as a tag",
+      {
+        "version": {
+          "$veq": "١.٢.٣"
+        }
+      },
+      {
+        "version": "١.٢.٣"
+      },
+      true
+    ],
+    [
       "$or pass but second condition fail",
       {
         "$or": [{ "foo": 1 }, { "bar": 1 }],
@@ -3250,6 +3692,1570 @@
       { "id": "3" },
       false,
       { "group_id": [1, "2", 3] }
+    ],
+    [
+      "type mismatch - implicit 5 vs \"5\" attribute",
+      { "x": 5 },
+      { "x": "5" },
+      false
+    ],
+    [
+      "type mismatch - $eq 5 vs \"5\" attribute",
+      { "x": { "$eq": 5 } },
+      { "x": "5" },
+      false
+    ],
+    [
+      "type mismatch - $ne 5 vs \"5\" attribute",
+      { "x": { "$ne": 5 } },
+      { "x": "5" },
+      true
+    ],
+    [
+      "type mismatch - $not 5 vs \"5\" attribute",
+      { "x": { "$not": 5 } },
+      { "x": "5" },
+      true
+    ],
+    [
+      "type mismatch - implicit \"5\" vs 5 attribute",
+      { "x": "5" },
+      { "x": 5 },
+      false
+    ],
+    [
+      "type mismatch - $eq \"5\" vs 5 attribute",
+      { "x": { "$eq": "5" } },
+      { "x": 5 },
+      false
+    ],
+    [
+      "type mismatch - $ne \"5\" vs 5 attribute",
+      { "x": { "$ne": "5" } },
+      { "x": 5 },
+      true
+    ],
+    [
+      "type mismatch - $not \"5\" vs 5 attribute",
+      { "x": { "$not": "5" } },
+      { "x": 5 },
+      true
+    ],
+    [
+      "type mismatch - implicit 5 vs \" 5 \" attribute",
+      { "x": 5 },
+      { "x": " 5 " },
+      false
+    ],
+    [
+      "type mismatch - $eq 5 vs \" 5 \" attribute",
+      { "x": { "$eq": 5 } },
+      { "x": " 5 " },
+      false
+    ],
+    [
+      "type mismatch - $ne 5 vs \" 5 \" attribute",
+      { "x": { "$ne": 5 } },
+      { "x": " 5 " },
+      true
+    ],
+    [
+      "type mismatch - $not 5 vs \" 5 \" attribute",
+      { "x": { "$not": 5 } },
+      { "x": " 5 " },
+      true
+    ],
+    [
+      "type mismatch - implicit 5 vs \"5e0\" attribute",
+      { "x": 5 },
+      { "x": "5e0" },
+      false
+    ],
+    [
+      "type mismatch - $eq 5 vs \"5e0\" attribute",
+      { "x": { "$eq": 5 } },
+      { "x": "5e0" },
+      false
+    ],
+    [
+      "type mismatch - $ne 5 vs \"5e0\" attribute",
+      { "x": { "$ne": 5 } },
+      { "x": "5e0" },
+      true
+    ],
+    [
+      "type mismatch - $not 5 vs \"5e0\" attribute",
+      { "x": { "$not": 5 } },
+      { "x": "5e0" },
+      true
+    ],
+    [
+      "type mismatch - implicit 0 vs \"\" attribute",
+      { "x": 0 },
+      { "x": "" },
+      false
+    ],
+    [
+      "type mismatch - $eq 0 vs \"\" attribute",
+      { "x": { "$eq": 0 } },
+      { "x": "" },
+      false
+    ],
+    [
+      "type mismatch - $ne 0 vs \"\" attribute",
+      { "x": { "$ne": 0 } },
+      { "x": "" },
+      true
+    ],
+    [
+      "type mismatch - $not 0 vs \"\" attribute",
+      { "x": { "$not": 0 } },
+      { "x": "" },
+      true
+    ],
+    [
+      "type mismatch - implicit \"\" vs 0 attribute",
+      { "x": "" },
+      { "x": 0 },
+      false
+    ],
+    [
+      "type mismatch - $eq \"\" vs 0 attribute",
+      { "x": { "$eq": "" } },
+      { "x": 0 },
+      false
+    ],
+    [
+      "type mismatch - $ne \"\" vs 0 attribute",
+      { "x": { "$ne": "" } },
+      { "x": 0 },
+      true
+    ],
+    [
+      "type mismatch - $not \"\" vs 0 attribute",
+      { "x": { "$not": "" } },
+      { "x": 0 },
+      true
+    ],
+    [
+      "type mismatch - implicit 1 vs true attribute",
+      { "x": 1 },
+      { "x": true },
+      false
+    ],
+    [
+      "type mismatch - $eq 1 vs true attribute",
+      { "x": { "$eq": 1 } },
+      { "x": true },
+      false
+    ],
+    [
+      "type mismatch - $ne 1 vs true attribute",
+      { "x": { "$ne": 1 } },
+      { "x": true },
+      true
+    ],
+    [
+      "type mismatch - $not 1 vs true attribute",
+      { "x": { "$not": 1 } },
+      { "x": true },
+      true
+    ],
+    [
+      "type mismatch - implicit true vs 1 attribute",
+      { "x": true },
+      { "x": 1 },
+      false
+    ],
+    [
+      "type mismatch - $eq true vs 1 attribute",
+      { "x": { "$eq": true } },
+      { "x": 1 },
+      false
+    ],
+    [
+      "type mismatch - $ne true vs 1 attribute",
+      { "x": { "$ne": true } },
+      { "x": 1 },
+      true
+    ],
+    [
+      "type mismatch - $not true vs 1 attribute",
+      { "x": { "$not": true } },
+      { "x": 1 },
+      true
+    ],
+    [
+      "type mismatch - implicit 0 vs false attribute",
+      { "x": 0 },
+      { "x": false },
+      false
+    ],
+    [
+      "type mismatch - $eq 0 vs false attribute",
+      { "x": { "$eq": 0 } },
+      { "x": false },
+      false
+    ],
+    [
+      "type mismatch - $ne 0 vs false attribute",
+      { "x": { "$ne": 0 } },
+      { "x": false },
+      true
+    ],
+    [
+      "type mismatch - $not 0 vs false attribute",
+      { "x": { "$not": 0 } },
+      { "x": false },
+      true
+    ],
+    [
+      "type mismatch - implicit false vs 0 attribute",
+      { "x": false },
+      { "x": 0 },
+      false
+    ],
+    [
+      "type mismatch - $eq false vs 0 attribute",
+      { "x": { "$eq": false } },
+      { "x": 0 },
+      false
+    ],
+    [
+      "type mismatch - $ne false vs 0 attribute",
+      { "x": { "$ne": false } },
+      { "x": 0 },
+      true
+    ],
+    [
+      "type mismatch - $not false vs 0 attribute",
+      { "x": { "$not": false } },
+      { "x": 0 },
+      true
+    ],
+    [
+      "type mismatch - implicit \"true\" vs true attribute",
+      { "x": "true" },
+      { "x": true },
+      false
+    ],
+    [
+      "type mismatch - $eq \"true\" vs true attribute",
+      { "x": { "$eq": "true" } },
+      { "x": true },
+      false
+    ],
+    [
+      "type mismatch - $ne \"true\" vs true attribute",
+      { "x": { "$ne": "true" } },
+      { "x": true },
+      true
+    ],
+    [
+      "type mismatch - $not \"true\" vs true attribute",
+      { "x": { "$not": "true" } },
+      { "x": true },
+      true
+    ],
+    [
+      "type mismatch - implicit true vs \"true\" attribute",
+      { "x": true },
+      { "x": "true" },
+      false
+    ],
+    [
+      "type mismatch - $eq true vs \"true\" attribute",
+      { "x": { "$eq": true } },
+      { "x": "true" },
+      false
+    ],
+    [
+      "type mismatch - $ne true vs \"true\" attribute",
+      { "x": { "$ne": true } },
+      { "x": "true" },
+      true
+    ],
+    [
+      "type mismatch - $not true vs \"true\" attribute",
+      { "x": { "$not": true } },
+      { "x": "true" },
+      true
+    ],
+    [
+      "type mismatch - implicit \"false\" vs false attribute",
+      { "x": "false" },
+      { "x": false },
+      false
+    ],
+    [
+      "type mismatch - $eq \"false\" vs false attribute",
+      { "x": { "$eq": "false" } },
+      { "x": false },
+      false
+    ],
+    [
+      "type mismatch - $ne \"false\" vs false attribute",
+      { "x": { "$ne": "false" } },
+      { "x": false },
+      true
+    ],
+    [
+      "type mismatch - $not \"false\" vs false attribute",
+      { "x": { "$not": "false" } },
+      { "x": false },
+      true
+    ],
+    [
+      "type mismatch - implicit false vs \"false\" attribute",
+      { "x": false },
+      { "x": "false" },
+      false
+    ],
+    [
+      "type mismatch - $eq false vs \"false\" attribute",
+      { "x": { "$eq": false } },
+      { "x": "false" },
+      false
+    ],
+    [
+      "type mismatch - $ne false vs \"false\" attribute",
+      { "x": { "$ne": false } },
+      { "x": "false" },
+      true
+    ],
+    [
+      "type mismatch - $not false vs \"false\" attribute",
+      { "x": { "$not": false } },
+      { "x": "false" },
+      true
+    ],
+    [
+      "type mismatch - implicit true vs \"yes\" attribute",
+      { "x": true },
+      { "x": "yes" },
+      false
+    ],
+    [
+      "type mismatch - $eq true vs \"yes\" attribute",
+      { "x": { "$eq": true } },
+      { "x": "yes" },
+      false
+    ],
+    [
+      "type mismatch - $ne true vs \"yes\" attribute",
+      { "x": { "$ne": true } },
+      { "x": "yes" },
+      true
+    ],
+    [
+      "type mismatch - $not true vs \"yes\" attribute",
+      { "x": { "$not": true } },
+      { "x": "yes" },
+      true
+    ],
+    [
+      "type mismatch - implicit \"yes\" vs true attribute",
+      { "x": "yes" },
+      { "x": true },
+      false
+    ],
+    [
+      "type mismatch - $eq \"yes\" vs true attribute",
+      { "x": { "$eq": "yes" } },
+      { "x": true },
+      false
+    ],
+    [
+      "type mismatch - $ne \"yes\" vs true attribute",
+      { "x": { "$ne": "yes" } },
+      { "x": true },
+      true
+    ],
+    [
+      "type mismatch - $not \"yes\" vs true attribute",
+      { "x": { "$not": "yes" } },
+      { "x": true },
+      true
+    ],
+    [
+      "type mismatch - implicit false vs \"\" attribute",
+      { "x": false },
+      { "x": "" },
+      false
+    ],
+    [
+      "type mismatch - $eq false vs \"\" attribute",
+      { "x": { "$eq": false } },
+      { "x": "" },
+      false
+    ],
+    [
+      "type mismatch - $ne false vs \"\" attribute",
+      { "x": { "$ne": false } },
+      { "x": "" },
+      true
+    ],
+    [
+      "type mismatch - $not false vs \"\" attribute",
+      { "x": { "$not": false } },
+      { "x": "" },
+      true
+    ],
+    [
+      "type mismatch - implicit \"\" vs false attribute",
+      { "x": "" },
+      { "x": false },
+      false
+    ],
+    [
+      "type mismatch - $eq \"\" vs false attribute",
+      { "x": { "$eq": "" } },
+      { "x": false },
+      false
+    ],
+    [
+      "type mismatch - $ne \"\" vs false attribute",
+      { "x": { "$ne": "" } },
+      { "x": false },
+      true
+    ],
+    [
+      "type mismatch - $not \"\" vs false attribute",
+      { "x": { "$not": "" } },
+      { "x": false },
+      true
+    ],
+    [
+      "type mismatch - implicit 0 vs null attribute",
+      { "x": 0 },
+      { "x": null },
+      false
+    ],
+    [
+      "type mismatch - $eq 0 vs null attribute",
+      { "x": { "$eq": 0 } },
+      { "x": null },
+      false
+    ],
+    [
+      "type mismatch - $ne 0 vs null attribute",
+      { "x": { "$ne": 0 } },
+      { "x": null },
+      true
+    ],
+    [
+      "type mismatch - $not 0 vs null attribute",
+      { "x": { "$not": 0 } },
+      { "x": null },
+      true
+    ],
+    [
+      "type mismatch - implicit \"null\" vs null attribute",
+      { "x": "null" },
+      { "x": null },
+      false
+    ],
+    [
+      "type mismatch - $eq \"null\" vs null attribute",
+      { "x": { "$eq": "null" } },
+      { "x": null },
+      false
+    ],
+    [
+      "type mismatch - $ne \"null\" vs null attribute",
+      { "x": { "$ne": "null" } },
+      { "x": null },
+      true
+    ],
+    [
+      "type mismatch - $not \"null\" vs null attribute",
+      { "x": { "$not": "null" } },
+      { "x": null },
+      true
+    ],
+    [
+      "type mismatch - implicit false vs null attribute",
+      { "x": false },
+      { "x": null },
+      false
+    ],
+    [
+      "type mismatch - $eq false vs null attribute",
+      { "x": { "$eq": false } },
+      { "x": null },
+      false
+    ],
+    [
+      "type mismatch - $ne false vs null attribute",
+      { "x": { "$ne": false } },
+      { "x": null },
+      true
+    ],
+    [
+      "type mismatch - $not false vs null attribute",
+      { "x": { "$not": false } },
+      { "x": null },
+      true
+    ],
+    ["type mismatch - implicit 0 vs missing attribute", { "x": 0 }, {}, false],
+    [
+      "type mismatch - $eq 0 vs missing attribute",
+      { "x": { "$eq": 0 } },
+      {},
+      false
+    ],
+    [
+      "type mismatch - $ne 0 vs missing attribute",
+      { "x": { "$ne": 0 } },
+      {},
+      true
+    ],
+    [
+      "type mismatch - $not 0 vs missing attribute",
+      { "x": { "$not": 0 } },
+      {},
+      true
+    ],
+    [
+      "type mismatch - implicit \"null\" vs missing attribute",
+      { "x": "null" },
+      {},
+      false
+    ],
+    [
+      "type mismatch - $eq \"null\" vs missing attribute",
+      { "x": { "$eq": "null" } },
+      {},
+      false
+    ],
+    [
+      "type mismatch - $ne \"null\" vs missing attribute",
+      { "x": { "$ne": "null" } },
+      {},
+      true
+    ],
+    [
+      "type mismatch - $not \"null\" vs missing attribute",
+      { "x": { "$not": "null" } },
+      {},
+      true
+    ],
+    [
+      "type mismatch - implicit false vs missing attribute",
+      { "x": false },
+      {},
+      false
+    ],
+    [
+      "type mismatch - $eq false vs missing attribute",
+      { "x": { "$eq": false } },
+      {},
+      false
+    ],
+    [
+      "type mismatch - $ne false vs missing attribute",
+      { "x": { "$ne": false } },
+      {},
+      true
+    ],
+    [
+      "type mismatch - $not false vs missing attribute",
+      { "x": { "$not": false } },
+      {},
+      true
+    ],
+    [
+      "type mismatch - implicit 5 vs [5] attribute",
+      { "x": 5 },
+      { "x": [5] },
+      false
+    ],
+    [
+      "type mismatch - $eq 5 vs [5] attribute",
+      { "x": { "$eq": 5 } },
+      { "x": [5] },
+      false
+    ],
+    [
+      "type mismatch - $ne 5 vs [5] attribute",
+      { "x": { "$ne": 5 } },
+      { "x": [5] },
+      true
+    ],
+    [
+      "type mismatch - $not 5 vs [5] attribute",
+      { "x": { "$not": 5 } },
+      { "x": [5] },
+      true
+    ],
+    [
+      "type mismatch - $eq [5] vs 5 attribute",
+      { "x": { "$eq": [5] } },
+      { "x": 5 },
+      false
+    ],
+    [
+      "type mismatch - $ne [5] vs 5 attribute",
+      { "x": { "$ne": [5] } },
+      { "x": 5 },
+      true
+    ],
+    [
+      "type mismatch - implicit 5 vs [\"5\"] attribute",
+      { "x": 5 },
+      { "x": ["5"] },
+      false
+    ],
+    [
+      "type mismatch - $eq 5 vs [\"5\"] attribute",
+      { "x": { "$eq": 5 } },
+      { "x": ["5"] },
+      false
+    ],
+    [
+      "type mismatch - $ne 5 vs [\"5\"] attribute",
+      { "x": { "$ne": 5 } },
+      { "x": ["5"] },
+      true
+    ],
+    [
+      "type mismatch - $not 5 vs [\"5\"] attribute",
+      { "x": { "$not": 5 } },
+      { "x": ["5"] },
+      true
+    ],
+    [
+      "type mismatch - $eq [\"5\"] vs 5 attribute",
+      { "x": { "$eq": ["5"] } },
+      { "x": 5 },
+      false
+    ],
+    [
+      "type mismatch - $ne [\"5\"] vs 5 attribute",
+      { "x": { "$ne": ["5"] } },
+      { "x": 5 },
+      true
+    ],
+    [
+      "type mismatch - implicit \"5\" vs [5] attribute",
+      { "x": "5" },
+      { "x": [5] },
+      false
+    ],
+    [
+      "type mismatch - $eq \"5\" vs [5] attribute",
+      { "x": { "$eq": "5" } },
+      { "x": [5] },
+      false
+    ],
+    [
+      "type mismatch - $ne \"5\" vs [5] attribute",
+      { "x": { "$ne": "5" } },
+      { "x": [5] },
+      true
+    ],
+    [
+      "type mismatch - $not \"5\" vs [5] attribute",
+      { "x": { "$not": "5" } },
+      { "x": [5] },
+      true
+    ],
+    [
+      "type mismatch - $eq [5] vs \"5\" attribute",
+      { "x": { "$eq": [5] } },
+      { "x": "5" },
+      false
+    ],
+    [
+      "type mismatch - $ne [5] vs \"5\" attribute",
+      { "x": { "$ne": [5] } },
+      { "x": "5" },
+      true
+    ],
+    [
+      "type mismatch - implicit \"a\" vs [\"a\"] attribute",
+      { "x": "a" },
+      { "x": ["a"] },
+      false
+    ],
+    [
+      "type mismatch - $eq \"a\" vs [\"a\"] attribute",
+      { "x": { "$eq": "a" } },
+      { "x": ["a"] },
+      false
+    ],
+    [
+      "type mismatch - $ne \"a\" vs [\"a\"] attribute",
+      { "x": { "$ne": "a" } },
+      { "x": ["a"] },
+      true
+    ],
+    [
+      "type mismatch - $not \"a\" vs [\"a\"] attribute",
+      { "x": { "$not": "a" } },
+      { "x": ["a"] },
+      true
+    ],
+    [
+      "type mismatch - $eq [\"a\"] vs \"a\" attribute",
+      { "x": { "$eq": ["a"] } },
+      { "x": "a" },
+      false
+    ],
+    [
+      "type mismatch - $ne [\"a\"] vs \"a\" attribute",
+      { "x": { "$ne": ["a"] } },
+      { "x": "a" },
+      true
+    ],
+    [
+      "type mismatch - implicit 0 vs [] attribute",
+      { "x": 0 },
+      { "x": [] },
+      false
+    ],
+    [
+      "type mismatch - $eq 0 vs [] attribute",
+      { "x": { "$eq": 0 } },
+      { "x": [] },
+      false
+    ],
+    [
+      "type mismatch - $ne 0 vs [] attribute",
+      { "x": { "$ne": 0 } },
+      { "x": [] },
+      true
+    ],
+    [
+      "type mismatch - $not 0 vs [] attribute",
+      { "x": { "$not": 0 } },
+      { "x": [] },
+      true
+    ],
+    [
+      "type mismatch - implicit \"\" vs [] attribute",
+      { "x": "" },
+      { "x": [] },
+      false
+    ],
+    [
+      "type mismatch - $eq \"\" vs [] attribute",
+      { "x": { "$eq": "" } },
+      { "x": [] },
+      false
+    ],
+    [
+      "type mismatch - $ne \"\" vs [] attribute",
+      { "x": { "$ne": "" } },
+      { "x": [] },
+      true
+    ],
+    [
+      "type mismatch - $not \"\" vs [] attribute",
+      { "x": { "$not": "" } },
+      { "x": [] },
+      true
+    ],
+    [
+      "type mismatch - implicit true vs [] attribute",
+      { "x": true },
+      { "x": [] },
+      false
+    ],
+    [
+      "type mismatch - $eq true vs [] attribute",
+      { "x": { "$eq": true } },
+      { "x": [] },
+      false
+    ],
+    [
+      "type mismatch - $ne true vs [] attribute",
+      { "x": { "$ne": true } },
+      { "x": [] },
+      true
+    ],
+    [
+      "type mismatch - $not true vs [] attribute",
+      { "x": { "$not": true } },
+      { "x": [] },
+      true
+    ],
+    [
+      "type mismatch - implicit true vs {\"a\": 1} attribute",
+      { "x": true },
+      { "x": { "a": 1 } },
+      false
+    ],
+    [
+      "type mismatch - $eq true vs {\"a\": 1} attribute",
+      { "x": { "$eq": true } },
+      { "x": { "a": 1 } },
+      false
+    ],
+    [
+      "type mismatch - $ne true vs {\"a\": 1} attribute",
+      { "x": { "$ne": true } },
+      { "x": { "a": 1 } },
+      true
+    ],
+    [
+      "type mismatch - $not true vs {\"a\": 1} attribute",
+      { "x": { "$not": true } },
+      { "x": { "a": 1 } },
+      true
+    ],
+    [
+      "type mismatch - $in [5] vs \"5\" attribute",
+      { "x": { "$in": [5] } },
+      { "x": "5" },
+      false
+    ],
+    [
+      "type mismatch - $nin [5] vs \"5\" attribute",
+      { "x": { "$nin": [5] } },
+      { "x": "5" },
+      true
+    ],
+    [
+      "type mismatch - $in [\"5\"] vs 5 attribute",
+      { "x": { "$in": ["5"] } },
+      { "x": 5 },
+      false
+    ],
+    [
+      "type mismatch - $nin [\"5\"] vs 5 attribute",
+      { "x": { "$nin": ["5"] } },
+      { "x": 5 },
+      true
+    ],
+    [
+      "type mismatch - $in [1] vs true attribute",
+      { "x": { "$in": [1] } },
+      { "x": true },
+      false
+    ],
+    [
+      "type mismatch - $nin [1] vs true attribute",
+      { "x": { "$nin": [1] } },
+      { "x": true },
+      true
+    ],
+    [
+      "type mismatch - $in [true] vs 1 attribute",
+      { "x": { "$in": [true] } },
+      { "x": 1 },
+      false
+    ],
+    [
+      "type mismatch - $nin [true] vs 1 attribute",
+      { "x": { "$nin": [true] } },
+      { "x": 1 },
+      true
+    ],
+    [
+      "type mismatch - $in [\"true\"] vs true attribute",
+      { "x": { "$in": ["true"] } },
+      { "x": true },
+      false
+    ],
+    [
+      "type mismatch - $nin [\"true\"] vs true attribute",
+      { "x": { "$nin": ["true"] } },
+      { "x": true },
+      true
+    ],
+    [
+      "type mismatch - $in [true] vs \"true\" attribute",
+      { "x": { "$in": [true] } },
+      { "x": "true" },
+      false
+    ],
+    [
+      "type mismatch - $nin [true] vs \"true\" attribute",
+      { "x": { "$nin": [true] } },
+      { "x": "true" },
+      true
+    ],
+    [
+      "type mismatch - $in [0] vs null attribute",
+      { "x": { "$in": [0] } },
+      { "x": null },
+      false
+    ],
+    [
+      "type mismatch - $nin [0] vs null attribute",
+      { "x": { "$nin": [0] } },
+      { "x": null },
+      true
+    ],
+    [
+      "type mismatch - $in [\"null\"] vs null attribute",
+      { "x": { "$in": ["null"] } },
+      { "x": null },
+      false
+    ],
+    [
+      "type mismatch - $nin [\"null\"] vs null attribute",
+      { "x": { "$nin": ["null"] } },
+      { "x": null },
+      true
+    ],
+    [
+      "type mismatch - $in [5] vs [\"5\"] attribute",
+      { "x": { "$in": [5] } },
+      { "x": ["5"] },
+      false
+    ],
+    [
+      "type mismatch - $nin [5] vs [\"5\"] attribute",
+      { "x": { "$nin": [5] } },
+      { "x": ["5"] },
+      true
+    ],
+    [
+      "type mismatch - $in [\"5\"] vs [5] attribute",
+      { "x": { "$in": ["5"] } },
+      { "x": [5] },
+      false
+    ],
+    [
+      "type mismatch - $nin [\"5\"] vs [5] attribute",
+      { "x": { "$nin": ["5"] } },
+      { "x": [5] },
+      true
+    ],
+    [
+      "type mismatch - $ini [\"5\"] vs 5 attribute",
+      { "x": { "$ini": ["5"] } },
+      { "x": 5 },
+      false
+    ],
+    [
+      "type mismatch - $nini [\"5\"] vs 5 attribute",
+      { "x": { "$nini": ["5"] } },
+      { "x": 5 },
+      true
+    ],
+    [
+      "type mismatch - $gte 5 vs \"5\" attribute",
+      { "x": { "$gte": 5 } },
+      { "x": "5" },
+      false
+    ],
+    [
+      "type mismatch - $not $gte 5 vs \"5\" attribute",
+      { "x": { "$not": { "$gte": 5 } } },
+      { "x": "5" },
+      true
+    ],
+    [
+      "type mismatch - $lte 5 vs \"5\" attribute",
+      { "x": { "$lte": 5 } },
+      { "x": "5" },
+      false
+    ],
+    [
+      "type mismatch - $not $lte 5 vs \"5\" attribute",
+      { "x": { "$not": { "$lte": 5 } } },
+      { "x": "5" },
+      true
+    ],
+    [
+      "type mismatch - $gte \"5\" vs 5 attribute",
+      { "x": { "$gte": "5" } },
+      { "x": 5 },
+      false
+    ],
+    [
+      "type mismatch - $not $gte \"5\" vs 5 attribute",
+      { "x": { "$not": { "$gte": "5" } } },
+      { "x": 5 },
+      true
+    ],
+    [
+      "type mismatch - $lte \"5\" vs 5 attribute",
+      { "x": { "$lte": "5" } },
+      { "x": 5 },
+      false
+    ],
+    [
+      "type mismatch - $not $lte \"5\" vs 5 attribute",
+      { "x": { "$not": { "$lte": "5" } } },
+      { "x": 5 },
+      true
+    ],
+    [
+      "type mismatch - $gte 1 vs true attribute",
+      { "x": { "$gte": 1 } },
+      { "x": true },
+      false
+    ],
+    [
+      "type mismatch - $not $gte 1 vs true attribute",
+      { "x": { "$not": { "$gte": 1 } } },
+      { "x": true },
+      true
+    ],
+    [
+      "type mismatch - $lte 1 vs true attribute",
+      { "x": { "$lte": 1 } },
+      { "x": true },
+      false
+    ],
+    [
+      "type mismatch - $not $lte 1 vs true attribute",
+      { "x": { "$not": { "$lte": 1 } } },
+      { "x": true },
+      true
+    ],
+    [
+      "type mismatch - $gte true vs 1 attribute",
+      { "x": { "$gte": true } },
+      { "x": 1 },
+      false
+    ],
+    [
+      "type mismatch - $not $gte true vs 1 attribute",
+      { "x": { "$not": { "$gte": true } } },
+      { "x": 1 },
+      true
+    ],
+    [
+      "type mismatch - $lte true vs 1 attribute",
+      { "x": { "$lte": true } },
+      { "x": 1 },
+      false
+    ],
+    [
+      "type mismatch - $not $lte true vs 1 attribute",
+      { "x": { "$not": { "$lte": true } } },
+      { "x": 1 },
+      true
+    ],
+    [
+      "type mismatch - $gte 0 vs false attribute",
+      { "x": { "$gte": 0 } },
+      { "x": false },
+      false
+    ],
+    [
+      "type mismatch - $not $gte 0 vs false attribute",
+      { "x": { "$not": { "$gte": 0 } } },
+      { "x": false },
+      true
+    ],
+    [
+      "type mismatch - $lte 0 vs false attribute",
+      { "x": { "$lte": 0 } },
+      { "x": false },
+      false
+    ],
+    [
+      "type mismatch - $not $lte 0 vs false attribute",
+      { "x": { "$not": { "$lte": 0 } } },
+      { "x": false },
+      true
+    ],
+    [
+      "type mismatch - $gte false vs 0 attribute",
+      { "x": { "$gte": false } },
+      { "x": 0 },
+      false
+    ],
+    [
+      "type mismatch - $not $gte false vs 0 attribute",
+      { "x": { "$not": { "$gte": false } } },
+      { "x": 0 },
+      true
+    ],
+    [
+      "type mismatch - $lte false vs 0 attribute",
+      { "x": { "$lte": false } },
+      { "x": 0 },
+      false
+    ],
+    [
+      "type mismatch - $not $lte false vs 0 attribute",
+      { "x": { "$not": { "$lte": false } } },
+      { "x": 0 },
+      true
+    ],
+    [
+      "type mismatch - $gte 0 vs null attribute",
+      { "x": { "$gte": 0 } },
+      { "x": null },
+      false
+    ],
+    [
+      "type mismatch - $not $gte 0 vs null attribute",
+      { "x": { "$not": { "$gte": 0 } } },
+      { "x": null },
+      true
+    ],
+    [
+      "type mismatch - $lte 0 vs null attribute",
+      { "x": { "$lte": 0 } },
+      { "x": null },
+      false
+    ],
+    [
+      "type mismatch - $not $lte 0 vs null attribute",
+      { "x": { "$not": { "$lte": 0 } } },
+      { "x": null },
+      true
+    ],
+    [
+      "type mismatch - $gte \"\" vs null attribute",
+      { "x": { "$gte": "" } },
+      { "x": null },
+      false
+    ],
+    [
+      "type mismatch - $not $gte \"\" vs null attribute",
+      { "x": { "$not": { "$gte": "" } } },
+      { "x": null },
+      true
+    ],
+    [
+      "type mismatch - $lte \"\" vs null attribute",
+      { "x": { "$lte": "" } },
+      { "x": null },
+      false
+    ],
+    [
+      "type mismatch - $not $lte \"\" vs null attribute",
+      { "x": { "$not": { "$lte": "" } } },
+      { "x": null },
+      true
+    ],
+    [
+      "type mismatch - $gte 0 vs missing attribute",
+      { "x": { "$gte": 0 } },
+      {},
+      false
+    ],
+    [
+      "type mismatch - $not $gte 0 vs missing attribute",
+      { "x": { "$not": { "$gte": 0 } } },
+      {},
+      true
+    ],
+    [
+      "type mismatch - $lte 0 vs missing attribute",
+      { "x": { "$lte": 0 } },
+      {},
+      false
+    ],
+    [
+      "type mismatch - $not $lte 0 vs missing attribute",
+      { "x": { "$not": { "$lte": 0 } } },
+      {},
+      true
+    ],
+    [
+      "type mismatch - $gte 0 vs \"\" attribute",
+      { "x": { "$gte": 0 } },
+      { "x": "" },
+      false
+    ],
+    [
+      "type mismatch - $not $gte 0 vs \"\" attribute",
+      { "x": { "$not": { "$gte": 0 } } },
+      { "x": "" },
+      true
+    ],
+    [
+      "type mismatch - $lte 0 vs \"\" attribute",
+      { "x": { "$lte": 0 } },
+      { "x": "" },
+      false
+    ],
+    [
+      "type mismatch - $not $lte 0 vs \"\" attribute",
+      { "x": { "$not": { "$lte": 0 } } },
+      { "x": "" },
+      true
+    ],
+    [
+      "type mismatch - $gte \"\" vs 0 attribute",
+      { "x": { "$gte": "" } },
+      { "x": 0 },
+      false
+    ],
+    [
+      "type mismatch - $not $gte \"\" vs 0 attribute",
+      { "x": { "$not": { "$gte": "" } } },
+      { "x": 0 },
+      true
+    ],
+    [
+      "type mismatch - $lte \"\" vs 0 attribute",
+      { "x": { "$lte": "" } },
+      { "x": 0 },
+      false
+    ],
+    [
+      "type mismatch - $not $lte \"\" vs 0 attribute",
+      { "x": { "$not": { "$lte": "" } } },
+      { "x": 0 },
+      true
+    ],
+    [
+      "type mismatch - $gte 5 vs [5] attribute",
+      { "x": { "$gte": 5 } },
+      { "x": [5] },
+      false
+    ],
+    [
+      "type mismatch - $not $gte 5 vs [5] attribute",
+      { "x": { "$not": { "$gte": 5 } } },
+      { "x": [5] },
+      true
+    ],
+    [
+      "type mismatch - $lte 5 vs [5] attribute",
+      { "x": { "$lte": 5 } },
+      { "x": [5] },
+      false
+    ],
+    [
+      "type mismatch - $not $lte 5 vs [5] attribute",
+      { "x": { "$not": { "$lte": 5 } } },
+      { "x": [5] },
+      true
+    ],
+    [
+      "type mismatch - $gte \"a\" vs [\"a\"] attribute",
+      { "x": { "$gte": "a" } },
+      { "x": ["a"] },
+      false
+    ],
+    [
+      "type mismatch - $not $gte \"a\" vs [\"a\"] attribute",
+      { "x": { "$not": { "$gte": "a" } } },
+      { "x": ["a"] },
+      true
+    ],
+    [
+      "type mismatch - $lte \"a\" vs [\"a\"] attribute",
+      { "x": { "$lte": "a" } },
+      { "x": ["a"] },
+      false
+    ],
+    [
+      "type mismatch - $not $lte \"a\" vs [\"a\"] attribute",
+      { "x": { "$not": { "$lte": "a" } } },
+      { "x": ["a"] },
+      true
+    ],
+    [
+      "type mismatch - $gt 5 vs \"8\" attribute",
+      { "x": { "$gt": 5 } },
+      { "x": "8" },
+      false
+    ],
+    [
+      "type mismatch - $lt \"10\" vs 8 attribute",
+      { "x": { "$lt": "10" } },
+      { "x": 8 },
+      false
+    ],
+    [
+      "type mismatch - $gt 0 vs true attribute",
+      { "x": { "$gt": 0 } },
+      { "x": true },
+      false
+    ],
+    [
+      "type mismatch - $lt 10 vs null attribute",
+      { "x": { "$lt": 10 } },
+      { "x": null },
+      false
+    ],
+    [
+      "type mismatch - $regex vs 5 attribute",
+      { "x": { "$regex": "5" } },
+      { "x": 5 },
+      false
+    ],
+    [
+      "type mismatch - $regexi vs 5 attribute",
+      { "x": { "$regexi": "5" } },
+      { "x": 5 },
+      false
+    ],
+    [
+      "type mismatch - $not $regex vs 5 attribute",
+      { "x": { "$not": { "$regex": "5" } } },
+      { "x": 5 },
+      true
+    ],
+    [
+      "type mismatch - $regex vs true attribute",
+      { "x": { "$regex": "^true$" } },
+      { "x": true },
+      false
+    ],
+    [
+      "type mismatch - $regexi vs true attribute",
+      { "x": { "$regexi": "^true$" } },
+      { "x": true },
+      false
+    ],
+    [
+      "type mismatch - $not $regex vs true attribute",
+      { "x": { "$not": { "$regex": "^true$" } } },
+      { "x": true },
+      true
+    ],
+    [
+      "type mismatch - $regex vs null attribute",
+      { "x": { "$regex": "^null$" } },
+      { "x": null },
+      false
+    ],
+    [
+      "type mismatch - $regexi vs null attribute",
+      { "x": { "$regexi": "^null$" } },
+      { "x": null },
+      false
+    ],
+    [
+      "type mismatch - $not $regex vs null attribute",
+      { "x": { "$not": { "$regex": "^null$" } } },
+      { "x": null },
+      true
+    ],
+    [
+      "type mismatch - $regex vs missing attribute",
+      { "x": { "$regex": "^null$" } },
+      {},
+      false
+    ],
+    [
+      "type mismatch - $regexi vs missing attribute",
+      { "x": { "$regexi": "^null$" } },
+      {},
+      false
+    ],
+    [
+      "type mismatch - $not $regex vs missing attribute",
+      { "x": { "$not": { "$regex": "^null$" } } },
+      {},
+      true
+    ],
+    [
+      "type mismatch - $regex vs [\"a\"] attribute",
+      { "x": { "$regex": "^a$" } },
+      { "x": ["a"] },
+      false
+    ],
+    [
+      "type mismatch - $regexi vs [\"a\"] attribute",
+      { "x": { "$regexi": "^a$" } },
+      { "x": ["a"] },
+      false
+    ],
+    [
+      "type mismatch - $not $regex vs [\"a\"] attribute",
+      { "x": { "$not": { "$regex": "^a$" } } },
+      { "x": ["a"] },
+      true
+    ],
+    [
+      "type mismatch - $regex vs {\"a\": 1} attribute",
+      { "x": { "$regex": "object" } },
+      { "x": { "a": 1 } },
+      false
+    ],
+    [
+      "type mismatch - $regexi vs {\"a\": 1} attribute",
+      { "x": { "$regexi": "object" } },
+      { "x": { "a": 1 } },
+      false
+    ],
+    [
+      "type mismatch - $not $regex vs {\"a\": 1} attribute",
+      { "x": { "$not": { "$regex": "object" } } },
+      { "x": { "a": 1 } },
+      true
+    ],
+    [
+      "type mismatch - $veq \"2\" vs 2 attribute",
+      { "x": { "$veq": "2" } },
+      { "x": 2 },
+      false
+    ],
+    [
+      "type mismatch - $vne \"2\" vs 2 attribute",
+      { "x": { "$vne": "2" } },
+      { "x": 2 },
+      true
+    ],
+    [
+      "type mismatch - $veq \"0\" vs false attribute",
+      { "x": { "$veq": "0" } },
+      { "x": false },
+      false
+    ],
+    [
+      "type mismatch - $vne \"0\" vs false attribute",
+      { "x": { "$vne": "0" } },
+      { "x": false },
+      true
+    ],
+    [
+      "type mismatch - $veq \"0\" vs null attribute",
+      { "x": { "$veq": "0" } },
+      { "x": null },
+      false
+    ],
+    [
+      "type mismatch - $vne \"0\" vs null attribute",
+      { "x": { "$vne": "0" } },
+      { "x": null },
+      true
+    ],
+    [
+      "type mismatch - $veq \"0\" vs missing attribute",
+      { "x": { "$veq": "0" } },
+      {},
+      false
+    ],
+    [
+      "type mismatch - $vne \"0\" vs missing attribute",
+      { "x": { "$vne": "0" } },
+      {},
+      true
+    ],
+    [
+      "type mismatch - $veq \"0\" vs [] attribute",
+      { "x": { "$veq": "0" } },
+      { "x": [] },
+      false
+    ],
+    [
+      "type mismatch - $vne \"0\" vs [] attribute",
+      { "x": { "$vne": "0" } },
+      { "x": [] },
+      true
+    ],
+    [
+      "type mismatch - $veq \"0\" vs {\"a\": 1} attribute",
+      { "x": { "$veq": "0" } },
+      { "x": { "a": 1 } },
+      false
+    ],
+    [
+      "type mismatch - $vne \"0\" vs {\"a\": 1} attribute",
+      { "x": { "$vne": "0" } },
+      { "x": { "a": 1 } },
+      true
+    ],
+    [
+      "type mismatch - $vlt \"2.0.0\" vs missing attribute",
+      { "x": { "$vlt": "2.0.0" } },
+      {},
+      false
+    ],
+    [
+      "type mismatch - $vgte \"0.0.0\" vs missing attribute",
+      { "x": { "$vgte": "0.0.0" } },
+      {},
+      false
+    ],
+    [
+      "type mismatch - $vlte \"2.0.0\" vs null attribute",
+      { "x": { "$vlte": "2.0.0" } },
+      { "x": null },
+      false
+    ],
+    [
+      "type mismatch - $elemMatch $eq 5 vs [\"5\"] attribute",
+      { "x": { "$elemMatch": { "$eq": 5 } } },
+      { "x": ["5"] },
+      false
+    ],
+    [
+      "type mismatch - $elemMatch $eq \"5\" vs [5] attribute",
+      { "x": { "$elemMatch": { "$eq": "5" } } },
+      { "x": [5] },
+      false
+    ],
+    [
+      "type mismatch - $elemMatch $gte 5 vs [\"5\"] attribute",
+      { "x": { "$elemMatch": { "$gte": 5 } } },
+      { "x": ["5"] },
+      false
+    ],
+    [
+      "type mismatch - $elemMatch $gte \"5\" vs [5] attribute",
+      { "x": { "$elemMatch": { "$gte": "5" } } },
+      { "x": [5] },
+      false
+    ],
+    [
+      "type mismatch - $all [5] vs [\"5\"] attribute",
+      { "x": { "$all": [5] } },
+      { "x": ["5"] },
+      false
+    ],
+    [
+      "type mismatch - $all [\"5\"] vs [5] attribute",
+      { "x": { "$all": ["5"] } },
+      { "x": [5] },
+      false
+    ],
+    [
+      "type mismatch - $all [true] vs [1] attribute",
+      { "x": { "$all": [true] } },
+      { "x": [1] },
+      false
+    ],
+    [
+      "type mismatch - $alli [\"5\"] vs [5] attribute",
+      { "x": { "$alli": ["5"] } },
+      { "x": [5] },
+      false
+    ],
+    [
+      "type mismatch - $size \"1\" vs [\"a\"] attribute",
+      { "x": { "$size": "1" } },
+      { "x": ["a"] },
+      false
+    ],
+    [
+      "type mismatch - $inGroup 2 vs [\"2\"] group",
+      { "x": { "$inGroup": "group_id" } },
+      { "x": 2 },
+      false,
+      { "group_id": [1, "2", 3] }
+    ],
+    [
+      "type mismatch - $notInGroup 2 vs [\"2\"] group",
+      { "x": { "$notInGroup": "group_id" } },
+      { "x": 2 },
+      true,
+      { "group_id": [1, "2", 3] }
+    ],
+    [
+      "type mismatch - $notInGroup \"3\" vs [3] group",
+      { "x": { "$notInGroup": "group_id" } },
+      { "x": "3" },
+      true,
+      { "group_id": [1, "2", 3] }
+    ],
+    [
+      "type mismatch - $exists false vs null attribute",
+      { "x": { "$exists": false } },
+      { "x": null },
+      true
+    ],
+    [
+      "type mismatch - $type \"number\" vs \"5\" attribute",
+      { "x": { "$type": "number" } },
+      { "x": "5" },
+      false
     ]
   ],
   "hash": [
@@ -5087,6 +7093,43 @@
       }
     ],
     [
+      "Malformed prerequisite condition does not match, skip rule",
+      {
+        "attributes": {
+          "id": "123"
+        },
+        "features": {
+          "parentFlag": {
+            "defaultValue": true
+          },
+          "childFlag": {
+            "defaultValue": "default",
+            "rules": [
+              {
+                "parentConditions": [
+                  {
+                    "id": "parentFlag",
+                    "condition": {
+                      "$not": null
+                    }
+                  }
+                ],
+                "force": "prereq"
+              }
+            ]
+          }
+        }
+      },
+      "childFlag",
+      {
+        "value": "default",
+        "on": true,
+        "off": false,
+        "source": "defaultValue",
+        "ruleId": ""
+      }
+    ],
+    [
       "SavedGroups correctly pulled from context for force rule",
       {
         "attributes": {
@@ -6143,6 +8186,22 @@
       false
     ],
     [
+      "querystring force",
+      {
+        "attributes": {
+          "id": "1"
+        },
+        "url": "http://example.com?forced-test-qs=1#someanchor"
+      },
+      {
+        "key": "forced-test-qs",
+        "variations": [0, 1]
+      },
+      1,
+      true,
+      false
+    ],
+    [
       "run active experiments",
       {
         "attributes": {
@@ -6172,6 +8231,23 @@
       },
       0,
       false,
+      false
+    ],
+    [
+      "querystring force with inactive",
+      {
+        "attributes": {
+          "id": "1"
+        },
+        "url": "http://example.com/?my-test=1"
+      },
+      {
+        "key": "my-test",
+        "active": false,
+        "variations": [0, 1]
+      },
+      1,
+      true,
       false
     ],
     [
@@ -10788,5 +12864,1515 @@
         }
       }
     ]
-  ]
+  ],
+  "savedGroupReferencesV2": {
+    "evalCondition": [
+      [
+        "list entry matches when the attribute is in the list",
+        {
+          "$savedGroup": { "id": "grp_list" }
+        },
+        {
+          "id": "u_1"
+        },
+        true,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          },
+          "grp_cond": {
+            "type": "condition",
+            "condition": {
+              "plan": "pro"
+            }
+          }
+        }
+      ],
+      [
+        "list entry does not match when the attribute is absent from the list",
+        {
+          "$savedGroup": { "id": "grp_list" }
+        },
+        {
+          "id": "u_9"
+        },
+        false,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          },
+          "grp_cond": {
+            "type": "condition",
+            "condition": {
+              "plan": "pro"
+            }
+          }
+        }
+      ],
+      [
+        "condition entry matches when its condition passes",
+        {
+          "$savedGroup": { "id": "grp_cond" }
+        },
+        {
+          "plan": "pro"
+        },
+        true,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          },
+          "grp_cond": {
+            "type": "condition",
+            "condition": {
+              "plan": "pro"
+            }
+          }
+        }
+      ],
+      [
+        "condition entry does not match when its condition fails",
+        {
+          "$savedGroup": { "id": "grp_cond" }
+        },
+        {
+          "plan": "free"
+        },
+        false,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          },
+          "grp_cond": {
+            "type": "condition",
+            "condition": {
+              "plan": "pro"
+            }
+          }
+        }
+      ],
+      [
+        "follows a chain of condition groups",
+        {
+          "$savedGroup": { "id": "grp_a" }
+        },
+        {
+          "country": "US"
+        },
+        true,
+        {
+          "grp_a": {
+            "type": "condition",
+            "condition": {
+              "$savedGroup": { "id": "grp_b" }
+            }
+          },
+          "grp_b": {
+            "type": "condition",
+            "condition": {
+              "$savedGroup": { "id": "grp_c" }
+            }
+          },
+          "grp_c": {
+            "type": "condition",
+            "condition": {
+              "country": "US"
+            }
+          }
+        }
+      ],
+      [
+        "follows a chain and fails at the end",
+        {
+          "$savedGroup": { "id": "grp_a" }
+        },
+        {
+          "country": "CA"
+        },
+        false,
+        {
+          "grp_a": {
+            "type": "condition",
+            "condition": {
+              "$savedGroup": { "id": "grp_b" }
+            }
+          },
+          "grp_b": {
+            "type": "condition",
+            "condition": {
+              "$savedGroup": { "id": "grp_c" }
+            }
+          },
+          "grp_c": {
+            "type": "condition",
+            "condition": {
+              "country": "US"
+            }
+          }
+        }
+      ],
+      [
+        "resolves inside $not",
+        {
+          "$not": {
+            "$savedGroup": { "id": "grp_list" }
+          }
+        },
+        {
+          "id": "u_9"
+        },
+        true,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          },
+          "grp_cond": {
+            "type": "condition",
+            "condition": {
+              "plan": "pro"
+            }
+          }
+        }
+      ],
+      [
+        "resolves inside $and",
+        {
+          "$and": [
+            {
+              "$savedGroup": { "id": "grp_list" }
+            },
+            {
+              "$savedGroup": { "id": "grp_cond" }
+            }
+          ]
+        },
+        {
+          "id": "u_1",
+          "plan": "pro"
+        },
+        true,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          },
+          "grp_cond": {
+            "type": "condition",
+            "condition": {
+              "plan": "pro"
+            }
+          }
+        }
+      ],
+      [
+        "resolves inside $or",
+        {
+          "$or": [
+            {
+              "$savedGroup": { "id": "grp_list" }
+            },
+            {
+              "$savedGroup": { "id": "grp_cond" }
+            }
+          ]
+        },
+        {
+          "id": "u_9",
+          "plan": "pro"
+        },
+        true,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          },
+          "grp_cond": {
+            "type": "condition",
+            "condition": {
+              "plan": "pro"
+            }
+          }
+        }
+      ],
+      [
+        "match all: passes only when in every group",
+        {
+          "$and": [
+            {
+              "$savedGroup": { "id": "grp_list" }
+            },
+            {
+              "$savedGroup": { "id": "grp_cond" }
+            }
+          ]
+        },
+        {
+          "id": "u_1",
+          "plan": "free"
+        },
+        false,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          },
+          "grp_cond": {
+            "type": "condition",
+            "condition": {
+              "plan": "pro"
+            }
+          }
+        }
+      ],
+      [
+        "match any: passes when in one group",
+        {
+          "$or": [
+            {
+              "$savedGroup": { "id": "grp_list" }
+            },
+            {
+              "$savedGroup": { "id": "grp_cond" }
+            }
+          ]
+        },
+        {
+          "id": "u_9",
+          "plan": "free"
+        },
+        false,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          },
+          "grp_cond": {
+            "type": "condition",
+            "condition": {
+              "plan": "pro"
+            }
+          }
+        }
+      ],
+      [
+        "match none: an AND of NOTs passes when in neither group",
+        {
+          "$and": [
+            {
+              "$not": {
+                "$savedGroup": { "id": "grp_list" }
+              }
+            },
+            {
+              "$not": {
+                "$savedGroup": { "id": "grp_cond" }
+              }
+            }
+          ]
+        },
+        {
+          "id": "u_9",
+          "plan": "free"
+        },
+        true,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          },
+          "grp_cond": {
+            "type": "condition",
+            "condition": {
+              "plan": "pro"
+            }
+          }
+        }
+      ],
+      [
+        "match none: an AND of NOTs fails when in one group",
+        {
+          "$and": [
+            {
+              "$not": {
+                "$savedGroup": { "id": "grp_list" }
+              }
+            },
+            {
+              "$not": {
+                "$savedGroup": { "id": "grp_cond" }
+              }
+            }
+          ]
+        },
+        {
+          "id": "u_1",
+          "plan": "free"
+        },
+        false,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          },
+          "grp_cond": {
+            "type": "condition",
+            "condition": {
+              "plan": "pro"
+            }
+          }
+        }
+      ],
+      [
+        "a negated pair passes when in only one group, where an AND of NOTs fails",
+        {
+          "$not": {
+            "$and": [
+              {
+                "$savedGroup": { "id": "grp_list" }
+              },
+              {
+                "$savedGroup": { "id": "grp_cond" }
+              }
+            ]
+          }
+        },
+        {
+          "id": "u_1",
+          "plan": "free"
+        },
+        true,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          },
+          "grp_cond": {
+            "type": "condition",
+            "condition": {
+              "plan": "pro"
+            }
+          }
+        }
+      ],
+      [
+        "combines with plain attribute targeting",
+        {
+          "$and": [
+            {
+              "country": "US"
+            },
+            {
+              "$savedGroup": { "id": "grp_list" }
+            }
+          ]
+        },
+        {
+          "country": "US",
+          "id": "u_1"
+        },
+        true,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          },
+          "grp_cond": {
+            "type": "condition",
+            "condition": {
+              "plan": "pro"
+            }
+          }
+        }
+      ],
+      [
+        "combines with plain attribute targeting and fails on the attribute",
+        {
+          "$and": [
+            {
+              "country": "US"
+            },
+            {
+              "$savedGroup": { "id": "grp_list" }
+            }
+          ]
+        },
+        {
+          "country": "CA",
+          "id": "u_1"
+        },
+        false,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          },
+          "grp_cond": {
+            "type": "condition",
+            "condition": {
+              "plan": "pro"
+            }
+          }
+        }
+      ],
+      [
+        "list entry intersects when the attribute is an array",
+        {
+          "$savedGroup": { "id": "grp_list" }
+        },
+        {
+          "id": ["u_9", "u_2"]
+        },
+        true,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          },
+          "grp_cond": {
+            "type": "condition",
+            "condition": {
+              "plan": "pro"
+            }
+          }
+        }
+      ],
+      [
+        "list entry matches numeric values",
+        {
+          "$savedGroup": { "id": "grp_num" }
+        },
+        {
+          "age": 21
+        },
+        true,
+        {
+          "grp_num": {
+            "type": "list",
+            "attributeKey": "age",
+            "values": [21, 30]
+          }
+        }
+      ],
+      [
+        "a cycle resolves to false instead of hanging",
+        {
+          "$savedGroup": { "id": "grp_x" }
+        },
+        {
+          "id": "u_1"
+        },
+        false,
+        {
+          "grp_x": {
+            "type": "condition",
+            "condition": {
+              "$savedGroup": { "id": "grp_y" }
+            }
+          },
+          "grp_y": {
+            "type": "condition",
+            "condition": {
+              "$savedGroup": { "id": "grp_x" }
+            }
+          }
+        }
+      ],
+      [
+        "an unknown group type matches nobody",
+        {
+          "$savedGroup": { "id": "grp_future" }
+        },
+        {
+          "id": "u_1"
+        },
+        false,
+        {
+          "grp_future": {
+            "type": "somethingNew",
+            "values": ["u_1"]
+          }
+        }
+      ],
+      [
+        "an id that is not in the payload matches nobody",
+        {
+          "$savedGroup": { "id": "grp_missing" }
+        },
+        {
+          "id": "u_1"
+        },
+        false,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          },
+          "grp_cond": {
+            "type": "condition",
+            "condition": {
+              "plan": "pro"
+            }
+          }
+        }
+      ],
+      [
+        "a non-string operator value matches nobody",
+        {
+          "$savedGroup": ["grp_list"]
+        },
+        {
+          "id": "u_1"
+        },
+        false,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          },
+          "grp_cond": {
+            "type": "condition",
+            "condition": {
+              "plan": "pro"
+            }
+          }
+        }
+      ],
+      [
+        "a list entry with no values matches nobody",
+        {
+          "$savedGroup": { "id": "grp_bad" }
+        },
+        {
+          "id": "u_1"
+        },
+        false,
+        {
+          "grp_bad": {
+            "type": "list",
+            "attributeKey": "id"
+          }
+        }
+      ],
+      [
+        "a condition entry with no condition matches nobody",
+        {
+          "$savedGroup": { "id": "grp_bad" }
+        },
+        {
+          "id": "u_1"
+        },
+        false,
+        {
+          "grp_bad": {
+            "type": "condition"
+          }
+        }
+      ],
+      [
+        "$savedGroup cannot resolve a legacy bare array",
+        {
+          "$savedGroup": { "id": "grp_legacy" }
+        },
+        {
+          "id": "u_1"
+        },
+        false,
+        {
+          "grp_legacy": ["u_1"],
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          }
+        }
+      ],
+      [
+        "$inGroup still works beside typed entries",
+        {
+          "id": {
+            "$inGroup": "grp_legacy"
+          }
+        },
+        {
+          "id": "u_1"
+        },
+        true,
+        {
+          "grp_legacy": ["u_1"],
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          }
+        }
+      ],
+      [
+        "$inGroup resolves a typed list entry",
+        {
+          "id": {
+            "$inGroup": "grp_list"
+          }
+        },
+        {
+          "id": "u_1"
+        },
+        true,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          },
+          "grp_cond": {
+            "type": "condition",
+            "condition": {
+              "plan": "pro"
+            }
+          }
+        }
+      ],
+      [
+        "$inGroup uses the attribute it sits on, not the one in the entry",
+        {
+          "backup_id": {
+            "$inGroup": "grp_list"
+          }
+        },
+        {
+          "id": "u_9",
+          "backup_id": "u_1"
+        },
+        true,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          }
+        }
+      ],
+      [
+        "$inGroup matches nobody for a typed condition entry",
+        {
+          "id": {
+            "$inGroup": "grp_cond"
+          }
+        },
+        {
+          "id": "u_1",
+          "plan": "pro"
+        },
+        false,
+        {
+          "grp_cond": {
+            "type": "condition",
+            "condition": {
+              "plan": "pro"
+            }
+          }
+        }
+      ],
+      [
+        "$notInGroup resolves a typed list entry and fails for a member",
+        {
+          "id": {
+            "$notInGroup": "grp_list"
+          }
+        },
+        {
+          "id": "u_1"
+        },
+        false,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          }
+        }
+      ],
+      [
+        "$notInGroup resolves a typed list entry and passes for a non-member",
+        {
+          "id": {
+            "$notInGroup": "grp_list"
+          }
+        },
+        {
+          "id": "u_9"
+        },
+        true,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          }
+        }
+      ],
+      [
+        "$notInGroup fails closed for a typed condition entry rather than passing everyone",
+        {
+          "id": {
+            "$notInGroup": "grp_cond"
+          }
+        },
+        {
+          "id": "u_1",
+          "plan": "free"
+        },
+        false,
+        {
+          "grp_cond": {
+            "type": "condition",
+            "condition": {
+              "plan": "pro"
+            }
+          }
+        }
+      ],
+      [
+        "$notInGroup fails closed for a group type added after the SDK was built",
+        {
+          "id": {
+            "$notInGroup": "grp_future"
+          }
+        },
+        {
+          "id": "u_1"
+        },
+        false,
+        {
+          "grp_future": {
+            "type": "somethingNew",
+            "values": ["u_1"]
+          }
+        }
+      ],
+      [
+        "$notInGroup fails closed for a malformed entry rather than passing everyone",
+        {
+          "id": {
+            "$notInGroup": "grp_bad"
+          }
+        },
+        {
+          "id": "u_1"
+        },
+        false,
+        {
+          "grp_bad": null
+        }
+      ],
+      [
+        "$inGroup matches nobody for a malformed entry",
+        {
+          "id": {
+            "$inGroup": "grp_bad"
+          }
+        },
+        {
+          "id": "u_1"
+        },
+        false,
+        {
+          "grp_bad": null
+        }
+      ],
+      [
+        "$notInGroup still passes for an id that is not in the payload",
+        {
+          "id": {
+            "$notInGroup": "grp_missing"
+          }
+        },
+        {
+          "id": "u_1"
+        },
+        true,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          }
+        }
+      ],
+      [
+        "the authoring operator $savedGroups is not understood",
+        {
+          "$savedGroups": ["grp_list"]
+        },
+        {
+          "id": "u_1"
+        },
+        false,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          },
+          "grp_cond": {
+            "type": "condition",
+            "condition": {
+              "plan": "pro"
+            }
+          }
+        }
+      ],
+      [
+        "an attributeKey override checks that attribute instead of the entry's",
+        {
+          "$savedGroup": {
+            "id": "grp_list",
+            "attributeKey": "backup_id"
+          }
+        },
+        {
+          "id": "u_9",
+          "backup_id": "u_1"
+        },
+        true,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          }
+        }
+      ],
+      [
+        "an attributeKey override does not fall back to the entry's attribute",
+        {
+          "$savedGroup": {
+            "id": "grp_list",
+            "attributeKey": "backup_id"
+          }
+        },
+        {
+          "id": "u_1",
+          "backup_id": "u_9"
+        },
+        false,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          }
+        }
+      ],
+      [
+        "an attributeKey override resolves inside $not",
+        {
+          "$not": {
+            "$savedGroup": {
+              "id": "grp_list",
+              "attributeKey": "backup_id"
+            }
+          }
+        },
+        {
+          "id": "u_1",
+          "backup_id": "u_9"
+        },
+        true,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          }
+        }
+      ],
+      [
+        "a non-string attributeKey matches nobody rather than using the entry's",
+        {
+          "$savedGroup": {
+            "id": "grp_list",
+            "attributeKey": 42
+          }
+        },
+        {
+          "id": "u_1"
+        },
+        false,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          }
+        }
+      ],
+      [
+        "an attributeKey override is ignored for a condition entry",
+        {
+          "$savedGroup": {
+            "id": "grp_cond",
+            "attributeKey": "backup_id"
+          }
+        },
+        {
+          "plan": "pro"
+        },
+        true,
+        {
+          "grp_cond": {
+            "type": "condition",
+            "condition": {
+              "plan": "pro"
+            }
+          }
+        }
+      ],
+      [
+        "an unknown key inside the reference is ignored",
+        {
+          "$savedGroup": {
+            "id": "grp_list",
+            "somethingNew": "ignore me"
+          }
+        },
+        {
+          "id": "u_1"
+        },
+        true,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          }
+        }
+      ],
+      [
+        "a bare string id is not a reference and matches nobody",
+        {
+          "$savedGroup": "grp_list"
+        },
+        {
+          "id": "u_1"
+        },
+        false,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          }
+        }
+      ],
+      [
+        "a reference with no id matches nobody",
+        {
+          "$savedGroup": {
+            "attributeKey": "id"
+          }
+        },
+        {
+          "id": "u_1"
+        },
+        false,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          }
+        }
+      ],
+      [
+        "an error marker matches nobody",
+        {
+          "__sgInvalid__": "grp_cond"
+        },
+        {
+          "id": "u_1"
+        },
+        false,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          }
+        }
+      ],
+      [
+        "a negated error marker passes everyone, as an unresolved exclusion did before",
+        {
+          "$not": {
+            "__sgUnknown__": "grp_missing"
+          }
+        },
+        {
+          "id": "u_1"
+        },
+        true,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          }
+        }
+      ],
+      [
+        "an error marker fails the $and it sits in",
+        {
+          "$and": [
+            {
+              "country": "US"
+            },
+            {
+              "__sgInvalid__": "grp_cond"
+            }
+          ]
+        },
+        {
+          "id": "u_1",
+          "country": "US"
+        },
+        false,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          }
+        }
+      ],
+      [
+        "an error marker does not fail an $or whose other branch passes",
+        {
+          "$or": [
+            {
+              "country": "US"
+            },
+            {
+              "__sgInvalid__": "grp_cond"
+            }
+          ]
+        },
+        {
+          "id": "u_1",
+          "country": "US"
+        },
+        true,
+        {
+          "grp_list": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["u_1", "u_2"]
+          }
+        }
+      ],
+      [
+        "type mismatch - $savedGroup number attribute vs string list",
+        { "$savedGroup": { "id": "grp_strs" } },
+        { "id": 1 },
+        false,
+        {
+          "grp_strs": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["1", "2"]
+          }
+        }
+      ],
+      [
+        "type mismatch - $savedGroup string attribute vs number list",
+        { "$savedGroup": { "id": "grp_nums" } },
+        { "id": "1" },
+        false,
+        {
+          "grp_nums": { "type": "list", "attributeKey": "id", "values": [1, 2] }
+        }
+      ],
+      [
+        "type mismatch - $inGroup number attribute vs typed string list",
+        { "id": { "$inGroup": "grp_strs" } },
+        { "id": 1 },
+        false,
+        {
+          "grp_strs": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["1", "2"]
+          }
+        }
+      ],
+      [
+        "type mismatch - $notInGroup number attribute vs typed string list",
+        { "id": { "$notInGroup": "grp_strs" } },
+        { "id": 1 },
+        true,
+        {
+          "grp_strs": {
+            "type": "list",
+            "attributeKey": "id",
+            "values": ["1", "2"]
+          }
+        }
+      ]
+    ],
+    "feature": [
+      [
+        "a rule condition using a saved group reference",
+        {
+          "attributes": {
+            "id": "u_1",
+            "plan": "pro"
+          },
+          "savedGroups": {
+            "grp_list": {
+              "type": "list",
+              "attributeKey": "id",
+              "values": ["u_1", "u_2"]
+            },
+            "grp_cond": {
+              "type": "condition",
+              "condition": {
+                "plan": "pro"
+              }
+            }
+          },
+          "features": {
+            "flag": {
+              "defaultValue": false,
+              "rules": [
+                {
+                  "condition": {
+                    "$savedGroup": { "id": "grp_cond" }
+                  },
+                  "force": true,
+                  "id": "rule_1"
+                }
+              ]
+            }
+          }
+        },
+        "flag",
+        {
+          "value": true,
+          "on": true,
+          "off": false,
+          "source": "force",
+          "ruleId": "rule_1"
+        }
+      ],
+      [
+        "a rule condition using a saved group reference that does not match",
+        {
+          "attributes": {
+            "id": "u_1",
+            "plan": "free"
+          },
+          "savedGroups": {
+            "grp_list": {
+              "type": "list",
+              "attributeKey": "id",
+              "values": ["u_1", "u_2"]
+            },
+            "grp_cond": {
+              "type": "condition",
+              "condition": {
+                "plan": "pro"
+              }
+            }
+          },
+          "features": {
+            "flag": {
+              "defaultValue": false,
+              "rules": [
+                {
+                  "condition": {
+                    "$savedGroup": { "id": "grp_cond" }
+                  },
+                  "force": true,
+                  "id": "rule_1"
+                }
+              ]
+            }
+          }
+        },
+        "flag",
+        {
+          "value": false,
+          "on": false,
+          "off": true,
+          "source": "defaultValue",
+          "ruleId": ""
+        }
+      ],
+      [
+        "a prerequisite gate that itself uses a saved group reference",
+        {
+          "attributes": {
+            "id": "u_1"
+          },
+          "savedGroups": {
+            "grp_parent_on": {
+              "type": "condition",
+              "condition": {
+                "value": true
+              }
+            }
+          },
+          "features": {
+            "parent": {
+              "defaultValue": true
+            },
+            "child": {
+              "defaultValue": false,
+              "rules": [
+                {
+                  "parentConditions": [
+                    {
+                      "id": "parent",
+                      "condition": {
+                        "$savedGroup": { "id": "grp_parent_on" }
+                      }
+                    }
+                  ],
+                  "force": true,
+                  "id": "child_rule"
+                }
+              ]
+            }
+          }
+        },
+        "child",
+        {
+          "value": true,
+          "on": true,
+          "off": false,
+          "source": "force",
+          "ruleId": "child_rule"
+        }
+      ],
+      [
+        "a prerequisite gate whose saved group reference does not match",
+        {
+          "attributes": {
+            "id": "u_1"
+          },
+          "savedGroups": {
+            "grp_parent_on": {
+              "type": "condition",
+              "condition": {
+                "value": true
+              }
+            }
+          },
+          "features": {
+            "parent": {
+              "defaultValue": false
+            },
+            "child": {
+              "defaultValue": false,
+              "rules": [
+                {
+                  "parentConditions": [
+                    {
+                      "id": "parent",
+                      "condition": {
+                        "$savedGroup": { "id": "grp_parent_on" }
+                      }
+                    }
+                  ],
+                  "force": true,
+                  "id": "child_rule"
+                }
+              ]
+            }
+          }
+        },
+        "child",
+        {
+          "value": false,
+          "on": false,
+          "off": true,
+          "source": "defaultValue",
+          "ruleId": ""
+        }
+      ]
+    ],
+    "run": [
+      [
+        "an experiment targeted by a saved group reference",
+        {
+          "attributes": {
+            "id": "u_1",
+            "plan": "pro"
+          },
+          "savedGroups": {
+            "grp_list": {
+              "type": "list",
+              "attributeKey": "id",
+              "values": ["u_1", "u_2"]
+            },
+            "grp_cond": {
+              "type": "condition",
+              "condition": {
+                "plan": "pro"
+              }
+            }
+          }
+        },
+        {
+          "key": "sg-exp",
+          "variations": [0, 1],
+          "condition": {
+            "$savedGroup": { "id": "grp_cond" }
+          }
+        },
+        0,
+        true,
+        true
+      ],
+      [
+        "an experiment skipped because the saved group does not match",
+        {
+          "attributes": {
+            "id": "u_1",
+            "plan": "free"
+          },
+          "savedGroups": {
+            "grp_list": {
+              "type": "list",
+              "attributeKey": "id",
+              "values": ["u_1", "u_2"]
+            },
+            "grp_cond": {
+              "type": "condition",
+              "condition": {
+                "plan": "pro"
+              }
+            }
+          }
+        },
+        {
+          "key": "sg-exp",
+          "variations": [0, 1],
+          "condition": {
+            "$savedGroup": { "id": "grp_cond" }
+          }
+        },
+        0,
+        false,
+        false
+      ],
+      [
+        "an experiment gated by a prerequisite that uses a saved group reference",
+        {
+          "attributes": {
+            "id": "u_1",
+            "plan": "pro"
+          },
+          "savedGroups": {
+            "grp_parent_on": {
+              "type": "condition",
+              "condition": {
+                "value": true
+              }
+            },
+            "grp_cond": {
+              "type": "condition",
+              "condition": {
+                "plan": "pro"
+              }
+            }
+          },
+          "features": {
+            "parent": {
+              "defaultValue": true
+            }
+          }
+        },
+        {
+          "key": "sg-prereq-exp",
+          "variations": [0, 1],
+          "parentConditions": [
+            {
+              "id": "parent",
+              "condition": {
+                "$savedGroup": { "id": "grp_parent_on" }
+              }
+            }
+          ]
+        },
+        0,
+        true,
+        true
+      ],
+      [
+        "an experiment blocked because its prerequisite saved group does not match",
+        {
+          "attributes": {
+            "id": "u_1",
+            "plan": "pro"
+          },
+          "savedGroups": {
+            "grp_parent_on": {
+              "type": "condition",
+              "condition": {
+                "value": true
+              }
+            },
+            "grp_cond": {
+              "type": "condition",
+              "condition": {
+                "plan": "pro"
+              }
+            }
+          },
+          "features": {
+            "parent": {
+              "defaultValue": false
+            }
+          }
+        },
+        {
+          "key": "sg-prereq-exp",
+          "variations": [0, 1],
+          "parentConditions": [
+            {
+              "id": "parent",
+              "condition": {
+                "$savedGroup": { "id": "grp_parent_on" }
+              }
+            }
+          ]
+        },
+        0,
+        false,
+        false
+      ]
+    ]
+  }
 }

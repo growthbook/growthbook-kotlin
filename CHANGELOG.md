@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [Unreleased]
+
+### Fixed
+- A prerequisite (`parentConditions`) with a malformed condition, such as `{"$not": null}`, no longer
+  matches, so the gated rule or experiment is skipped (shared spec 0.10.1).
+
+### Breaking changes
+- **Strict types in condition evaluation** (shared spec 0.10.0, growthbook/growthbook#7379). Conditions no
+  longer coerce attribute types. When the attribute's type differs from the condition's, the positive
+  operator fails and its negation matches:
+  - `"10"` does not equal `10`, `0` does not match null or a missing attribute, and `false` does not match `""`.
+  - Two strings compare as text (`"10" < "9"` is true); a string never compares with a number.
+  - Booleans are not ordered: `$gt`, `$gte`, `$lt` and `$lte` always fail on them.
+  - Version operators (`$veq`, `$vgt`, …) need both sides to be strings, or both numbers. A missing, null,
+    boolean, array or float attribute against a version string fails; `$vne` matches.
+  - A missing attribute fails comparison operators.
+  - `$exists` and `$type` are unchanged.
+
+  Targeting that relied on coercion, such as a numeric attribute sent as a string, stops matching. Send
+  attributes with the type the condition uses.
+
 ## [9.0.0] - 2026-10-16
 
 A major because two public contracts change with no signature change and no compile error to
