@@ -370,8 +370,7 @@ internal class GBConditionEvaluator {
             val itemResult = if (testsElement) {
                 evalConditionValueResult(condition, item, savedGroups)
             } else {
-                val attributes = if (item is GBJson) HashMap(item) else mapOf("value" to item)
-                evalConditionResult(attributes, condition as? GBJson ?: GBJson(emptyMap()), savedGroups)
+                evalConditionResult(ownFields(item), condition as? GBJson ?: GBJson(emptyMap()), savedGroups)
             }
             when (itemResult) {
                 true -> return true
@@ -381,6 +380,18 @@ internal class GBConditionEvaluator {
         }
         return result
     }
+
+    /**
+     * The fields a condition sees on an `$elemMatch` element, like JS own keys: an object's keys,
+     * an array's indices and `length`, and none for a string, number or boolean.
+     */
+    private fun ownFields(item: GBValue): Map<String, GBValue> =
+        when (item) {
+            is GBJson -> item
+            is GBArray -> item.withIndex().associate { (index, value) -> index.toString() to value } +
+                ("length" to GBNumber(item.size))
+            else -> emptyMap()
+        }
 
     /**
      * This function is just a case statement that handles all the possible operators

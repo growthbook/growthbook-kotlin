@@ -67,6 +67,20 @@ class JsNumberTests {
     }
 
     @Test
+    fun elemMatchConditionsReadElementFieldsLikeJs() {
+        val primitives = mapOf("x" to json("[1]"))
+        // A primitive element has no fields; there is no "value" key
+        assertFalse(eval("""{"x":{"${'$'}elemMatch":{"${'$'}or":[{"value":1}]}}}""", primitives))
+        assertFalse(eval("""{"x":{"${'$'}elemMatch":{"value":1}}}""", primitives))
+        val nested = mapOf("x" to json("[[1, 2]]"))
+        // An array element exposes its indices and length
+        assertTrue(eval("""{"x":{"${'$'}elemMatch":{"${'$'}or":[{"0":1}]}}}""", nested))
+        assertTrue(eval("""{"x":{"${'$'}elemMatch":{"1":2,"length":2}}}""", nested))
+        assertFalse(eval("""{"x":{"${'$'}elemMatch":{"2":{"${'$'}exists":true}}}}""", nested))
+        assertTrue(eval("""{"x":{"${'$'}elemMatch":{"${'$'}and":[{"a.0":3}]}}}""", mapOf("x" to json("""[{"a":[3]}]"""))))
+    }
+
+    @Test
     fun numbersFormatLikeJsString() {
         assertEquals("0.30000000000000004", jsNumberToString(0.1 + 0.2))
         assertEquals("1e-7", jsNumberToString(1e-7))
