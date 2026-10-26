@@ -51,6 +51,8 @@ class JsNumberTests {
         assertEquals("1e+21", json("1e21").toHashValue())
         assertEquals("100", json("100").toHashValue())
         assertEquals("9007199254740994", GBNumber(9007199254740994L).toHashValue())
+        // Java 17 prints 1e23 as 9.999999999999999E22, which hashes to another bucket
+        assertEquals("1e+23", json("1e23").toHashValue())
     }
 
     @Test
