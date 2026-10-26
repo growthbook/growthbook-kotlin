@@ -342,13 +342,12 @@ class GrowthBookSDK internal constructor(
     fun close() {
         pluginRegistry?.closeAll()
         featuresViewModel.close()
-        // Release the per-feature usage history, as the reference SDK's destroy() does. Its
-        // trackedExperiments counterpart is deliberately left alone: gbExperimentHelper holds a
-        // plain unsynchronized set read on the evaluation path, so clearing it while an evaluation
-        // is in flight would be a data race, bought for nothing — the instance is unusable after
-        // close(), so this is a memory release, not a semantic one. The usage history is safe to
-        // drop because it is swapped behind an AtomicReference.
+        // Release the per-feature usage history and its trackedExperiments counterpart, as the
+        // reference SDK's destroy() does. A memory release, not a semantic one — the instance is
+        // unusable after close(). Both are safe to drop while an evaluation is in flight because
+        // each is swapped behind an AtomicReference rather than cleared in place.
         gbContext.resetFeatureUsageHistory()
+        gbExperimentHelper.reset()
     }
 
     /**
