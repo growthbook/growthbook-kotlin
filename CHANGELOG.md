@@ -9,8 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
-- A prerequisite (`parentConditions`) with a malformed condition, such as `{"$not": null}`, no longer
-  matches, so the gated rule or experiment is skipped (shared spec 0.10.1).
+- A malformed condition, such as `{"$not": null}`, no longer matches, so the rule, experiment or gated
+  rule is skipped. This covers prerequisites (`parentConditions`, shared spec 0.10.1) and, since spec
+  0.11.0, rule and experiment conditions too.
+- Decimal attributes parse as `Double` instead of 32-bit `Float`, and numbers compare by value (`1`
+  equals `1.0`, also in `$in`/`$nin`).
+- Attribute paths follow the JS SDK: array segments are indexable (`a.0`, `a.length`) and a path through
+  a non-object is null.
+- `$elemMatch` with `$or`, `$and` or `$nor` tests each element's fields (shared spec 0.11.0).
+- A condition value of `{}` always passes (shared spec 0.11.0).
+
+### Breaking changes
+- **Bucketing uses `Double`** (growthbook-kotlin#274). Hashes, bucket ranges and coverage are `Double`
+  instead of `Float`, and range ends round like the JS SDK (shared spec 0.11.2). A few users whose hash
+  lands on a range end can move to a neighbouring variation.
+- **Rollouts include a user only when `hash < coverage`** (shared spec 0.11.1, growthbook/growthbook#7425).
+  Before, `hash <= coverage` included one extra hash bucket, so a partial rollout whose coverage is
+  exactly a bucket value loses one bucket (for example, 0.02% → 0.01%).
+- **Numeric hash attributes format like JS `String()`** (`1` for `1.0`, `1e+21`), so a decimal hash
+  attribute can land in a different bucket than before, matching the JS SDK.
+- **Unsupported operators fail** (shared spec 0.11.0, growthbook/growthbook#7346). A condition that
+  depends on an operator, `$savedGroup` reference or saved group type this SDK doesn't support now fails,
+  also under `$not` and `$nor`, where it used to pass.
 
 ### Breaking changes
 - **Strict types in condition evaluation** (shared spec 0.10.0, growthbook/growthbook#7379). Conditions no
