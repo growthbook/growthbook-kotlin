@@ -1,11 +1,16 @@
 package com.sdk.growthbook.model
 
+import kotlin.math.abs
+
+private const val MAX_SAFE_INTEGER = 9007199254740992.0
+
 data object GBNull: GBValue()
 data class GBBoolean(val value: Boolean): GBValue()
 data class GBString(val value: String): GBValue()
 
 class GBNumber(val value: Number): GBValue() {
 
+    /** Numbers are equal by value, as in JS: 1 == 1.0. */
     override fun equals(other: Any?): Boolean {
         if (this === other) {
             return true
@@ -13,29 +18,29 @@ class GBNumber(val value: Number): GBValue() {
         if (other !is GBNumber) {
             return false
         }
-        if (isIntegerValue() && other.isIntegerValue() && value.toLong() == other.value.toLong()) {
-            return true
+        if (isIntegerValue() && other.isIntegerValue()) {
+            return value.toLong() == other.value.toLong()
         }
-        if (
-            !isIntegerValue() && !other.isIntegerValue() &&
-            value.toDouble() == other.value.toDouble()
-        ) {
-            return true
-        }
-        return false
+        return doubleValue() == other.doubleValue()
     }
 
-    override fun hashCode(): Int =
-        if (isIntegerValue()) {
-            value.toLong().hashCode()
+    override fun hashCode(): Int {
+        val number = doubleValue()
+        return if (number % 1.0 == 0.0 && abs(number) < MAX_SAFE_INTEGER) {
+            number.toLong().hashCode()
         } else {
-            value.toDouble().hashCode()
+            number.hashCode()
         }
+    }
 
     override fun toString(): String = "GBNumber(value=$value)"
 
     private fun isIntegerValue(): Boolean =
         value is Byte || value is Short || value is Int || value is Long
+
+    // A Float is taken at its decimal value (0.1f is 0.1), as it was before decimals became Double.
+    private fun doubleValue(): Double =
+        if (value is Float) value.toString().toDouble() else value.toDouble()
 
 }
 

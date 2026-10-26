@@ -2,7 +2,6 @@ package com.sdk.growthbook.kotlinx.serialization
 
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.long
-import kotlinx.serialization.json.float
 import kotlinx.serialization.json.double
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.JsonNull
@@ -10,7 +9,6 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.floatOrNull
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.booleanOrNull
@@ -73,7 +71,6 @@ fun GBValue.Companion.from(jsonElement: JsonElement): GBValue =
                 jsonElement.isString -> GBString(jsonElement.content)
                 jsonElement.intOrNull != null -> GBNumber(jsonElement.int)
                 jsonElement.longOrNull != null -> GBNumber(jsonElement.long)
-                jsonElement.floatOrNull != null -> GBNumber(jsonElement.float)
                 jsonElement.doubleOrNull != null -> GBNumber(jsonElement.double)
                 jsonElement.booleanOrNull != null -> GBBoolean(jsonElement.boolean)
                 else -> GBValue.Unknown

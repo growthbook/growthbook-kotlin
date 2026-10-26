@@ -253,9 +253,18 @@ internal class GBConditionEvaluator {
 
         var element: GBValue = attributes[paths[0]] ?: GBNull
 
+        // Like JS getPath: arrays are indexable, anything else that isn't an object ends in null
         for (path in paths.subList(1, paths.size)) {
-            if (element is GBJson) {
-                element = element[path] ?: GBNull
+            element = when (element) {
+                is GBJson -> element[path] ?: return GBNull
+                is GBArray -> when {
+                    path == "length" -> GBNumber(element.size)
+                    else -> path.toIntOrNull()
+                        ?.takeIf { it.toString() == path && it in element.indices }
+                        ?.let { element[it] }
+                        ?: return GBNull
+                }
+                else -> return GBNull
             }
         }
 
