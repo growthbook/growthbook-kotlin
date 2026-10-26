@@ -8,6 +8,7 @@ import com.sdk.growthbook.utils.GBUtils
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBBoolean
+import com.sdk.growthbook.utils.toJsString
 
 /**
  * Both experiments and features can define targeting conditions using a syntax modeled
@@ -690,11 +691,7 @@ internal class GBConditionEvaluator {
     private fun versionInput(value: GBValue?): String? =
         when (value) {
             is GBString -> value.value.ifEmpty { "0" }
-            is GBNumber -> {
-                val number = value.value.toDouble()
-                if (number % 1.0 == 0.0 && number.isFinite()) number.toLong().toString()
-                else value.value.toString()
-            }
+            is GBNumber -> value.toJsString()
             else -> null
         }
 

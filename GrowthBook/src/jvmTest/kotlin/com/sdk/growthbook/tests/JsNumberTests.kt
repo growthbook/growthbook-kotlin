@@ -12,6 +12,7 @@ import com.sdk.growthbook.utils.jsNumberToString
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -53,6 +54,16 @@ class JsNumberTests {
         assertEquals("9007199254740994", GBNumber(9007199254740994L).toHashValue())
         // Java 17 prints 1e23 as 9.999999999999999E22, which hashes to another bucket
         assertEquals("1e+23", json("1e23").toHashValue())
+    }
+
+    @Test
+    fun numericVersionsUseJsNumberStrings() {
+        // Both are past Long's range and must not saturate to the same version
+        assertFalse(eval("""{"x":{"${'$'}veq":1e20}}""", mapOf("x" to json("1e19"))))
+        assertTrue(eval("""{"x":{"${'$'}vne":1e20}}""", mapOf("x" to json("1e19"))))
+        assertTrue(eval("""{"x":{"${'$'}veq":1e20}}""", mapOf("x" to json("100000000000000000000"))))
+        assertTrue(eval("""{"x":{"${'$'}vlt":1e21}}""", mapOf("x" to json("2"))))
+        assertTrue(eval("""{"x":{"${'$'}vgt":1}}""", mapOf("x" to json("1.5"))))
     }
 
     @Test
