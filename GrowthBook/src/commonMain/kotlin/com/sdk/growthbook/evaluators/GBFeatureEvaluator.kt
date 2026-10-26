@@ -119,7 +119,7 @@ internal class GBFeatureEvaluator(
                             val conditionObj = parentCondition
                                 .condition.let(GBValue::from) as? GBJson
                                 ?: GBJson(emptyMap())
-                            val evalCondition = GBConditionEvaluator().evalParentCondition(
+                            val evalCondition = GBConditionEvaluator().evalConditionSafely(
                                 attributes = evalObj,
                                 conditionObj = conditionObj,
                                 savedGroups = evaluationContext.savedGroups,
@@ -176,7 +176,7 @@ internal class GBFeatureEvaluator(
                         /**
                          * If it's a conditional rule, skip if the condition doesn't pass
                          */
-                        if (rule.conditionGB != null && !GBConditionEvaluator().evalCondition(
+                        if (rule.conditionGB != null && !GBConditionEvaluator().evalConditionSafely(
                                 attributes = getAttributes(
                                     attributeOverrides = attributeOverrides,
                                     attributes = evaluationContext.userContext.attributes,

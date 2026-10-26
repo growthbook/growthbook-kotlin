@@ -184,7 +184,7 @@ internal class GBExperimentEvaluator(
                     attributeOverrides = attributeOverrides,
                     attributes = evaluationContext.userContext.attributes,
                 )
-                val evaluationResult = GBConditionEvaluator().evalCondition(
+                val evaluationResult = GBConditionEvaluator().evalConditionSafely(
                     attr, conditionObj,
                     evaluationContext.savedGroups,
                 )
@@ -231,7 +231,7 @@ internal class GBExperimentEvaluator(
                     val conditionObj: GBJson =
                         parentCondition.condition.let(GBValue::from) as? GBJson
                             ?: GBJson(emptyMap())
-                    val evalCondition = GBConditionEvaluator().evalParentCondition(
+                    val evalCondition = GBConditionEvaluator().evalConditionSafely(
                         attributes = evalObj,
                         conditionObj = conditionObj,
                         savedGroups = evaluationContext.savedGroups,

@@ -79,7 +79,8 @@ class GBConditionTests {
     fun testInValidConditionObj() {
         val evaluator = GBConditionEvaluator()
 
-        assertFalse(evaluator.isOperatorObject(GBJson(emptyMap())))
+        // An empty object has no operators, so as a condition value it always passes
+        assertTrue(evaluator.isOperatorObject(GBJson(emptyMap())))
 
         assertEquals(evaluator.getType(null).toString(), GBAttributeType.GbUnknown.toString())
 
@@ -87,7 +88,7 @@ class GBConditionTests {
         val gbValue = evaluator.getPath(userAttributes, "key")
         assertTrue(gbValue is GBNull)
 
-        assertTrue(!evaluator.evalConditionValue(GBJson(emptyMap()), null, null))
+        assertTrue(evaluator.evalConditionValue(GBJson(emptyMap()), null, null))
 
         assertTrue(
             evaluator.evalOperatorCondition(
