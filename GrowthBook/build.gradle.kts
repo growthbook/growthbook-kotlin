@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "9.0.0"
+version = "9.0.1"
 
 val generateSdkMeta by tasks.registering {
     val outputDir = layout.buildDirectory.dir("generated/sdk-meta/commonMain/kotlin")

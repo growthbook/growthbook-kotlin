@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [9.0.1] - 2026-10-26
+
+### Fixed
+- **Duplicate `Experiment Viewed` exposures under concurrent evaluation.** The helper that keeps a
+  tracking callback to one firing per unique exposure held its history in an unsynchronized set and
+  performed a non-atomic test-and-set over it: it checked membership, and only afterwards recorded
+  the key. One instance is shared by the whole SDK, and `feature()` / `run()` are plain synchronous
+  methods callable from any thread, so two evaluations of the same enrolment racing through that
+  window were both told the exposure was new — two callbacks, two exposure rows in the warehouse
+  for one user, i.e. noise in the experiment's statistics. Concurrent writes to the set were a data
+  race in their own right. The history now lives behind an `AtomicReference` and the test-and-set
+  runs in a CAS loop, so exactly one caller can ever be told an exposure is new. Reachable on
+  Android, JVM and the native targets; the single-threaded JS and wasmJs targets were never
+  affected, and the SDK itself never evaluates off the caller's thread, so apps reading flags from
+  one thread only were not affected either. Evaluation cost is unchanged: an already-tracked
+  exposure still returns after one atomic load and a lookup, allocating nothing
+
+### Changed
+- `GrowthBookSDK.close()` now releases the exposure history as well as the feature-usage history,
+  matching the reference SDK's `destroy()`. It was previously skipped because an unsynchronized set
+  could not be cleared safely while an evaluation was in flight. A memory release, not a semantic
+  one — the instance is unusable after `close()`. The history is still deliberately **not** cleared
+  on a user change: its key carries `hashAttribute`/`hashValue`, so it tells users apart by itself,
+  and clearing it would re-fire a user's exposure across an A → B → A switch
+
+---
 ## [9.0.0] - 2026-10-16
 
 A major because two public contracts change with no signature change and no compile error to
