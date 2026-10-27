@@ -31,6 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `growthBook { }` gained `featureRefreshListeners`, mapping onto
   `GBSDKBuilder.addFeatureRefreshListener` so DSL users can also register before the first load.
 
+### Changed
+- `growthBook { cachingEnabled = false }` now does what its KDoc always said: the SDK neither reads nor
+  writes the feature cache. Before, only the write was skipped, and a cache file left by an earlier run
+  was still applied on a cold start. **This is a silent behaviour change** carried in from the core: with
+  caching off, a cold offline start now gets `initialFeatures` or code defaults rather than that file.
+  See the [core changelog](CHANGELOG.md#1000---unreleased).
+
 Requires `GrowthBook` 9.1.0, which this artifact pulls in transitively.
 
 ---

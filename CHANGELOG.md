@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [10.0.0] - Unreleased
+
+A major for the same reason as 9.0.0: one public contract changes with no signature change and no compile error to
+announce it. An app that passes `cachingEnabled = false` keeps compiling, and on a cold offline start it now gets its
+seed or code defaults instead of whatever an earlier run left on disk.
+
+### Fixed
+- **`cachingEnabled = false` no longer reads the feature cache.** It used to gate only the write: a cold start still
+  loaded `FeatureCache_<apiKey>` left by an earlier run and applied it over `setInitialFeatures` /
+  `setInitialPayload`, raising a `GBFeatureRefreshSource.Cache` event for it. Since the cache was never rewritten,
+  that snapshot only grew staler with every release. Reads are now bypassed too, in the same place as the
+  remote-eval bypass, and this applies to a custom `GBCachingLayer` as well.
+  Both reference SDKs already gate the read (sdk-js on `disableCache`). With caching on, nothing changes: freshness
+  zones, stale-while-revalidate and `serveStaleOnError` behave as before.
+
+### Breaking changes
+- **`cachingEnabled = false` no longer serves the disk cache as an offline fallback.** **This is a silent behaviour
+  change**: until the network answers, features come from `setInitialFeatures` / `setInitialPayload` or the code
+  defaults, never from a cache file.
+  - **Migration:** if you relied on the cache surviving offline starts, enable caching (the default). If you disabled
+    caching but want offline values, bundle a snapshot with `setInitialPayload`. Sticky-bucket persistence is not
+    governed by `cachingEnabled` and is unaffected.
+
+---
 ## [9.1.0] - Unreleased
 
 ### Added

@@ -51,8 +51,8 @@ class FeatureRefreshListenerTests {
     @JvmField
     var tempFolder = TemporaryFolder()
 
-    // Cache reads happen even with writes disabled: point them at an empty dir so a payload left
-    // by another test cannot satisfy a fetch and change the event sequence.
+    // buildSdk disables caching, so no cache is read; tests that enable it still get an empty dir,
+    // so a payload left by another test cannot satisfy a fetch and change the event sequence.
     @BeforeTest
     fun setUp() {
         CachingJvm.baseDir = tempFolder.newFolder()
@@ -434,7 +434,8 @@ class FeatureRefreshListenerTests {
         encryptionKey = null,
         trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
         networkDispatcher = MockNetworkClient(payload, null),
-        cachingEnabled = false,
+        // Caching on: with it off the seeded cache is never read (SeededCache ignores writes anyway).
+        cachingEnabled = true,
     )
         .setCoroutineContext(UnconfinedTestDispatcher(testScheduler))
         .setCachingLayer(SeededCache(cachedPayload()))

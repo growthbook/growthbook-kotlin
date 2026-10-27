@@ -242,6 +242,8 @@ class GBSDKBuilder(
      * Features are applied immediately so flags are available from the first millisecond,
      * and the normal cache/network refresh still runs on top — overwriting the seed as
      * fresher data arrives. Effective precedence: network > disk cache > seed > code defaults.
+     * With `cachingEnabled = false` the disk cache is neither read nor written, so the seed holds
+     * until the network answers.
      *
      * Takes an already-decoded feature map; see [setInitialPayload] to seed straight from a
      * payload as the API returns it.
@@ -493,12 +495,14 @@ class GBSDKBuilder(
     override fun initialize(): GrowthBookSDK {
         val gbContext = createGbContext()
 
-        if (enableLogging && !cachingEnabled) {
+        // With caching disabled the feature cache is not read, so without a seed every feature
+        // evaluates to its code default until the network answers. A seed covers that gap.
+        if (enableLogging && !cachingEnabled && initialFeatures == null && initialPayloadJson == null) {
             GB.warning(
                 """
-                    calling #initialize with caching
-                    disabled will cause feature values nulls. We recommend to enable
-                    caching or calling method #initialize with callback
+                    calling #initialize with caching disabled and no setInitialFeatures /
+                    setInitialPayload seed: features use code defaults until the network
+                    answers. Seed the SDK, enable caching, or call #initialize with a callback.
                 """.trimIndent()
             )
         }
