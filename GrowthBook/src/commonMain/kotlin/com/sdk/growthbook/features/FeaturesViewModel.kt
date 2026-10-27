@@ -57,17 +57,62 @@ internal interface FeaturesFlowDelegate {
      * never observe one field from this payload paired with another from the previous one.
      *
      * A null argument means the field was absent from the payload — keep the current value.
+     *
+     * @param features the decoded feature definitions, already decrypted.
+     * @param savedGroups the payload's saved groups, still as raw JSON — the implementer converts.
+     * @param contextualBandits bandit rules keyed by experiment id.
+     * @param isRemote true when the result is authoritative (network / SSE / cache still inside the
+     *   freshness window) and so may unblock suspendFeature()/initialize{}; false for the cache
+     *   pre-load that precedes a network round, which must not be reported as a refresh result.
+     * @param fromCache where the payload physically came from, independent of [isRemote]: a cache
+     *   entry still inside its freshness window is served as authoritative (`isRemote = true`) with
+     *   no network call at all, so the two cannot be collapsed into one flag.
+     * @param staleError non-null only for the stale-if-error fallback
+     *   ([com.sdk.growthbook.GBSDKBuilder.setServeStaleOnError]): the payload is an expired cache
+     *   served because the network round failed with this error. The refresh handler still stays
+     *   silent for it — its (Boolean, GBError?) contract cannot say "stale fallback served" — but
+     *   feature refresh listeners report it as
+     *   [com.sdk.growthbook.model.GBFeatureRefreshSource.Stale].
      */
     fun payloadFetchedSuccessfully(
         features: GBFeatures?,
         savedGroups: JsonObject?,
         contextualBandits: Map<String, GBContextualBandit>?,
         isRemote: Boolean,
+        staleError: GBError? = null,
+        fromCache: Boolean = false,
     )
 
+    /**
+     * A decoded payload, before it is applied: the hook where sticky-bucket documents for the
+     * assignments it implies are loaded, which is why it suspends.
+     */
     suspend fun onPayloadReady(model: FeaturesDataModel)
+
+    /**
+     * The fetch produced nothing usable — transport error, timeout, or a payload that decoded to
+     * neither features nor saved groups.
+     *
+     * @param isRemote false for a failed cache read, which is not a refresh result: the refresh
+     *   handler is left silent, while feature refresh listeners are told either way, since an app
+     *   showing "data may be outdated" cares which source let it down as much as that one did.
+     */
     fun featuresFetchFailed(error: GBError, isRemote: Boolean)
+
+    /**
+     * Saved groups specifically could not be read from an otherwise fine payload. Separate from
+     * [featuresFetchFailed] because features stay usable: targeting that references a saved group
+     * degrades, the rest evaluates normally.
+     */
     fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean)
+
+    /**
+     * The server answered 304 — the cached definitions are current and there is nothing to apply.
+     *
+     * Counts as a successful refresh only when a payload has already been loaded. A 304 arriving
+     * before that cannot guarantee anything is there to serve, so the implementer treats it as a
+     * failure and lets the fetch be retried.
+     */
     fun featuresNotModified()
 }
 
@@ -95,9 +140,10 @@ internal class FeaturesViewModel(
      */
     private val encryptionKey: String? = null,
     /**
-     * Gates cache *writes* only: when true, a successful network payload is
-     * persisted to [cachingLayer]. Cache *reads* (see [serveCache]) happen
-     * regardless, so bundled/previously cached data can still be served.
+     * Gates the feature cache in both directions: when true, a successful network
+     * payload is persisted to [cachingLayer] and read back in [serveCache]; when
+     * false, neither happens, so a payload left by an earlier run is never served
+     * and the seed (if any) holds until the network answers.
      */
     private val cachingEnabled: Boolean,
     /**
@@ -361,7 +407,8 @@ internal class FeaturesViewModel(
      * [FetchPolicy.ForceNetwork]) — a fresh cache can never cancel this round.
      *
      * The freshness ceiling still applies: a cache past `cacheMaxAge` is not served here either
-     * (see [serveCache]). It is not carried as an on-error fallback on this path — the returned
+     * (see [serveCache]), and with [cachingEnabled] false or in remote-eval mode nothing is served
+     * from cache at all — this is then a plain network refresh. It is not carried as an on-error fallback on this path — the returned
      * [CacheOutcome] is deliberately discarded, because [awaitRefresh] is coalesced and a fallback
      * belongs to one caller, so a second caller joining the same round would inherit it.
      *
@@ -472,9 +519,16 @@ internal class FeaturesViewModel(
                             // fires neither the success nor the failure delegate path. The handler's
                             // (Boolean, GBError?) contract cannot express "stale fallback served", so
                             // signalling either side would mislead. Documented on
-                            // GBSDKBuilder.setServeStaleOnError; revisit if the handler ever grows a
-                            // dedicated stale signal.
-                            dispatch(FetchOutcome.Ready(onErrorFallback, source = Source.CACHE, authoritative = false))
+                            // GBSDKBuilder.setServeStaleOnError. Feature refresh listeners do get it:
+                            // staleError carries the failure through to GBFeatureRefreshSource.Stale.
+                            dispatch(
+                                FetchOutcome.Ready(
+                                    onErrorFallback,
+                                    source = Source.CACHE,
+                                    authoritative = false,
+                                    staleError = GBError(it),
+                                )
+                            )
                         } else {
                             dispatch(FetchOutcome.Failed(GBError(it), source = Source.NETWORK))
                         }
@@ -528,6 +582,13 @@ internal class FeaturesViewModel(
         // cache entirely in remote-eval mode and always hits the network. See also the write-side
         // bypass in [handleNetworkModel].
         if (remoteEval) return CacheOutcome.ServedStaleOrMiss
+
+        // cachingEnabled = false means the feature cache is not used at all, not merely never
+        // written: a file left on disk by an earlier run must not outrank setInitialFeatures /
+        // setInitialPayload, nor be served as a snapshot nothing will ever refresh. Mirrors the
+        // write-side bypass in [handleNetworkModel] and the reference SDKs (sdk-js gates both
+        // cache.get and the localStorage hydration on disableCache).
+        if (!cachingEnabled) return CacheOutcome.ServedStaleOrMiss
 
         val entry = runCatching { readCache() }.getOrElse {
             GB.error("FeaturesViewModel: cache read failed", it)
@@ -662,7 +723,9 @@ internal class FeaturesViewModel(
                 features = outcome.payload.features,
                 savedGroups = outcome.payload.savedGroups,
                 contextualBandits = outcome.payload.contextualBandits,
-                isRemote = outcome.authoritative
+                isRemote = outcome.authoritative,
+                staleError = outcome.staleError,
+                fromCache = outcome.source == Source.CACHE
             )
         }
 

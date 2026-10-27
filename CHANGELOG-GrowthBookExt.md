@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.1.0] - Unreleased
+
+### Added
+- `GrowthBookSDK.featureRefreshFlow(): Flow<GBFeatureRefreshEvent>` — the feature refresh listeners
+  added in `GrowthBook` 9.1.0, exposed as a flow so the subscription follows the collecting
+  coroutine instead of a handle you have to cancel by hand.
+    - Cold and per-collector: each collection registers its own listener and removes it when the
+      coroutine ends, however it ends. Nothing is replayed, and collection necessarily starts after
+      `initialize()` has applied the cached payload, so the cold-start load never appears in the
+      stream — read `getFeatures()` for the state at the time collection starts, or register on the
+      builder (`GBSDKBuilder.addFeatureRefreshListener`) when that load must be observed.
+    - Events are emitted on whichever thread the SDK reports them from, without a context switch,
+      so add your own `flowOn` if a collector must run elsewhere. A slow collector cannot block a
+      refresh: the producer only offers, and the flow buffers a single event and drops the one it
+      overtakes, since an event describing superseded definitions is of no use.
+    - Collecting an SDK that is already closed completes immediately. Closing one *while* a
+      collector is attached does not end the flow — the SDK has no termination signal to deliver —
+      so scope the collection rather than relying on it to complete on its own.
+    - Hidden from the Objective-C header (`Flow` has no usable representation there); iOS consumers
+      use `addFeatureRefreshListener` directly.
+
+- `growthBook { }` gained `featureRefreshListeners`, mapping onto
+  `GBSDKBuilder.addFeatureRefreshListener` so DSL users can also register before the first load.
+
+### Changed
+- `growthBook { cachingEnabled = false }` now does what its KDoc always said: the SDK neither reads nor
+  writes the feature cache. Before, only the write was skipped, and a cache file left by an earlier run
+  was still applied on a cold start. **This is a silent behaviour change** carried in from the core: with
+  caching off, a cold offline start now gets `initialFeatures` or code defaults rather than that file.
+  See the [core changelog](CHANGELOG.md#1000---unreleased).
+
+Requires `GrowthBook` 9.1.0, which this artifact pulls in transitively.
+
+---
+
 ## [3.0.0] - 2026-10-16
 
 `GrowthBookExt`'s own API only gains below. The major bump propagates the breaking changes in
