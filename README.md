@@ -922,6 +922,20 @@ body — a brand-new interface breaks nobody. Every future optional hook follows
 > where you need them. `FakeGrowthBook` mirrors the method (with `loggedEvents()` / `wasLogged(name)` to assert on),
 > which is likewise reachable only through the concrete type.
 
+### Replacing callbacks at runtime
+
+The tracking and feature-usage callbacks given to `GBSDKBuilder` can be replaced on the built instance — useful when
+the analytics sink is only known after the SDK exists (request-scoped or framework-managed setups):
+
+```kotlin
+sdk.setTrackingCallback { experiment, result -> analytics.experimentViewed(experiment.key, result.key) }
+sdk.setFeatureUsageCallback { featureKey, result -> analytics.featureUsed(featureKey) }
+```
+
+The next evaluation reports to the new callback; `setFeatureUsageCallback(null)` removes the feature-usage sink. An
+exposure already delivered to the previous callback is not repeated to the new one — the SDK reports each unique
+exposure once per instance. A callback that throws is logged and ignored rather than breaking evaluation.
+
 ### Reusing one instance across users
 
 One instance commonly serves several users in turn — login, logout, account switching. Two layers of de-duplication
