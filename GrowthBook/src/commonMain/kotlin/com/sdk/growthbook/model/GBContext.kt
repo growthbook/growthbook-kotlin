@@ -15,7 +15,6 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 internal typealias FeatureUsageFuncCallback = (String, GBFeatureResult) -> Unit
 internal typealias StickyBucketAssignmentDocsType = Map<GBStickyAttributeKey, GBStickyAssignmentsDocument>
-
 /**
  * Immutable snapshot of the evaluation-input state shared across threads.
  *
@@ -124,12 +123,12 @@ class GBContext internal constructor(
     /**
      * A function that takes experiment and result as arguments.
      */
-    val trackingCallback: GBTrackingCallback,
+    trackingCallback: GBTrackingCallback,
 
     /**
      * A callback that will be invoked every time a feature is viewed. Listen for feature usage events
      */
-    val onFeatureUsage: FeatureUsageFuncCallback? = null,
+    onFeatureUsage: FeatureUsageFuncCallback? = null,
 
     /**
      * Flag which defines whether to use Remote Evaluation
@@ -182,6 +181,29 @@ class GBContext internal constructor(
      * of reading the individual properties separately, so it operates on a single consistent state.
      */
     internal fun evalSnapshot(): EvalSnapshot = state.load()
+
+    // The two consumer sinks live outside the EvalSnapshot: they are configuration, not evaluation
+    // input, and swapping one must not contend with the payload pipeline's CAS loop. Each is read
+    // once per evaluation (see GrowthBookSDK.createEvaluationContext), so a write is picked up by
+    // the next feature()/run() and never lands halfway through one.
+    private val trackingCallbackRef = AtomicReference(trackingCallback)
+    private val onFeatureUsageRef = AtomicReference(onFeatureUsage)
+
+    /**
+     * A function that takes experiment and result as arguments.
+     * Replaceable at runtime via [com.sdk.growthbook.GrowthBookSDK.setTrackingCallback].
+     */
+    var trackingCallback: GBTrackingCallback
+        get() = trackingCallbackRef.load()
+        internal set(value) = trackingCallbackRef.store(value)
+
+    /**
+     * A callback that will be invoked every time a feature is viewed. Listen for feature usage events.
+     * Replaceable at runtime via [com.sdk.growthbook.GrowthBookSDK.setFeatureUsageCallback].
+     */
+    var onFeatureUsage: FeatureUsageFuncCallback?
+        get() = onFeatureUsageRef.load()
+        internal set(value) = onFeatureUsageRef.store(value)
 
     private fun mutate(transform: (EvalSnapshot) -> EvalSnapshot) {
         while (true) {

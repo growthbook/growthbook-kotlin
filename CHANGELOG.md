@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [9.1.0] - Unreleased
+
+### Added
+- **`GrowthBookSDK.setTrackingCallback(callback)` / `setFeatureUsageCallback(callback)`** — replace the tracking and
+  feature-usage sinks after the instance is built (parity with the JS SDK). The next `feature()` / `run()` reports to the
+  new sink; the builder path is unchanged. `setFeatureUsageCallback(null)` removes the feature-usage sink.
+
+Unlike the JS SDK, `setTrackingCallback` flushes nothing: the tracking callback is required at construction, so there
+is never a moment without a sink and no exposure is ever buffered waiting for one.
+
+Both setters live on `GrowthBookSDK` only, not on `IGrowthBookSDK`, for the same reason as `logEvent`: a new abstract
+member would break every implementor of the interface.
+
+---
 ## [9.0.0] - 2026-10-16
 
 A major because two public contracts change with no signature change and no compile error to
