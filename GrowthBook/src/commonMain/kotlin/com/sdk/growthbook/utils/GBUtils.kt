@@ -205,7 +205,8 @@ internal class GBUtils {
          */
         fun paddedVersionString(input: String): String {
             // "v1.2.3-rc.1+build123" -> ["1","2","3","rc","1"]
-            var parts: List<String> = input.replace(Regex("^v|\\+.*\$"), "")
+            // (build metadata starts at the first `+`; avoid a regex here, `\+.*$` is quadratic)
+            var parts: List<String> = input.removePrefix("v").substringBefore('+')
                 .split(Regex("[-.]"))
 
             // ["1","0","0"] -> ["1","0","0","~"]

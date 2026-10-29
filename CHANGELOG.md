@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `$elemMatch` with `$or`, `$and` or `$nor` tests each element's fields (shared spec 0.11.0).
 - A condition value of `{}` always passes (shared spec 0.11.0).
 - `$in`, `$nin`, `$ini` and `$nini` never match an array or object item, like JS `===` (shared spec 0.12.0).
+- Version operators (`$veq`, `$vgt`, …) strip a leading `v` and build metadata without a regex
+  (growthbook/growthbook#7401). The regex took quadratic time on a version with many `+` signs before a
+  newline, and kept the build metadata when a newline followed the `+`.
 
 ### Breaking changes
 - **Bucketing uses `Double`** (growthbook-kotlin#274). Hashes, bucket ranges and coverage are `Double`
