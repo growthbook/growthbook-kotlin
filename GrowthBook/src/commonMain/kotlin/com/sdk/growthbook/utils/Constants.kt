@@ -35,6 +35,12 @@ internal class Constants {
         const val ID_ATTRIBUTE_KEY = "id"
 
         /**
+         * Attribute holding the ids of the remote saved groups the user is in. Internal attributes
+         * start with `__gb_`, matching GrowthBook's back end.
+         */
+        const val REMOTE_GROUP_IDS_ATTRIBUTE = "__gb_remoteGroupIds"
+
+        /**
          * Identifier for Caching Feature Data in Internal Storage File
          */
         const val FEATURE_CACHE = "FeatureCache"

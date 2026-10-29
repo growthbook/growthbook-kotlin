@@ -115,6 +115,10 @@ class GBTestHelper {
         fun getSavedGroupReferencesV2RunData(): JsonArray =
             getSavedGroupReferencesV2Data("run")
 
+        /** A section of the spec's `savedGroupReferencesRemote` key: `evalCondition` or `feature`. */
+        fun getSavedGroupReferencesRemoteData(section: String): JsonArray =
+            testData.jsonObject["savedGroupReferencesRemote"]!!.jsonObject[section] as JsonArray
+
         internal fun createTestScopeEvaluationContext(
             features: GBFeatures,
             attributes: Map<String, GBValue>,

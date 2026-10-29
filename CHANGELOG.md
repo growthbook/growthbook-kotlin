@@ -22,6 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Nothing changes for an existing integration until the SDK declares the capability: GrowthBook only sends this
   format to SDKs that do.
+- **Remote saved groups (shared spec section `savedGroupReferencesRemote`, growthbook/growthbook#7277).** A remote
+  group keeps its members outside the payload, which only carries `{"type": "remote", "attributeKey": …}`. The app
+  resolves the user's groups and passes their ids with `GBSDKBuilder.setRemoteGroupIds` or
+  `GrowthBookSDK.setRemoteGroupIds`; conditions read them as the `__gb_remoteGroupIds` attribute, over any value the
+  attributes set for it, and remote evaluation sends them too. `$savedGroup` on a remote entry matches when its id
+  is in that list; a reference with another `attributeKey` (a derived group) doesn't match, and `$inGroup` on a
+  remote entry is unsupported. Until the ids are set, rules using remote groups fail, "not in group" included, and
+  one warning is logged when logging is enabled.
 
 ### Fixed
 - A malformed condition, such as `{"$not": null}`, no longer matches, so the rule, experiment or gated
