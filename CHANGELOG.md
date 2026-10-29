@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
+### Added
+- **Saved group references v2 (`$savedGroup`, shared spec section `savedGroupReferencesV2`).** The payload's
+  `savedGroups` map may hold typed entries beside the bare arrays it has always carried:
+  `{"type": "list", "attributeKey": …, "values": […]}` or `{"type": "condition", "condition": {…}}`. Rules
+  reference one with a top-level `$savedGroup` operator, `{"$savedGroup": {"id": "grp_beta"}}`, with an optional
+  `attributeKey` that overrides a list entry's attribute (a condition entry has no single attribute, so it's
+  ignored there). A condition entry is evaluated in full and may reference further groups.
+
+  An id absent from the payload, a v1 bare array, a malformed entry or a non-string `id`/`attributeKey` matches
+  nobody; a group type added after this release is unsupported, so the condition fails. A group that references
+  itself, directly or around a cycle, doesn't match instead of recursing.
+
+  Nothing changes for an existing integration until the SDK declares the capability: GrowthBook only sends this
+  format to SDKs that do.
+
 ### Fixed
 - A malformed condition, such as `{"$not": null}`, no longer matches, so the rule, experiment or gated
   rule is skipped. This covers prerequisites (`parentConditions`, shared spec 0.10.1) and, since spec
@@ -19,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `$elemMatch` with `$or`, `$and` or `$nor` tests each element's fields (shared spec 0.11.0).
 - A condition value of `{}` always passes (shared spec 0.11.0).
 - `$in`, `$nin`, `$ini` and `$nini` never match an array or object item, like JS `===` (shared spec 0.12.0).
+- `$exists` reads its value as a JS boolean, as the JS SDK does: `$exists: 1` asks for a present attribute and
+  `0` or `""` for an absent one. Only a JSON boolean was read before, and any other value matched neither way.
 
 ### Breaking changes
 - **Bucketing uses `Double`** (growthbook-kotlin#274). Hashes, bucket ranges and coverage are `Double`
@@ -37,7 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as missing: the fallback attribute is tried where one applies, otherwise the user is not in the
   experiment or rollout. Before, `0`, booleans, arrays and objects were hashed as their JSON text.
 - **Unsupported operators fail** (shared spec 0.11.0, growthbook/growthbook#7346). A condition that
-  depends on an operator, `$savedGroup` reference or saved group type this SDK doesn't support now fails,
+  depends on an operator or saved group type this SDK doesn't support now fails,
   also under `$not` and `$nor`, where it used to pass.
 
 ### Breaking changes
@@ -54,6 +71,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Targeting that relied on coercion, such as a numeric attribute sent as a string, stops matching. Send
   attributes with the type the condition uses.
+
+### Companion artifacts
+- `GrowthBookExt` **3.0.1** and `GrowthBookTest` **3.0.1**: no source changes. Both declare `GrowthBook` as an `api`
+  dependency, so they're republished to resolve it to 10.0.0.
 
 ## [9.0.0] - 2026-10-16
 
