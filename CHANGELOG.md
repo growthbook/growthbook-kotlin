@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a non-object is null.
 - `$elemMatch` with `$or`, `$and` or `$nor` tests each element's fields (shared spec 0.11.0).
 - A condition value of `{}` always passes (shared spec 0.11.0).
+- `$in`, `$nin`, `$ini` and `$nini` never match an array or object item, like JS `===` (shared spec 0.12.0).
 
 ### Breaking changes
 - **Bucketing uses `Double`** (growthbook-kotlin#274). Hashes, bucket ranges and coverage are `Double`
@@ -28,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exactly a bucket value loses one bucket (for example, 0.02% → 0.01%).
 - **Numeric hash attributes format like JS `String()`** (`1` for `1.0`, `1e+21`), so a decimal hash
   attribute can land in a different bucket than before, matching the JS SDK.
+- **Hashing uses UTF-16 code units** (shared spec 0.12.0). FNV-1a now hashes each UTF-16 code unit, like
+  the JS SDK, instead of only its low byte. Bucketing changes only when the hashed value or seed contains
+  non-ASCII characters.
+- **Only strings and numbers identify a user** (shared spec 0.12.0). A hash attribute is used only when it
+  is a non-empty string or a finite, non-zero number. `0`, booleans, `""`, null, arrays and objects count
+  as missing: the fallback attribute is tried where one applies, otherwise the user is not in the
+  experiment or rollout. Before, `0`, booleans, arrays and objects were hashed as their JSON text.
 - **Unsupported operators fail** (shared spec 0.11.0, growthbook/growthbook#7346). A condition that
   depends on an operator, `$savedGroup` reference or saved group type this SDK doesn't support now fails,
   also under `$not` and `$nor`, where it used to pass.

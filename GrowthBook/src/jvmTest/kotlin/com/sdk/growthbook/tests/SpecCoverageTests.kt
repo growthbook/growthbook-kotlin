@@ -36,6 +36,8 @@ class SpecCoverageTests {
         "savedGroupReferencesV2.evalCondition" to "\$savedGroup references aren't implemented yet",
         "savedGroupReferencesV2.feature" to "\$savedGroup references aren't implemented yet",
         "savedGroupReferencesV2.run" to "\$savedGroup references aren't implemented yet",
+        "savedGroupReferencesRemote.evalCondition" to "Remote saved groups aren't implemented yet",
+        "savedGroupReferencesRemote.feature" to "Remote saved groups aren't implemented yet",
         "pruneCondition" to "The payload reduction methods are not implemented for client SDKs to start with",
         "reducePayload" to "The payload reduction methods are not implemented for client SDKs to start with",
     )

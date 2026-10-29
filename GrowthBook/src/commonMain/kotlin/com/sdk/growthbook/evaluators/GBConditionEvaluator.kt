@@ -468,11 +468,7 @@ internal class GBConditionEvaluator {
             when (operator) {
                 // Evaluate IN operator - attributeValue in the conditionValue array
                 "\$in" -> {
-                    return if (attributeValue is GBArray) {
-                        isIn(attributeValue, conditionValue)
-                    } else {
-                        attributeValue != null && conditionValue.contains(attributeValue)
-                    }
+                    return isIn(attributeValue, conditionValue)
                 }
                 // Evaluate INI operator - attributeValue in the conditionValue array
                 "\$ini" -> {
@@ -484,11 +480,7 @@ internal class GBConditionEvaluator {
                 }
                 // Evaluate NIN operator - attributeValue not in the conditionValue array
                 "\$nin" -> {
-                    return if (attributeValue is GBArray) {
-                        !isIn(attributeValue, conditionValue)
-                    } else {
-                        attributeValue == null || !conditionValue.contains(attributeValue)
-                    }
+                    return !isIn(attributeValue, conditionValue)
                 }
                 // Evaluate ALL operator - whether condition contains all attribute
                 "\$all" -> {
@@ -583,37 +575,25 @@ internal class GBConditionEvaluator {
             else -> this.toString()
         }
 
+    /**
+     * Like the JS SDK's `isIn`: an array attribute matches if any of its items is in
+     * [conditionValue]. Only a string, number, boolean or null can match, because JS compares
+     * arrays and objects by reference, so an array or object item is never in the list.
+     */
     private fun isIn(actualValue: GBValue?, conditionValue: GBArray, inSensitive: Boolean = false): Boolean {
-        fun caseFold(value: GBValue?): GBValue? {
-            return if (inSensitive && value is GBString) {
-                GBString(value.value.lowercase())
-            } else {
-                value
-            }
+        fun caseFold(value: GBValue): GBValue =
+            if (value is GBString) GBString(value.value.lowercase()) else value
+
+        fun matches(value: GBValue?): Boolean {
+            if (value == null || !value.isPrimitiveValue()) return false
+            // Case-sensitive lookup uses GBArray.contains, a HashSet for large lists
+            if (!inSensitive) return conditionValue.contains(value)
+            val folded = caseFold(value)
+            return conditionValue.any { it.isPrimitiveValue() && caseFold(it) == folded }
         }
 
-        // Case-sensitive path uses GBArray.contains → HashSet membership.
-        if (!inSensitive) {
-            if (actualValue is GBArray) {
-                if (actualValue.isEmpty()) return false
-                return actualValue.any { conditionValue.contains(it) }
-            }
-            return actualValue != null && conditionValue.contains(actualValue)
-        }
-
-        if (actualValue is GBArray) {
-            if (actualValue.isEmpty()) return false
-
-            return actualValue.any { attr ->
-                conditionValue.any { cond ->
-                    caseFold(attr) == caseFold(cond)
-                }
-            }
-        }
-
-        return conditionValue.any {
-            caseFold(actualValue) == caseFold(it)
-        }
+        if (actualValue is GBArray) return actualValue.any { matches(it) }
+        return matches(actualValue)
     }
 
     private fun isInAll(

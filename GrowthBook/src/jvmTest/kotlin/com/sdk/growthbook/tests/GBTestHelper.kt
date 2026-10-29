@@ -18,6 +18,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
@@ -157,7 +158,7 @@ class GBFeaturesTest(
 @Serializable
 class GBFeatureResultTest(
     val ruleId: String = "",
-    val value: JsonPrimitive,
+    val value: JsonElement = JsonNull,
     val on: Boolean,
     val off: Boolean,
     val source: String,

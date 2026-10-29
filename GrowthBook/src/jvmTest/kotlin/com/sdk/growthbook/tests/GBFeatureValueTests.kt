@@ -96,10 +96,9 @@ class GBFeatureValueTests {
                     )
 
                 val resultJsonElement: JsonElement? = result.gbValue?.gbSerialize()
-                val resultJsonPrimitive =  resultJsonElement as? JsonPrimitive?
                 val status = item[0].toString() +
                     "\nExpected Result - " +
-                    "\nValue - " + expectedResult.value.content +
+                    "\nValue - " + expectedResult.value +
                     "\nRule Id - " + expectedResult.ruleId +
                     "\nOn - " + expectedResult.on.toString() +
                     "\nOff - " + expectedResult.off.toString() +
@@ -107,7 +106,7 @@ class GBFeatureValueTests {
                     "\nExperiment - " + expectedResult.experiment?.key +
                     "\nExperiment Result - " + expectedResult.experimentResult?.variationId +
                     "\nActual result - " +
-                    "\nValue - " + resultJsonPrimitive?.content.toString() +
+                    "\nValue - " + resultJsonElement +
                     "\nRule Id - " + result.ruleId +
                     "\nOn - " + result.on.toString() +
                     "\nOff - " + result.off.toString() +
@@ -116,7 +115,7 @@ class GBFeatureValueTests {
                     "\nExperiment Result - " + result.experimentResult?.variationId + "\n\n"
 
                 if (
-                    resultJsonPrimitive?.content.toString() == expectedResult.value.content &&
+                    sameValue(resultJsonElement, expectedResult.value) &&
                     result.on.toString() == expectedResult.on.toString() &&
                     result.off.toString() == expectedResult.off.toString() &&
                     result.source.toString() == expectedResult.source &&
@@ -281,4 +280,15 @@ class GBFeatureValueTests {
             }
         }
     }
+
+    /**
+     * Primitives compare by their JSON content text, arrays and objects structurally. A missing
+     * result value matches an expected `null`.
+     */
+    private fun sameValue(actual: JsonElement?, expected: JsonElement): Boolean =
+        if (expected is JsonPrimitive && (actual == null || actual is JsonPrimitive)) {
+            (actual as? JsonPrimitive)?.content.toString() == expected.content
+        } else {
+            actual == expected
+        }
 }

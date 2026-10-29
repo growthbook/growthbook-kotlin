@@ -142,7 +142,8 @@ internal class VerifySDKReturnFeatureValues {
         val boolAttributeValue = sdkInstance.getGBContext().attributes["user_id"]?.gbSerialize()?.toString() ?: ""
         assertEquals("true", boolAttributeValue)
         val boolFeature = sdkInstance.feature("test_feature")
-        assertEquals("experiment", boolFeature.source.name)
+        // A boolean never identifies a user, like the JS SDK, so the experiment is skipped
+        assertEquals("defaultValue", boolFeature.source.name)
 
         //Check casting with Float value
         sdkInstance.setAttributes(attributes = mapOf("user_id" to 1.8f.toGbNumber()))

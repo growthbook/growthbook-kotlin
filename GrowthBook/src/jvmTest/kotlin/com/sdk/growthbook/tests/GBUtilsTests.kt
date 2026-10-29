@@ -1,5 +1,12 @@
 package com.sdk.growthbook.tests
 
+import com.sdk.growthbook.model.GBArray
+import com.sdk.growthbook.model.GBBoolean
+import com.sdk.growthbook.model.GBJson
+import com.sdk.growthbook.model.GBNull
+import com.sdk.growthbook.model.GBNumber
+import com.sdk.growthbook.model.GBString
+import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.utils.Constants
 import com.sdk.growthbook.utils.GBBucketRange
 import com.sdk.growthbook.utils.GBNameSpace
@@ -333,6 +340,34 @@ class GBUtilsTests {
         print(failedScenarios)
 
         assertTrue(failedScenarios.size == 0)
+    }
+
+    @Test
+    fun testHashMixesWholeUtf16CodeUnits() {
+        // 'ā' (U+0101) and U+0001 share a low byte, so they only differ if the whole unit is mixed in
+        assertTrue(GBUtils.hash("\u0101", 1, "") != GBUtils.hash("\u0001", 1, ""))
+        // An astral character hashes as its two surrogate code units
+        assertEquals(GBUtils.hash("\uD83D\uDE00", 2, "s"), GBUtils.hash("😀", 2, "s"))
+    }
+
+    @Test
+    fun testHashAttributeUsesOnlyNonEmptyStringsAndNonZeroNumbers() {
+        fun hashValue(id: GBValue?, fallback: GBValue? = null): Pair<String, String> {
+            val attributes = HashMap<String, GBValue>()
+            id?.let { attributes["id"] = it }
+            fallback?.let { attributes["deviceId"] = it }
+            return GBUtils.getHashAttribute("id", "deviceId", attributes, emptyMap())
+        }
+        val device = GBString("d1")
+        for (missing in listOf(GBBoolean(true), GBBoolean(false), GBNumber(0), GBNumber(0.0), GBString(""), GBNull,
+            GBArray(listOf(GBString("1"))), GBArray(emptyList()), GBJson(emptyMap()), GBNumber(Double.NaN), null)) {
+            assertEquals("deviceId" to "d1", hashValue(missing, device), "id $missing falls back")
+            assertEquals("id" to "", hashValue(missing), "id $missing is missing")
+        }
+        assertEquals("id" to "1", hashValue(GBNumber(1.0), device))
+        assertEquals("id" to "1.5", hashValue(GBNumber(1.5), device))
+        assertEquals("id" to "-3", hashValue(GBNumber(-3), device))
+        assertEquals("id" to "abc", hashValue(GBString("abc"), device))
     }
 
     @Test

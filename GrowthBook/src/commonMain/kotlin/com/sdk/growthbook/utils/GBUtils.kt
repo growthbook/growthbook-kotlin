@@ -9,13 +9,10 @@ import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.StickyBucketAssignmentDocsType
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
-import com.sdk.growthbook.kotlinx.serialization.gbSerialize
 import com.sdk.growthbook.logger.GB
-import com.sdk.growthbook.model.GBNull
 import com.sdk.growthbook.stickybucket.GBStickyBucketService
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -29,13 +26,10 @@ private const val FNV_PRIME = 0x01000193
 /**
  * Fowler-Noll-Vo FNV-1a, 32-bit.
  *
- * For each UTF-16 code unit: XOR the low 8 bits into [hash], then multiply
- * by [FNV_PRIME]. Kotlin `Int` multiply wraps at 32 bits — that wrap *is*
- * the FNV modulo 2^32.
- *
- * Only the low byte of each code unit is mixed in (`code and 0xFF`). That
- * is this SDK's historical behaviour; ASCII ids/keys are identical either
- * way. Code units > 255 (e.g. `'€'`) hash differently than a full-char XOR.
+ * For each UTF-16 code unit: XOR the whole 16-bit unit into [hash], then
+ * multiply by [FNV_PRIME], like the JS SDK's `charCodeAt` loop. An astral
+ * character is two code units. Kotlin `Int` multiply wraps at 32 bits — that
+ * wrap *is* the FNV modulo 2^32.
  *
  * Returns an unsigned value in 0..2^32-1 so remainders and hash-v2's
  * decimal stringify do not see a negative `Int`.
@@ -45,7 +39,7 @@ private fun fnv1a32(data: String): Long {
     val length = data.length
     var i = 0
     while (i < length) {
-        hash = hash xor (data[i].code and 0xFF)
+        hash = hash xor data[i].code
         hash *= FNV_PRIME
         i++
     }
@@ -262,12 +256,7 @@ internal class GBUtils {
                     attributeOverrides
                 )
 
-                val hashValueElement: GBValue = merged.getValue(hashAttribute)
-
-                if (hashValueElement is GBValue.Unknown) return@any true
-                if (hashValueElement.gbSerialize() !is JsonPrimitive) return@any true
-
-                val hashValue: String = hashValueElement.toHashValue()
+                val hashValue: String = merged[hashAttribute].toHashValue()
 
                 if (hashValue.isEmpty()) return@any true
                 val hashVersion: Int = filter.hashVersion ?: 2
@@ -586,14 +575,20 @@ internal class GBUtils {
             return Pair(hashAttribute, hashValue)
         }
 
+        /**
+         * The attribute as a hash value, like the JS SDK's `isHashable`: only a non-empty string or
+         * a finite, non-zero number identifies a user, formatted like JS `String()` (`1.0` is
+         * `"1"`). Anything else (`0`, booleans, null, arrays, objects, missing) is `""`, which
+         * callers treat as missing.
+         */
         internal fun GBValue?.toHashValue(): String =
             when (this) {
-                is GBString -> this.value // without quotes
-                is GBValue.Unknown -> ""
-                is GBNull -> ""
-                null -> ""
-                is GBNumber -> this.toJsString()
-                else -> this.gbSerialize().toString()
+                is GBString -> this.value
+                is GBNumber -> {
+                    val number = this.toJsDouble()
+                    if (number != 0.0 && number.isFinite()) this.toJsString() else ""
+                }
+                else -> ""
             }
     }
 }

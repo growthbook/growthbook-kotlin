@@ -75,6 +75,49 @@ class GBConditionTests {
         assertTrue(failedScenarios.size == 0)
     }
 
+    private fun evalJson(attributes: String, condition: String, savedGroups: String? = null): Boolean {
+        fun parse(json: String) = (GBValue.from(Json.parseToJsonElement(json)) as GBJson)
+        return GBConditionEvaluator().evalCondition(parse(attributes), parse(condition), savedGroups?.let(::parse))
+    }
+
+    @Test
+    fun testArrayAndObjectItemsAreNeverInTheList() {
+        // JS compares arrays and objects by reference, so an array or object item never matches
+        assertFalse(evalJson("""{"x": [1]}""", """{"x": {"${'$'}in": [[1]]}}"""))
+        assertFalse(evalJson("""{"x": {"a": 1}}""", """{"x": {"${'$'}in": [{"a": 1}]}}"""))
+        assertFalse(evalJson("""{"x": [[1]]}""", """{"x": {"${'$'}in": [[1]]}}"""))
+        assertTrue(evalJson("""{"x": [[1]]}""", """{"x": {"${'$'}nin": [[1]]}}"""))
+        assertTrue(evalJson("""{"x": {"a": 1}}""", """{"x": {"${'$'}nin": [{"a": 1}]}}"""))
+        assertFalse(evalJson("""{"x": [["A"]]}""", """{"x": {"${'$'}ini": [["a"]]}}"""))
+        assertTrue(evalJson("""{"x": {"a": "A"}}""", """{"x": {"${'$'}nini": [{"a": "a"}]}}"""))
+        // Primitive items still match, including one item of an array attribute
+        assertTrue(evalJson("""{"x": [2, [1]]}""", """{"x": {"${'$'}in": [[1], 2]}}"""))
+    }
+
+    @Test
+    fun testEqualityWithArrayOrObjectOperandNeverMatches() {
+        assertFalse(evalJson("""{"x": [1]}""", """{"x": {"${'$'}eq": [1]}}"""))
+        assertTrue(evalJson("""{"x": [1]}""", """{"x": {"${'$'}ne": [1]}}"""))
+        assertFalse(evalJson("""{"x": {"a": 1}}""", """{"x": {"${'$'}eq": {"a": 1}}}"""))
+        assertTrue(evalJson("""{"x": {"a": 1}}""", """{"x": {"${'$'}ne": {"a": 1}}}"""))
+    }
+
+    @Test
+    fun testRegexWithNonStringPatternIsFalse() {
+        assertFalse(evalJson("""{"x": "1"}""", """{"x": {"${'$'}regex": 1}}"""))
+        assertFalse(evalJson("""{"x": "true"}""", """{"x": {"${'$'}regexi": true}}"""))
+        assertFalse(evalJson("""{"x": "a"}""", """{"x": {"${'$'}regex": ["a"]}}"""))
+    }
+
+    @Test
+    fun testNumbersCompareByValueInListsAndSavedGroups() {
+        assertTrue(evalJson("""{"x": 1}""", """{"x": {"${'$'}in": [1.0]}}"""))
+        assertTrue(evalJson("""{"x": [1.0]}""", """{"x": {"${'$'}in": [1]}}"""))
+        assertFalse(evalJson("""{"x": 1.0}""", """{"x": {"${'$'}nin": [1]}}"""))
+        assertTrue(evalJson("""{"x": 1.0}""", """{"x": {"${'$'}inGroup": "g"}}""", """{"g": [1, 2]}"""))
+        assertTrue(evalJson("""{"x": 2}""", """{"x": {"${'$'}inGroup": "g"}}""", """{"g": [1.0, 2.0]}"""))
+    }
+
     @Test
     fun testInValidConditionObj() {
         val evaluator = GBConditionEvaluator()
