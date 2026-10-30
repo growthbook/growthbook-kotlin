@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
+## [10.0.0] - 2026-10-30
+
 ### Fixed
 - A malformed condition, such as `{"$not": null}`, no longer matches, so the rule, experiment or gated
   rule is skipped. This covers prerequisites (`parentConditions`, shared spec 0.10.1) and, since spec
