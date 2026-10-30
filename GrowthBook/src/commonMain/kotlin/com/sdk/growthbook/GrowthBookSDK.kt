@@ -27,6 +27,7 @@ import com.sdk.growthbook.features.FetchResult
 import com.sdk.growthbook.model.GBJson
 import com.sdk.growthbook.model.GBNull
 import com.sdk.growthbook.model.GBArray
+import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBOptions
 import com.sdk.growthbook.model.GBContext
@@ -735,6 +736,23 @@ class GrowthBookSDK internal constructor(
     }
 
     /**
+     * Sets the remote saved groups the user is in. A remote saved group keeps its members outside
+     * the payload, so the app resolves the user's groups (for example from its back end) and passes
+     * their ids here. Conditions read them as the `__gb_remoteGroupIds` attribute, over any value
+     * the attributes set for it. In remote-eval mode this triggers a fresh remote evaluation.
+     *
+     * Pass null while the groups are unresolved: rules that use remote groups then fail, including
+     * "not in group". Don't pass an empty list for that — it means "in no group", so "not in group"
+     * rules match.
+     */
+    fun setRemoteGroupIds(remoteGroupIds: List<String>?) {
+        gbContext.remoteGroupIds = remoteGroupIds
+        refreshForRemoteEval()
+    }
+
+    fun getRemoteGroupIds(): List<String>? = gbContext.remoteGroupIds
+
+    /**
      * The setForcedVariations method setup the Map of user's (forced) variations
      * to assign a specific variation (used for QA)
      */
@@ -818,9 +836,10 @@ class GrowthBookSDK internal constructor(
         if (!gbContext.remoteEval) {
             return null
         }
+        val snapshot = gbContext.evalSnapshot()
         return GBRemoteEvalParams(
-            gbContext.attributes,
-            gbContext.forcedFeatures, gbContext.forcedVariations
+            snapshot.evaluationAttributes(),
+            snapshot.forcedFeatures, snapshot.forcedVariations
         )
     }
 
@@ -875,10 +894,30 @@ class GrowthBookSDK internal constructor(
         NoResultYet, Success, Failed
     }
 
-    private fun createEvaluationContext(snapshot: EvalSnapshot = gbContext.evalSnapshot()) =
-        createEvaluationContext(
+    private fun createEvaluationContext(snapshot: EvalSnapshot = gbContext.evalSnapshot()): EvaluationContext {
+        warnIfRemoteGroupIdsMissing(snapshot)
+        return createEvaluationContext(
             gbContext, gbExperimentHelper, snapshot, pluginRegistry
         )
+    }
+
+    // Set once the missing-ids warning has been logged, so it isn't repeated on every evaluation
+    private var warnedMissingRemoteGroupIds = false
+
+    /**
+     * Logs once when the payload has remote saved groups but the user has no remote group ids, since
+     * every rule using them will then fail. Logs no attribute values.
+     */
+    private fun warnIfRemoteGroupIdsMissing(snapshot: EvalSnapshot) {
+        if (warnedMissingRemoteGroupIds || !gbContext.enableLogging) return
+        if (snapshot.remoteGroupIds != null || !snapshot.hasRemoteSavedGroups) return
+        if (snapshot.attributes[Constants.REMOTE_GROUP_IDS_ATTRIBUTE] is GBArray) return
+        warnedMissingRemoteGroupIds = true
+        GB.warning(
+            "GrowthBook: the payload has remote saved groups, but the user has no remote group ids. " +
+                "Rules using them won't match. See setRemoteGroupIds."
+        )
+    }
 
     //@ThreadLocal
     internal companion object {
@@ -913,7 +952,7 @@ class GrowthBookSDK internal constructor(
                 stickyBucketService = gbContext.stickyBucketService,
                 userContext = UserContext(
                     qaMode = gbContext.qaMode,
-                    attributes = snapshot.attributes,
+                    attributes = snapshot.evaluationAttributes(),
                     stickyBucketAssignmentDocs = snapshot.stickyBucketAssignmentDocs,
                 ),
                 // Merge each newly-generated sticky assignment back into the shared context by its
@@ -927,6 +966,16 @@ class GrowthBookSDK internal constructor(
                 eventLogger = gbContext.eventLogger,
                 contextualBandits = snapshot.contextualBandits
             )
+        }
+
+        /**
+         * The attributes conditions see: the user's, with the resolved remote saved group ids
+         * (when set) as [Constants.REMOTE_GROUP_IDS_ATTRIBUTE], over any value the attributes set for it.
+         * Remote evaluation sends these too, so the server sees the same groups.
+         */
+        private fun EvalSnapshot.evaluationAttributes(): Map<String, GBValue> {
+            val ids = remoteGroupIds ?: return attributes
+            return attributes + (Constants.REMOTE_GROUP_IDS_ATTRIBUTE to GBArray(ids.map { GBString(it) }))
         }
     }
 }

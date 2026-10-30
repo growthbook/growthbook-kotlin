@@ -697,8 +697,31 @@ a payload may safely be newer than the SDK reading it. A group that references i
 resolves the same way instead of recursing.
 
 Reference formats reduce payload size by shipping each group once instead of per rule. They do **not** keep a group's
-members off the client: the contents still travel in the payload. Only [Remote Evaluation](#remote-evaluation) does
-that.
+members off the client: the contents still travel in the payload. Only [Remote Evaluation](#remote-evaluation) and
+remote saved groups do that.
+
+### Remote saved groups
+
+A **remote** saved group keeps its members outside the payload, for lists too large to ship (millions of ids). The
+payload only says which attribute the group is about, `{"type": "remote", "attributeKey": "account_id"}`, so the SDK
+can't work out membership itself: your app resolves the user's groups, typically from its own back end, and passes
+their ids.
+
+```kotlin
+val sdk = GBSDKBuilder(/* ... */)
+    .setRemoteGroupIds(listOf("grp_vip"))
+    .initialize()
+
+// Later, when the user or their groups change
+sdk.setRemoteGroupIds(listOf("grp_vip", "grp_beta"))
+```
+
+Conditions read the ids as the `__gb_remoteGroupIds` attribute, and remote evaluation sends them too. Setting them
+here wins over an attribute of that name, which also works on its own.
+
+Leave the ids unset (or pass `null`) while they are unresolved: rules that use remote groups then fail, including
+"not in group" rules, and one warning is logged when logging is enabled. Pass an empty list only when the user is in
+no group, because that is what lets "not in group" rules match.
 
 ## Contextual Bandits
 
