@@ -4,19 +4,15 @@ import com.sdk.growthbook.evaluators.EvaluationContext
 import com.sdk.growthbook.evaluators.UserContext
 import com.sdk.growthbook.features.FeaturesDataModel
 import com.sdk.growthbook.model.GBContext
+import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.StickyBucketAssignmentDocsType
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.floatOrNull
+import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
-import kotlin.math.pow
-import kotlin.math.roundToInt
-import com.sdk.growthbook.kotlinx.serialization.gbSerialize
 import com.sdk.growthbook.logger.GB
-import com.sdk.growthbook.model.GBNull
 import com.sdk.growthbook.stickybucket.GBStickyBucketService
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -30,13 +26,10 @@ private const val FNV_PRIME = 0x01000193
 /**
  * Fowler-Noll-Vo FNV-1a, 32-bit.
  *
- * For each UTF-16 code unit: XOR the low 8 bits into [hash], then multiply
- * by [FNV_PRIME]. Kotlin `Int` multiply wraps at 32 bits — that wrap *is*
- * the FNV modulo 2^32.
- *
- * Only the low byte of each code unit is mixed in (`code and 0xFF`). That
- * is this SDK's historical behaviour; ASCII ids/keys are identical either
- * way. Code units > 255 (e.g. `'€'`) hash differently than a full-char XOR.
+ * For each UTF-16 code unit: XOR the whole 16-bit unit into [hash], then
+ * multiply by [FNV_PRIME], like the JS SDK's `charCodeAt` loop. An astral
+ * character is two code units. Kotlin `Int` multiply wraps at 32 bits — that
+ * wrap *is* the FNV modulo 2^32.
  *
  * Returns an unsigned value in 0..2^32-1 so remainders and hash-v2's
  * decimal stringify do not see a negative `Int`.
@@ -46,7 +39,7 @@ private fun fnv1a32(data: String): Long {
     val length = data.length
     var i = 0
     while (i < length) {
-        hash = hash xor (data[i].code and 0xFF)
+        hash = hash xor data[i].code
         hash *= FNV_PRIME
         i++
     }
@@ -71,14 +64,14 @@ internal class GBUtils {
         private val stickyBucketMutex = Mutex()
 
         /**
-         * Hashes a string to a float between 0 and 1
-         * fnv32a returns an integer, so we convert that to a float using a modulus:
+         * Hashes a string to a double between 0 and 1
+         * fnv32a returns an integer, so we convert that to a double using a modulus:
          */
         fun hash(
             stringValue: String,
             hashVersion: Int?,
             seed: String?
-        ): Float? {
+        ): Double? {
             if (hashVersion == null) return null
             return when (hashVersion) {
                 1 -> hashV1(stringValue, seed)
@@ -88,18 +81,18 @@ internal class GBUtils {
         }
 
         /**
-         * Method for hash stings to float for hash version #1
+         * Method for hash stings to double for hash version #1
          */
-        private fun hashV1(stringValue: String, seed: String?): Float {
-            return (fnv1a32(stringValue + seed) % 1000L).toFloat() / 1000f
+        private fun hashV1(stringValue: String, seed: String?): Double {
+            return (fnv1a32(stringValue + seed) % 1000L).toDouble() / 1000.0
         }
 
         /**
-         * Method for hash stings to float for hash version #2
+         * Method for hash stings to double for hash version #2
          */
-        private fun hashV2(stringValue: String, seed: String?): Float {
+        private fun hashV2(stringValue: String, seed: String?): Double {
             val first = fnv1a32(seed + stringValue)
-            return (fnv1a32(first.toString()) % 10000L).toFloat() / 10000f
+            return (fnv1a32(first.toString()) % 10000L).toDouble() / 10000.0
         }
 
         /**
@@ -123,12 +116,12 @@ internal class GBUtils {
         }
 
         /**
-         * Returns an array of floats with numVariations items that are all equal and sum to 1.
+         * Returns an array of doubles with numVariations items that are all equal and sum to 1.
          * For example, getEqualWeights(2) would return [0.5, 0.5].
          */
-        fun getEqualWeights(numVariations: Int): List<Float> {
+        fun getEqualWeights(numVariations: Int): List<Double> {
             if (numVariations <= 0) return emptyList()
-            val weight = 1.0f / numVariations.toFloat()
+            val weight = 1.0 / numVariations
             return List(numVariations) { weight }
         }
 
@@ -138,16 +131,16 @@ internal class GBUtils {
          */
         fun getBucketRanges(
             numVariations: Int,
-            coverage: Float,
-            weights: List<Float>?
+            coverage: Double,
+            weights: List<Double>?
         ): List<GBBucketRange> {
             val bucketRange: List<GBBucketRange>
 
             var targetCoverage = coverage
 
             // Clamp the value of coverage to between 0 and 1 inclusive.
-            if (coverage < 0) targetCoverage = 0F
-            if (coverage > 1) targetCoverage = 1F
+            if (coverage < 0) targetCoverage = 0.0
+            if (coverage > 1) targetCoverage = 1.0
 
             // Default to equal weights if the weights don't match the number of variations.
             val equal = getEqualWeights(numVariations)
@@ -164,33 +157,22 @@ internal class GBUtils {
             }
 
             // Convert weights to ranges and return
-            var cumulative = 0f
+            var cumulative = 0.0
 
             bucketRange = targetWeights.map { weight ->
                 val start = cumulative
                 cumulative += weight
 
-                GBBucketRange(
-                    start.roundTo(4),
-                    (start + (targetCoverage * weight)).roundTo(4)
-                )
+                GBBucketRange(start, start + targetCoverage * weight)
             }
 
             return bucketRange
         }
 
         /**
-         * Extension function for round float number to specific digit after comma
-         */
-        private fun Float.roundTo(numFractionDigits: Int): Float {
-            val factor = 10F.pow(numFractionDigits.toFloat())
-            return (this * factor).roundToInt() / factor
-        }
-
-        /**
          * Choose Variation from List of ranges which matches particular number
          */
-        fun chooseVariation(n: Float, ranges: List<GBBucketRange>): Int {
+        fun chooseVariation(n: Double, ranges: List<GBBucketRange>): Int {
             for ((index, range) in ranges.withIndex()) {
                 if (inRange(n = n, range = range)) {
                     return index
@@ -207,8 +189,8 @@ internal class GBUtils {
 
             if (namespace.size >= 3) {
                 val title = namespace[0].jsonPrimitive.contentOrNull
-                val start = namespace[1].jsonPrimitive.floatOrNull
-                val end = namespace[2].jsonPrimitive.floatOrNull
+                val start = namespace[1].jsonPrimitive.doubleOrNull
+                val end = namespace[2].jsonPrimitive.doubleOrNull
 
                 if (title != null && start != null && end != null) {
                     return GBNameSpace(title, start, end)
@@ -247,7 +229,7 @@ internal class GBUtils {
          * Determines if a number n is within the provided range.
          */
         private fun inRange(
-            n: Float?,
+            n: Double?,
             range: GBBucketRange?
         ): Boolean {
             return if (n == null || range == null) false
@@ -274,17 +256,12 @@ internal class GBUtils {
                     attributeOverrides
                 )
 
-                val hashValueElement: GBValue = merged.getValue(hashAttribute)
-
-                if (hashValueElement is GBValue.Unknown) return@any true
-                if (hashValueElement.gbSerialize() !is JsonPrimitive) return@any true
-
-                val hashValue: String = hashValueElement.toHashValue()
+                val hashValue: String = merged[hashAttribute].toHashValue()
 
                 if (hashValue.isEmpty()) return@any true
                 val hashVersion: Int = filter.hashVersion ?: 2
 
-                val n: Float = hash(
+                val n: Double = hash(
                     hashValue,
                     hashVersion,
                     filter.seed
@@ -318,11 +295,11 @@ internal class GBUtils {
             hashAttribute: String?,
             fallbackAttribute: String?,
             range: GBBucketRange?,
-            coverage: Float?,
+            coverage: Double?,
             hashVersion: Int?,
         ): Boolean {
             if (range == null && coverage == null) return true
-            if (range == null && coverage == 0f) return false
+            if (range == null && coverage == 0.0) return false
 
             val (_, hashValue) = getHashAttribute(
                 attr = hashAttribute,
@@ -342,7 +319,8 @@ internal class GBUtils {
             return if (range != null) {
                 inRange(n = hash, range = range)
             } else if (coverage != null) {
-                hash <= coverage
+                // Half-open like inRange, so a coverage of k/10000 includes exactly k buckets
+                hash < coverage
             } else {
                 true
             }
@@ -597,13 +575,20 @@ internal class GBUtils {
             return Pair(hashAttribute, hashValue)
         }
 
+        /**
+         * The attribute as a hash value, like the JS SDK's `isHashable`: only a non-empty string or
+         * a finite, non-zero number identifies a user, formatted like JS `String()` (`1.0` is
+         * `"1"`). Anything else (`0`, booleans, null, arrays, objects, missing) is `""`, which
+         * callers treat as missing.
+         */
         internal fun GBValue?.toHashValue(): String =
             when (this) {
-                is GBString -> this.value // without quotes
-                is GBValue.Unknown -> ""
-                is GBNull -> ""
-                null -> ""
-                else -> this.gbSerialize().toString()
+                is GBString -> this.value
+                is GBNumber -> {
+                    val number = this.toJsDouble()
+                    if (number != 0.0 && number.isFinite()) this.toJsString() else ""
+                }
+                else -> ""
             }
     }
 }

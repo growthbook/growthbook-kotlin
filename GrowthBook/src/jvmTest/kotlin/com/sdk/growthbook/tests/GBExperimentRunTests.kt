@@ -44,8 +44,15 @@ class GBExperimentRunTests {
     fun testExperiments() {
         val failedScenarios: ArrayList<String> = ArrayList()
         val passedScenarios: ArrayList<String> = ArrayList()
+        var skipped = 0
         for (item in evalConditions) {
             if (item is JsonArray) {
+                // Kotlin (mobile-first) has no querystring/URL-based experiment override; skip those cases.
+                if (item[1].jsonObject.containsKey("url")) {
+                    skipped++
+                    continue
+                }
+
                 val testContext =
                     GBTestHelper.jsonParser.decodeFromJsonElement(
                         GBContextTest.serializer(),
@@ -106,11 +113,13 @@ class GBExperimentRunTests {
                 val resultJsonElement = result.value.gbSerialize()
                 val status =
                     item[0].toString() + "\nExpected Result - " + item[3] + " & " + item[4] +
+                        " & " + item[5] +
                         "\nActual result - " + resultJsonElement.toString() + " & " +
-                        result.inExperiment + "\n\n"
+                        result.inExperiment + " & " + result.hashUsed + "\n\n"
 
                 if (item[3].toString() == resultJsonElement.toString()
                     && item[4].toString() == result.inExperiment.toString()
+                    && item[5].toString() == result.hashUsed.toString()
                 ) {
                     passedScenarios.add(status)
                 } else {
@@ -122,6 +131,7 @@ class GBExperimentRunTests {
         print("\nTOTAL TESTS - " + evalConditions.size)
         print("\nPassed TESTS - " + passedScenarios.size)
         print("\nFailed TESTS - " + failedScenarios.size)
+        print("\nSkipped TESTS (no URL override) - " + skipped)
         print("\n")
         print(failedScenarios)
 

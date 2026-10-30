@@ -184,7 +184,7 @@ internal class GBExperimentEvaluator(
                     attributeOverrides = attributeOverrides,
                     attributes = evaluationContext.userContext.attributes,
                 )
-                val evaluationResult = GBConditionEvaluator().evalCondition(
+                val evaluationResult = GBConditionEvaluator().evalConditionSafely(
                     attr, conditionObj,
                     evaluationContext.savedGroups,
                 )
@@ -231,7 +231,7 @@ internal class GBExperimentEvaluator(
                     val conditionObj: GBJson =
                         parentCondition.condition.let(GBValue::from) as? GBJson
                             ?: GBJson(emptyMap())
-                    val evalCondition = GBConditionEvaluator().evalCondition(
+                    val evalCondition = GBConditionEvaluator().evalConditionSafely(
                         attributes = evalObj,
                         conditionObj = conditionObj,
                         savedGroups = evaluationContext.savedGroups,
@@ -280,7 +280,7 @@ internal class GBExperimentEvaluator(
         if (!foundStickyBucket) {
             val bucketRanges = experiment.ranges ?: GBUtils.getBucketRanges(
                 experiment.variations.size,
-                experiment.coverage ?: 1f,
+                experiment.coverage ?: 1.0,
                 experiment.weights ?: emptyList()
             )
             assigned = GBUtils.chooseVariation(hash, bucketRanges)
@@ -437,7 +437,7 @@ internal class GBExperimentEvaluator(
         variationIndex: Int = 0,
         hashUsed: Boolean,
         featureId: String? = null,
-        bucket: Float? = null,
+        bucket: Double? = null,
         stickyBucketUsed: Boolean? = null,
         attributeOverrides: Map<String, GBValue>
 

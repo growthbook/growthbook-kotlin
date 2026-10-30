@@ -89,7 +89,7 @@ class ConfigDslTest {
             rules = listOf(
                 GBFeatureRule(
                     hashAttribute = "id",
-                    coverage = 1f,
+                    coverage = 1.0,
                     variations = listOf(GBString("A"), GBString("B"))
                 )
             )

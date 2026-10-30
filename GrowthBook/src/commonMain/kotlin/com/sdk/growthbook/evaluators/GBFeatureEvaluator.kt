@@ -119,7 +119,7 @@ internal class GBFeatureEvaluator(
                             val conditionObj = parentCondition
                                 .condition.let(GBValue::from) as? GBJson
                                 ?: GBJson(emptyMap())
-                            val evalCondition = GBConditionEvaluator().evalCondition(
+                            val evalCondition = GBConditionEvaluator().evalConditionSafely(
                                 attributes = evalObj,
                                 conditionObj = conditionObj,
                                 savedGroups = evaluationContext.savedGroups,
@@ -176,7 +176,7 @@ internal class GBFeatureEvaluator(
                         /**
                          * If it's a conditional rule, skip if the condition doesn't pass
                          */
-                        if (rule.conditionGB != null && !GBConditionEvaluator().evalCondition(
+                        if (rule.conditionGB != null && !GBConditionEvaluator().evalConditionSafely(
                                 attributes = getAttributes(
                                     attributeOverrides = attributeOverrides,
                                     attributes = evaluationContext.userContext.attributes,
@@ -507,11 +507,11 @@ internal class GBFeatureEvaluator(
      * [0.99, 1.01] — plus finite/non-negative, which the bucketer's sum check misses
      * for NaN (NaN comparisons are false, so a NaN vector slips through it).
      */
-    private fun isValidWeightVector(weights: List<Float>, numVariations: Int): Boolean {
+    private fun isValidWeightVector(weights: List<Double>, numVariations: Int): Boolean {
         if (weights.size != numVariations) return false
-        if (weights.any { !it.isFinite() || it < 0f }) return false
+        if (weights.any { !it.isFinite() || it < 0.0 }) return false
         val sum = weights.sum()
-        return sum >= 0.99f && sum <= 1.01f
+        return sum >= 0.99 && sum <= 1.01
     }
 
     private fun getContextualBanditLeaf(

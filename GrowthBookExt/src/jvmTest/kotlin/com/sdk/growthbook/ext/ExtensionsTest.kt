@@ -121,7 +121,7 @@ class ExtensionsTest {
                 GBFeatureRule(
                     key = "exp",
                     hashAttribute = "id",
-                    coverage = 1f,
+                    coverage = 1.0,
                     variations = listOf(GBBoolean(false), GBBoolean(true)),
                     namespace = JsonArray(
                         listOf(JsonObject(emptyMap()), JsonPrimitive(0), JsonPrimitive(1))

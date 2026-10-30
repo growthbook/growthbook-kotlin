@@ -6,6 +6,55 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [Unreleased]
+
+### Fixed
+- A malformed condition, such as `{"$not": null}`, no longer matches, so the rule, experiment or gated
+  rule is skipped. This covers prerequisites (`parentConditions`, shared spec 0.10.1) and, since spec
+  0.11.0, rule and experiment conditions too.
+- Decimal attributes parse as `Double` instead of 32-bit `Float`, and numbers compare by value (`1`
+  equals `1.0`, also in `$in`/`$nin`).
+- Attribute paths follow the JS SDK: array segments are indexable (`a.0`, `a.length`) and a path through
+  a non-object is null.
+- `$elemMatch` with `$or`, `$and` or `$nor` tests each element's fields (shared spec 0.11.0).
+- A condition value of `{}` always passes (shared spec 0.11.0).
+- `$in`, `$nin`, `$ini` and `$nini` never match an array or object item, like JS `===` (shared spec 0.12.0).
+
+### Breaking changes
+- **Bucketing uses `Double`** (growthbook-kotlin#274). Hashes, bucket ranges and coverage are `Double`
+  instead of `Float`, and range ends round like the JS SDK (shared spec 0.11.2). A few users whose hash
+  lands on a range end can move to a neighbouring variation.
+- **Rollouts include a user only when `hash < coverage`** (shared spec 0.11.1, growthbook/growthbook#7425).
+  Before, `hash <= coverage` included one extra hash bucket, so a partial rollout whose coverage is
+  exactly a bucket value loses one bucket (for example, 0.02% → 0.01%).
+- **Numeric hash attributes format like JS `String()`** (`1` for `1.0`, `1e+21`), so a decimal hash
+  attribute can land in a different bucket than before, matching the JS SDK.
+- **Hashing uses UTF-16 code units** (shared spec 0.12.0). FNV-1a now hashes each UTF-16 code unit, like
+  the JS SDK, instead of only its low byte. Bucketing changes only when the hashed value or seed contains
+  non-ASCII characters.
+- **Only strings and numbers identify a user** (shared spec 0.12.0). A hash attribute is used only when it
+  is a non-empty string or a finite, non-zero number. `0`, booleans, `""`, null, arrays and objects count
+  as missing: the fallback attribute is tried where one applies, otherwise the user is not in the
+  experiment or rollout. Before, `0`, booleans, arrays and objects were hashed as their JSON text.
+- **Unsupported operators fail** (shared spec 0.11.0, growthbook/growthbook#7346). A condition that
+  depends on an operator, `$savedGroup` reference or saved group type this SDK doesn't support now fails,
+  also under `$not` and `$nor`, where it used to pass.
+
+### Breaking changes
+- **Strict types in condition evaluation** (shared spec 0.10.0, growthbook/growthbook#7379). Conditions no
+  longer coerce attribute types. When the attribute's type differs from the condition's, the positive
+  operator fails and its negation matches:
+  - `"10"` does not equal `10`, `0` does not match null or a missing attribute, and `false` does not match `""`.
+  - Two strings compare as text (`"10" < "9"` is true); a string never compares with a number.
+  - Booleans are not ordered: `$gt`, `$gte`, `$lt` and `$lte` always fail on them.
+  - Version operators (`$veq`, `$vgt`, …) need both sides to be strings, or both numbers. A missing, null,
+    boolean, array or float attribute against a version string fails; `$vne` matches.
+  - A missing attribute fails comparison operators.
+  - `$exists` and `$type` are unchanged.
+
+  Targeting that relied on coercion, such as a numeric attribute sent as a string, stops matching. Send
+  attributes with the type the condition uses.
+
 ## [9.0.0] - 2026-10-16
 
 A major because two public contracts change with no signature change and no compile error to

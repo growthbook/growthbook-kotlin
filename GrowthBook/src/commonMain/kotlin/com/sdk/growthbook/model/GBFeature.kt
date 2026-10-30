@@ -60,7 +60,7 @@ data class GBFeatureRule(
     /**
      * What percent of users should be included in the experiment (between 0 and 1, inclusive)
      */
-    val coverage: Float? = null,
+    val coverage: Double? = null,
 
     /**
      * Immediately force a specific value (ignore every other option besides condition and coverage)
@@ -79,7 +79,7 @@ data class GBFeatureRule(
     /**
      * How to weight traffic between variations. Must add to 1.
      */
-    val weights: List<Float>? = null,
+    val weights: List<Double>? = null,
 
     /**
      * A tuple that contains the namespace identifier, plus a range of coverage for the experiment.
