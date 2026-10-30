@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
+## [10.0.0] - 2026-10-30
+
 ### Fixed
 - A malformed condition, such as `{"$not": null}`, no longer matches, so the rule, experiment or gated
   rule is skipped. This covers prerequisites (`parentConditions`, shared spec 0.10.1) and, since spec
@@ -40,7 +42,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   depends on an operator, `$savedGroup` reference or saved group type this SDK doesn't support now fails,
   also under `$not` and `$nor`, where it used to pass.
 
-### Breaking changes
 - **Strict types in condition evaluation** (shared spec 0.10.0, growthbook/growthbook#7379). Conditions no
   longer coerce attribute types. When the attribute's type differs from the condition's, the positive
   operator fails and its negation matches:
@@ -54,6 +55,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Targeting that relied on coercion, such as a numeric attribute sent as a string, stops matching. Send
   attributes with the type the condition uses.
+
+### Companion artifacts
+- `Core` **2.0.0**: numbers compare by value (`1` equals `1.0`), as in JS.
+- `GrowthBookKotlinxSerialization` **2.0.0**: decimals parse as `Double` instead of `Float`.
+- `GrowthBookExt` **4.0.0** and `GrowthBookTest` **4.0.0**: no code changes; republished to depend on `GrowthBook` 10.0.0.
+- `NetworkDispatcherKtor` and `NetworkDispatcherOkHttp` are unaffected and keep their current versions.
 
 ## [9.0.0] - 2026-10-16
 
