@@ -165,6 +165,8 @@ var sdkInstance: GrowthBookSDK = GBSDKBuilder(
 
 Values are opaque JSON strings keyed by filename — persist and return them verbatim. When set, the custom layer replaces the built-in cache for both feature definitions and sticky-bucket storage. It may be called in any order relative to the sticky-bucket setters.
 
+On the JVM, [Caffeine cache adapter](#caffeine-cache-adapter-jvm) ships a ready-made bounded in-memory layer instead of writing to disk.
+
 #### Cache freshness window (`setCacheMaxAge`)
 
 By default the SDK refetches features from the network on every `initialize()`. Pass `setCacheMaxAge(<ms>)` to define a freshness window: while the cached features are younger than that window, the network call on the next fetch is skipped and the cache is served as the authoritative result. Once the cache is older, the SDK refetches. This is a staleness gate evaluated on the next fetch, not a background polling mechanism.
@@ -1038,6 +1040,77 @@ class GBStickyBucketServiceImp(
     }
 }
 ```
+
+## Caffeine cache adapter (JVM)
+
+`io.growthbook.sdk:GrowthBookCaffeine` is an optional JVM-only module with two [Caffeine](https://github.com/ben-manes/caffeine)-backed
+adapters: a bounded in-memory feature cache and a bounded sticky bucket store.
+
+> Requires Java 17, matching the core SDK's JVM artifact — `jvmToolchain(17)` pins the published bytecode to class 61 rather than letting
+> it follow the JDK that built it.
+
+```kotlin
+dependencies {
+    implementation 'io.growthbook.sdk:GrowthBookCaffeine:1.0.0'
+}
+```
+
+Neither adapter writes to disk. On a server that is usually what you want: no cache files to clean up in a container, no
+disk I/O between a request and its variation, and a bound on the memory cached state may take. The trade-off is that
+everything is per-process — a restarted instance starts cold.
+
+```kotlin
+var sdkInstance: GrowthBookSDK = GBSDKBuilder(
+    apiKey = <API_KEY>,
+    hostURL = <GrowthBook_URL>,
+    attributes = hashMapOf(),
+    trackingCallback = { _, _ -> },
+    networkDispatcher = GBNetworkDispatcherKtor(),
+)
+    .setStickyBucketService(GBCaffeineStickyBucketService(applicationScope, clientKey = <API_KEY>))
+    .setCachingLayer(GBCaffeineCachingLayer())
+    .initialize()
+```
+
+The sticky service takes the API key because its keys — `attributeName||attributeValue` — do not carry one, exactly as
+the SDK's own default service is given a `gbStickyBuckets__<apiKey>_` prefix. Use one service per SDK instance: handing
+the same instance to two SDKs puts both their assignments under one user's key. The caching layer needs no such
+parameter, since the SDK builds its keys as `FeatureCache_<apiKey>` already.
+
+Both take the same knobs, with `kotlin.time.Duration` for the expiry ones:
+
+| option | default | what it does |
+| --- | --- | --- |
+| `maximumSize` | 1000 (cache) / 10 000 (sticky) | evicts the least recently used entry past this count |
+| `maximumWeightBytes` | `null` | caching layer only — bounds by the total UTF-8 size of the cached payloads instead of by entry count. The better bound when memory is the concern. Keep it above the largest payload you expect: Caffeine admits an entry heavier than the whole bound and evicts it on the next maintenance pass, which reads as a cache that never hits. |
+| `expireAfterWrite` | `null` (never) | evicts an entry this long after it was written, read or not |
+| `expireAfterAccess` | `null` (never) | evicts an entry once it has been neither read nor written for this long |
+| `recordStats` | `false` | counts hits, misses and evictions for `stats()`; costs a little on every read and write |
+| `ticker` | system clock | time source for expiry — pass one to drive expiry in tests instead of sleeping |
+
+Two things worth being explicit about:
+
+**Expiry is eviction, not freshness.** `expireAfterWrite` decides how long a payload is *kept*, not how old the SDK will
+let it get: that is `setCacheMaxAge` / `setStaleTtl`, evaluated against the payload's own timestamp. An evicted entry is
+simply a cache miss, and the SDK fetches from the network.
+
+**Sticky bucketing needs the dedicated service.** `setCachingLayer` also routes the *default* sticky bucket service
+through the caching layer, and `GBCaffeineCachingLayer` must not serve it: per-user documents would share the feature
+payload's size bound and be evicted by it, silently rebucketing users. It therefore answers only the SDK's feature cache
+keys and reports anything else once through its `onError` callback, as a `GBCaffeineCacheScopeException` — or, with no
+callback given, through `java.util.logging` at `WARNING`, since a guard nobody hears about is no guard. Pass
+`GBCaffeineStickyBucketService` to `setStickyBucketService(...)` alongside it — an explicit service takes precedence over
+the caching layer.
+
+Note that `clear()` on either adapter drops stored state but does not by itself change the next evaluation: the SDK
+evaluates against the features and assignment documents held in its own context. After clearing the sticky service in a
+sign-out flow, call `setAttributes` / `setAttributesSync` — that is what makes the SDK reload assignments.
+
+Because assignments live in memory, a user whose entry was evicted, or who lands on another instance or on a restarted
+one, is bucketed again. Bucketing is deterministic, so they normally land in the same variation — unless the
+experiment's weights, coverage or variations changed in between, which is the case sticky bucketing exists to protect
+against. Use it where assignments only need to hold within a process; use a shared, durable store when they must survive
+a restart or be seen by every instance.
 
 ## License
 
