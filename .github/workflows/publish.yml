@@ -1,0 +1,97 @@
+# Publishes to Maven Central when a GitHub release is published.
+# The release tag must equal the GrowthBook module's version, for example 10.0.0.
+# Every publishable module is considered; a module whose version is already on Maven Central
+# is skipped, so bump a module's version in its build.gradle.kts to release it.
+name: Publish to Maven Central
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to Maven Central
+    # Apple (iOS/macOS) targets only build on macOS
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Cache Konan
+        uses: actions/cache@v4
+        with:
+          path: ~/.konan
+          key: konan-${{ runner.os }}-${{ hashFiles('build.gradle.kts', 'gradle/libs.versions.toml') }}
+          restore-keys: konan-${{ runner.os }}-
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Check the release tag matches the GrowthBook version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          version=$(sed -nE 's/^version = "([^"]+)"$/\1/p' GrowthBook/build.gradle.kts)
+          if [ "$RELEASE_TAG" != "$version" ]; then
+            echo "Release tag $RELEASE_TAG doesn't match the GrowthBook version $version"
+            exit 1
+          fi
+
+      - name: Choose the modules to publish
+        id: modules
+        run: |
+          tasks=""
+          for module in Core GrowthBookKotlinxSerialization GrowthBook GrowthBookExt GrowthBookTest NetworkDispatcherKtor NetworkDispatcherOkHttp; do
+            version=$(sed -nE 's/^version = "([^"]+)"$/\1/p' "$module/build.gradle.kts")
+            status=$(curl -s -o /dev/null -w '%{http_code}' \
+              "https://repo1.maven.org/maven2/io/growthbook/sdk/$module/$version/$module-$version.pom")
+            if [ "$status" = "200" ]; then
+              echo "$module $version is already on Maven Central; skipping"
+            else
+              echo "$module $version will be published"
+              tasks="$tasks :$module:publish"
+            fi
+          done
+          echo "tasks=$tasks" >> "$GITHUB_OUTPUT"
+
+      - name: Build, sign and upload to the Sonatype staging repository
+        if: steps.modules.outputs.tasks != ''
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PRIVATE_PASSWORD: ${{ secrets.GPG_PRIVATE_PASSWORD }}
+          GB_SONATYPE_USERNAME: ${{ secrets.GB_SONATYPE_USERNAME }}
+          GB_SONATYPE_PASSWORD: ${{ secrets.GB_SONATYPE_PASSWORD }}
+          PUBLISH_TASKS: ${{ steps.modules.outputs.tasks }}
+        run: ./gradlew $PUBLISH_TASKS
+
+      # The upload isn't visible on central.sonatype.com until it's transferred, from the same IP.
+      # publishing_type=automatic releases it to Maven Central once Sonatype's validation passes.
+      - name: Transfer the upload to Maven Central
+        if: steps.modules.outputs.tasks != ''
+        env:
+          GB_SONATYPE_USERNAME: ${{ secrets.GB_SONATYPE_USERNAME }}
+          GB_SONATYPE_PASSWORD: ${{ secrets.GB_SONATYPE_PASSWORD }}
+        run: |
+          token=$(printf '%s:%s' "$GB_SONATYPE_USERNAME" "$GB_SONATYPE_PASSWORD" | base64 | tr -d '\n')
+          echo "::add-mask::$token"
+          status=$(curl -s -o response.json -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer $token" \
+            "https://ossrh-staging-api.central.sonatype.com/manual/upload/defaultRepository/io.growthbook.sdk?publishing_type=automatic")
+          echo "Transfer: HTTP $status"
+          # The logs are public, so leave out any IP address fields
+          jq 'walk(if type == "object" then with_entries(select(.key | test("(^|_)ip($|_)|ipaddress"; "i") | not)) else . end)' response.json 2>/dev/null \
+            || echo "(response is not JSON; not shown)"
+          if [ "${status:0:1}" != "2" ]; then
+            exit 1
+          fi
