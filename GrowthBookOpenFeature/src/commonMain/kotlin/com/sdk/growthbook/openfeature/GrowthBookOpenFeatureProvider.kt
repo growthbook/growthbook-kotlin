@@ -271,7 +271,8 @@ class GrowthBookOpenFeatureProvider(
         try {
             trackingCallback(experiment, result)
         } catch (e: Exception) {
-            // Like the SDK, don't let a failing tracking callback fail the evaluation.
+            // Like the SDK, log a failing tracking callback instead of failing the evaluation.
+            logError("OpenFeature provider: trackingCallback exception for '${experiment.key}'", e)
         }
     }
 
