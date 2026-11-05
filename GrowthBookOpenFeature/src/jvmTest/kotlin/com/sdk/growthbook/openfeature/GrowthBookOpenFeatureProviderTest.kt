@@ -31,6 +31,9 @@ import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.CoroutineStart
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -373,18 +376,25 @@ class GrowthBookOpenFeatureProviderTest {
         val provider = makeProvider(network)
         provider.initialize(null)
 
-        val changed = async(start = CoroutineStart.UNDISPATCHED) {
-            provider.observe().filterIsInstance<OpenFeatureProviderEvents.ProviderConfigurationChanged>().first()
+        val changes = Channel<OpenFeatureProviderEvents.ProviderConfigurationChanged>(Channel.UNLIMITED)
+        val collector = launch(start = CoroutineStart.UNDISPATCHED) {
+            provider.observe().filterIsInstance<OpenFeatureProviderEvents.ProviderConfigurationChanged>()
+                .collect { changes.send(it) }
         }
 
-        // Same payload: no event.
-        provider.sdk!!.refreshCache()
+        // Refreshes are applied in the background, so wait for each one before starting the next;
+        // overlapping refreshes can apply out of order.
         network.response = """{"features": {"string-flag": {"defaultValue": "updated"}}}"""
         provider.sdk!!.refreshCache()
-
-        val event = withTimeout(2.seconds) { changed.await() }
+        val event = withTimeout(2.seconds) { changes.receive() }
         assertTrue("string-flag" in event.eventDetails!!.flagsChanged)
         assertEquals("updated", provider.getStringEvaluation("string-flag", "", null).value)
+
+        // Same payload again: no event.
+        provider.sdk!!.refreshCache()
+        delay(500.milliseconds)
+        assertTrue(changes.tryReceive().isFailure)
+        collector.cancel()
     }
 
     @Test
