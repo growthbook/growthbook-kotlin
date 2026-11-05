@@ -3,6 +3,8 @@ package com.sdk.growthbook.openfeature
 import com.sdk.growthbook.GBSDKBuilder
 import com.sdk.growthbook.GBTrackingCallback
 import com.sdk.growthbook.GrowthBookSDK
+import com.sdk.growthbook.model.GBExperiment
+import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeatureSource
 import com.sdk.growthbook.model.GBNull
 import com.sdk.growthbook.model.GBValue
@@ -77,7 +79,7 @@ class GrowthBookOpenFeatureProvider(
 
     private val events = MutableSharedFlow<OpenFeatureProviderEvents>(extraBufferCapacity = 64)
 
-    /** Guards the state below. Reentrant, so a tracking callback that evaluates another flag can't deadlock. */
+    /** Guards the state below. Reentrant, so the SDK can call back into the provider while it's held. */
     private val lock = SynchronizedObject()
     internal var sdk: GrowthBookSDK? = null
         private set
@@ -88,6 +90,8 @@ class GrowthBookOpenFeatureProvider(
     private var initializationFailed = false
     private var isStale = false
     private var isClosed = false
+    /** Exposures recorded during the current evaluation, reported once [lock] is released. `null` outside evaluations. */
+    private var pendingExposures: MutableList<Pair<GBExperiment, GBExperimentResult>>? = null
 
     override fun observe(): Flow<OpenFeatureProviderEvents> = events
 
@@ -193,7 +197,26 @@ class GrowthBookOpenFeatureProvider(
         defaultValue: T,
         context: EvaluationContext?,
         convert: (GBValue) -> T?,
-    ): ProviderEvaluation<T> = synchronized(lock) {
+    ): ProviderEvaluation<T> {
+        val (outcome, exposures) = synchronized(lock) {
+            pendingExposures = mutableListOf()
+            val outcome = runCatching { evaluateLocked(key, defaultValue, context, convert) }
+            val exposures = pendingExposures.orEmpty()
+            pendingExposures = null
+            outcome to exposures
+        }
+        // Report exposures without holding the lock, so a slow tracking callback doesn't block other evaluations.
+        exposures.forEach { (experiment, result) -> track(experiment, result) }
+        return outcome.getOrThrow()
+    }
+
+    /** Evaluates a flag with [lock] held, so the result always belongs to the applied context. */
+    private fun <T> evaluateLocked(
+        key: String,
+        defaultValue: T,
+        context: EvaluationContext?,
+        convert: (GBValue) -> T?,
+    ): ProviderEvaluation<T> {
         if (isClosed) throw OpenFeatureError.ProviderFatalError("Provider closed")
         val sdk = sdk
         if (sdk == null || !hasUsablePayload) throw OpenFeatureError.ProviderNotReadyError()
@@ -216,7 +239,7 @@ class GrowthBookOpenFeatureProvider(
             return ProviderEvaluation(defaultValue, variant = variant, reason = Reason.DEFAULT.name)
         }
         val converted = convert(value) ?: throw OpenFeatureError.TypeMismatchError()
-        ProviderEvaluation(converted, variant = variant, reason = reason(result.source).name)
+        return ProviderEvaluation(converted, variant = variant, reason = reason(result.source).name)
     }
 
     // Internals
@@ -229,12 +252,28 @@ class GrowthBookOpenFeatureProvider(
             networkDispatcher = networkDispatcher,
             attributes = attributes,
             encryptionKey = encryptionKey,
-            trackingCallback = trackingCallback,
+            trackingCallback = ::recordExposure,
         )
             .apply(configureSdk)
             .setRefreshHandler { success, _ -> handleRefresh(success) }
             .setFeaturesChangeHandler { diff -> handleFeaturesChanged(diff.changedKeys) }
             .initialize()
+
+    /** Queues an exposure from the current evaluation, or reports it straight away outside one. */
+    private fun recordExposure(experiment: GBExperiment, result: GBExperimentResult) {
+        val queued = synchronized(lock) {
+            pendingExposures?.add(experiment to result) != null
+        }
+        if (!queued) track(experiment, result)
+    }
+
+    private fun track(experiment: GBExperiment, result: GBExperimentResult) {
+        try {
+            trackingCallback(experiment, result)
+        } catch (e: Exception) {
+            // Like the SDK, don't let a failing tracking callback fail the evaluation.
+        }
+    }
 
     /** Replaces the SDK's attributes when the context differs from the last one applied. Caller holds [lock]. */
     private fun apply(context: EvaluationContext?) {

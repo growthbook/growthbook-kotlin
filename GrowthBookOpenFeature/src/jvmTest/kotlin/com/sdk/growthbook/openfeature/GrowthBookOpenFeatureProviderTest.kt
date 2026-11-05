@@ -257,6 +257,42 @@ class GrowthBookOpenFeatureProviderTest {
         assertEquals(listOf("experiment-flag"), exposures)
     }
 
+    @Test
+    fun trackingCallbackRunsAfterTheProviderLockIsReleased() = runBlocking<Unit> {
+        var otherThreadFinished = false
+        var client: Client? = null
+        client = makeClient(
+            network = FakeNetwork(Payloads.features),
+            // The SDK reports each user's exposure once, so use a user no other test tracks.
+            context = ImmutableContext("lock-test-user"),
+            trackingCallback = { _, _ ->
+                // Waiting on another thread that evaluates a flag deadlocks if the callback runs under the lock.
+                val done = java.util.concurrent.CountDownLatch(1)
+                Thread {
+                    client?.getStringValue("string-flag", "")
+                    done.countDown()
+                }.start()
+                otherThreadFinished = done.await(2, java.util.concurrent.TimeUnit.SECONDS)
+            },
+        )
+
+        assertEquals("treatment", client.getStringValue("experiment-flag", ""))
+        assertTrue(otherThreadFinished)
+    }
+
+    @Test
+    fun failingTrackingCallbackDoesNotFailEvaluation() = runBlocking<Unit> {
+        val client = makeClient(
+            network = FakeNetwork(Payloads.features),
+            context = ImmutableContext("throwing-callback-user"),
+            trackingCallback = { _, _ -> throw IllegalStateException("analytics down") },
+        )
+
+        val details = client.getStringDetails("experiment-flag", "")
+        assertEquals("treatment", details.value)
+        assertNull(details.errorCode)
+    }
+
     // Initialization
 
     @Test

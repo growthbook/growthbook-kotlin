@@ -639,7 +639,8 @@ val enabled = OpenFeatureAPI.getClient().getBooleanValue("new-checkout", false)
 - **Values:** values are never converted between types. Integer flags must hold whole numbers in
   range, and a `null` flag value returns the caller's default.
 - **Tracking:** experiment exposures are reported through `trackingCallback`, as with the
-  GrowthBook SDK.
+  GrowthBook SDK. The callback runs after the provider releases its internal lock, so a slow
+  callback doesn't block other evaluations.
 - **Further configuration:** `configureSdk` receives the `GBSDKBuilder`. The provider installs its
   own refresh and features-change handlers, replacing any set there.
 - **Not supported yet:** remote evaluation and sticky bucketing. Configuring a sticky bucket
