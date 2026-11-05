@@ -599,6 +599,52 @@ val sdk = growthBook {
 }
 ```
 
+## OpenFeature (GrowthBookOpenFeature)
+
+`GrowthBookOpenFeature` is an [OpenFeature](https://openfeature.dev) provider for the
+[OpenFeature Kotlin SDK](https://github.com/open-feature/kotlin-sdk) 0.9.x, for Android and the JVM.
+It requires Java 11.
+
+```groovy
+implementation 'io.growthbook.sdk:GrowthBookOpenFeature:1.0.0'
+```
+
+The provider creates and owns its GrowthBook SDK instance:
+
+```kotlin
+val provider = GrowthBookOpenFeatureProvider(
+    apiKey = "sdk-abc123",
+    apiHost = "https://cdn.growthbook.io",
+    networkDispatcher = GBNetworkDispatcherOkHttp(),
+    trackingCallback = { experiment, result ->
+        // Send the experiment exposure to your analytics tool
+    },
+)
+
+OpenFeatureAPI.setProviderAndWait(provider, ImmutableContext(targetingKey = "user-123"))
+
+val enabled = OpenFeatureAPI.getClient().getBooleanValue("new-checkout", false)
+```
+
+- **Context:** OpenFeature context attributes become GrowthBook attributes, and `targetingKey`
+  becomes the `id` attribute. When the context has both, `identityPrecedence` decides which wins
+  (`TARGETING_KEY` by default, or `ID_ATTRIBUTE`). Each context change replaces all attributes. A
+  non-empty initial context replaces the provider's `attributes`; an empty one keeps them.
+- **Readiness:** the provider is ready immediately when features are supplied or cached. Otherwise
+  it waits for the first fetch, up to `initializationTimeout` (10 seconds by default), and reports
+  an error if no features loaded. Evaluations return the caller's default until features are
+  available.
+- **Updates:** feature refreshes and streaming updates emit a configuration-changed event when flags
+  change. A failed refresh keeps serving the last features and reports the provider as stale.
+- **Values:** values are never converted between types. Integer flags must hold whole numbers in
+  range, and a `null` flag value returns the caller's default.
+- **Tracking:** experiment exposures are reported through `trackingCallback`, as with the
+  GrowthBook SDK.
+- **Further configuration:** `configureSdk` receives the `GBSDKBuilder`. The provider installs its
+  own refresh and features-change handlers, replacing any set there.
+- **Not supported yet:** remote evaluation and sticky bucketing. Configuring a sticky bucket
+  service makes initialization fail.
+
 ## Models
 
 This SDK operates with such models as `GBContext`, `GBFeature`, `GBFeatureRule`, `GBFeatureSource`, `GBFeatureResult`, `GBExperiment`, `GBExperimentResult`, etc.
