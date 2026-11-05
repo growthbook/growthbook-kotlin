@@ -32,9 +32,9 @@ dependencies {
 
     // Add Network Dispatcher you prefer:
     // 1) NetworkDispatcherKtor — supports Android, iOS, JVM, JS, Wasm
-    implementation 'io.growthbook.sdk:NetworkDispatcherKtor:1.3.0'
+    implementation 'io.growthbook.sdk:NetworkDispatcherKtor:1.3.1'
     // 2) NetworkDispatcherOkHttp — supports Android and JVM only
-    implementation 'io.growthbook.sdk:NetworkDispatcherOkHttp:1.2.0'
+    implementation 'io.growthbook.sdk:NetworkDispatcherOkHttp:1.3.0'
 }
 ```
 

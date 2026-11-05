@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.0] - 2026-11-05
+
+### Added
+- `GBEventSourceHandler.onOpen()`, invoked by `GBEventSourceListener` once the stream is open.
+  It has a default no-op body, so existing implementations keep compiling
+
+### Fixed
+- SSE retry budget is now reset when the stream opens successfully, not only when a non-empty
+  event arrives. A proxy that sends empty heartbeats and closes each stream on a timer (e.g.
+  GrowthBook Proxy with a max stream duration) previously used up `maxRetries` across
+  perfectly healthy connections whenever no features were published, and the stream stopped
+  for good (~14 minutes with the defaults and a 60 s stream lifetime)
+
+---
 ## [1.2.0] - 2026-09-08
 
 ### Added

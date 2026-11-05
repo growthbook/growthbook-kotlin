@@ -7,6 +7,13 @@ import okhttp3.sse.EventSource
  */
 interface GBEventSourceHandler {
     /**
+     * Invoke when the stream has been opened successfully (2xx, `text/event-stream`).
+     *
+     * Has a default no-op body so existing implementations keep compiling.
+     */
+    fun onOpen() {}
+
+    /**
      * Invoke when connection is closed
      */
     fun onClose(eventSource: EventSource?)
