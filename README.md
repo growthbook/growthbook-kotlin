@@ -645,6 +645,9 @@ val enabled = OpenFeatureAPI.getClient().getBooleanValue("new-checkout", false)
 - **Not supported yet:** remote evaluation and sticky bucketing. Configuring a sticky bucket
   service makes initialization fail.
 
+[`examples/openfeature-cli`](examples/openfeature-cli) is a small JVM program that evaluates flags
+through the provider. It runs offline with bundled features, or against GrowthBook with a client key.
+
 ## Models
 
 This SDK operates with such models as `GBContext`, `GBFeature`, `GBFeatureRule`, `GBFeatureSource`, `GBFeatureResult`, `GBExperiment`, `GBExperimentResult`, etc.

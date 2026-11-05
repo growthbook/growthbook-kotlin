@@ -21,3 +21,5 @@ jobs:
       run: chmod +x gradlew
     - name: Build with Gradle
       run: ./gradlew test
+    - name: Run OpenFeature example
+      run: ./gradlew -p examples/openfeature-cli run
