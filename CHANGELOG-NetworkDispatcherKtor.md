@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.1] - 2026-11-05
+
+### Fixed
+- SSE retry budget is now reset when the stream opens successfully (2xx), not only when a
+  non-empty event arrives. A proxy that sends empty heartbeats and closes each stream on a
+  timer (e.g. GrowthBook Proxy with a max stream duration) previously used up `maxRetries`
+  across perfectly healthy connections whenever no features were published, and the stream
+  stopped for good (~14 minutes with the defaults and a 60 s stream lifetime)
+- A non-2xx SSE response is now treated as a failed attempt (backoff + counted retry) instead
+  of being read as an event stream
+
+---
 ## [1.3.0] - 2026-09-08
 
 ### Added
