@@ -9,8 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-06
+
 ### Added
-- First release (1.0.0). `GrowthBookOpenFeatureProvider`, an [OpenFeature](https://openfeature.dev) provider for the
+- First release. `GrowthBookOpenFeatureProvider`, an [OpenFeature](https://openfeature.dev) provider for the
   OpenFeature Kotlin SDK 0.9.x on Android and the JVM, backed by a GrowthBook SDK instance the
   provider creates and owns. Supports local evaluation with fetched, cached or supplied payloads.
 - OpenFeature context attributes become GrowthBook attributes, and `targetingKey` becomes the `id`

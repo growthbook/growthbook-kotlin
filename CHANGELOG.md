@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
+## [10.1.0] - 2026-11-06
+
+No changes to the core SDK. This release publishes the new `GrowthBookOpenFeature` module; the other modules
+keep their current versions.
+
 ### Added
 - **`GrowthBookOpenFeature` 1.0.0**, a new artifact (`io.growthbook.sdk:GrowthBookOpenFeature`) with an
   [OpenFeature](https://openfeature.dev) provider for Android and the JVM. Apps that don't use it are unaffected:
