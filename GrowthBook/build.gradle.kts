@@ -11,7 +11,8 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "10.1.0"
+// Required: release-please bumps this version using the marker comment. Don't remove it.
+version = "10.1.0" // x-release-please-version
 
 val generateSdkMeta by tasks.registering {
     val outputDir = layout.buildDirectory.dir("generated/sdk-meta/commonMain/kotlin")

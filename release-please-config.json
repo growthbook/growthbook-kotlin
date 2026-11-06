@@ -1,0 +1,91 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "591cda45bb289124daf34bb409fce4510f17f03c",
+  "release-type": "simple",
+  "include-v-in-tag": false,
+  "include-v-in-release-name": false,
+  "tag-separator": "-",
+  "packages": {
+    "Core": {
+      "component": "Core",
+      "changelog-path": "/CHANGELOG-Core.md",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "build.gradle.kts"
+        }
+      ]
+    },
+    "GrowthBookKotlinxSerialization": {
+      "component": "GrowthBookKotlinxSerialization",
+      "changelog-path": "/CHANGELOG-GrowthBookKotlinxSerialization.md",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "build.gradle.kts"
+        }
+      ]
+    },
+    "GrowthBook": {
+      "component": "GrowthBook",
+      "changelog-path": "/CHANGELOG.md",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "build.gradle.kts"
+        }
+      ],
+      "include-component-in-tag": false
+    },
+    "GrowthBookExt": {
+      "component": "GrowthBookExt",
+      "changelog-path": "/CHANGELOG-GrowthBookExt.md",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "build.gradle.kts"
+        }
+      ]
+    },
+    "GrowthBookTest": {
+      "component": "GrowthBookTest",
+      "changelog-path": "/CHANGELOG-GrowthBookTest.md",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "build.gradle.kts"
+        }
+      ]
+    },
+    "NetworkDispatcherKtor": {
+      "component": "NetworkDispatcherKtor",
+      "changelog-path": "/CHANGELOG-NetworkDispatcherKtor.md",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "build.gradle.kts"
+        }
+      ]
+    },
+    "NetworkDispatcherOkHttp": {
+      "component": "NetworkDispatcherOkHttp",
+      "changelog-path": "/CHANGELOG-NetworkDispatcherOkhttp.md",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "build.gradle.kts"
+        }
+      ]
+    },
+    "GrowthBookOpenFeature": {
+      "component": "GrowthBookOpenFeature",
+      "changelog-path": "/CHANGELOG-GrowthBookOpenFeature.md",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "build.gradle.kts"
+        }
+      ]
+    }
+  }
+}

@@ -7,7 +7,8 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "1.0.0"
+// Required: release-please bumps this version using the marker comment. Don't remove it.
+version = "1.0.0" // x-release-please-version
 
 // OpenFeature's Kotlin SDK is pre-1.0, so a minor release can break providers.
 val openFeatureVersion = "[0.9.0,0.10.0["

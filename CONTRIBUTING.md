@@ -30,28 +30,48 @@ Releasing
 
 This section is for maintainers. Contributors don't need to do any of this.
 
-Each module is published to Maven Central as its own artifact with its own version. One GitHub
-release publishes every module whose version isn't on Maven Central yet.
+Each module is published to Maven Central (group `io.growthbook.sdk`) with its own version.
+[release-please](https://github.com/googleapis/release-please) manages versions, changelogs, tags
+and GitHub releases; nothing is bumped by hand.
 
-1. Open a release PR (for example, `chore: release 10.0.0`) that:
-   - bumps `version` in the `build.gradle.kts` of each module that changed, plus `GrowthBook`,
-     whose version names the release
-   - moves the `[Unreleased]` notes in `CHANGELOG.md` under the new version, and updates the
-     per-module changelog (`CHANGELOG-<module>.md`) of each other module that changed
-2. Merge the release PR.
-3. Publish a GitHub release whose tag equals the `GrowthBook` version, such as `10.0.0`, with no
-   `v` prefix.
+**What gets released.** PRs are squash-merged, so the PR title is the commit release-please reads
+and must follow [Conventional Commits](https://www.conventionalcommits.org) (CI checks this).
+`fix:` releases a patch, `feat:` a minor and `feat!:` or a `BREAKING CHANGE:` footer a major
+version, for each module whose directory the commit changes. Other types, and changes outside
+module directories, release nothing.
 
-Publishing the release runs `.github/workflows/publish.yml`, which:
+**Tags and changelogs.** `GrowthBook` uses plain tags (`10.1.0`), continuing the repo's earlier tags,
+and `CHANGELOG.md`. Other modules use `<Module>-x.y.z` tags and `CHANGELOG-<Module>.md` (see
+`release-please-config.json`).
 
-- fails unless the tag matches the `GrowthBook` version
-- publishes each module in its module list whose version isn't on Maven Central, and skips the rest
-- signs the artifacts and uploads them to Sonatype, then transfers them to Maven Central, which
-  releases them once validation passes
+**Releasing.**
 
-A new module must be added to the module list in `publish.yml`, or it is never published. Check
-[Maven Central](https://central.sonatype.com/namespace/io.growthbook.sdk) after a release; new
-versions can take a while to appear.
+1. After each merge to `main`, release-please opens or updates a release PR that bumps the affected
+   modules' versions and changelogs. Edit the changelog wording there if needed.
+2. Merging the release PR tags and creates a GitHub release for each released module, then runs
+   `publish.yml`, which publishes every module in its list whose version isn't on Maven Central yet.
+3. Check [Maven Central](https://central.sonatype.com/namespace/io.growthbook.sdk); new versions can
+   take about 30 minutes to appear. If the publish fails, nothing in that run is published: fix the
+   cause and run **Publish to Maven Central** from the Actions tab.
+
+**Dependencies between modules.** `Core` is used by `GrowthBook`, `GrowthBookKotlinxSerialization`
+and both `NetworkDispatcher*` modules; `GrowthBook` is used by `GrowthBookExt`, `GrowthBookTest` and
+`GrowthBookOpenFeature`. Releasing a module doesn't release its dependents, and a published module
+keeps the dependency versions it was built with. So:
+
+- If a dependent's users need a dependency's change (for example a `Core` fix for `GrowthBook`
+  users), release the dependent in the same release PR.
+- `Core` is an `api` dependency of `GrowthBook`, and `GrowthBook` of its three dependents, so a
+  breaking change in either is also a breaking change for those dependents.
+- To release a module with no changes of its own, merge a commit that changes a file in its
+  directory with a `Release-As: x.y.z` footer. The footer applies to every module the commit
+  changes, and changelog-only or empty commits release nothing.
+
+**Adding a module.** Add it to `release-please-config.json` and `.release-please-manifest.json`
+(matching its `build.gradle.kts` version), put `// x-release-please-version` on its `version` line,
+and give it a complete `pom {}` block, including `developers`; Maven Central rejects the whole
+upload if one is missing. Add it to the `publish.yml` list only when it's ready, since the next
+publish run publishes any listed module that isn't on Maven Central yet.
 
 ### Publishing secrets
 
