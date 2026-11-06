@@ -30,26 +30,41 @@ Releasing
 
 This section is for maintainers. Contributors don't need to do any of this.
 
-Each module is published to Maven Central as its own artifact with its own version. One GitHub
-release publishes every module whose version isn't on Maven Central yet.
+Each module is published to Maven Central as its own artifact with its own version.
+[release-please](https://github.com/googleapis/release-please) manages the versions, changelogs,
+tags and GitHub releases, so nothing is bumped by hand.
 
-1. Open a release PR (for example, `chore: release 10.0.0`) that:
-   - bumps `version` in the `build.gradle.kts` of each module that changed, plus `GrowthBook`,
-     whose version names the release
-   - moves the `[Unreleased]` notes in `CHANGELOG.md` under the new version, and updates the
-     per-module changelog (`CHANGELOG-<module>.md`) of each other module that changed
-2. Merge the release PR.
-3. Publish a GitHub release whose tag equals the `GrowthBook` version, such as `10.0.0`, with no
-   `v` prefix.
+**Commit messages.** Pull requests are squash-merged, and the PR title becomes the commit that
+release-please reads, so titles must follow [Conventional Commits](https://www.conventionalcommits.org)
+(CI checks this). `fix:` releases a patch, `feat:` a minor version, and `!` (as in `feat!:`) or a
+`BREAKING CHANGE:` footer a major version. Other types, such as `docs:`, `chore:`, `ci:` and `test:`,
+don't release anything.
 
-Publishing the release runs `.github/workflows/publish.yml`, which:
+**Which modules release.** Each module directory is a release-please package (see
+`release-please-config.json`). A commit releases every module whose directory it changes. Changes
+outside the module directories, such as the README or workflows, release nothing.
 
-- fails unless the tag matches the `GrowthBook` version
-- publishes each module in its module list whose version isn't on Maven Central, and skips the rest
-- signs the artifacts and uploads them to Sonatype, then transfers them to Maven Central, which
-  releases them once validation passes
+A module isn't released just because a module it depends on was: if a `Core` fix should reach
+`GrowthBook` users, `GrowthBook` needs a release too. To force one, merge a commit that touches the
+module with a `Release-As: x.y.z` footer, or bump it with a `fix:` or `feat:` change of its own.
 
-A new module must be added to the module list in `publish.yml`, or it is never published. Check
+**Releasing.**
+
+1. After each merge to `main`, release-please opens or updates a release PR that bumps each
+   affected module's `version` in its `build.gradle.kts`, `.release-please-manifest.json`, and its
+   changelog. Edit the changelog wording in that PR if needed.
+2. Merge the release PR when you want to release. release-please tags each released module and
+   creates a GitHub release for it. `GrowthBook` keeps plain tags such as `10.1.0`; other modules
+   use prefixed tags such as `GrowthBookOpenFeature-1.0.1`.
+3. The same workflow then runs `.github/workflows/publish.yml`, which publishes each module in its
+   module list whose version isn't on Maven Central yet. It signs the artifacts, uploads them to
+   Sonatype and transfers them to Maven Central, which releases them once validation passes.
+
+If publishing fails, fix the cause and run **Publish to Maven Central** manually from the Actions
+tab; it skips anything already published.
+
+A new module must be added to both `release-please-config.json` and the module list in
+`publish.yml`, and its `version` line needs the `// x-release-please-version` marker. Check
 [Maven Central](https://central.sonatype.com/namespace/io.growthbook.sdk) after a release; new
 versions can take a while to appear.
 

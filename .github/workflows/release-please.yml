@@ -1,0 +1,39 @@
+name: Release Please
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-please-main
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    outputs:
+      releases_created: ${{ steps.release.outputs.releases_created }}
+    steps:
+      - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
+        id: release
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          target-branch: main
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  # Releases created with GITHUB_TOKEN don't trigger other workflows, so publish from here.
+  publish:
+    needs: release-please
+    if: needs.release-please.outputs.releases_created == 'true'
+    uses: ./.github/workflows/publish.yml
+    secrets: inherit

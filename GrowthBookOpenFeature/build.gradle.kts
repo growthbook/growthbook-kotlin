@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
-version = "1.0.0"
+version = "1.0.0" // x-release-please-version
 
 // OpenFeature's Kotlin SDK is pre-1.0, so a minor release can break providers.
 val openFeatureVersion = "[0.9.0,0.10.0["
