@@ -132,6 +132,12 @@ publishing {
                     connection.set("https://github.com/growthbook/growthbook-kotlin.git")
                     url.set("https://github.com/growthbook/growthbook-kotlin")
                 }
+                developers {
+                    developer {
+                        name.set("GrowthBook")
+                        email.set("sdk-dev@growthbook.io")
+                    }
+                }
             }
         }
     }
