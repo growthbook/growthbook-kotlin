@@ -10,6 +10,7 @@ plugins {
 }
 
 group = "io.growthbook.sdk"
+// Required: release-please bumps this version using the marker comment. Don't remove it.
 version = "4.0.0" // x-release-please-version
 
 kotlin {
