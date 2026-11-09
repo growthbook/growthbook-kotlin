@@ -395,6 +395,8 @@ class GBUtilsTests {
         assertEquals(plain, GBUtils.paddedVersionString("1.2.3+build\nx"))
         assertEquals("v1-    2-    3-~", GBUtils.paddedVersionString("vv1.2.3"))
         assertEquals("", GBUtils.paddedVersionString("+build"))
+        // An empty version is version 0, as in JS
+        assertEquals("    0", GBUtils.paddedVersionString(""))
     }
 
     @Test

@@ -207,7 +207,8 @@ internal class GBUtils {
             // "v1.2.3-rc.1+build123" -> ["1","2","3","rc","1"]
             // Build metadata starts at the first `+`. No regex here: `\+.*$` is quadratic
             // on many `+`s then a newline.
-            var version = input.removePrefix("v")
+            // An empty version is version 0, as in JS
+            var version = input.ifEmpty { "0" }.removePrefix("v")
             val buildIndex = version.indexOf('+')
             if (buildIndex != -1) version = version.substring(0, buildIndex)
             var parts: List<String> = version.split(Regex("[-.]"))
