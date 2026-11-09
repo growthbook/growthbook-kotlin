@@ -69,10 +69,12 @@ fun GBValue.Companion.from(jsonElement: JsonElement): GBValue =
             when {
                 jsonElement is JsonNull -> GBNull
                 jsonElement.isString -> GBString(jsonElement.content)
+                // Booleans first: booleanOrNull doesn't throw, while intOrNull and longOrNull
+                // throw and catch an exception internally for every non-integer value.
+                jsonElement.booleanOrNull != null -> GBBoolean(jsonElement.boolean)
                 jsonElement.intOrNull != null -> GBNumber(jsonElement.int)
                 jsonElement.longOrNull != null -> GBNumber(jsonElement.long)
                 jsonElement.doubleOrNull != null -> GBNumber(jsonElement.double)
-                jsonElement.booleanOrNull != null -> GBBoolean(jsonElement.boolean)
                 else -> GBValue.Unknown
             }
         }

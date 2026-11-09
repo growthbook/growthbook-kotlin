@@ -176,6 +176,70 @@ class GBValueTest {
     }
 
     @Test
+    fun `from converts JsonPrimitive false to GBBoolean`() {
+        val result = GBValue.from(JsonPrimitive(false))
+        assertEquals(GBBoolean(false), result)
+    }
+
+    @Test
+    fun `from converts parsed boolean literals to GBBoolean`() {
+        val result = GBValue.from(Json.parseToJsonElement("[true,false]"))
+        assertEquals(GBArray(listOf(GBBoolean(true), GBBoolean(false))), result)
+    }
+
+    @Test
+    fun `from keeps quoted true and false as GBString`() {
+        val result = GBValue.from(Json.parseToJsonElement("""["true","false"]"""))
+        assertEquals(GBArray(listOf(GBString("true"), GBString("false"))), result)
+    }
+
+    @Test
+    fun `from does not treat 0 and 1 as booleans`() {
+        val result = GBValue.from(Json.parseToJsonElement("[0,1]"))
+        assertEquals(GBArray(listOf(GBNumber(0), GBNumber(1))), result)
+    }
+
+    @Test
+    fun `from converts number larger than Int to GBNumber Long`() {
+        val result = GBValue.from(JsonPrimitive(3_000_000_000L))
+        assertEquals(GBNumber(3_000_000_000L), result)
+    }
+
+    @Test
+    fun `from converts decimal to GBNumber Double`() {
+        val result = GBValue.from(JsonPrimitive(0.25))
+        assertEquals(GBNumber(0.25), result)
+    }
+
+    @Test
+    fun `from converts exponent literal the same way as kotlinx`() {
+        val result = GBValue.from(Json.parseToJsonElement("[1e2,1.5e-3]"))
+        assertEquals(GBArray(listOf(GBNumber(100), GBNumber(0.0015))), result)
+    }
+
+    @Test
+    fun `from converts mixed object with booleans numbers and strings`() {
+        val result = GBValue.from(
+            Json.parseToJsonElement(
+                """{"enabled":true,"count":3,"ratio":0.5,"name":"x","off":false,"none":null}"""
+            )
+        )
+        assertEquals(
+            GBJson(
+                mapOf(
+                    "enabled" to GBBoolean(true),
+                    "count" to GBNumber(3),
+                    "ratio" to GBNumber(0.5),
+                    "name" to GBString("x"),
+                    "off" to GBBoolean(false),
+                    "none" to GBNull,
+                )
+            ),
+            result
+        )
+    }
+
+    @Test
     fun `from converts JsonArray to GBArray`() {
         val result = GBValue.from(JsonArray(listOf(JsonPrimitive(1))))
         assertEquals(GBArray(listOf(GBNumber(1))), result)
