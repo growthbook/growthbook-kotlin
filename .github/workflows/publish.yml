@@ -1,12 +1,12 @@
-# Publishes to Maven Central when a GitHub release is published.
-# The release tag must equal the GrowthBook module's version, for example 10.0.0.
+# Publishes to Maven Central. release-please.yml calls this after a release PR merges; run it
+# manually to retry a failed publish.
 # Every publishable module is considered; a module whose version is already on Maven Central
-# is skipped, so bump a module's version in its build.gradle.kts to release it.
+# is skipped, so only the modules a release bumped are published.
 name: Publish to Maven Central
 
 on:
-  release:
-    types: [published]
+  workflow_call:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -38,22 +38,12 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Check the release tag matches the GrowthBook version
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: |
-          version=$(sed -nE 's/^version = "([^"]+)"$/\1/p' GrowthBook/build.gradle.kts)
-          if [ "$RELEASE_TAG" != "$version" ]; then
-            echo "Release tag $RELEASE_TAG doesn't match the GrowthBook version $version"
-            exit 1
-          fi
-
       - name: Choose the modules to publish
         id: modules
         run: |
           tasks=""
           for module in Core GrowthBookKotlinxSerialization GrowthBook GrowthBookExt GrowthBookOpenFeature GrowthBookTest NetworkDispatcherKtor NetworkDispatcherOkHttp; do
-            version=$(sed -nE 's/^version = "([^"]+)"$/\1/p' "$module/build.gradle.kts")
+            version=$(sed -nE 's/^version = "([^"]+)".*$/\1/p' "$module/build.gradle.kts")
             status=$(curl -s -o /dev/null -w '%{http_code}' \
               "https://repo1.maven.org/maven2/io/growthbook/sdk/$module/$version/$module-$version.pom")
             if [ "$status" = "200" ]; then
