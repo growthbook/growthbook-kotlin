@@ -205,8 +205,12 @@ internal class GBUtils {
          */
         fun paddedVersionString(input: String): String {
             // "v1.2.3-rc.1+build123" -> ["1","2","3","rc","1"]
-            var parts: List<String> = input.replace(Regex("^v|\\+.*\$"), "")
-                .split(Regex("[-.]"))
+            // Build metadata starts at the first `+`. No regex here: `\+.*$` is quadratic
+            // on many `+`s then a newline.
+            var version = input.removePrefix("v")
+            val buildIndex = version.indexOf('+')
+            if (buildIndex != -1) version = version.substring(0, buildIndex)
+            var parts: List<String> = version.split(Regex("[-.]"))
 
             // ["1","0","0"] -> ["1","0","0","~"]
             // "~" is the largest ASCII character, so this will make "1.0.0" greater
