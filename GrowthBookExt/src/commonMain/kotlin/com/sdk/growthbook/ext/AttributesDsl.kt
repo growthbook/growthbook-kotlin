@@ -1,6 +1,6 @@
 package com.sdk.growthbook.ext
 
-import com.sdk.growthbook.GrowthBookSDK
+import com.sdk.growthbook.IGrowthBookSDK
 import com.sdk.growthbook.model.GBArray
 import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.model.GBJson
@@ -121,7 +121,7 @@ inline fun buildAttributes(block: GBAttributesBuilder.() -> Unit): Map<String, G
 
 /**
  * Replaces the SDK's user attributes using the attributes DSL — a sugar bridge
- * over [GrowthBookSDK.setAttributes] that hides the [GBValue] wrappers.
+ * over [IGrowthBookSDK.setAttributes] that hides the [GBValue] wrappers.
  *
  * ```kotlin
  * sdk.setAttributes {
@@ -130,10 +130,10 @@ inline fun buildAttributes(block: GBAttributesBuilder.() -> Unit): Map<String, G
  * }
  * ```
  */
-inline fun GrowthBookSDK.setAttributes(block: GBAttributesBuilder.() -> Unit) {
+inline fun IGrowthBookSDK.setAttributes(block: GBAttributesBuilder.() -> Unit) {
     setAttributes(buildAttributes(block))
 }
 
-suspend inline fun GrowthBookSDK.setAttributesSync(block: GBAttributesBuilder.() -> Unit) {
+suspend inline fun IGrowthBookSDK.setAttributesSync(block: GBAttributesBuilder.() -> Unit) {
     setAttributesSync(buildAttributes(block))
 }

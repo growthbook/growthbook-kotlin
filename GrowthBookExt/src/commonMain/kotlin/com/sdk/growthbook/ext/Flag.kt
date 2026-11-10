@@ -1,6 +1,7 @@
 package com.sdk.growthbook.ext
 
-import com.sdk.growthbook.GrowthBookSDK
+import com.sdk.growthbook.IGrowthBookSDK
+import com.sdk.growthbook.suspendFeatureValue
 
 /**
  * A typed, self-describing feature flag: bundles the feature [key], its value
@@ -39,7 +40,7 @@ data class Flag<out T>(val key: String, val default: T)
  *
  * @throws IllegalArgumentException if the flag's value type is not supported
  */
-fun <T : Any> GrowthBookSDK.value(flag: Flag<T>): T = resolveFlag(flag)
+fun <T : Any> IGrowthBookSDK.value(flag: Flag<T>): T = resolveFlag(flag)
 
 /**
  * Shared resolution behind [value] and the `featureFlag(Flag)` property delegate, so both
@@ -51,7 +52,7 @@ fun <T : Any> GrowthBookSDK.value(flag: Flag<T>): T = resolveFlag(flag)
  *
  * @throws IllegalArgumentException if the flag's value type is not supported
  */
-internal fun <T : Any> GrowthBookSDK.resolveFlag(flag: Flag<T>): T {
+internal fun <T : Any> IGrowthBookSDK.resolveFlag(flag: Flag<T>): T {
     val raw: Any? = when (flag.default) {
         is Boolean -> getBooleanOrNull(flag.key)
         is String -> getStringOrNull(flag.key)
@@ -59,6 +60,42 @@ internal fun <T : Any> GrowthBookSDK.resolveFlag(flag: Flag<T>): T {
         is Long -> getLongOrNull(flag.key)
         is Float -> getFloatOrNull(flag.key)
         is Double -> getDoubleOrNull(flag.key)
+        else -> throw IllegalArgumentException(
+            "Unsupported Flag type ${flag.default::class.simpleName}; " +
+                "decode custom types via GrowthBookKotlinxSerialization"
+        )
+    }
+    @Suppress("UNCHECKED_CAST")
+    return (raw as? T) ?: flag.default
+}
+
+/**
+ * Awaiting counterpart of [value]: suspends until feature definitions are loaded (see
+ * `SuspendExtensions.kt`) and only then resolves [flag], so a first read at startup returns the
+ * real value instead of [Flag.default].
+ *
+ * Supported types: [Boolean], [String], [Int], [Long], [Float], [Double].
+ *
+ * @throws IllegalArgumentException if the flag's value type is not supported
+ */
+suspend fun <T : Any> IGrowthBookSDK.await(flag: Flag<T>): T = resolveFlagSuspending(flag)
+
+/**
+ * Suspending twin of [resolveFlag], kept adjacent to it on purpose: the two dispatch tables must
+ * stay in step, and Kotlin cannot abstract over suspend-ness, so one function cannot serve both.
+ * The alternative — awaiting once and then delegating to [resolveFlag] — would evaluate the feature
+ * twice and so report it twice through the feature-usage callback and plugins.
+ *
+ * @throws IllegalArgumentException if the flag's value type is not supported
+ */
+internal suspend fun <T : Any> IGrowthBookSDK.resolveFlagSuspending(flag: Flag<T>): T {
+    val raw: Any? = when (flag.default) {
+        is Boolean -> suspendFeatureValue<Boolean>(flag.key)
+        is String -> suspendFeatureValue<String>(flag.key)
+        is Int -> suspendFeatureValue<Number>(flag.key)?.toInt()
+        is Long -> suspendFeatureValue<Number>(flag.key)?.toLong()
+        is Float -> suspendFeatureValue<Number>(flag.key)?.toFloat()
+        is Double -> suspendFeatureValue<Number>(flag.key)?.toDouble()
         else -> throw IllegalArgumentException(
             "Unsupported Flag type ${flag.default::class.simpleName}; " +
                 "decode custom types via GrowthBookKotlinxSerialization"
@@ -78,4 +115,4 @@ internal fun <T : Any> GrowthBookSDK.resolveFlag(flag: Flag<T>): T {
  * strategy applies only to an unknown feature, whereas this flag's default also
  * covers a present-but-non-boolean value.
  */
-fun GrowthBookSDK.isOn(flag: Flag<Boolean>): Boolean = value(flag)
+fun IGrowthBookSDK.isOn(flag: Flag<Boolean>): Boolean = value(flag)
