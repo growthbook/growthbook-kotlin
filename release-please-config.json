@@ -86,6 +86,16 @@
           "path": "build.gradle.kts"
         }
       ]
+    },
+    "GrowthBookCaffeine": {
+      "component": "GrowthBookCaffeine",
+      "changelog-path": "/CHANGELOG-GrowthBookCaffeine.md",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "build.gradle.kts"
+        }
+      ]
     }
   }
 }
