@@ -306,6 +306,42 @@ internal class GBFeatureEvaluator(
                                     attributeOverrides = attributeOverrides,
                                     conditionObj = rule.conditionGB,
                                 )
+
+                            /**
+                             * Bandit metadata is for enrolled users only. The result already strips
+                             * it (see GBExperimentEvaluator.getExperimentResult), but [exp] is the
+                             * same object [buildContextualBanditExperiment] wrote it onto, so it has
+                             * to be stripped here too before the hook can observe it — the reference
+                             * SDK does exactly this before calling `onExperimentEval` (core.ts).
+                             */
+                            if (exp.contextualBandit != null &&
+                                !(result.hashUsed == true && result.inExperiment)
+                            ) {
+                                exp.contextualBandit = null
+                            }
+
+                            /**
+                             * Report the assignment before the in-experiment check, so subscribers
+                             * also see a user dropping out of an experiment and can roll the
+                             * variation back. Purely observational: it must not influence the value
+                             * returned below.
+                             */
+                            try {
+                                evaluationContext.onExperimentEval?.invoke(exp, result)
+                            } catch (c: CancellationException) {
+                                // Evaluations can run inside coroutines; swallowing cancellation
+                                // would break it.
+                                throw c
+                            } catch (e: Throwable) {
+                                if (evaluationContext.loggingEnabled) {
+                                    GB.error(
+                                        "FeatureEvaluator: onExperimentEval exception for " +
+                                            "'$featureKey'",
+                                        e
+                                    )
+                                }
+                            }
+
                             if (result.inExperiment && (result.passthrough != true)) {
                                 return prepareResult(
                                     ruleId = rule.id,

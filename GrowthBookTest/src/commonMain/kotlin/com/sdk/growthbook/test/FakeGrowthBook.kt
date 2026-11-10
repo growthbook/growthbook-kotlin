@@ -1,5 +1,7 @@
 package com.sdk.growthbook.test
 
+import com.sdk.growthbook.GBExperimentRunCallback
+import com.sdk.growthbook.GBSubscription
 import com.sdk.growthbook.IGrowthBookSDK
 import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.model.GBExperiment
@@ -67,6 +69,9 @@ class FakeGrowthBook : IGrowthBookSDK {
     private var attributes: Map<String, GBValue> = emptyMap()
     private val queried: MutableList<String> = mutableListOf()
     private val logged: MutableList<Pair<String, Map<String, GBValue>>> = mutableListOf()
+    private val subscriptions: MutableMap<Long, GBExperimentRunCallback> = mutableMapOf()
+    private var nextSubscriptionId: Long = 0
+    private val assigned: MutableMap<String, Pair<GBExperiment, GBExperimentResult>> = mutableMapOf()
 
     /** Forces [id] on by assigning it a boolean `true`. */
     fun enable(id: String): FakeGrowthBook = setValue(id, GBBoolean(true))
@@ -129,8 +134,9 @@ class FakeGrowthBook : IGrowthBookSDK {
 
     /**
      * Returns an independent copy with the same features, forced variations, and
-     * attributes. Interaction tracking ([queriedFeatures]) starts fresh. Use this
-     * to fork a shared fixture per test without mutating the original.
+     * attributes. Interaction tracking ([queriedFeatures]), subscriptions and recorded
+     * assignments ([getAllResults]) start fresh. Use this to fork a shared fixture per
+     * test without mutating the original.
      */
     fun copy(): FakeGrowthBook {
         val forked = FakeGrowthBook()
@@ -189,7 +195,7 @@ class FakeGrowthBook : IGrowthBookSDK {
         }
 
         val meta = experiment.meta?.getOrNull(index)
-        return GBExperimentResult(
+        val result = GBExperimentResult(
             inExperiment = inExperiment,
             variationId = index,
             value = experiment.variations.getOrNull(index) ?: GBValue.Unknown,
@@ -197,6 +203,41 @@ class FakeGrowthBook : IGrowthBookSDK {
             name = meta?.name,
             passthrough = meta?.passthrough,
         )
+        fireSubscriptions(experiment, result)
+        return result
+    }
+
+    /**
+     * Registers [callback], with the same change-only contract as the real SDK: it fires the first
+     * time an experiment is run and afterwards only when the variation or the in-experiment flag
+     * differs from the last result for that key. Drive it from the test by calling [run] again after
+     * [setForcedVariation].
+     *
+     * The fake evaluates no feature rules (see the class note on scope), so only [run] reports
+     * assignments here — in production an experiment reached through a feature rule reports too.
+     *
+     * Unlike the real SDK, a throwing callback is **not** swallowed: an assertion made inside a
+     * subscriber should fail its test rather than be logged and ignored.
+     */
+    override fun subscribe(callback: GBExperimentRunCallback): GBSubscription {
+        val id = nextSubscriptionId++
+        subscriptions[id] = callback
+        return GBSubscription { subscriptions.remove(id) }
+    }
+
+    /** Latest result per experiment key, for every experiment passed to [run]. */
+    fun getAllResults(): Map<String, Pair<GBExperiment, GBExperimentResult>> = assigned.toMap()
+
+    private fun fireSubscriptions(experiment: GBExperiment, result: GBExperimentResult) {
+        val prev = assigned.put(experiment.key, experiment to result)
+        if (subscriptions.isEmpty()) return
+        if (prev != null &&
+            prev.second.inExperiment == result.inExperiment &&
+            prev.second.variationId == result.variationId
+        ) {
+            return
+        }
+        subscriptions.values.toList().forEach { it.invoke(experiment, result) }
     }
 
     override fun setAttributes(attributes: Map<String, GBValue>) {
