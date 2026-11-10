@@ -15,6 +15,8 @@ import com.sdk.growthbook.utils.GBFetchStatsHandler
 import com.sdk.growthbook.utils.GBRemoteEvalParams
 import com.sdk.growthbook.utils.Resource
 import com.sdk.growthbook.utils.getFeaturesFromEncryptedFeatures
+import com.sdk.growthbook.utils.url.isUrlTargeted
+import com.sdk.growthbook.utils.url.mergeQueryStrings
 import com.sdk.growthbook.evaluators.GBExperimentHelper
 import com.sdk.growthbook.evaluators.GBFeatureEvaluator
 import com.sdk.growthbook.evaluators.GBExperimentEvaluator
@@ -25,6 +27,8 @@ import com.sdk.growthbook.features.FeaturesFlowDelegate
 import com.sdk.growthbook.features.FeaturesViewModel
 import com.sdk.growthbook.features.FetchResult
 import com.sdk.growthbook.model.GBJson
+import com.sdk.growthbook.model.GBString
+import com.sdk.growthbook.model.GBUrlRedirectResult
 import com.sdk.growthbook.model.GBNull
 import com.sdk.growthbook.model.GBArray
 import com.sdk.growthbook.model.GBValue
@@ -436,6 +440,7 @@ class GrowthBookSDK internal constructor(
         features: GBFeatures?,
         savedGroups: JsonObject?,
         contextualBandits: Map<String, GBContextualBandit>?,
+        experiments: List<GBExperiment>?,
         isRemote: Boolean,
     ) {
         // Compute the diff only for authoritative results (network / SSE / fresh cache), against the
@@ -449,7 +454,8 @@ class GrowthBookSDK internal constructor(
         gbContext.applyPayload(
             features = features,
             savedGroups = savedGroups?.mapValues { GBValue.from(it.value) },
-            contextualBandits = contextualBandits
+            contextualBandits = contextualBandits,
+            experiments = experiments
         )
 
         if (features != null) {
@@ -579,9 +585,19 @@ class GrowthBookSDK internal constructor(
     /**
      * The run method takes an Experiment object and returns an ExperimentResult
      */
-    override fun run(experiment: GBExperiment): GBExperimentResult {
+    override fun run(experiment: GBExperiment): GBExperimentResult = runInternal(experiment, url = null)
+
+    /**
+     * [run], but able to evaluate against an explicit page URL rather than the context's.
+     *
+     * Private on purpose. [getUrlRedirects] needs it, since resolving a redirect is a question
+     * about one specific inbound URL, but it is not offered as a public `run` overload: no
+     * reference SDK has one, and it would only appear to make a shared instance request-safe —
+     * attributes, the input every targeting decision depends on, stay shared regardless.
+     */
+    private fun runInternal(experiment: GBExperiment, url: String?): GBExperimentResult {
         val snapshot = gbContext.evalSnapshot()
-        val evalContext = createEvaluationContext(snapshot)
+        val evalContext = createEvaluationContext(snapshot, urlOverride = url)
         val evaluator = GBExperimentEvaluator(
             evalContext
         )
@@ -595,6 +611,141 @@ class GrowthBookSDK internal constructor(
 
         fireSubscriptions(experiment, result)
         return result
+    }
+
+    /**
+     * The auto-experiments carried by the current payload (`experiments` / `encryptedExperiments`),
+     * in payload order, exactly as received.
+     *
+     * Redirect experiments are only included for a connection whose SDK declares the `redirects`
+     * capability, so the list is empty unless that is enabled. It is *not* redirect-only, though:
+     * the API gates visual-editor experiments on a connection setting rather than a capability, so
+     * a connection with the visual editor enabled sends those here too — which is why
+     * [getUrlRedirects] evaluates only the redirect ones.
+     */
+    fun getExperiments(): List<GBExperiment> = gbContext.experiments ?: emptyList()
+
+    /**
+     * Evaluates URL-redirect (split-URL) [experiments] against [url] — or, when it is null, against
+     * the context URL — and returns the [GBUrlRedirectResult] of the redirect experiment the user
+     * was enrolled in. Passing no [experiments] evaluates the ones from the payload
+     * ([getExperiments]).
+     *
+     * At most one result: evaluation stops at the first redirect experiment the user is enrolled
+     * in, so the list is either empty — nowhere to redirect — or holds that single entry, whose
+     * [GBUrlRedirectResult.urlWithParams] is the URL to redirect to.
+     *
+     * [url] is offered because resolving a redirect is a question about one specific inbound URL,
+     * so passing it reads better than mutating [setUrl] and calling. It does **not** make a shared
+     * instance safe for concurrent requests: the attributes every targeting decision depends on
+     * stay shared either way.
+     *
+     * Mirrors the reference SDK's auto-experiment redirect flow: each redirect experiment runs in
+     * turn (honouring its `urlPatterns`), and the first one the user is enrolled in whose assigned
+     * variation carries a `urlRedirect` decides the redirect — evaluation stops there. When the
+     * experiment sets `persistQueryString`, the original URL's query string is merged into the
+     * target. If the resolved target is itself matched by the same patterns (the user is already on
+     * the destination), no redirect is applied.
+     *
+     * Auto-experiments that are **not** redirect experiments are skipped without being evaluated:
+     * the payload's list also carries visual-editor experiments, whose changes this SDK does not
+     * apply. See the note in the loop below for why merely evaluating one is harmful.
+     *
+     * This computes the destination and nothing else: performing the navigation is the
+     * application's job, and browser-only concerns (anti-flicker, DOM mutations, cross-origin
+     * blocking) are out of scope.
+     */
+    fun getUrlRedirects(
+        experiments: List<GBExperiment>? = null,
+        url: String? = null,
+    ): List<GBUrlRedirectResult> {
+        // One read for both: two property reads are two separate atomic loads, which could straddle
+        // a payload swap and pair a new experiment list with the previous URL.
+        val snapshot = gbContext.evalSnapshot()
+        val toEvaluate = experiments ?: snapshot.experiments
+        if (toEvaluate.isNullOrEmpty()) return emptyList()
+
+        val contextUrl = url ?: snapshot.url
+
+        for (experiment in toEvaluate) {
+            // Filter before evaluating, not after. The payload's auto-experiment list also carries
+            // visual-editor experiments — the API gates only redirects behind an SDK capability,
+            // visual ones ship to any connection that has them enabled — and evaluating one runs
+            // the full path, firing the tracking callback and the plugin exposure hook. That would
+            // enrol users in an experiment whose DOM/CSS changes this SDK never applies, polluting
+            // its results with people who saw no variation. The reference SDK avoids the same trap
+            // via `_isAutoExperimentBlockedByContext`, which hands back a `-1` result *without*
+            // tracking for a change type the host cannot apply.
+            if (!experiment.isRedirectExperiment()) continue
+
+            val result = runInternal(experiment, contextUrl)
+            if (!result.inExperiment) continue
+
+            val variationRedirect = result.value.urlRedirect()
+            var resolved = ""
+
+            if (variationRedirect != null) {
+                val target = if (experiment.persistQueryString == true) {
+                    mergeQueryStrings(contextUrl, variationRedirect)
+                } else {
+                    variationRedirect
+                }
+
+                if (isUrlTargeted(target, experiment.urlPatterns)) {
+                    if (gbContext.enableLogging) {
+                        GB.log(
+                            "GrowthBookSDK: skipping redirect, the original URL already matches " +
+                                "the redirect URL for ${experiment.key}"
+                        )
+                    }
+                } else {
+                    resolved = target
+                }
+            }
+
+            // The first enrolled redirect experiment decides the destination; nothing after it is
+            // evaluated, so this is the whole answer.
+            return listOf(
+                GBUrlRedirectResult(
+                    inExperiment = true,
+                    urlRedirect = variationRedirect,
+                    urlWithParams = resolved,
+                    experimentResult = result,
+                    experiment = experiment,
+                )
+            )
+        }
+
+        return emptyList()
+    }
+
+    private fun GBExperiment.isRedirectExperiment(): Boolean =
+        urlPatterns != null && variations.any { it.urlRedirect() != null }
+
+    private fun GBValue.urlRedirect(): String? =
+        ((this as? GBJson)?.get("urlRedirect") as? GBString)?.value
+
+    /**
+     * Updates the page URL that `experiment.urlPatterns` is matched against — call it when the
+     * route changes.
+     *
+     * Unlike the browser SDK this does not re-run anything by itself: the new URL applies to the
+     * next [run] / [feature] call. Under `remoteEval` it does trigger a re-evaluation, because the
+     * URL is an input the remote evaluator holds rather than this SDK — the same reason
+     * [setAttributes] refreshes.
+     *
+     * This is shared state, like the attributes. A server that serves many users from one SDK
+     * instance cannot make per-request targeting safe by managing this value alone — the reference
+     * SDKs solve that with a per-user scoped instance, which this SDK does not have. (The per-call
+     * `url` of [getUrlRedirects] is evaluated locally and is never sent remotely.)
+     */
+    fun setUrl(url: String?) {
+        // No-op guard before the refresh, as in the reference SDK: navigation code tends to set the
+        // URL unconditionally, and each redundant call would otherwise cost a remote-eval round trip.
+        if (url == gbContext.url) return
+
+        gbContext.url = url
+        refreshForRemoteEval()
     }
 
     /**
@@ -818,9 +969,14 @@ class GrowthBookSDK internal constructor(
         if (!gbContext.remoteEval) {
             return null
         }
+        // One snapshot read, not four: each property getter is its own atomic load, so reading them
+        // one by one could straddle a write and post, say, the new user's attributes with the
+        // previous route's URL.
+        val snapshot = gbContext.evalSnapshot()
         return GBRemoteEvalParams(
-            gbContext.attributes,
-            gbContext.forcedFeatures, gbContext.forcedVariations
+            snapshot.attributes,
+            snapshot.forcedFeatures, snapshot.forcedVariations,
+            snapshot.url
         )
     }
 
@@ -875,10 +1031,12 @@ class GrowthBookSDK internal constructor(
         NoResultYet, Success, Failed
     }
 
-    private fun createEvaluationContext(snapshot: EvalSnapshot = gbContext.evalSnapshot()) =
-        createEvaluationContext(
-            gbContext, gbExperimentHelper, snapshot, pluginRegistry
-        )
+    private fun createEvaluationContext(
+        snapshot: EvalSnapshot = gbContext.evalSnapshot(),
+        urlOverride: String? = null,
+    ) = createEvaluationContext(
+        gbContext, gbExperimentHelper, snapshot, pluginRegistry, urlOverride
+    )
 
     //@ThreadLocal
     internal companion object {
@@ -898,7 +1056,10 @@ class GrowthBookSDK internal constructor(
             // (e.g. new features with stale sticky docs, or one user's attributes with another's
             // usage history). Callers pass the snapshot they read.
             snapshot: EvalSnapshot,
-            pluginRegistry: PluginRegistry?
+            pluginRegistry: PluginRegistry?,
+            // Per-call page URL. Wins over the one on the shared context so that a server serving
+            // many requests from a single SDK instance can target by URL without mutating it.
+            urlOverride: String? = null
         ): EvaluationContext {
             return EvaluationContext(
                 enabled = gbContext.enabled,
@@ -915,6 +1076,7 @@ class GrowthBookSDK internal constructor(
                     qaMode = gbContext.qaMode,
                     attributes = snapshot.attributes,
                     stickyBucketAssignmentDocs = snapshot.stickyBucketAssignmentDocs,
+                    url = urlOverride ?: snapshot.url,
                 ),
                 // Merge each newly-generated sticky assignment back into the shared context by its
                 // single key, atomically — instead of writing the whole docs map back after

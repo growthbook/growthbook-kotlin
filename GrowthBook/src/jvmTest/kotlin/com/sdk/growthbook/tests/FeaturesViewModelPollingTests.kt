@@ -6,6 +6,7 @@ import com.sdk.growthbook.features.FeaturesFlowDelegate
 import com.sdk.growthbook.features.FeaturesViewModel
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBContextualBandit
+import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBOptions
 import com.sdk.growthbook.sandbox.CachingLayer
 import com.sdk.growthbook.utils.GBError
@@ -50,6 +51,7 @@ class FeaturesViewModelPollingTests {
             features: GBFeatures?,
             savedGroups: JsonObject?,
             contextualBandits: Map<String, GBContextualBandit>?,
+            experiments: List<GBExperiment>?,
             isRemote: Boolean,
         ) = Unit
         override suspend fun onPayloadReady(model: FeaturesDataModel) = Unit
@@ -317,6 +319,7 @@ class FeaturesViewModelPollingTests {
                 features: GBFeatures?,
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
+                experiments: List<GBExperiment>?,
                 isRemote: Boolean,
             ) {
                 if (!isRemote) record()
@@ -443,6 +446,7 @@ class FeaturesViewModelPollingTests {
                 features: GBFeatures?,
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
+                experiments: List<GBExperiment>?,
                 isRemote: Boolean,
             ) {
                 if (!isRemote) appliedFromCache = true

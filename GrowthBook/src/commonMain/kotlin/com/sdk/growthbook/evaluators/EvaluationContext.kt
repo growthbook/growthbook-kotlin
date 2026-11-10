@@ -48,4 +48,10 @@ internal data class UserContext(
     val qaMode: Boolean,
     internal val attributes: Map<String, GBValue>,
     internal var stickyBucketAssignmentDocs: StickyBucketAssignmentDocsType?,
+    /**
+     * The page URL matched against `experiment.urlPatterns`. Resolved per evaluation, so that
+     * [com.sdk.growthbook.GrowthBookSDK.getUrlRedirects] can answer for one specific inbound URL
+     * without mutating the shared context; otherwise it is the context's own URL.
+     */
+    internal val url: String? = null,
 )

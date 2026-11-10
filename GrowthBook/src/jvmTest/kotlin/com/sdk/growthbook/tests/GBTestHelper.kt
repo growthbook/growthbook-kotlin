@@ -97,6 +97,16 @@ class GBTestHelper {
             return array
         }
 
+        fun getUrlRedirectData(): JsonArray {
+            val array = testData.jsonObject["urlRedirect"] as JsonArray
+            return array
+        }
+
+        fun getQueryStringOverrideData(): JsonArray {
+            val array = testData.jsonObject["getQueryStringOverride"] as JsonArray
+            return array
+        }
+
         internal fun createTestScopeEvaluationContext(
             features: GBFeatures,
             attributes: Map<String, GBValue>,
@@ -106,6 +116,7 @@ class GBTestHelper {
             onFeatureUsage: ((String, GBFeatureResult) -> Unit)? = null,
             stickyBucketAssignmentDocs: StickyBucketAssignmentDocsType? = null,
             contextualBandits: Map<String, GBContextualBandit>? = null,
+            url: String? = null,
             qaMode: Boolean = false,
             enabled: Boolean = true
         ) =
@@ -124,6 +135,7 @@ class GBTestHelper {
                     qaMode = qaMode,
                     attributes = attributes,
                     stickyBucketAssignmentDocs = stickyBucketAssignmentDocs,
+                    url = url,
                 ),
                 stackContext = StackContext(null, mutableSetOf()),
                 pluginRegistry = null,
@@ -139,6 +151,7 @@ class GBContextTest(
     val attributes: JsonElement = JsonObject(HashMap()),
     val savedGroups: JsonElement = JsonObject(HashMap()),
     val features: SerializableFeatures = emptyMap(),
+    val url: String? = null,
     val qaMode: Boolean = false,
     val enabled: Boolean = true,
     val forcedVariations: HashMap<String, Int>? = null
@@ -151,6 +164,7 @@ class GBFeaturesTest(
     val attributes: JsonElement = JsonObject(HashMap()),
     val forcedVariations: JsonObject? = null,
     val contextualBandits: Map<String, SerializableGBContextualBandit>? = null,
+    val url: String? = null,
     val qaMode: Boolean = false,
     val enabled: Boolean = true
 )
