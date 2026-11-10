@@ -1,5 +1,3 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-
 plugins {
     kotlin("multiplatform")
     id("com.android.library")
@@ -14,19 +12,16 @@ version = "1.0.0" // x-release-please-version
 val openFeatureVersion = "[0.9.0,0.10.0["
 
 kotlin {
-    // OpenFeature's Kotlin SDK targets Java 11.
+    // Pin every JVM-based compilation (incl. tests) to JDK 17 so the published -jvm
+    // bytecode is Java 17 (class 61), not whatever JDK built it. OpenFeature's Kotlin SDK
+    // itself targets Java 11, but this module depends on GrowthBook, which needs Java 17.
+    jvmToolchain(17)
+
     androidTarget {
         publishLibraryVariants("release")
-        compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_11)
-        }
     }
 
-    jvm {
-        compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_11)
-        }
-    }
+    jvm()
 
     //noinspection UseTomlInstead
     sourceSets {
@@ -63,8 +58,8 @@ android {
         release {}
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 }
 
