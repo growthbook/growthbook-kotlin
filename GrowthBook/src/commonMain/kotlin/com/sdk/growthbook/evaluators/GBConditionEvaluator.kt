@@ -5,6 +5,7 @@ import com.sdk.growthbook.model.GBNull
 import com.sdk.growthbook.model.GBArray
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.utils.GBUtils
+import com.sdk.growthbook.utils.Constants
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBBoolean
@@ -355,7 +356,8 @@ internal class GBConditionEvaluator {
      * Resolves a `$savedGroup` reference: `{"id": "...", "attributeKey"?: "..."}`.
      *
      * A `list` entry tests one attribute (the reference's `attributeKey` wins over the entry's) against
-     * its values; a `condition` entry is evaluated in full. Anything unreadable matches nobody, and a
+     * its values; a `condition` entry is evaluated in full; a `remote` entry checks the user's resolved
+     * remote group ids (see [Constants.REMOTE_GROUP_IDS_ATTRIBUTE]). Anything unreadable matches nobody, and a
      * group type added after this SDK was built is unsupported (`null`). [visited] holds the ids being
      * resolved, so a group that references itself, directly or through others, fails instead of
      * recursing forever.
@@ -389,6 +391,16 @@ internal class GBConditionEvaluator {
             "condition" -> {
                 val condition = entry["condition"] as? GBJson ?: return false
                 evalConditionResult(attributes, condition, savedGroups, visited + id)
+            }
+            // The ids live outside the payload: the user's groups arrive resolved, in REMOTE_GROUP_IDS_ATTRIBUTE
+            "remote" -> {
+                // Another attribute needs a derived group, which isn't supported yet
+                if (overrideKey != null && overrideKey != (entry["attributeKey"] as? GBString)?.value) {
+                    return false
+                }
+                val groupIds = getPath(attributes, Constants.REMOTE_GROUP_IDS_ATTRIBUTE) as? GBArray
+                    ?: return false
+                groupIds.contains(GBString(id))
             }
             else -> null
         }
