@@ -23,6 +23,7 @@ import com.sdk.growthbook.sandbox.GBCachingLayerAdapter
 import com.sdk.growthbook.stickybucket.GBStickyBucketService
 import com.sdk.growthbook.stickybucket.GBStickyBucketServiceImp
 import com.sdk.growthbook.utils.GBCacheRefreshHandler
+import com.sdk.growthbook.utils.GBFeatureRefreshListener
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.utils.GBFeaturesChangeHandler
 import com.sdk.growthbook.utils.GBFetchStatsHandler
@@ -119,6 +120,7 @@ class GBSDKBuilder(
     private var refreshHandler: GBCacheRefreshHandler? = null
     private var featuresChangeHandler: GBFeaturesChangeHandler? = null
     private var fetchStatsHandler: GBFetchStatsHandler? = null
+    private val featureRefreshListeners = mutableListOf<GBFeatureRefreshListener>()
     private var stickyBucketService: GBStickyBucketService? = null
     // Deferred builder for the default sticky-bucket service. The caching layer is resolved
     // lazily at initialize() time (via resolveCachingLayer()) rather than when the setter is
@@ -159,12 +161,59 @@ class GBSDKBuilder(
      * Note: the handler is invoked from the SDK's payload-processing dispatcher (the platform IO
      * dispatcher by default), i.e. on a background thread — not necessarily the main thread.
      * Marshal back to your UI thread yourself if the callback touches UI state.
+     *
+     * Reports **remote** refresh results only, and there is one handler per instance, fixed at
+     * build time. When you need the cache loads too, more than one observer, or subscriptions that
+     * come and go with a screen, use [GrowthBookSDK.addFeatureRefreshListener] instead — the two
+     * coexist and neither replaces the other.
+     *
+     * @see GrowthBookSDK.addFeatureRefreshListener
      */
     fun setRefreshHandler(refreshHandler: GBCacheRefreshHandler): GBSDKBuilder {
         this.refreshHandler = refreshHandler
         return this
     }
 
+    /**
+     * Registers a feature refresh listener before the instance exists, so it also sees the very
+     * first load of the session.
+     *
+     * This is not the same as calling [GrowthBookSDK.addFeatureRefreshListener] right after
+     * `initialize()`: the cached payload is served **synchronously from inside** `initialize()`,
+     * so a listener attached afterwards has already missed it. Register here for anything that
+     * must observe the cold start; register on the instance for subscriptions that come and go
+     * with a screen.
+     *
+     * That synchronous cold start is also why a listener must not block: it runs on the thread
+     * calling `initialize()`, usually the main one. See [GrowthBookSDK.addFeatureRefreshListener]
+     * for the full threading contract.
+     *
+     * Can be called repeatedly to register several listeners. They live as long as the instance
+     * — there is no per-listener handle to cancel, since the builder returns itself to keep the
+     * chain fluent; use [GrowthBookSDK.clearFeatureRefreshListeners] or
+     * [GrowthBookSDK.close] to drop them.
+     *
+     * @see GrowthBookSDK.addFeatureRefreshListener
+     */
+    fun addFeatureRefreshListener(listener: GBFeatureRefreshListener): GBSDKBuilder {
+        featureRefreshListeners.add(listener)
+        return this
+    }
+
+    /**
+     * Set Features Change Handler — called only when the decrypted feature set actually changed,
+     * with the added / removed / changed keys. Use it to drive diff-based work (invalidate a
+     * screen, re-read one flag) instead of reacting to every refresh.
+     *
+     * Only authoritative results are diffed, and against the features currently applied, so the
+     * non-authoritative cache pre-load that precedes a network round does not fire it — otherwise
+     * a warm start would report the whole feature set as "added" before the network answered.
+     *
+     * Invoked on the SDK's payload-processing dispatcher, like the other handlers.
+     *
+     * @see setRefreshHandler
+     * @see GrowthBookSDK.addFeatureRefreshListener
+     */
     fun setFeaturesChangeHandler(featuresChangeHandler: GBFeaturesChangeHandler): GBSDKBuilder {
         this.featuresChangeHandler = featuresChangeHandler
         return this
@@ -471,7 +520,8 @@ class GBSDKBuilder(
             coroutineContext = coroutineContext,
             featuresChangeHandler = featuresChangeHandler,
             cachingLayer = customCachingLayer,
-            fetchStatsHandler = fetchStatsHandler
+            fetchStatsHandler = fetchStatsHandler,
+            initialRefreshListeners = featureRefreshListeners.toList()
         )
     }
 
@@ -536,7 +586,8 @@ class GBSDKBuilder(
                 coroutineContext = coroutineContext,
                 featuresChangeHandler = featuresChangeHandler,
                 cachingLayer = customCachingLayer,
-                fetchStatsHandler = fetchStatsHandler
+                fetchStatsHandler = fetchStatsHandler,
+                initialRefreshListeners = featureRefreshListeners.toList()
             )
         }
     }
