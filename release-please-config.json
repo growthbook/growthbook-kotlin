@@ -86,6 +86,16 @@
           "path": "build.gradle.kts"
         }
       ]
+    },
+    "GrowthBookRedis": {
+      "component": "GrowthBookRedis",
+      "changelog-path": "/CHANGELOG-GrowthBookRedis.md",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "build.gradle.kts"
+        }
+      ]
     }
   }
 }
