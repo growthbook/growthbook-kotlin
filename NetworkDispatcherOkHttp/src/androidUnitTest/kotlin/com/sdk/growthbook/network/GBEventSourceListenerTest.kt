@@ -2,7 +2,9 @@ package com.sdk.growthbook.network
 
 import com.sdk.growthbook.utils.GBEventSourceHandler
 import com.sdk.growthbook.utils.GBEventSourceListener
+import okhttp3.Protocol
 import okhttp3.Request
+import okhttp3.Response
 import okhttp3.sse.EventSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -25,6 +27,11 @@ class GBEventSourceListenerTest {
         val closeCalls = mutableListOf<EventSource?>()
         val featureResponses = mutableListOf<String?>()
         val failures = mutableListOf<Pair<EventSource?, Throwable?>>()
+        var openCalls = 0
+
+        override fun onOpen() {
+            openCalls++
+        }
 
         override fun onClose(eventSource: EventSource?) {
             closeCalls += eventSource
@@ -87,6 +94,22 @@ class GBEventSourceListenerTest {
         val listener = GBEventSourceListener(crashingHandler, enableLogging = false)
 
         listener.onEvent(fakeEventSource, id = null, type = null, data = """{"x":1}""")
+    }
+
+    @Test
+    fun `onOpen calls handler onOpen`() {
+        val handler = RecordingHandler()
+        val listener = listenerWith(handler)
+        val response = Response.Builder()
+            .request(fakeEventSource.request())
+            .protocol(Protocol.HTTP_1_1)
+            .code(200)
+            .message("OK")
+            .build()
+
+        listener.onOpen(fakeEventSource, response)
+
+        assertEquals(1, handler.openCalls)
     }
 
     @Test
