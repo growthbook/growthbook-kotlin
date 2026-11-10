@@ -1,9 +1,5 @@
 package com.sdk.growthbook.kotlinx.serialization
 
-import kotlinx.serialization.json.int
-import kotlinx.serialization.json.long
-import kotlinx.serialization.json.double
-import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.JsonArray
@@ -69,13 +65,15 @@ fun GBValue.Companion.from(jsonElement: JsonElement): GBValue =
             when {
                 jsonElement is JsonNull -> GBNull
                 jsonElement.isString -> GBString(jsonElement.content)
-                // Booleans first: booleanOrNull doesn't throw, while intOrNull and longOrNull
-                // throw and catch an exception internally for every non-integer value.
-                jsonElement.booleanOrNull != null -> GBBoolean(jsonElement.boolean)
-                jsonElement.intOrNull != null -> GBNumber(jsonElement.int)
-                jsonElement.longOrNull != null -> GBNumber(jsonElement.long)
-                jsonElement.doubleOrNull != null -> GBNumber(jsonElement.double)
-                else -> GBValue.Unknown
+                // Booleans first: booleanOrNull matches case-insensitive true/false literals and
+                // doesn't throw, while intOrNull and longOrNull throw and catch an exception
+                // internally for every non-integer value. Each value is parsed once (no
+                // xOrNull check followed by a second parse).
+                else -> jsonElement.booleanOrNull?.let(::GBBoolean)
+                    ?: jsonElement.intOrNull?.let(::GBNumber)
+                    ?: jsonElement.longOrNull?.let(::GBNumber)
+                    ?: jsonElement.doubleOrNull?.let(::GBNumber)
+                    ?: GBValue.Unknown
             }
         }
         is JsonArray -> GBArray(

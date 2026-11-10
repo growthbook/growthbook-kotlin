@@ -188,6 +188,22 @@ class GBValueTest {
     }
 
     @Test
+    fun `from converts case-insensitive boolean literals to GBBoolean`() {
+        // booleanOrNull matches true/false ignoring case, e.g. from a payload parsed leniently.
+        val result = GBValue.from(Json { isLenient = true }.parseToJsonElement("[TRUE, False]"))
+        assertEquals(GBArray(listOf(GBBoolean(true), GBBoolean(false))), result)
+    }
+
+    @Test
+    fun `from keeps the Int Long and Double types of numbers`() {
+        // GBNumber equality ignores the type (1 == 1.0), so check the wrapped values directly.
+        val result = GBValue.from(Json.parseToJsonElement("[42,3000000000,0.25]")) as GBArray
+        val values = result.map { (it as GBNumber).value }
+        assertEquals(listOf<Number>(42, 3_000_000_000L, 0.25), values)
+        assertEquals(listOf(Int::class, Long::class, Double::class), values.map { it::class })
+    }
+
+    @Test
     fun `from keeps quoted true and false as GBString`() {
         val result = GBValue.from(Json.parseToJsonElement("""["true","false"]"""))
         assertEquals(GBArray(listOf(GBString("true"), GBString("false"))), result)
