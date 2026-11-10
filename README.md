@@ -109,7 +109,7 @@ var sdkInstance: GrowthBookSDK = GBSDKBuilder(
     .initialize()
 ```
 
-The seeded features are applied immediately. The normal cache/network refresh still runs on top and overwrites the seed as fresher data arrives. Effective precedence: **network > disk cache > seed > code defaults**.
+The seeded features are applied immediately. The normal cache/network refresh still runs on top and overwrites the seed as fresher data arrives. Effective precedence: **network > disk cache > seed > code defaults**. With `cachingEnabled = false` the disk cache is neither read nor written, so the seed holds until the network answers.
 
 #### Bundled fallback payload (`setInitialPayload`)
 

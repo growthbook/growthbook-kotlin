@@ -810,7 +810,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 gbContext, testGbOptions,
             ),
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
-            cachingEnabled = false,
+            cachingEnabled = true,
             cachingLayer = cacheLayer,
             coroutineContext = UnconfinedTestDispatcher(testScheduler),
         )
@@ -836,7 +836,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 gbContext, testGbOptions,
             ),
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
-            cachingEnabled = false,
+            cachingEnabled = true,
             cachingLayer = cacheLayer,
             coroutineContext = UnconfinedTestDispatcher(testScheduler),
         )
@@ -860,7 +860,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 MockNetworkClient(null, Throwable("Network error")),
                 gbContext, testGbOptions,
             ),
-            cachingEnabled = false,
+            cachingEnabled = true,
             cachingLayer = cacheLayer,
             coroutineContext = UnconfinedTestDispatcher(testScheduler),
         )
@@ -939,7 +939,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             delegate = this@FeaturesViewModelTests,
             dataSource = FeaturesDataSource(mockClient, gbContext, testGbOptions),
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
-            cachingEnabled = false,
+            cachingEnabled = true,
             cachingLayer = cacheLayer,
             cacheMaxAge = 48 * 60 * 60 * 1000L,
             coroutineContext = UnconfinedTestDispatcher(testScheduler)

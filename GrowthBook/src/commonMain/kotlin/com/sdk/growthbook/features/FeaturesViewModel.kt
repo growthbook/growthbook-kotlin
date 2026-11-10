@@ -140,9 +140,10 @@ internal class FeaturesViewModel(
      */
     private val encryptionKey: String? = null,
     /**
-     * Gates cache *writes* only: when true, a successful network payload is
-     * persisted to [cachingLayer]. Cache *reads* (see [serveCache]) happen
-     * regardless, so bundled/previously cached data can still be served.
+     * Gates the feature cache in both directions: when true, a successful network
+     * payload is persisted to [cachingLayer] and read back in [serveCache]; when
+     * false, neither happens, so a payload left by an earlier run is never served
+     * and the seed (if any) holds until the network answers.
      */
     private val cachingEnabled: Boolean,
     /**
@@ -406,7 +407,8 @@ internal class FeaturesViewModel(
      * [FetchPolicy.ForceNetwork]) — a fresh cache can never cancel this round.
      *
      * The freshness ceiling still applies: a cache past `cacheMaxAge` is not served here either
-     * (see [serveCache]). It is not carried as an on-error fallback on this path — the returned
+     * (see [serveCache]), and with [cachingEnabled] false or in remote-eval mode nothing is served
+     * from cache at all — this is then a plain network refresh. It is not carried as an on-error fallback on this path — the returned
      * [CacheOutcome] is deliberately discarded, because [awaitRefresh] is coalesced and a fallback
      * belongs to one caller, so a second caller joining the same round would inherit it.
      *
@@ -580,6 +582,13 @@ internal class FeaturesViewModel(
         // cache entirely in remote-eval mode and always hits the network. See also the write-side
         // bypass in [handleNetworkModel].
         if (remoteEval) return CacheOutcome.ServedStaleOrMiss
+
+        // cachingEnabled = false means the feature cache is not used at all, not merely never
+        // written: a file left on disk by an earlier run must not outrank setInitialFeatures /
+        // setInitialPayload, nor be served as a snapshot nothing will ever refresh. Mirrors the
+        // write-side bypass in [handleNetworkModel] and the reference SDKs (sdk-js gates both
+        // cache.get and the localStorage hydration on disableCache).
+        if (!cachingEnabled) return CacheOutcome.ServedStaleOrMiss
 
         val entry = runCatching { readCache() }.getOrElse {
             GB.error("FeaturesViewModel: cache read failed", it)

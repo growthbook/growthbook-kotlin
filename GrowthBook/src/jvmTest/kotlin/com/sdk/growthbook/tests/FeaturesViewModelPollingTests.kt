@@ -106,7 +106,7 @@ class FeaturesViewModelPollingTests {
         delegate = delegate,
         dataSource = FeaturesDataSource(client, gbContext, testGbOptions),
         encryptionKey = encryptionKey,
-        cachingEnabled = false,
+        cachingEnabled = true,
         cachingLayer = cachingLayer,
         cacheMaxAge = cacheMaxAge,
         staleTtl = staleTtl,
