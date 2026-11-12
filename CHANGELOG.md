@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [10.1.1](https://github.com/growthbook/growthbook-kotlin/compare/10.1.0...10.1.1) (2026-11-12)
+
+
+### Bug Fixes
+
+* avoid quadratic regex when stripping version build metadata ([#291](https://github.com/growthbook/growthbook-kotlin/issues/291)) ([0545ab0](https://github.com/growthbook/growthbook-kotlin/commit/0545ab0502eeb1b54f37cd27d9df5f03be0a9286))
+
 ## [10.1.0] - 2026-11-06
 
 No changes to the core SDK. This release publishes the new `GrowthBookOpenFeature` module; the other modules
