@@ -4,6 +4,7 @@ import com.sdk.growthbook.IGrowthBookSDK
 import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
+import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.model.GBFeatureSource
 import com.sdk.growthbook.model.GBNull
@@ -12,6 +13,7 @@ import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.serializable_model.SerializableGBFeature
 import com.sdk.growthbook.serializable_model.gbDeserialize
+import com.sdk.growthbook.utils.GBFeatures
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
@@ -206,6 +208,18 @@ class FakeGrowthBook : IGrowthBookSDK {
     override suspend fun setAttributesSync(attributes: Map<String, GBValue>) {
         this.attributes = attributes
     }
+
+    /**
+     * The configured feature keys, each wrapped in a [GBFeature] carrying its value as
+     * `defaultValue`. `rules` is always `null` — the fake holds values, not rule definitions.
+     *
+     * Overridden rather than left to the interface default so callers that use this to tell
+     * "feature absent" from "feature present but off" — such as the `GrowthBookExt` helpers —
+     * behave against the fake as they do against the real SDK, and without the extra [feature]
+     * call the default would force, which would show up in [queriedFeatures].
+     */
+    override fun getFeatures(): GBFeatures =
+        features.mapValues { (_, entry) -> GBFeature(defaultValue = entry.value) }
 
     /** The attributes last set via [setAttributes]/[setAttributesSync]. */
     fun attributes(): Map<String, GBValue> = attributes

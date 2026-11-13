@@ -13,6 +13,7 @@ import com.sdk.growthbook.stickybucket.GBStickyBucketService
 import com.sdk.growthbook.utils.GBCacheRefreshHandler
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.utils.GBFeaturesChangeHandler
+import com.sdk.growthbook.utils.GBFetchStatsHandler
 import kotlinx.coroutines.CoroutineScope
 
 /**
@@ -95,6 +96,13 @@ class GrowthBookConfigBuilder {
     var eventLogger: GBEventLogger? = null
 
     /**
+     * Optional callback invoked once per feature fetch with its outcome, duration and payload
+     * size. Scoped to feature GET fetches — remote evaluation goes through a POST that is not
+     * reported.
+     */
+    var fetchStatsHandler: GBFetchStatsHandler? = null
+
+    /**
      * Plugins receiving lifecycle callbacks (init / experiment viewed / feature evaluated /
      * close) — for example the built-in tracking plugin. Defaults to none.
      */
@@ -107,11 +115,46 @@ class GrowthBookConfigBuilder {
     var cachingEnabled: Boolean = true
 
     /**
-     * Optional freshness window for cached features, in milliseconds. While the cache is
-     * younger than this, the next fetch is skipped and the cached payload is served. When
-     * unset, the SDK always refetches.
+     * Optional freshness window for cached features, in milliseconds.
+     *
+     * Used alone it is a stale-while-revalidate window with no hard cutoff: while the cache is
+     * younger than this the network call is skipped, and once it is older the cached payload is
+     * still served (as a non-authoritative result) while a refresh runs — it is never dropped.
+     * Combine it with [staleTtl] to turn it into a hard ceiling past which the cache stops being
+     * served at all, and with [serveStaleOnError] to keep serving beyond that ceiling when the
+     * refresh fails.
+     *
+     * Evaluated on the next fetch — this is not background polling, see [refreshInterval]. No
+     * effect when [remoteEval] is true, which bypasses the feature cache entirely. Must be
+     * positive; [build] throws otherwise.
      */
     var cacheMaxAge: Long? = null
+
+    /**
+     * Optional inner "fresh" window in milliseconds that turns [cacheMaxAge] into a three-tier
+     * policy: below [staleTtl] the cache is served and the network skipped, between the two it is
+     * served while a background refresh runs, and past [cacheMaxAge] it is not served at all.
+     *
+     * When both are set, `staleTtl` must be smaller than [cacheMaxAge]. Must be positive; [build]
+     * throws otherwise. No effect when [remoteEval] is true.
+     */
+    var staleTtl: Long? = null
+
+    /**
+     * When true, a cache past the [cacheMaxAge] ceiling is served as a last-resort fallback if the
+     * revalidating fetch fails (`stale-if-error`). Defaults to false, which fails closed to code
+     * defaults. Only meaningful together with [staleTtl] + [cacheMaxAge], and applies to automatic
+     * refreshes rather than an explicit `refreshCache()`.
+     */
+    var serveStaleOnError: Boolean = false
+
+    /**
+     * Optional background polling interval in milliseconds. Polling is opt-in twice over: setting
+     * this only enables `GrowthBookSDK.startPolling()`, which you must call yourself. Mutually
+     * exclusive with SSE, which wins. Disabled when unset. Must be positive; [build] throws
+     * otherwise.
+     */
+    var refreshInterval: Long? = null
 
     /**
      * Optional custom cache, replacing the built-in per-platform one. Also backs
@@ -140,6 +183,16 @@ class GrowthBookConfigBuilder {
      * normal cache/network refresh still runs on top.
      */
     var initialFeatures: GBFeatures? = null
+
+    /**
+     * Optional bundled seed in the raw form the features endpoint returns. Use this instead of
+     * [initialFeatures] when the payload carries more than features — saved groups and contextual
+     * bandits are seeded too, and encrypted variants are decrypted with [encryptionKey]. A payload
+     * that cannot be parsed is ignored rather than failing initialization.
+     *
+     * Setting both is allowed: [initialFeatures] wins over the payload's features.
+     */
+    var initialPayload: String? = null
 
     private var attributes: Map<String, GBValue> = emptyMap()
 
@@ -193,12 +246,17 @@ class GrowthBookConfigBuilder {
         builder.setForcedVariations(forceVariations)
         builder.setEnabled(enabled)
         builder.setQAMode(qaMode)
+        builder.setServeStaleOnError(serveStaleOnError)
         initialFeatures?.let { builder.setInitialFeatures(it) }
+        initialPayload?.let { builder.setInitialPayload(it) }
         refreshHandler?.let { builder.setRefreshHandler(it) }
         featuresChangeHandler?.let { builder.setFeaturesChangeHandler(it) }
         featureUsageCallback?.let { builder.setFeatureUsageCallback(it) }
         eventLogger?.let { builder.setEventLogger(it) }
+        fetchStatsHandler?.let { builder.setFetchStatsHandler(it) }
         cacheMaxAge?.let { builder.setCacheMaxAge(it) }
+        staleTtl?.let { builder.setStaleTtl(it) }
+        refreshInterval?.let { builder.setRefreshInterval(it) }
         cachingLayer?.let { builder.setCachingLayer(it) }
         if (plugins.isNotEmpty()) {
             builder.setPlugins(plugins)
