@@ -10,6 +10,8 @@ import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeature
+import com.sdk.growthbook.model.GBFeatureRefreshEvent
+import com.sdk.growthbook.model.GBFeatureRefreshSource
 import com.sdk.growthbook.model.GBFeatureSource
 import com.sdk.growthbook.model.GBNull
 import com.sdk.growthbook.model.GBNumber
@@ -1070,6 +1072,156 @@ class GrowthBookSDKBuilderTests {
             .initialize()
 
         assertTrue(sdkInstance.getFeatures().isNotEmpty())
+    }
+
+    /**
+     * A fresh cache entry (cachedAt = now) holding [cachedKey]. Fresh on purpose: with caching on it
+     * is served as authoritative and fires the refresh handler with success as well as a
+     * [GBFeatureRefreshSource.Cache] event, so a test that sees none of that proves the read was
+     * bypassed rather than merely classified as stale.
+     */
+    private fun freshCacheEntry(cachedKey: String) = """
+        {
+          "features": { "$cachedKey": { "defaultValue": "from-cache" } },
+          "cachedAt": ${System.currentTimeMillis()}
+        }
+    """.trimIndent()
+
+    private fun buildOfflineSdkWithCustomLayer(
+        cachingLayer: GBCachingLayer,
+        cachingEnabled: Boolean,
+        refreshHandler: GBCacheRefreshHandler,
+        refreshEvents: MutableList<GBFeatureRefreshEvent>,
+        testScope: TestScope,
+    ): GrowthBookSDK = GBSDKBuilder(
+        testApiKey,
+        testHostURL,
+        attributes = testAttributes,
+        encryptionKey = null,
+        trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
+        networkDispatcher = MockNetworkClient(null, Throwable("no network")),
+        cachingEnabled = cachingEnabled,
+    )
+        .setInitialFeatures(mapOf("bundled-feature" to GBFeature()))
+        .setCachingLayer(cachingLayer)
+        // Without a freshness window every entry classifies as STALE; this makes freshCacheEntry FRESH.
+        .setCacheMaxAge(60_000)
+        .setRefreshHandler(refreshHandler)
+        // On the builder, not the instance: the cache is served synchronously inside initialize().
+        .addFeatureRefreshListener { refreshEvents += it }
+        .setCoroutineContext(UnconfinedTestDispatcher(testScope.testScheduler))
+        .initialize()
+
+    @Test
+    fun testCachingDisabledIgnoresPrePopulatedCustomLayer() = runTest {
+        val featureCacheReads = mutableListOf<String>()
+        val customLayer = object : GBCachingLayer {
+            val store = mutableMapOf("FeatureCache_$testApiKey" to freshCacheEntry("cached-feature"))
+            override fun getContent(fileName: String): String? {
+                if (fileName.startsWith("FeatureCache_")) featureCacheReads += fileName
+                return store[fileName]
+            }
+            override fun saveContent(fileName: String, content: String) {
+                store[fileName] = content
+            }
+        }
+        val refreshSuccesses = mutableListOf<Boolean>()
+        val refreshEvents = mutableListOf<GBFeatureRefreshEvent>()
+
+        val sdkInstance = buildOfflineSdkWithCustomLayer(
+            cachingLayer = customLayer,
+            cachingEnabled = false,
+            refreshHandler = { success, _ -> refreshSuccesses += success },
+            refreshEvents = refreshEvents,
+            testScope = this,
+        )
+        try {
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(emptyList(), featureCacheReads, "caching disabled must not read the feature cache")
+            assertTrue(sdkInstance.getFeatures().containsKey("bundled-feature"), "seed must stay in effect")
+            assertFalse(sdkInstance.getFeatures().containsKey("cached-feature"), "cached payload must not be applied")
+            assertFalse(true in refreshSuccesses, "no successful refresh may come from the cache")
+            assertTrue(refreshEvents.none { it.source == GBFeatureRefreshSource.Cache }, "no cache event: $refreshEvents")
+        } finally {
+            sdkInstance.close()
+        }
+    }
+
+    @Test
+    fun testCachingEnabledServesSamePrePopulatedCustomLayer() = runTest {
+        // Control for the test above: the identical setup with caching on does serve the cache, so
+        // the disabled case is asserting a bypass, not a fixture that was never readable.
+        val customLayer = FakeCachingLayer().apply {
+            store["FeatureCache_$testApiKey"] = freshCacheEntry("cached-feature")
+        }
+        val refreshSuccesses = mutableListOf<Boolean>()
+        val refreshEvents = mutableListOf<GBFeatureRefreshEvent>()
+
+        val sdkInstance = buildOfflineSdkWithCustomLayer(
+            cachingLayer = customLayer,
+            cachingEnabled = true,
+            refreshHandler = { success, _ -> refreshSuccesses += success },
+            refreshEvents = refreshEvents,
+            testScope = this,
+        )
+        try {
+            testScheduler.advanceUntilIdle()
+
+            assertTrue(sdkInstance.getFeatures().containsKey("cached-feature"))
+            assertTrue(true in refreshSuccesses, "a fresh cache entry is served as authoritative")
+            assertTrue(refreshEvents.any { it.source == GBFeatureRefreshSource.Cache && it.success })
+        } finally {
+            sdkInstance.close()
+        }
+    }
+
+    @Test
+    fun testCachingDisabledIgnoresCacheFileFromEarlierRun() = runTest {
+        // Earlier run with caching on leaves FeatureCache_<apiKey> on disk via the default layer.
+        val writer = GBSDKBuilder(
+            testApiKey,
+            testHostURL,
+            attributes = testAttributes,
+            encryptionKey = null,
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
+            networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
+        )
+            .setCoroutineContext(UnconfinedTestDispatcher(testScheduler))
+            .initialize()
+        testScheduler.advanceUntilIdle()
+        // Closed before the second run so nothing it launched can write into the cache mid-test.
+        writer.close()
+        assertTrue(
+            CachingJvm.baseDir.walkTopDown().any { it.name.startsWith("FeatureCache_$testApiKey") },
+            "precondition: the first run must have written the cache file"
+        )
+
+        // Cold offline start with caching disabled and no seed: nothing to serve but defaults.
+        var refreshSucceeded = false
+        val refreshEvents = mutableListOf<GBFeatureRefreshEvent>()
+        val sdkInstance = GBSDKBuilder(
+            testApiKey,
+            testHostURL,
+            attributes = testAttributes,
+            encryptionKey = null,
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
+            networkDispatcher = MockNetworkClient(null, Throwable("no network")),
+            cachingEnabled = false,
+        )
+            .setRefreshHandler { success, _ -> if (success) refreshSucceeded = true }
+            .addFeatureRefreshListener { refreshEvents += it }
+            .setCoroutineContext(UnconfinedTestDispatcher(testScheduler))
+            .initialize()
+        try {
+            testScheduler.advanceUntilIdle()
+
+            assertTrue(sdkInstance.getFeatures().isEmpty(), "the stale disk cache must not be applied")
+            assertFalse(refreshSucceeded)
+            assertTrue(refreshEvents.none { it.source == GBFeatureRefreshSource.Cache }, "no cache event: $refreshEvents")
+        } finally {
+            sdkInstance.close()
+        }
     }
 
 //    @Test
