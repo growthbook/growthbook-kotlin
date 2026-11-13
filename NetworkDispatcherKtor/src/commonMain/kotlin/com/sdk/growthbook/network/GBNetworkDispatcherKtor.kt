@@ -26,6 +26,7 @@ import io.ktor.client.statement.HttpStatement
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
+import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.ByteReadChannel
 import kotlinx.coroutines.CoroutineScope
@@ -278,6 +279,16 @@ class GBNetworkDispatcherKtor(
             connectionJob = scope.launch(PlatformDependentIODispatcher) {
                 try {
                     prepareGetRequest(url, bounded = false).execute { response ->
+                        if (!response.status.isSuccess()) {
+                            throw IOException(
+                                "SSE connection failed with status ${response.status.value}"
+                            )
+                        }
+                        // The stream is open: reset the retry budget here rather than only on a
+                        // non-empty event. A proxy that sends empty heartbeats and recycles the
+                        // stream on a timer would otherwise exhaust maxRetries across perfectly
+                        // healthy connections whenever no features are published.
+                        retryManager.reset()
                         val channel: ByteReadChannel = response.body()
                         channel.readSse(
                             onSseEvent = { sseEvent ->
