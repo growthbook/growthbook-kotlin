@@ -27,15 +27,15 @@ class SpecCoverageTests {
         "decrypt" to "GBEncryptedFeatures",
         "stickyBucket" to "GBStickyBucketingFeatureTests",
         "contextualBandit" to "GBContextualBanditTest",
+        "savedGroupReferencesV2.evalCondition" to "GBSavedGroupReferencesV2Tests",
+        "savedGroupReferencesV2.feature" to "GBSavedGroupReferencesV2Tests",
+        "savedGroupReferencesV2.run" to "GBSavedGroupReferencesV2Tests",
     )
 
     /** Sections the tests don't run, and why. */
     private val excludedSections = mapOf(
         "getQueryStringOverride" to "This SDK has no querystring/URL experiment overrides",
         "urlRedirect" to "URL redirect experiments are a browser feature",
-        "savedGroupReferencesV2.evalCondition" to "\$savedGroup references aren't implemented yet",
-        "savedGroupReferencesV2.feature" to "\$savedGroup references aren't implemented yet",
-        "savedGroupReferencesV2.run" to "\$savedGroup references aren't implemented yet",
         "savedGroupReferencesRemote.evalCondition" to "Remote saved groups aren't implemented yet",
         "savedGroupReferencesRemote.feature" to "Remote saved groups aren't implemented yet",
         "pruneCondition" to "The payload reduction methods are not implemented for client SDKs to start with",
