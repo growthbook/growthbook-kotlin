@@ -42,7 +42,7 @@ jobs:
         id: modules
         run: |
           tasks=""
-          for module in Core GrowthBookKotlinxSerialization GrowthBook GrowthBookExt GrowthBookOpenFeature GrowthBookTest NetworkDispatcherKtor NetworkDispatcherOkHttp; do
+          for module in Core GrowthBookKotlinxSerialization GrowthBook GrowthBookExt GrowthBookOpenFeature GrowthBookRedis GrowthBookTest NetworkDispatcherKtor NetworkDispatcherOkHttp; do
             version=$(sed -nE 's/^version = "([^"]+)".*$/\1/p' "$module/build.gradle.kts")
             status=$(curl -s -o /dev/null -w '%{http_code}' \
               "https://repo1.maven.org/maven2/io/growthbook/sdk/$module/$version/$module-$version.pom")
