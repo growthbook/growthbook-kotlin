@@ -74,6 +74,8 @@ kotlin {
                 implementation(libs.cryptography.core) // encryption/decryption
 
                 implementation(libs.kotlinx.serialization.json)
+                // A published GrowthBook pins the GrowthBookKotlinxSerialization version it was built
+                // with, so a fix there reaches SDK users only after GrowthBook is released as well.
                 implementation(project(":GrowthBookKotlinxSerialization"))
             }
         }
