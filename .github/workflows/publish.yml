@@ -7,6 +7,11 @@ name: Publish to Maven Central
 on:
   workflow_call:
   workflow_dispatch:
+    inputs:
+      ref:
+        description: Tag, branch or commit to publish, such as a release tag to retry. Defaults to the branch the run starts from.
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -19,6 +24,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Empty, the default, for release runs
+          ref: ${{ inputs.ref }}
 
       - uses: actions/setup-java@v4
         with:
@@ -65,8 +73,10 @@ jobs:
           PUBLISH_TASKS: ${{ steps.modules.outputs.tasks }}
         run: ./gradlew $PUBLISH_TASKS
 
-      # The upload isn't visible on central.sonatype.com until it's transferred, from the same IP.
+      # The upload isn't visible on central.sonatype.com until it's transferred.
       # publishing_type=automatic releases it to Maven Central once Sonatype's validation passes.
+      # Sonatype files each upload under the IP it came from, and a macOS runner's requests don't
+      # always leave from one IP, so find the open uploads from any IP and transfer each by key.
       - name: Transfer the upload to Maven Central
         if: steps.modules.outputs.tasks != ''
         env:
@@ -75,13 +85,36 @@ jobs:
         run: |
           token=$(printf '%s:%s' "$GB_SONATYPE_USERNAME" "$GB_SONATYPE_PASSWORD" | base64 | tr -d '\n')
           echo "::add-mask::$token"
-          status=$(curl -s -o response.json -w '%{http_code}' -X POST \
+          api=https://ossrh-staging-api.central.sonatype.com/manual
+          # The logs are public, so hide IP addresses
+          redact() { sed -E 's/[0-9]{1,3}(\.[0-9]{1,3}){3}/<ip>/g'; }
+
+          status=$(curl -s -o repositories.json -w '%{http_code}' \
             -H "Authorization: Bearer $token" \
-            "https://ossrh-staging-api.central.sonatype.com/manual/upload/defaultRepository/io.growthbook.sdk?publishing_type=automatic")
-          echo "Transfer: HTTP $status"
-          # The logs are public, so leave out any IP address fields
-          jq 'walk(if type == "object" then with_entries(select(.key | test("(^|_)ip($|_)|ipaddress"; "i") | not)) else . end)' response.json 2>/dev/null \
-            || echo "(response is not JSON; not shown)"
+            "$api/search/repositories?ip=any&profile_id=io.growthbook.sdk&state=open")
+          echo "Search: HTTP $status"
           if [ "${status:0:1}" != "2" ]; then
+            redact < repositories.json
             exit 1
           fi
+          keys=$(jq -r '.repositories[].key' repositories.json)
+          if [ -z "$keys" ]; then
+            echo "No open uploads found"
+            exit 1
+          fi
+
+          failed=0
+          while IFS= read -r key; do
+            # Keys contain slashes
+            encoded=$(jq -rn --arg key "$key" '$key | @uri')
+            status=$(curl -s -o response.json -w '%{http_code}' -X POST \
+              -H "Authorization: Bearer $token" \
+              "$api/upload/repository/$encoded?publishing_type=automatic")
+            echo "Transfer $(printf '%s' "$key" | redact): HTTP $status"
+            redact < response.json
+            echo
+            if [ "${status:0:1}" != "2" ]; then
+              failed=1
+            fi
+          done <<< "$keys"
+          exit $failed
