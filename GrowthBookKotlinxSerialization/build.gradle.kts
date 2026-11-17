@@ -10,7 +10,7 @@ plugins {
 
 group = "io.growthbook.sdk"
 // Required: release-please bumps this version using the marker comment. Don't remove it.
-version = "2.0.1" // x-release-please-version
+version = "2.0.2" // x-release-please-version
 
 kotlin {
     // Pin every JVM-based compilation (incl. tests) to JDK 17 so the published -jvm
