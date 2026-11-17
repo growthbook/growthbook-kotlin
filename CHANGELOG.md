@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [10.1.2](https://github.com/growthbook/growthbook-kotlin/compare/10.1.1...10.1.2) (2026-11-17)
+
+
+### Miscellaneous Chores
+
+* release GrowthBook with GrowthBookKotlinxSerialization 2.0.1 ([#295](https://github.com/growthbook/growthbook-kotlin/issues/295)) ([852a9ee](https://github.com/growthbook/growthbook-kotlin/commit/852a9eebc098f7857bf82b74f88a77c6076a6914))
+
 ## [10.1.1](https://github.com/growthbook/growthbook-kotlin/compare/10.1.0...10.1.1) (2026-11-12)
 
 
