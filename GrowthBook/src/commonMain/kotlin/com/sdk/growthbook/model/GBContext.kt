@@ -26,6 +26,7 @@ internal typealias StickyBucketAssignmentDocsType = Map<GBStickyAttributeKey, GB
  */
 internal data class EvalSnapshot(
     val features: GBFeatures = HashMap(),
+    val definitionsSource: GBFeatureDefinitionsSource = GBFeatureDefinitionsSource.None,
     val attributes: Map<String, GBValue> = emptyMap(),
     val forcedVariations: Map<String, Number> = emptyMap(),
     val forcedFeatures: Map<String, GBValue> = emptyMap(),
@@ -336,9 +337,11 @@ class GBContext internal constructor(
         features: GBFeatures?,
         savedGroups: Map<String, GBValue>?,
         contextualBandits: Map<String, GBContextualBandit>?,
+        definitionsSource: GBFeatureDefinitionsSource,
     ) = mutate {
         it.copy(
             features = features ?: it.features,
+            definitionsSource = if (features == null) it.definitionsSource else definitionsSource,
             savedGroups = savedGroups ?: it.savedGroups,
             contextualBandits = contextualBandits ?: it.contextualBandits,
         )
@@ -379,7 +382,7 @@ class GBContext internal constructor(
     // Feature definitions - To be pulled from API / Cache.
     internal var features: GBFeatures
         get() = state.load().features
-        set(value) = mutate { it.copy(features = value) }
+        set(value) = mutate { it.copy(features = value, definitionsSource = GBFeatureDefinitionsSource.Provided) }
 
     /**
      * Contextual bandit definitions keyed by bandit ref, pulled from the payload alongside

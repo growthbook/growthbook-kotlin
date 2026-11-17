@@ -32,7 +32,10 @@ import com.sdk.growthbook.model.GBOptions
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.EvalSnapshot
 import com.sdk.growthbook.model.GBExperiment
+import com.sdk.growthbook.model.GBFeatureDefinitionsSource
 import com.sdk.growthbook.model.GBFeatureResult
+import com.sdk.growthbook.model.GBFeatureResultWithSource
+import com.sdk.growthbook.model.GBFeaturesStatus
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.kotlinx.serialization.from
 import com.sdk.growthbook.logger.GB
@@ -358,6 +361,12 @@ class GrowthBookSDK internal constructor(
         return gbContext.features
     }
 
+    /** Returns the origin and count of the feature definitions in the current snapshot. */
+    fun getFeaturesStatus(): GBFeaturesStatus {
+        val snapshot = gbContext.evalSnapshot()
+        return GBFeaturesStatus(snapshot.definitionsSource, snapshot.features.size)
+    }
+
     /**
      * Delegate that fire refreshHandler with success = true when a 304 response occurs.
      * Only treated as success when the SDK instance has a loaded feature payload.
@@ -437,6 +446,20 @@ class GrowthBookSDK internal constructor(
         savedGroups: JsonObject?,
         contextualBandits: Map<String, GBContextualBandit>?,
         isRemote: Boolean,
+    ) = payloadFetchedSuccessfully(
+        features,
+        savedGroups,
+        contextualBandits,
+        isRemote,
+        if (isRemote) GBFeatureDefinitionsSource.Network else GBFeatureDefinitionsSource.Provided,
+    )
+
+    override fun payloadFetchedSuccessfully(
+        features: GBFeatures?,
+        savedGroups: JsonObject?,
+        contextualBandits: Map<String, GBContextualBandit>?,
+        isRemote: Boolean,
+        definitionsSource: GBFeatureDefinitionsSource,
     ) {
         // Compute the diff only for authoritative results (network / SSE / fresh cache), against the
         // features currently applied. The non-authoritative cache pre-load that precedes a network
@@ -449,7 +472,8 @@ class GrowthBookSDK internal constructor(
         gbContext.applyPayload(
             features = features,
             savedGroups = savedGroups?.mapValues { GBValue.from(it.value) },
-            contextualBandits = contextualBandits
+            contextualBandits = contextualBandits,
+            definitionsSource = definitionsSource,
         )
 
         if (features != null) {
@@ -525,10 +549,18 @@ class GrowthBookSDK internal constructor(
      * the first fetch completes — returns default/unknown values. To guarantee the fetched payload
      * (and sticky-bucket assignments) are loaded before evaluating, use [suspendFeature] instead.
      */
-    override fun feature(id: String): GBFeatureResult {
-        // Single atomic snapshot for every evaluation input (attributes, forced features/variations,
-        // attribute overrides, sticky docs), so a concurrent setter can't yield a torn mix.
+    override fun feature(id: String): GBFeatureResult = evaluateFeature(id, gbContext.evalSnapshot())
+
+    /**
+     * Evaluates a flag just like [feature], with the origin of the definitions from the same snapshot.
+     * [GBFeatureResult.source] still describes how the result was evaluated.
+     */
+    fun featureWithSource(id: String): GBFeatureResultWithSource {
         val snapshot = gbContext.evalSnapshot()
+        return GBFeatureResultWithSource(evaluateFeature(id, snapshot), snapshot.definitionsSource)
+    }
+
+    private fun evaluateFeature(id: String, snapshot: EvalSnapshot): GBFeatureResult {
         val evalContext = createEvaluationContext(snapshot)
         val evaluator = GBFeatureEvaluator(evalContext, snapshot.forcedFeatures)
         val result = evaluator.evaluateFeature(featureKey = id, attributeOverrides = snapshot.attributeOverrides)

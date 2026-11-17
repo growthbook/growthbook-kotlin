@@ -165,6 +165,22 @@ var sdkInstance: GrowthBookSDK = GBSDKBuilder(
 
 Values are opaque JSON strings keyed by filename — persist and return them verbatim. When set, the custom layer replaces the built-in cache for both feature definitions and sticky-bucket storage. It may be called in any order relative to the sticky-bucket setters.
 
+#### Feature definition source
+
+Use `getFeaturesStatus()` to inspect the origin and count of the definitions currently loaded
+in the SDK. Use `featureWithSource(id)` when the evaluation and its definition source need to
+come from the same snapshot, even if a refresh finishes concurrently.
+
+```kotlin
+val evaluation = sdk.featureWithSource("checkout-button")
+println(evaluation.definitionsSource) // None, Provided, Cache, or Network
+println(evaluation.result.source)    // How the flag was evaluated
+```
+
+The definition source describes the loaded dataset. For a missing flag, inspect
+`result.source` for `unknownFeature` before applying an application default. A failed refresh
+or a 304 response does not change the source unless the SDK applies another dataset.
+
 #### Cache freshness window (`setCacheMaxAge`)
 
 By default the SDK refetches features from the network on every `initialize()`. Pass `setCacheMaxAge(<ms>)` to define a freshness window: while the cached features are younger than that window, the network call on the next fetch is skipped and the cache is served as the authoritative result. Once the cache is older, the SDK refetches. This is a staleness gate evaluated on the next fetch, not a background polling mechanism.

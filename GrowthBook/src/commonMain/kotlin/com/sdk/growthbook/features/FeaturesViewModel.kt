@@ -31,6 +31,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
+import com.sdk.growthbook.model.GBFeatureDefinitionsSource
 import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -64,6 +65,14 @@ internal interface FeaturesFlowDelegate {
         contextualBandits: Map<String, GBContextualBandit>?,
         isRemote: Boolean,
     )
+
+    fun payloadFetchedSuccessfully(
+        features: GBFeatures?,
+        savedGroups: JsonObject?,
+        contextualBandits: Map<String, GBContextualBandit>?,
+        isRemote: Boolean,
+        definitionsSource: GBFeatureDefinitionsSource,
+    ) = payloadFetchedSuccessfully(features, savedGroups, contextualBandits, isRemote)
 
     suspend fun onPayloadReady(model: FeaturesDataModel)
     fun featuresFetchFailed(error: GBError, isRemote: Boolean)
@@ -662,7 +671,11 @@ internal class FeaturesViewModel(
                 features = outcome.payload.features,
                 savedGroups = outcome.payload.savedGroups,
                 contextualBandits = outcome.payload.contextualBandits,
-                isRemote = outcome.authoritative
+                isRemote = outcome.authoritative,
+                definitionsSource = when (outcome.source) {
+                    Source.CACHE -> GBFeatureDefinitionsSource.Cache
+                    Source.NETWORK -> GBFeatureDefinitionsSource.Network
+                }
             )
         }
 
