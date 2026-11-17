@@ -15,6 +15,10 @@ group = "io.growthbook.sdk"
 version = "4.0.0" // x-release-please-version
 
 kotlin {
+    // Pin every JVM-based compilation (incl. tests) to JDK 17 so the published -jvm
+    // bytecode is Java 17 (class 61), not whatever JDK built it.
+    jvmToolchain(17)
+
     androidTarget {
         publishLibraryVariants("release")
     }

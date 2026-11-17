@@ -32,6 +32,10 @@ val generateSdkMeta by tasks.registering {
 }
 
 kotlin {
+    // Pin every JVM-based compilation (incl. tests) to JDK 17 so the published -jvm
+    // bytecode is Java 17 (class 61), not whatever JDK built it.
+    jvmToolchain(17)
+
     androidTarget {
         publishLibraryVariants("release")
     }

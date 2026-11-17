@@ -15,6 +15,17 @@
 - **Use your existing event tracking (GA, Segment, Mixpanel, custom)**
 - **Adjust variation weights and targeting without deploying new code**
 
+## Requirements
+
+The JVM and Android artifacts are compiled to **Java 17 bytecode (class file 61)** with a pinned JDK
+17 toolchain, so **Java 17 is the minimum runtime** on the JVM and Android targets. Running them on an
+older runtime (e.g. Java 11) fails at class load with `UnsupportedClassVersionError`.
+
+- **Android:** `minSdk 21`; desugaring/toolchains that emit Java 17-compatible bytecode.
+- **JVM:** Java 17 or newer.
+- Releases before the toolchain was pinned have no guaranteed floor: their bytecode version
+  tracked whatever JDK published them (issue #250).
+
 See [CHANGELOG.md](CHANGELOG.md) for version history.
 
 ## Setup
@@ -28,7 +39,7 @@ repositories {
 
 dependencies {
     // Add GrowthBook module:
-    implementation 'io.growthbook.sdk:GrowthBook:8.0.0'
+    implementation 'io.growthbook.sdk:GrowthBook:10.1.0'
 
     // Add Network Dispatcher you prefer:
     // 1) NetworkDispatcherKtor — supports Android, iOS, JVM, JS, Wasm
@@ -603,7 +614,7 @@ val sdk = growthBook {
 
 `GrowthBookOpenFeature` is an [OpenFeature](https://openfeature.dev) provider for the
 [OpenFeature Kotlin SDK](https://github.com/open-feature/kotlin-sdk) 0.9.x, for Android and the JVM.
-It requires Java 11.
+It requires Java 17, like the rest of the SDK.
 
 ```groovy
 implementation 'io.growthbook.sdk:GrowthBookOpenFeature:1.0.0'
