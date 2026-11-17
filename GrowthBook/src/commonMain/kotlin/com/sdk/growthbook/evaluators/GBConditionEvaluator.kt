@@ -96,19 +96,19 @@ internal class GBConditionEvaluator {
     private fun evalConditionResult(
         attributes: Map<String, GBValue>,
         conditionObj: GBJson,
-        savedGroups: Map<String, GBValue>?
+        savedGroups: Map<String, GBValue>?,
+        visited: Set<String> = emptySet()
     ): Boolean? {
         var result: Boolean? = true
         for ((key, value) in conditionObj) {
             val entryResult: Boolean? = when (key) {
                 // A value of the wrong shape is skipped here; evalConditionSafely fails it
-                "\$or" -> if (value is GBArray) evalOr(attributes, value, savedGroups) else true
-                "\$nor" -> if (value is GBArray) not(evalOr(attributes, value, savedGroups)) else true
-                "\$and" -> if (value is GBArray) evalAnd(attributes, value, savedGroups) else true
-                "\$not" -> if (value is GBJson) not(evalConditionResult(attributes, value, savedGroups)) else true
-                // Saved group references aren't supported by this SDK yet
-                "\$savedGroup" -> null
-                else -> evalConditionValueResult(value, getPath(attributes, key), savedGroups)
+                "\$or" -> if (value is GBArray) evalOr(attributes, value, savedGroups, visited) else true
+                "\$nor" -> if (value is GBArray) not(evalOr(attributes, value, savedGroups, visited)) else true
+                "\$and" -> if (value is GBArray) evalAnd(attributes, value, savedGroups, visited) else true
+                "\$not" -> if (value is GBJson) not(evalConditionResult(attributes, value, savedGroups, visited)) else true
+                "\$savedGroup" -> evalSavedGroup(attributes, value, savedGroups, visited)
+                else -> evalConditionValueResult(value, getPath(attributes, key), savedGroups, visited = visited)
             }
             // One failing entry decides it, wherever an unsupported one is
             if (entryResult == false) return false
@@ -165,7 +165,8 @@ internal class GBConditionEvaluator {
     private fun evalOr(
         attributes: Map<String, GBValue>,
         conditionObjs: GBArray,
-        savedGroups: Map<String, GBValue>?
+        savedGroups: Map<String, GBValue>?,
+        visited: Set<String>
     ): Boolean? {
         // If conditionObjs is empty, return true
         if (conditionObjs.isEmpty()) return true
@@ -173,7 +174,7 @@ internal class GBConditionEvaluator {
         var result: Boolean? = false
         for (item in conditionObjs) {
             val gbJson = item as? GBJson ?: return false
-            when (evalConditionResult(attributes, gbJson, savedGroups)) {
+            when (evalConditionResult(attributes, gbJson, savedGroups, visited)) {
                 true -> return true
                 null -> result = null
                 false -> {}
@@ -188,12 +189,13 @@ internal class GBConditionEvaluator {
     private fun evalAnd(
         attributes: Map<String, GBValue>,
         conditionObjs: GBArray,
-        savedGroups: Map<String, GBValue>?
+        savedGroups: Map<String, GBValue>?,
+        visited: Set<String>
     ): Boolean? {
         var result: Boolean? = true
         for (item in conditionObjs) {
             val gbJson = item as? GBJson ?: return false
-            when (evalConditionResult(attributes, gbJson, savedGroups)) {
+            when (evalConditionResult(attributes, gbJson, savedGroups, visited)) {
                 false -> return false
                 null -> result = null
                 true -> {}
@@ -282,7 +284,8 @@ internal class GBConditionEvaluator {
         conditionValue: GBValue,
         attributeValue: GBValue?,
         savedGroups: Map<String, GBValue>?,
-        inSensitive: Boolean = false
+        inSensitive: Boolean = false,
+        visited: Set<String> = emptySet()
     ): Boolean? {
 
         // A string, number or boolean only equals an attribute of the same type: no coercion
@@ -316,7 +319,7 @@ internal class GBConditionEvaluator {
             if (isOperatorObject(conditionValue)) {
                 var result: Boolean? = true
                 for ((operator, value) in conditionValue) {
-                    when (evalOperatorResult(operator, attributeValue, value, savedGroups)) {
+                    when (evalOperatorResult(operator, attributeValue, value, savedGroups, visited)) {
                         false -> return false
                         null -> result = null
                         true -> {}
@@ -349,13 +352,57 @@ internal class GBConditionEvaluator {
     }
 
     /**
+     * Resolves a `$savedGroup` reference: `{"id": "...", "attributeKey"?: "..."}`.
+     *
+     * A `list` entry tests one attribute (the reference's `attributeKey` wins over the entry's) against
+     * its values; a `condition` entry is evaluated in full. Anything unreadable matches nobody, and a
+     * group type added after this SDK was built is unsupported (`null`). [visited] holds the ids being
+     * resolved, so a group that references itself, directly or through others, fails instead of
+     * recursing forever.
+     */
+    private fun evalSavedGroup(
+        attributes: Map<String, GBValue>,
+        reference: GBValue,
+        savedGroups: Map<String, GBValue>?,
+        visited: Set<String>
+    ): Boolean? {
+        val ref = reference as? GBJson ?: return false
+        val id = (ref["id"] as? GBString)?.value ?: return false
+        if (id in visited) return false
+        // Falling back to the entry's attribute would check a different population
+        val overrideKey = when (val raw = ref["attributeKey"]) {
+            null -> null
+            is GBString -> raw.value
+            else -> return false
+        }
+
+        // Absent, or a v1 bare array
+        val entry = savedGroups?.get(id) as? GBJson ?: return false
+
+        return when ((entry["type"] as? GBString)?.value) {
+            "list" -> {
+                val key = overrideKey ?: (entry["attributeKey"] as? GBString)?.value ?: return false
+                val values = entry["values"] as? GBArray ?: return false
+                isIn(getPath(attributes, key), values)
+            }
+            // A condition group has no single attribute, so any override is ignored
+            "condition" -> {
+                val condition = entry["condition"] as? GBJson ?: return false
+                evalConditionResult(attributes, condition, savedGroups, visited + id)
+            }
+            else -> null
+        }
+    }
+
+    /**
      * This checks if attributeValue is an array,
      * and if so at least one of the array items must match the condition
      */
     private fun elemMatch(
         attributeValue: GBValue,
         condition: GBValue,
-        savedGroups: Map<String, GBValue>?
+        savedGroups: Map<String, GBValue>?,
+        visited: Set<String>
     ): Boolean? {
         if (attributeValue !is GBArray) return false
 
@@ -368,9 +415,9 @@ internal class GBConditionEvaluator {
             // Only skip null elements; falsy values like 0, "" and false must still be tested
             if (item is GBNull) continue
             val itemResult = if (testsElement) {
-                evalConditionValueResult(condition, item, savedGroups)
+                evalConditionValueResult(condition, item, savedGroups, visited = visited)
             } else {
-                evalConditionResult(ownFields(item), condition as? GBJson ?: GBJson(emptyMap()), savedGroups)
+                evalConditionResult(ownFields(item), condition as? GBJson ?: GBJson(emptyMap()), savedGroups, visited)
             }
             when (itemResult) {
                 true -> return true
@@ -409,6 +456,7 @@ internal class GBConditionEvaluator {
         attributeValue: GBValue?,
         conditionValue: GBValue,
         savedGroups: Map<String, GBValue>?,
+        visited: Set<String> = emptySet(),
     ): Boolean? {
 
         // An operator this SDK can't evaluate makes the result unknown. Keys it knows on a
@@ -425,23 +473,14 @@ internal class GBConditionEvaluator {
 
         // Evaluate NOT operator - whether condition doesn't contain attribute
         if (operator == "\$not") {
-            return not(evalConditionValueResult(conditionValue, attributeValue, savedGroups))
+            return not(evalConditionValueResult(conditionValue, attributeValue, savedGroups, visited = visited))
         }
 
         // Evaluate EXISTS operator - whether condition contains attribute
+        // The value is read as a JS boolean, so `$exists: 1` asks for a present attribute and `0` or "" for an absent one
         if (operator == "\$exists") {
-            val targetPrimitiveValue = conditionValue as? GBBoolean
-            val gate2 = (attributeValue == null || attributeValue is GBNull)
-            if (targetPrimitiveValue?.value == false && gate2) {
-                return true
-            } else {
-                val gate3 = (targetPrimitiveValue?.value == true)
-                val gate4 = (attributeValue != null)
-                val gate5 = (attributeValue !is GBNull)
-                if (gate3 && gate4 && gate5) {
-                    return true
-                }
-            }
+            val present = attributeValue != null && attributeValue !is GBNull
+            return if (conditionValue.isJsTruthy()) present else !present
         }
 
         // Equality, ordering and version operators never coerce types: on a type mismatch the
@@ -485,12 +524,12 @@ internal class GBConditionEvaluator {
                 // Evaluate ALL operator - whether condition contains all attribute
                 "\$all" -> {
                     if (attributeValue !is GBArray) return false
-                    return isInAll(attributeValue, conditionValue, savedGroups, false)
+                    return isInAll(attributeValue, conditionValue, savedGroups, false, visited)
                 }
                 // Evaluate ALLI operator - whether condition contains all attribute
                 "\$alli" -> {
                     if (attributeValue !is GBArray) return false
-                    return isInAll(attributeValue, conditionValue, savedGroups, true)
+                    return isInAll(attributeValue, conditionValue, savedGroups, true, visited)
                 }
             }
         } else if (attributeValue is GBArray) {
@@ -498,14 +537,15 @@ internal class GBConditionEvaluator {
             when (operator) {
                 // Evaluate ElemMATCH operator - whether condition matches attribute
                 "\$elemMatch" -> {
-                    return elemMatch(attributeValue, conditionValue, savedGroups)
+                    return elemMatch(attributeValue, conditionValue, savedGroups, visited)
                 }
                 // Evaluate SIE operator - whether condition size is same as that of attribute
                 "\$size" -> {
                     return evalConditionValueResult(
                         conditionValue,
                         GBNumber(attributeValue.size),
-                        savedGroups
+                        savedGroups,
+                        visited = visited
                     )
                 }
             }
@@ -569,6 +609,16 @@ internal class GBConditionEvaluator {
         return type != "list" && type != "condition"
     }
 
+    /** JS truthiness: `false`, `0`, `NaN`, `""` and null are falsy; arrays and objects are truthy. */
+    private fun GBValue.isJsTruthy(): Boolean =
+        when (this) {
+            is GBBoolean -> value
+            is GBNumber -> value.toDouble().let { it != 0.0 && !it.isNaN() }
+            is GBString -> value.isNotEmpty()
+            GBNull, GBValue.Unknown -> false
+            is GBArray, is GBJson -> true
+        }
+
     private fun GBValue.asKey(): String =
         when (this) {
             is GBString -> this.value // without quotes
@@ -600,7 +650,8 @@ internal class GBConditionEvaluator {
         actual: GBValue,
         expected: GBArray,
         savedGroups: Map<String, GBValue>?,
-        inSensitive: Boolean = false
+        inSensitive: Boolean,
+        visited: Set<String>
     ): Boolean? {
         if (actual !is GBArray) return false
 
@@ -608,7 +659,7 @@ internal class GBConditionEvaluator {
         for (expectedItem in expected) {
             var passed: Boolean? = false
             for (actualItem in actual) {
-                when (evalConditionValueResult(expectedItem, actualItem, savedGroups, inSensitive)) {
+                when (evalConditionValueResult(expectedItem, actualItem, savedGroups, inSensitive, visited)) {
                     true -> {
                         passed = true
                         break
