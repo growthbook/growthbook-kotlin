@@ -7,6 +7,7 @@ import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.EvalSnapshot
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBContext
+import com.sdk.growthbook.model.GBFeatureDefinitionsSource
 import com.sdk.growthbook.model.GBContextualBandit
 import com.sdk.growthbook.model.GBOptions
 import com.sdk.growthbook.features.DecodedPayload
@@ -577,6 +578,7 @@ class GBSDKBuilder(
                     features = it.features,
                     savedGroups = it.savedGroups?.mapValues { (_, value) -> GBValue.from(value) },
                     contextualBandits = it.contextualBandits,
+                    definitionsSource = GBFeatureDefinitionsSource.Provided,
                 )
             }
         }
