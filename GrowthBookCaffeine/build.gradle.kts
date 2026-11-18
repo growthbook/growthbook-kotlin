@@ -110,8 +110,8 @@ publishing {
                 }
                 developers {
                     developer {
-                        name.set("Bohdan Kim")
-                        email.set("user576g@gmail.com")
+                        name.set("GrowthBook")
+                        email.set("sdk-dev@growthbook.io")
                     }
                 }
             }

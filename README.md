@@ -1181,7 +1181,7 @@ adapters: a bounded in-memory feature cache and a bounded sticky bucket store.
 > Requires Java 17, matching the core SDK's JVM artifact — `jvmToolchain(17)` pins the published bytecode to class 61 rather than letting
 > it follow the JDK that built it.
 
-```kotlin
+```groovy
 dependencies {
     implementation 'io.growthbook.sdk:GrowthBookCaffeine:1.0.0'
 }
