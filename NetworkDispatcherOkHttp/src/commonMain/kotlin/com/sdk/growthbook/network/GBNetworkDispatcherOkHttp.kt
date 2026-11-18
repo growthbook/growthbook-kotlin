@@ -270,6 +270,15 @@ class GBNetworkDispatcherOkHttp(
                         request,
                         GBEventSourceListener(
                             handler = object : GBEventSourceHandler {
+                                override fun onOpen() {
+                                    // The stream is open: reset the retry budget here rather than
+                                    // only on a non-empty event. A proxy that sends empty
+                                    // heartbeats and recycles the stream on a timer would
+                                    // otherwise exhaust maxRetries across healthy connections
+                                    // whenever no features are published.
+                                    retryManager.reset()
+                                }
+
                                 override fun onClose(eventSource: EventSource?) {
                                     if (controller.isStopped()) {
                                         if (enableLogging) {
