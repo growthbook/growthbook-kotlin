@@ -194,6 +194,13 @@ class GrowthBookConfigBuilder {
      */
     var initialPayload: String? = null
 
+    /**
+     * Optional ids of the remote saved groups the user is in, resolved by the app — see
+     * [com.sdk.growthbook.GrowthBookSDK.setRemoteGroupIds]. Leave it `null` while they are
+     * unresolved; an empty list means "in no group", so "not in group" rules match.
+     */
+    var remoteGroupIds: List<String>? = null
+
     private var attributes: Map<String, GBValue> = emptyMap()
 
     /**
@@ -249,6 +256,7 @@ class GrowthBookConfigBuilder {
         builder.setServeStaleOnError(serveStaleOnError)
         initialFeatures?.let { builder.setInitialFeatures(it) }
         initialPayload?.let { builder.setInitialPayload(it) }
+        remoteGroupIds?.let { builder.setRemoteGroupIds(it) }
         refreshHandler?.let { builder.setRefreshHandler(it) }
         featuresChangeHandler?.let { builder.setFeaturesChangeHandler(it) }
         featureUsageCallback?.let { builder.setFeatureUsageCallback(it) }

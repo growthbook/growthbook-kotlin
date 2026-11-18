@@ -133,6 +133,19 @@ class ConfigDslTest {
     }
 
     @Test
+    fun `growthBook wires remoteGroupIds into the SDK`() {
+        val sdk = growthBook {
+            apiKey = "key"
+            apiHost = "host"
+            networkDispatcher = MockNetworkDispatcher()
+            cachingEnabled = false
+            remoteGroupIds = listOf("grp_vip")
+        }
+
+        assertEquals(listOf("grp_vip"), sdk.getRemoteGroupIds())
+    }
+
+    @Test
     fun `growthBook wires fetchStatsHandler into the SDK`() {
         val fetched = CountDownLatch(1)
         val outcomes = mutableListOf<GBFetchOutcome>()

@@ -643,8 +643,8 @@ The DSL covers the whole of `GBSDKBuilder`, so nothing forces you back to the
 builder: `streamingHost`, `encryptionKey`, `enableLogging`, `remoteEval`, `qaMode`,
 `enabled`, `forceVariations`, `trackingCallback`, `refreshHandler`,
 `featuresChangeHandler`, `featureUsageCallback`, `fetchStatsHandler`,
-`initialFeatures`, `initialPayload`, `plugins`, `cachingEnabled`, `cacheMaxAge`,
-`staleTtl`, `serveStaleOnError`, `refreshInterval`, `cachingLayer`, and sticky
+`initialFeatures`, `initialPayload`, `remoteGroupIds`, `plugins`, `cachingEnabled`,
+`cacheMaxAge`, `staleTtl`, `serveStaleOnError`, `refreshInterval`, `cachingLayer`, and sticky
 bucketing via either `stickyBucketService` or `stickyBucketScope` (+ optional
 `stickyBucketPrefix`).
 

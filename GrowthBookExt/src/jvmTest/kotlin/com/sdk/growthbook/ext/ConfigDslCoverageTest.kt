@@ -35,6 +35,7 @@ class ConfigDslCoverageTest {
         "setFetchStatsHandler" to "fetchStatsHandler",
         "setInitialFeatures" to "initialFeatures",
         "setInitialPayload" to "initialPayload",
+        "setRemoteGroupIds" to "remoteGroupIds",
         "setCacheMaxAge" to "cacheMaxAge",
         "setStaleTtl" to "staleTtl",
         "setServeStaleOnError" to "serveStaleOnError",
