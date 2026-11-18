@@ -96,7 +96,7 @@ publishing {
                 name.set("kotlin")
                 description.set(
                     "Redis adapters for the GrowthBook Kotlin SDK: shared, durable " +
-                        "sticky bucket storage backed by Jedis or Lettuce."
+                        "sticky bucket storage and feature cache backed by Jedis or Lettuce."
                 )
                 licenses {
                     license {
@@ -115,8 +115,8 @@ publishing {
                 }
                 developers {
                     developer {
-                        name.set("Bohdan Kim")
-                        email.set("user576g@gmail.com")
+                        name.set("GrowthBook")
+                        email.set("sdk-dev@growthbook.io")
                     }
                 }
             }
