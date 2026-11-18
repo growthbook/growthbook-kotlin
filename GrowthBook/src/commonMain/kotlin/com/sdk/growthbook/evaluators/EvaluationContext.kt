@@ -1,6 +1,8 @@
 package com.sdk.growthbook.evaluators
 
 import com.sdk.growthbook.model.GBValue
+import com.sdk.growthbook.model.GBExperiment
+import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeatureResult
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.GBEventLogger
@@ -30,6 +32,12 @@ internal data class EvaluationContext(
     val gbFeatureUsageHelper: GBFeatureUsageHelper,
     val stickyBucketService: GBStickyBucketService?,
     val onFeatureUsage: ((String, GBFeatureResult) -> Unit)?,
+    // Invoked for every experiment evaluated through a feature rule, whether or not the user ended up
+    // in it, so GrowthBookSDK can report assignment changes to its subscribers. The reference JS SDK
+    // exposes the same seam as `ctx.global.onExperimentEval` (core.ts). Deliberately NOT fired from
+    // GBExperimentEvaluator itself: that evaluator also backs GrowthBookSDK.run(), which reports the
+    // assignment directly, so firing there too would report every inline experiment twice.
+    val onExperimentEval: ((GBExperiment, GBExperimentResult) -> Unit)? = null,
     // Invoked at the point a new sticky-bucket assignment doc is generated during evaluation, so the
     // single changed key can be merged back into the shared context atomically (see
     // GBContext.mergeStickyAssignmentDoc). Replaces the previous wholesale write-back of the whole
