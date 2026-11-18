@@ -383,4 +383,28 @@ class GBUtilsTests {
 
         assertTrue(GBUtils.getGBNameSpace(JsonArray(items)) == null)
     }
+
+    @Test
+    fun testPaddedVersionStringStripsBuildMetadata() {
+        val plain = GBUtils.paddedVersionString("1.2.3")
+        assertEquals("    1-    2-    3-~", plain)
+        assertEquals("    1-    2-    3-rc-    1", GBUtils.paddedVersionString("v1.2.3-rc.1+build123"))
+        assertEquals(plain, GBUtils.paddedVersionString("v1.2.3+build+more.1-2"))
+        assertEquals(plain, GBUtils.paddedVersionString("1.2.3+"))
+        // Build metadata is everything after the first `+`, even across a newline
+        assertEquals(plain, GBUtils.paddedVersionString("1.2.3+build\nx"))
+        assertEquals("v1-    2-    3-~", GBUtils.paddedVersionString("vv1.2.3"))
+        assertEquals("", GBUtils.paddedVersionString("+build"))
+        // An empty version is version 0, as in JS
+        assertEquals("    0", GBUtils.paddedVersionString(""))
+    }
+
+    @Test
+    fun testPaddedVersionStringIsLinearOnManyPluses() {
+        // The old `^v|\+.*$` regex took several seconds on this input
+        val input = "+".repeat(100_000) + "\nx"
+        val start = System.nanoTime()
+        assertEquals("", GBUtils.paddedVersionString(input))
+        assertTrue(System.nanoTime() - start < 1_000_000_000L)
+    }
 }
