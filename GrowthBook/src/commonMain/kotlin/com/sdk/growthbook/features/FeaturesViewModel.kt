@@ -57,17 +57,62 @@ internal interface FeaturesFlowDelegate {
      * never observe one field from this payload paired with another from the previous one.
      *
      * A null argument means the field was absent from the payload — keep the current value.
+     *
+     * @param features the decoded feature definitions, already decrypted.
+     * @param savedGroups the payload's saved groups, still as raw JSON — the implementer converts.
+     * @param contextualBandits bandit rules keyed by experiment id.
+     * @param isRemote true when the result is authoritative (network / SSE / cache still inside the
+     *   freshness window) and so may unblock suspendFeature()/initialize{}; false for the cache
+     *   pre-load that precedes a network round, which must not be reported as a refresh result.
+     * @param fromCache where the payload physically came from, independent of [isRemote]: a cache
+     *   entry still inside its freshness window is served as authoritative (`isRemote = true`) with
+     *   no network call at all, so the two cannot be collapsed into one flag.
+     * @param staleError non-null only for the stale-if-error fallback
+     *   ([com.sdk.growthbook.GBSDKBuilder.setServeStaleOnError]): the payload is an expired cache
+     *   served because the network round failed with this error. The refresh handler still stays
+     *   silent for it — its (Boolean, GBError?) contract cannot say "stale fallback served" — but
+     *   feature refresh listeners report it as
+     *   [com.sdk.growthbook.model.GBFeatureRefreshSource.Stale].
      */
     fun payloadFetchedSuccessfully(
         features: GBFeatures?,
         savedGroups: JsonObject?,
         contextualBandits: Map<String, GBContextualBandit>?,
         isRemote: Boolean,
+        staleError: GBError? = null,
+        fromCache: Boolean = false,
     )
 
+    /**
+     * A decoded payload, before it is applied: the hook where sticky-bucket documents for the
+     * assignments it implies are loaded, which is why it suspends.
+     */
     suspend fun onPayloadReady(model: FeaturesDataModel)
+
+    /**
+     * The fetch produced nothing usable — transport error, timeout, or a payload that decoded to
+     * neither features nor saved groups.
+     *
+     * @param isRemote false for a failed cache read, which is not a refresh result: the refresh
+     *   handler is left silent, while feature refresh listeners are told either way, since an app
+     *   showing "data may be outdated" cares which source let it down as much as that one did.
+     */
     fun featuresFetchFailed(error: GBError, isRemote: Boolean)
+
+    /**
+     * Saved groups specifically could not be read from an otherwise fine payload. Separate from
+     * [featuresFetchFailed] because features stay usable: targeting that references a saved group
+     * degrades, the rest evaluates normally.
+     */
     fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean)
+
+    /**
+     * The server answered 304 — the cached definitions are current and there is nothing to apply.
+     *
+     * Counts as a successful refresh only when a payload has already been loaded. A 304 arriving
+     * before that cannot guarantee anything is there to serve, so the implementer treats it as a
+     * failure and lets the fetch be retried.
+     */
     fun featuresNotModified()
 }
 
@@ -472,9 +517,16 @@ internal class FeaturesViewModel(
                             // fires neither the success nor the failure delegate path. The handler's
                             // (Boolean, GBError?) contract cannot express "stale fallback served", so
                             // signalling either side would mislead. Documented on
-                            // GBSDKBuilder.setServeStaleOnError; revisit if the handler ever grows a
-                            // dedicated stale signal.
-                            dispatch(FetchOutcome.Ready(onErrorFallback, source = Source.CACHE, authoritative = false))
+                            // GBSDKBuilder.setServeStaleOnError. Feature refresh listeners do get it:
+                            // staleError carries the failure through to GBFeatureRefreshSource.Stale.
+                            dispatch(
+                                FetchOutcome.Ready(
+                                    onErrorFallback,
+                                    source = Source.CACHE,
+                                    authoritative = false,
+                                    staleError = GBError(it),
+                                )
+                            )
                         } else {
                             dispatch(FetchOutcome.Failed(GBError(it), source = Source.NETWORK))
                         }
@@ -662,7 +714,9 @@ internal class FeaturesViewModel(
                 features = outcome.payload.features,
                 savedGroups = outcome.payload.savedGroups,
                 contextualBandits = outcome.payload.contextualBandits,
-                isRemote = outcome.authoritative
+                isRemote = outcome.authoritative,
+                staleError = outcome.staleError,
+                fromCache = outcome.source == Source.CACHE
             )
         }
 
