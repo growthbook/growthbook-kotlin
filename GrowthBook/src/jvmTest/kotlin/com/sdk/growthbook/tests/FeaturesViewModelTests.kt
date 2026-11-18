@@ -11,6 +11,7 @@ import com.sdk.growthbook.features.FetchResult
 import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBContextualBandit
+import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBOptions
 import kotlinx.coroutines.CompletableDeferred
@@ -252,6 +253,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             ),
             forcedFeatures = mapOf("demo-forced-flag" to GBBoolean(true)),
             forcedVariations = emptyMap(),
+            url = "https://example.com/home",
         )
         val viewModel = FeaturesViewModel(
             delegate = this@FeaturesViewModelTests,
@@ -278,6 +280,13 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         assertTrue(pair is JsonArray, "each forcedFeatures entry must be a [key, value] JsonArray")
         assertEquals(JsonPrimitive("demo-forced-flag"), pair[0])
         assertEquals(JsonPrimitive(true), pair[1])
+
+        // The remote evaluator matches urlPatterns, so the page URL is part of the body.
+        assertEquals("https://example.com/home", body["url"])
+
+        // …and it is always present: an unset URL goes out as "", mirroring sdk-js's getUrl().
+        viewModel.fetchFeatures(payload = payload.copy(url = null))
+        assertEquals("", assertNotNull(client.lastBodyParams)["url"])
     }
 
     @Test
@@ -336,6 +345,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 features: GBFeatures?,
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
+                experiments: List<GBExperiment>?,
                 isRemote: Boolean,
             ) {
                 appliedFeatures = features
@@ -435,6 +445,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 features: GBFeatures?,
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
+                experiments: List<GBExperiment>?,
                 isRemote: Boolean,
             ) {
                 features?.keys?.firstOrNull()?.let { appliedOrder.add(it) }
@@ -507,6 +518,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 features: GBFeatures?,
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
+                experiments: List<GBExperiment>?,
                 isRemote: Boolean,
             ) {
                 features?.keys?.firstOrNull()?.let { committed.add(it) }
@@ -582,6 +594,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 features: GBFeatures?,
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
+                experiments: List<GBExperiment>?,
                 isRemote: Boolean,
             ) = Unit
             override suspend fun onPayloadReady(model: FeaturesDataModel) = Unit
@@ -1037,6 +1050,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 features: GBFeatures?,
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
+                experiments: List<GBExperiment>?,
                 isRemote: Boolean,
             ) = Unit
             override fun featuresFetchFailed(error: GBError, isRemote: Boolean) = Unit
@@ -1167,6 +1181,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 features: GBFeatures?,
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
+                experiments: List<GBExperiment>?,
                 isRemote: Boolean,
             ) {
                 events += "featuresApplied"
@@ -1289,6 +1304,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 features: GBFeatures?,
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
+                experiments: List<GBExperiment>?,
                 isRemote: Boolean,
             ) {
                 docsAtApplyTime = ctx.stickyBucketAssignmentDocs
@@ -1331,6 +1347,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         features: GBFeatures?,
         savedGroups: JsonObject?,
         contextualBandits: Map<String, GBContextualBandit>?,
+        experiments: List<GBExperiment>?,
         isRemote: Boolean,
     ) {
         isSuccess = true

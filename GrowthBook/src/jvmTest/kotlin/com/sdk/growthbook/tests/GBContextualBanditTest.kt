@@ -38,20 +38,8 @@ class GBContextualBanditTest {
     @Test
     fun testContextualBandits() {
         val failed = ArrayList<String>()
-        var skipped = 0
         for (item in cases) {
             if (item !is JsonArray) continue
-
-            // This SDK has no URL dimension — no `url` on the context, no `getQueryStringOverride`,
-            // no `urlRedirect` — so a variation cannot be forced from a query parameter. Not a
-            // platform limitation (the browser targets could read `window.location.href`) but an
-            // unimplemented input, so this will start passing if the SDK ever accepts a URL.
-            // Skipped by name rather than removed from `cases.json`, which is a verbatim copy of
-            // the reference fixture. See GBExperimentRunTests.UNSUPPORTED_URL_CASES.
-            if (item[0].jsonPrimitive.content == QUERYSTRING_CASE) {
-                skipped++
-                continue
-            }
 
             val testData = GBTestHelper.jsonParser
                 .decodeFromJsonElement(GBFeaturesTest.serializer(), item[1])
@@ -64,6 +52,7 @@ class GBContextualBanditTest {
                 contextualBandits = testData.contextualBandits?.mapValues { it.value.gbDeserialize() },
                 forcedVariations = testData.forcedVariations
                     ?.mapValues { it.value.jsonPrimitive.intOrNull ?: 0 } ?: emptyMap(),
+                url = testData.url,
                 qaMode = testData.qaMode,
                 enabled = testData.enabled,
             )
@@ -95,13 +84,8 @@ class GBContextualBanditTest {
                         "variationId=${actualExperimentResult?.variationId}")
             }
         }
-        println("CB TESTS: ${cases.size}, skipped(no URL override): $skipped, failed: ${failed.size}\n$failed")
-        assertTrue(failed.isEmpty())
-        assertEquals(
-            1, skipped,
-            "Exactly one corpus case is expected to need the URL override; if it was renamed or " +
-                "removed upstream this skip is silently dropping a different case, or none.",
-        )
+        println("CB TESTS: ${cases.size}, failed: ${failed.size}\n$failed")
+        assertTrue(failed.isEmpty(), failed.toString())
     }
 
     /**
@@ -164,10 +148,6 @@ class GBContextualBanditTest {
 
         assertEquals(listOf("deviceId"), context.stickyBucketIdentifierAttributes)
         assertEquals(mapOf("deviceId" to "d1"), requestedAttributes)
-    }
-
-    private companion object {
-        const val QUERYSTRING_CASE = "querystring force overrides CB routing"
     }
 }
 
