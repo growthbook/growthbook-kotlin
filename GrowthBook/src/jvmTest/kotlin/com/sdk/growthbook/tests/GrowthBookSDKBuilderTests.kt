@@ -20,6 +20,7 @@ import com.sdk.growthbook.sandbox.CachingJvm
 import com.sdk.growthbook.sandbox.GBCachingLayer
 import com.sdk.growthbook.serializable_model.SerializableFeaturesDataModel
 import com.sdk.growthbook.stickybucket.GBStickyBucketServiceImp
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -508,7 +509,11 @@ class GrowthBookSDKBuilderTests {
             trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = false,
-        ).initialize()
+        )
+            // Apply the fetched payload (and its cache write) before initialize() returns, so no
+            // write is left running to land in the next test's cache folder.
+            .setCoroutineContext(Dispatchers.Unconfined)
+            .initialize()
 
         val threadCount = 8
         val perThread = 200
@@ -994,6 +999,10 @@ class GrowthBookSDKBuilderTests {
             ),
         )
             .setInitialFeatures(bundledFeatures)
+            // In-memory cache: an SDK left running by an earlier test can still write its payload
+            // to the shared JVM file cache after setUp() has switched folders, and initialize()
+            // would then load that payload over the bundled features.
+            .setCachingLayer(FakeCachingLayer())
             .setRefreshHandler { success, _ ->
                 refreshCalled = true
                 refreshSuccess = success
