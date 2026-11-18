@@ -296,9 +296,9 @@ class GrowthBookSDK internal constructor(
 
     /**
      * Reactive stream of a single feature's evaluated [GBFeatureResult]. Re-evaluates whenever any
-     * evaluation input changes — features, attributes, attribute overrides, forced features/variations
-     * or saved groups (it observes the full state snapshot, not just the feature map) — and only
-     * forwards distinct results.
+     * evaluation input changes — features, attributes, attribute overrides, forced
+     * features/variations, saved groups or remote group ids (it observes the full state snapshot,
+     * not just the feature map) — and only forwards distinct results.
      *
      * The reactive re-evaluations pass through a fully silent evaluation: they fire neither the
      * `featureUsageCallback` nor the experiment `trackingCallback`, do not notify registered

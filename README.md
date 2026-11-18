@@ -270,7 +270,7 @@ scope.launch {
 }
 ```
 
-> **Reacts to every evaluation input:** `featureFlow(id)` re-evaluates whenever anything that can change the result changes — feature definitions **and** attributes, attribute overrides, forced features or saved groups — so it re-fires on its own after `setAttributes()` / `setAttributeOverrides()`.
+> **Reacts to every evaluation input:** `featureFlow(id)` re-evaluates whenever anything that can change the result changes — feature definitions **and** attributes, attribute overrides, forced features, saved groups or remote group ids — so it re-fires on its own after `setAttributes()` / `setAttributeOverrides()` / `setRemoteGroupIds()`.
 
 > **No analytics pollution:** the reactive re-evaluations pass through a fully silent evaluation — they fire **neither** the `featureUsageCallback` **nor** the experiment `trackingCallback`, so streaming a feature inflates neither usage analytics nor experiment exposures. Only explicit `feature(id)` access counts as usage and fires exposures.
 

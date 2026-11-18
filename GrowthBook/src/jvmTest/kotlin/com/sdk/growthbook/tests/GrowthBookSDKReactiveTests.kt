@@ -210,6 +210,45 @@ class GrowthBookSDKReactiveTests {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
+    fun featureFlowReEmitsWhenRemoteGroupIdsChange() = runTest {
+        // Remote group ids live in the same evaluation snapshot as the attributes, so resolving
+        // them must re-fire featureFlow even though neither features nor attributes changed.
+        val payload = """
+            {
+              "savedGroups": {"grp_vip": {"type": "remote", "attributeKey": "account_id"}},
+              "features": {
+                "flag": {"defaultValue": false, "rules": [
+                  {"condition": {"${'$'}savedGroup": {"id": "grp_vip"}}, "force": true}
+                ]}
+              }
+            }
+        """.trimIndent()
+        val sdk = builder(MockNetworkClient(null, null), testScheduler)
+            .setInitialPayload(payload)
+            .initialize()
+        runCurrent()
+
+        val emissions = mutableListOf<Boolean>()
+        val job = backgroundScope.launch {
+            sdk.featureFlow("flag").collect { emissions.add(it.on) }
+        }
+        runCurrent()
+        assertEquals(listOf(false), emissions, "unresolved remote groups match nobody")
+
+        sdk.setRemoteGroupIds(listOf("grp_vip"))
+        runCurrent()
+
+        assertEquals(
+            listOf(false, true),
+            emissions,
+            "featureFlow must re-evaluate and emit when the remote group ids change the result"
+        )
+        job.cancel()
+        sdk.close()
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
     fun featureFlowObservationDoesNotFireTrackingButFeatureDoes() = runTest {
         // "expfeature" is backed by an experiment rule, so evaluating it buckets the user and would
         // fire the experiment-exposure trackingCallback. featureFlow is a passive observer: its
