@@ -128,6 +128,7 @@ class GBSDKBuilder(
     private var featureUsageCallback: GBFeatureUsageCallback? = null
     private var eventLogger: GBEventLogger? = null
     private var plugins: List<GrowthBookPlugin>? = null
+    private var remoteGroupIds: List<String>? = null
     private var initialFeatures: GBFeatures? = null
     private var initialPayloadJson: String? = null
     private var cacheMaxAge: Long? = null
@@ -401,6 +402,15 @@ class GBSDKBuilder(
     }
 
     /**
+     * Sets the remote saved groups the user is in, resolved by the app. See
+     * [GrowthBookSDK.setRemoteGroupIds]; leave unset while they are unresolved.
+     */
+    fun setRemoteGroupIds(remoteGroupIds: List<String>): GBSDKBuilder {
+        this.remoteGroupIds = remoteGroupIds
+        return this
+    }
+
+    /**
      * Opt-in background polling interval in milliseconds.
      *
      * When set, [GrowthBookSDK.startPolling] launches a coroutine on the SDK's background scope
@@ -572,6 +582,7 @@ class GBSDKBuilder(
                 ?: stickyBucketServiceFactory?.invoke(resolveCachingLayer()),
             plugins = plugins,
             eventLogger = eventLogger,
+            remoteGroupIds = remoteGroupIds,
         )
 
     private inner class WaitForCallCaseHelper(
