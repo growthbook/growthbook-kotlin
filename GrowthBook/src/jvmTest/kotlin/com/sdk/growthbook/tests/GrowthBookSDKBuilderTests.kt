@@ -510,8 +510,6 @@ class GrowthBookSDKBuilderTests {
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = false,
         )
-            // Apply the fetched payload (and its cache write) before initialize() returns, so no
-            // write is left running to land in the next test's cache folder.
             .setCoroutineContext(Dispatchers.Unconfined)
             .initialize()
 
@@ -999,9 +997,6 @@ class GrowthBookSDKBuilderTests {
             ),
         )
             .setInitialFeatures(bundledFeatures)
-            // In-memory cache: an SDK left running by an earlier test can still write its payload
-            // to the shared JVM file cache after setUp() has switched folders, and initialize()
-            // would then load that payload over the bundled features.
             .setCachingLayer(FakeCachingLayer())
             .setRefreshHandler { success, _ ->
                 refreshCalled = true
