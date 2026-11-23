@@ -4,6 +4,7 @@ package com.sdk.growthbook.features
 
 import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.GBContextualBandit
+import com.sdk.growthbook.model.GBDefinitionsOrigin
 import com.sdk.growthbook.sandbox.CachingImpl
 import com.sdk.growthbook.sandbox.CachingLayer
 import com.sdk.growthbook.sandbox.getData
@@ -31,7 +32,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
-import com.sdk.growthbook.model.GBFeatureDefinitionsSource
 import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -64,15 +64,8 @@ internal interface FeaturesFlowDelegate {
         savedGroups: JsonObject?,
         contextualBandits: Map<String, GBContextualBandit>?,
         isRemote: Boolean,
+        definitionsSource: GBDefinitionsOrigin,
     )
-
-    fun payloadFetchedSuccessfully(
-        features: GBFeatures?,
-        savedGroups: JsonObject?,
-        contextualBandits: Map<String, GBContextualBandit>?,
-        isRemote: Boolean,
-        definitionsSource: GBFeatureDefinitionsSource,
-    ) = payloadFetchedSuccessfully(features, savedGroups, contextualBandits, isRemote)
 
     suspend fun onPayloadReady(model: FeaturesDataModel)
     fun featuresFetchFailed(error: GBError, isRemote: Boolean)
@@ -483,7 +476,7 @@ internal class FeaturesViewModel(
                             // signalling either side would mislead. Documented on
                             // GBSDKBuilder.setServeStaleOnError; revisit if the handler ever grows a
                             // dedicated stale signal.
-                            dispatch(FetchOutcome.Ready(onErrorFallback, source = Source.CACHE, authoritative = false))
+                            dispatch(FetchOutcome.Ready(onErrorFallback, source = Source.STALE, authoritative = false))
                         } else {
                             dispatch(FetchOutcome.Failed(GBError(it), source = Source.NETWORK))
                         }
@@ -673,8 +666,9 @@ internal class FeaturesViewModel(
                 contextualBandits = outcome.payload.contextualBandits,
                 isRemote = outcome.authoritative,
                 definitionsSource = when (outcome.source) {
-                    Source.CACHE -> GBFeatureDefinitionsSource.Cache
-                    Source.NETWORK -> GBFeatureDefinitionsSource.Network
+                    Source.CACHE -> GBDefinitionsOrigin.Cache
+                    Source.STALE -> GBDefinitionsOrigin.Stale
+                    Source.NETWORK -> GBDefinitionsOrigin.Network
                 }
             )
         }

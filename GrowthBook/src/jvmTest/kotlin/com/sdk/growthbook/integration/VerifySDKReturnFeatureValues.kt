@@ -197,7 +197,7 @@ internal class VerifySDKReturnFeatureValues {
         val gbSdk = buildSDK(json = "{}", attributes = emptyMap())
 
         // A stale value is currently in context and the in-flight round is in the Failed/retry state.
-        gbSdk.getGBContext().features = mapOf("flag" to GBFeature(GBBoolean(false)))
+        gbSdk.getGBContext().setProvidedFeatures(mapOf("flag" to GBFeature(GBBoolean(false))))
         gbSdk.featuresFetchFailed(GBError(null), true) // remoteSourceFeaturesFetchResult = Failed
 
         val mockedFeaturesViewModel: FeaturesViewModel = mockk {
@@ -205,7 +205,7 @@ internal class VerifySDKReturnFeatureValues {
             //    must `continue`, NOT return the stale value.
             // 2nd awaitRefresh(): the newer round lands, applies the FRESH features and reports success.
             coEvery { awaitRefresh() } returns FetchResult.Superseded andThenAnswer {
-                gbSdk.getGBContext().features = mapOf("flag" to GBFeature(GBBoolean(true)))
+                gbSdk.getGBContext().setProvidedFeatures(mapOf("flag" to GBFeature(GBBoolean(true))))
                 gbSdk.payloadFetchedSuccessfully(
                     features = gbSdk.getGBContext().features,
                     savedGroups = null,

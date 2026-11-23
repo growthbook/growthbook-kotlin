@@ -12,7 +12,7 @@ plugins {
 
 group = "io.growthbook.sdk"
 // Required: release-please bumps this version using the marker comment. Don't remove it.
-version = "10.1.1" // x-release-please-version
+version = "10.2.0" // x-release-please-version
 
 val generateSdkMeta by tasks.registering {
     val outputDir = layout.buildDirectory.dir("generated/sdk-meta/commonMain/kotlin")
@@ -32,6 +32,10 @@ val generateSdkMeta by tasks.registering {
 }
 
 kotlin {
+    // Pin every JVM-based compilation (incl. tests) to JDK 17 so the published -jvm
+    // bytecode is Java 17 (class 61), not whatever JDK built it.
+    jvmToolchain(17)
+
     androidTarget {
         publishLibraryVariants("release")
     }
@@ -74,6 +78,8 @@ kotlin {
                 implementation(libs.cryptography.core) // encryption/decryption
 
                 implementation(libs.kotlinx.serialization.json)
+                // A published GrowthBook pins the GrowthBookKotlinxSerialization version it was built
+                // with, so a fix there reaches SDK users only after GrowthBook is released as well.
                 implementation(project(":GrowthBookKotlinxSerialization"))
             }
         }
