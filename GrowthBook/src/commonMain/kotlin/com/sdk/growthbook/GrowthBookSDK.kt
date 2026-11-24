@@ -121,7 +121,7 @@ class GrowthBookSDK internal constructor(
     cachingLayer: GBCachingLayer?,
     // Internal seam only, same reasoning: set via GBSDKBuilder.setFetchStatsHandler().
     private val fetchStatsHandler: GBFetchStatsHandler? = null
-    ) : FeaturesFlowDelegate, IGrowthBookSDK {
+    ) : IGrowthBookSDK {
 
     /**
      * Public constructor, kept binary-compatible with pre-7.3.0 releases. To set a cache
@@ -163,7 +163,26 @@ class GrowthBookSDK internal constructor(
      * SDK will not call API to fetch Features List
      */
     internal var featuresViewModel: FeaturesViewModel = FeaturesViewModel(
-        delegate = this,
+        delegate = object : FeaturesFlowDelegate {
+            override fun payloadFetchedSuccessfully(
+                features: GBFeatures?,
+                savedGroups: JsonObject?,
+                contextualBandits: Map<String, GBContextualBandit>?,
+                isRemote: Boolean,
+                definitionsSource: GBDefinitionsOrigin,
+            ) = applyFetchedPayload(features, savedGroups, contextualBandits, isRemote, definitionsSource)
+
+            override suspend fun onPayloadReady(model: FeaturesDataModel) =
+                this@GrowthBookSDK.onPayloadReady(model)
+
+            override fun featuresFetchFailed(error: GBError, isRemote: Boolean) =
+                this@GrowthBookSDK.featuresFetchFailed(error, isRemote)
+
+            override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) =
+                this@GrowthBookSDK.savedGroupsFetchFailed(error, isRemote)
+
+            override fun featuresNotModified() = this@GrowthBookSDK.featuresNotModified()
+        },
         dataSource = FeaturesDataSource(
             networkDispatcher, gbContext, gbOptions, onFetchStats = fetchStatsHandler
         ),
@@ -367,7 +386,7 @@ class GrowthBookSDK internal constructor(
      * Only treated as success when the SDK instance has a loaded feature payload.
      * Without prior state a 304 cannot guarantee features are available
      */
-    override fun featuresNotModified() {
+    fun featuresNotModified() {
         if (gbContext.evalSnapshot().definitionsSource == GBDefinitionsOrigin.None) {
             if (gbContext.enableLogging) {
                 GB.log(
@@ -413,7 +432,7 @@ class GrowthBookSDK internal constructor(
     /**
      * Delegate which inform that fetching features failed
      */
-    override fun featuresFetchFailed(error: GBError, isRemote: Boolean) {
+    fun featuresFetchFailed(error: GBError, isRemote: Boolean) {
 
         if (isRemote) {
             remoteSourceFeaturesFetchResult = FeaturesFetchResult.Failed
@@ -421,7 +440,7 @@ class GrowthBookSDK internal constructor(
         }
     }
 
-    override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) {
+    fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) {
         if (isRemote) {
             invokeRefreshHandler(false, error)
         }
@@ -431,6 +450,7 @@ class GrowthBookSDK internal constructor(
      * Preserves the four-argument method exported by GrowthBookSDK before definition origins
      * were introduced. Internal fetches pass the actual origin, including authoritative cache hits.
      */
+    @Deprecated("Retained for binary compatibility", level = DeprecationLevel.HIDDEN)
     fun payloadFetchedSuccessfully(
         features: GBFeatures?,
         savedGroups: JsonObject?,
@@ -442,22 +462,6 @@ class GrowthBookSDK internal constructor(
         contextualBandits,
         isRemote,
         if (isRemote) GBDefinitionsOrigin.Network else GBDefinitionsOrigin.Cache,
-        preserveNetworkDefinitions = false,
-    )
-
-    override fun payloadFetchedSuccessfully(
-        features: GBFeatures?,
-        savedGroups: JsonObject?,
-        contextualBandits: Map<String, GBContextualBandit>?,
-        isRemote: Boolean,
-        definitionsSource: GBDefinitionsOrigin,
-    ) = applyFetchedPayload(
-        features,
-        savedGroups,
-        contextualBandits,
-        isRemote,
-        definitionsSource,
-        preserveNetworkDefinitions = !isRemote,
     )
 
     private fun applyFetchedPayload(
@@ -466,7 +470,6 @@ class GrowthBookSDK internal constructor(
         contextualBandits: Map<String, GBContextualBandit>?,
         isRemote: Boolean,
         definitionsSource: GBDefinitionsOrigin,
-        preserveNetworkDefinitions: Boolean,
     ) {
         // Compute the diff only for authoritative results (network / SSE / fresh cache), against the
         // features currently applied. The non-authoritative cache pre-load that precedes a network
@@ -481,7 +484,7 @@ class GrowthBookSDK internal constructor(
             savedGroups = savedGroups?.mapValues { GBValue.from(it.value) },
             contextualBandits = contextualBandits,
             definitionsSource = definitionsSource,
-            preserveNetworkDefinitions = preserveNetworkDefinitions,
+            preserveNetworkDefinitions = !isRemote,
         )
 
         if (features != null) {
@@ -807,7 +810,7 @@ class GrowthBookSDK internal constructor(
      * Called after the full API payload is received, before features are applied to context.
      * Awaits sticky bucket refresh so that context is consistent when payloadFetchedSuccessfully fires.
      */
-    override suspend fun onPayloadReady(model: FeaturesDataModel) {
+    suspend fun onPayloadReady(model: FeaturesDataModel) {
         try {
             refreshStickyBuckets(
                 context = gbContext,

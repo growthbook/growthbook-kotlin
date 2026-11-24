@@ -23,6 +23,7 @@ import kotlin.test.assertEquals
 import com.sdk.growthbook.features.FeaturesViewModel
 import com.sdk.growthbook.features.FetchResult
 import com.sdk.growthbook.kotlinx.serialization.gbSerialize
+import com.sdk.growthbook.tests.invokeLegacyPayloadFetchedSuccessfully
 
 internal class VerifySDKReturnFeatureValues {
 
@@ -182,7 +183,6 @@ internal class VerifySDKReturnFeatureValues {
 
         delay(100) // cancel only after 100 millis of waiting
         job.cancel()
-        // or gbSdk.payloadFetchedSuccessfully(emptyMap(), null, null, true)
 
         coVerify { mockedFeaturesViewModel.awaitRefresh() }
     }
@@ -206,7 +206,7 @@ internal class VerifySDKReturnFeatureValues {
             // 2nd awaitRefresh(): the newer round lands, applies the FRESH features and reports success.
             coEvery { awaitRefresh() } returns FetchResult.Superseded andThenAnswer {
                 gbSdk.getGBContext().setProvidedFeatures(mapOf("flag" to GBFeature(GBBoolean(true))))
-                gbSdk.payloadFetchedSuccessfully(
+                gbSdk.invokeLegacyPayloadFetchedSuccessfully(
                     features = gbSdk.getGBContext().features,
                     savedGroups = null,
                     contextualBandits = null,

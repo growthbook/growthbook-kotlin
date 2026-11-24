@@ -352,7 +352,9 @@ class GBContext internal constructor(
      * generation's bandit definitions or saved groups.
      *
      * Absent fields keep their current values. The origin changes only when features are supplied.
-     * Set [preserveNetworkDefinitions] for a cache preload or fallback.
+     * When [preserveNetworkDefinitions] is true and the snapshot holds network definitions,
+     * ignore the entire cache payload, including saved groups and bandits. This keeps the
+     * in-memory payload even when a different instance or process has written a newer cache entry.
      */
     internal fun applyPayload(
         features: GBFeatures?,
