@@ -18,7 +18,7 @@ import kotlin.native.HiddenFromObjC
  * ```kotlin
  * viewModelScope.launch {
  *     sdk.featureRefreshFlow()
- *         .filter { it.success }
+ *         .filter { it.outcome == GBFeatureRefreshOutcome.Updated }
  *         .collect { render(it.features) }
  * }
  * ```

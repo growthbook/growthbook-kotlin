@@ -44,7 +44,7 @@ import com.sdk.growthbook.plugin.GBEventDispatch
 import com.sdk.growthbook.plugin.tracking.PluginRegistry
 import com.sdk.growthbook.model.GBContextualBandit
 import com.sdk.growthbook.model.GBFeatureRefreshEvent
-import com.sdk.growthbook.model.GBFeatureRefreshSource
+import com.sdk.growthbook.model.GBFeatureRefreshOutcome
 import com.sdk.growthbook.model.StackContext
 import com.sdk.growthbook.utils.GBFeaturesChangeHandler
 import com.sdk.growthbook.sandbox.CachingImpl
@@ -485,9 +485,9 @@ class GrowthBookSDK internal constructor(
      * Delegate which inform that fetching features failed.
      *
      * The refresh handler is told only about remote failures — a failed cache read is not a
-     * refresh result. Feature refresh listeners are told about both, with [isRemote] surfacing as
-     * [GBFeatureRefreshSource.Network] or [GBFeatureRefreshSource.Cache]: a listener driving UI
-     * needs to know the SDK is evaluating against whatever it had, whichever source let it down.
+     * refresh result. Feature refresh listeners are told about both, as
+     * [GBFeatureRefreshOutcome.Failed] with the definitions still in effect: a listener driving UI
+     * needs to know the SDK is evaluating against whatever it had.
      */
     fun featuresFetchFailed(error: GBError, isRemote: Boolean) {
 
@@ -496,12 +496,7 @@ class GrowthBookSDK internal constructor(
             invokeRefreshHandler(false, error)
         }
 
-        notifyFeatureRefresh(
-            success = false,
-            source = if (isRemote) GBFeatureRefreshSource.Network else GBFeatureRefreshSource.Cache,
-            features = gbContext.features,
-            error = error
-        )
+        notifyFeatureRefresh(GBFeatureRefreshOutcome.Failed, error)
     }
 
     fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) {
@@ -557,7 +552,7 @@ class GrowthBookSDK internal constructor(
             featuresChangeHandler?.let { diffFeatures(gbContext.features, features) }
         } else null
 
-        gbContext.applyPayload(
+        val applied = gbContext.applyPayload(
             features = features,
             savedGroups = savedGroups?.mapValues { GBValue.from(it.value) },
             contextualBandits = contextualBandits,
@@ -579,23 +574,17 @@ class GrowthBookSDK internal constructor(
 
         // Last, and outside both branches above: one event per payload, whichever fields it
         // carried, and only once everything it did carry is applied — a listener is free to call
-        // back into the SDK. The features come from the context, not the payload: a payload without
-        // features leaves the definitions untouched, and a cache payload arriving after network
-        // definitions is not applied at all (see GBContext.applyPayload), so the event always
-        // reports the definitions actually in effect.
-        notifyFeatureRefresh(
-            success = definitionsSource != GBDefinitionsOrigin.Stale,
-            // From the origin, not isRemote: a cache entry inside its freshness window is served as
-            // authoritative without any network call, so isRemote alone would label a disk read
-            // "Network".
-            source = when (definitionsSource) {
-                GBDefinitionsOrigin.Stale -> GBFeatureRefreshSource.Stale
-                GBDefinitionsOrigin.Cache -> GBFeatureRefreshSource.Cache
-                else -> GBFeatureRefreshSource.Network
-            },
-            features = gbContext.features,
-            error = staleError
-        )
+        // back into the SDK.
+        when {
+            // The stale-if-error fallback: the refresh failed, whether or not the expired cache
+            // could be applied — listeners must hear about the failure either way.
+            staleError != null -> notifyFeatureRefresh(GBFeatureRefreshOutcome.Failed, staleError)
+            // A cache payload refused because network definitions are loaded (the pre-load in front
+            // of a later refresh) changed nothing and is not a refresh result; the network round
+            // that follows reports.
+            !applied -> Unit
+            else -> notifyFeatureRefresh(GBFeatureRefreshOutcome.Updated)
+        }
     }
 
     /**
@@ -603,9 +592,9 @@ class GrowthBookSDK internal constructor(
      * Only treated as success when the SDK instance has a loaded feature payload.
      * Without prior state a 304 cannot guarantee features are available
      *
-     * Feature refresh listeners see the same split: [GBFeatureRefreshSource.NotModified] with
-     * `success = true` for the ordinary case, and a failed [GBFeatureRefreshSource.Network] event
-     * for a 304 that arrived before any payload was loaded.
+     * Feature refresh listeners see the same split: [GBFeatureRefreshOutcome.NotModified] for the
+     * ordinary case, and [GBFeatureRefreshOutcome.Failed] for a 304 that arrived before any
+     * payload was loaded.
      */
     fun featuresNotModified() {
         if (!hasLoadedDefinitions()) {
@@ -625,12 +614,7 @@ class GrowthBookSDK internal constructor(
 
             // Last, as in applyFetchedPayload: a consumer wiring up both a refresh handler
             // and a listener sees them in the same order on every path.
-            notifyFeatureRefresh(
-                success = false,
-                source = GBFeatureRefreshSource.Network,
-                features = gbContext.features,
-                error = featuresNotModifiedError
-            )
+            notifyFeatureRefresh(GBFeatureRefreshOutcome.Failed, featuresNotModifiedError)
             return
         }
         remoteSourceFeaturesFetchResult = FeaturesFetchResult.Success
@@ -643,11 +627,7 @@ class GrowthBookSDK internal constructor(
         }
         invokeRefreshHandler(true, null)
 
-        notifyFeatureRefresh(
-            success = true,
-            source = GBFeatureRefreshSource.NotModified,
-            features = gbContext.features
-        )
+        notifyFeatureRefresh(GBFeatureRefreshOutcome.NotModified)
     }
 
     /**
@@ -1058,7 +1038,7 @@ class GrowthBookSDK internal constructor(
      *
      * ```kotlin
      * val subscription = sdk.addFeatureRefreshListener { event ->
-     *     if (event.success) redrawFromFeatures(event.features)
+     *     if (event.outcome == GBFeatureRefreshOutcome.Updated) redrawFromFeatures(event.features)
      * }
      * // later, e.g. in onCleared()
      * subscription.cancel()
@@ -1112,18 +1092,21 @@ class GrowthBookSDK internal constructor(
      * Iterating the snapshot taken up front (rather than the live registry) is deliberate: a
      * listener is free to add or cancel subscriptions, including its own, while being called.
      *
-     * @param features the definitions this refresh applied, or the ones still in effect when it
-     *   applied none (304, failure, a payload carrying only saved groups).
+     * The event's features and origin come from one context snapshot read here, after the outcome
+     * was applied, so they always describe the same state — the definitions actually in effect.
+     *
+     * @param error non-null exactly for [GBFeatureRefreshOutcome.Failed].
      */
-    private fun notifyFeatureRefresh(
-        success: Boolean,
-        source: GBFeatureRefreshSource,
-        features: GBFeatures,
-        error: GBError? = null
-    ) {
+    private fun notifyFeatureRefresh(outcome: GBFeatureRefreshOutcome, error: GBError? = null) {
         val subs = refreshListeners.load()
         if (subs.isNullOrEmpty()) return
-        val event = GBFeatureRefreshEvent(success, source, features, error)
+        val snapshot = gbContext.evalSnapshot()
+        val event = GBFeatureRefreshEvent(
+            outcome = outcome,
+            definitionsSource = snapshot.definitionsSource,
+            features = snapshot.features,
+            error = error,
+        )
         for (sub in subs) {
             try {
                 sub.listener.invoke(event)

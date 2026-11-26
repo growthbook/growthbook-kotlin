@@ -260,7 +260,7 @@ By default the expired (third) tier *fails closed*: past `cacheMaxAge` nothing s
 
 While the network is reachable the freshness ceiling still holds (fresh data is never bypassed); the stale fallback applies purely to network failure. Prefer the default (fail-closed) for kill-switch-style flags that must never be stale.
 
-> **Observability caveat:** when the stale fallback is served, it is applied as a non-authoritative payload and your `GBCacheRefreshHandler` is **not** invoked — neither as success nor as failure. The handler's `(Boolean, GBError?)` contract cannot express "stale fallback served", so signalling either side would mislead. Treat `setServeStaleOnError` as a best-effort offline safety net, not something you can observe through the refresh handler.
+> **Observability caveat:** when the stale fallback is served, it is applied as a non-authoritative payload and your `GBCacheRefreshHandler` is **not** invoked — neither as success nor as failure. The handler's `(Boolean, GBError?)` contract cannot express "stale fallback served", so signalling either side would mislead. Treat `setServeStaleOnError` as a best-effort offline safety net, not something you can observe through the refresh handler. To observe it, register a feature refresh listener: it reports the fallback as a `Failed` event with the network `error` and `definitionsSource == GBDefinitionsOrigin.Stale`.
 
 > **Scope:** the fallback covers *automatic* refreshes (startup, background polling, the stale-while-revalidate round). An explicit `refreshCache()` does not serve an expired cache — it reports the failure through your refresh handler instead. The freshness ceiling itself holds on every path: nothing older than `cacheMaxAge` is ever applied, including on `refreshCache()`.
 
@@ -364,14 +364,13 @@ not of the requested type.
 
   ```kotlin
   val subscription = sdk.addFeatureRefreshListener { event ->
-      when (event.source) {
-          GBFeatureRefreshSource.Network     -> render(event.features)  // fetched from the API
-          GBFeatureRefreshSource.Cache       -> render(event.features)  // loaded from the cache
-          GBFeatureRefreshSource.NotModified -> Unit                    // 304: nothing changed
-          GBFeatureRefreshSource.Stale       -> showOutdatedBanner()    // expired cache after a
-                                                                       // failed refresh
+      when (event.outcome) {
+          GBFeatureRefreshOutcome.Updated     -> render(event.features)  // from the API or the cache
+          GBFeatureRefreshOutcome.NotModified -> Unit                    // 304: nothing changed
+          GBFeatureRefreshOutcome.Failed      -> log(event.error)        // kept what was in effect
       }
-      if (!event.success) log(event.error)
+      // Where the definitions in effect came from — the same value getFeaturesStatus() reports.
+      if (event.definitionsSource == GBDefinitionsOrigin.Stale) showOutdatedBanner()
   }
 
   // later — e.g. in onCleared(); cancelling one subscription never affects another
@@ -392,7 +391,11 @@ not of the requested type.
 
   ```kotlin
   val sdk = GBSDKBuilder(/* ... */)
-      .addFeatureRefreshListener { event -> if (event.source == GBFeatureRefreshSource.Cache) warmStart(event.features) }
+      .addFeatureRefreshListener { event ->
+          if (event.outcome == GBFeatureRefreshOutcome.Updated && event.definitionsSource == GBDefinitionsOrigin.Cache) {
+              warmStart(event.features)
+          }
+      }
       .initialize()
   ```
 
@@ -401,13 +404,17 @@ not of the requested type.
   fun addFeatureRefreshListener(listener: GBFeatureRefreshListener): GBFeatureRefreshSubscription
   fun clearFeatureRefreshListeners()
   // GBFeatureRefreshListener = (GBFeatureRefreshEvent) -> Unit
-  // GBFeatureRefreshEvent(success, source, features, error)
-  // GBFeatureRefreshSource = Network | Cache | NotModified | Stale
+  // GBFeatureRefreshEvent(outcome, definitionsSource, features, error)
+  // GBFeatureRefreshOutcome = Updated | NotModified | Failed
+  // definitionsSource: GBDefinitionsOrigin, as reported by getFeaturesStatus()
   ```
 
-  `Stale` is the only source that arrives with `success = false` **and** applied features: it means
-  `setServeStaleOnError(true)` served an expired cache because the refresh failed, and `error`
-  carries that failure.
+  The two axes are independent: `outcome` says what this attempt did, `definitionsSource` where the
+  definitions now in effect came from; `features` and `definitionsSource` are read from one
+  snapshot. A failed refresh keeps the origin it had, except under `setServeStaleOnError(true)`:
+  then the expired cache is served, the event is `Failed` with the network `error`, and
+  `definitionsSource` is `Stale`. A cache pre-load that is not applied because network definitions
+  are already loaded raises no event — the network round that follows does.
 
 - method for set prefix of filename in cache directory GrowthBook-KMM.
 
@@ -710,7 +717,7 @@ coroutine instead of a handle you have to cancel by hand:
 ```kotlin
 viewModelScope.launch {
     sdk.featureRefreshFlow()
-        .filter { it.success }
+        .filter { it.outcome == GBFeatureRefreshOutcome.Updated }
         .collect { event -> render(event.features) }
 }
 ```

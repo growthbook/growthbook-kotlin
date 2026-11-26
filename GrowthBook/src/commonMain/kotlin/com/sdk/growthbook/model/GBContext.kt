@@ -355,6 +355,9 @@ class GBContext internal constructor(
      * When [preserveNetworkDefinitions] is true and the snapshot holds network definitions,
      * ignore the entire cache payload, including saved groups and bandits. This keeps the
      * in-memory payload even when a different instance or process has written a newer cache entry.
+     *
+     * @return false when the payload was ignored for that reason, true when it was applied. Decided
+     *   by the same CAS round that wrote (or kept) the snapshot, so it cannot disagree with it.
      */
     internal fun applyPayload(
         features: GBFeatures?,
@@ -362,14 +365,20 @@ class GBContext internal constructor(
         contextualBandits: Map<String, GBContextualBandit>? = null,
         definitionsSource: GBDefinitionsOrigin,
         preserveNetworkDefinitions: Boolean = false,
-    ) = mutate {
-        if (preserveNetworkDefinitions && it.definitionsSource == GBDefinitionsOrigin.Network) return@mutate it
-        it.copy(
-            features = features ?: it.features,
-            definitionsSource = if (features == null) it.definitionsSource else definitionsSource,
-            savedGroups = savedGroups ?: it.savedGroups,
-            contextualBandits = contextualBandits ?: it.contextualBandits,
-        )
+    ): Boolean {
+        var applied = true
+        mutate {
+            // Reassigned on every CAS attempt, so the value left is the successful round's.
+            applied = !(preserveNetworkDefinitions && it.definitionsSource == GBDefinitionsOrigin.Network)
+            if (!applied) return@mutate it
+            it.copy(
+                features = features ?: it.features,
+                definitionsSource = if (features == null) it.definitionsSource else definitionsSource,
+                savedGroups = savedGroups ?: it.savedGroups,
+                contextualBandits = contextualBandits ?: it.contextualBandits,
+            )
+        }
+        return applied
     }
 
     /**
@@ -413,8 +422,9 @@ class GBContext internal constructor(
     internal val features: GBFeatures
         get() = state.load().features
 
-    internal fun setProvidedFeatures(features: GBFeatures) =
+    internal fun setProvidedFeatures(features: GBFeatures) {
         applyPayload(features = features, definitionsSource = GBDefinitionsOrigin.Provided)
+    }
 
     /**
      * Contextual bandit definitions keyed by bandit ref, pulled from the payload alongside

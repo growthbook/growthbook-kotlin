@@ -391,8 +391,9 @@ class FeaturesViewModelPollingTests {
     fun testStaleFallbackCarriesTheNetworkErrorToTheDelegate() = runTest {
         // The stale-if-error payload must be distinguishable from an ordinary cache read: it is
         // dispatched with the failure that forced it, which is what GrowthBookSDK turns into a
-        // GBFeatureRefreshSource.Stale event. An ordinary cache read carries no error.
+        // Failed refresh event with a Stale origin. An ordinary cache read carries no error.
         var seenStaleError: GBError? = null
+        var seenOrigin: GBDefinitionsOrigin? = null
         var applications = 0
         val recordingDelegate = object : FeaturesFlowDelegate {
             override fun payloadFetchedSuccessfully(
@@ -405,6 +406,7 @@ class FeaturesViewModelPollingTests {
             ) {
                 applications++
                 seenStaleError = staleError
+                seenOrigin = definitionsSource
             }
             override suspend fun onPayloadReady(model: FeaturesDataModel) = Unit
             override fun featuresFetchFailed(error: GBError, isRemote: Boolean) = Unit
@@ -429,6 +431,7 @@ class FeaturesViewModelPollingTests {
 
         assertEquals(1, applications, "the expired cache is applied exactly once, as the fallback")
         assertNotNull(seenStaleError, "the fallback must carry the network failure that caused it")
+        assertEquals(GBDefinitionsOrigin.Stale, seenOrigin)
     }
 
     @Test

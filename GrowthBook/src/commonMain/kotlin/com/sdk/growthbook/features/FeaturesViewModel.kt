@@ -73,7 +73,7 @@ internal interface FeaturesFlowDelegate {
      *   served because the network round failed with this error. The refresh handler still stays
      *   silent for it — its (Boolean, GBError?) contract cannot say "stale fallback served" — but
      *   feature refresh listeners report it as
-     *   [com.sdk.growthbook.model.GBFeatureRefreshSource.Stale].
+     *   [com.sdk.growthbook.model.GBFeatureRefreshOutcome.Failed] with the error.
      */
     fun payloadFetchedSuccessfully(
         features: GBFeatures?,
@@ -519,7 +519,7 @@ internal class FeaturesViewModel(
                             // (Boolean, GBError?) contract cannot express "stale fallback served", so
                             // signalling either side would mislead. Documented on
                             // GBSDKBuilder.setServeStaleOnError. Feature refresh listeners do get it:
-                            // staleError carries the failure through to GBFeatureRefreshSource.Stale.
+                            // staleError carries the failure through to a Failed refresh event.
                             dispatch(
                                 FetchOutcome.Ready(
                                     onErrorFallback,

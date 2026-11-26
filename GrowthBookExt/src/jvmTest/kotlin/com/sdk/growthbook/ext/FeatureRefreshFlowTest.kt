@@ -3,7 +3,7 @@ package com.sdk.growthbook.ext
 import com.sdk.growthbook.GBSDKBuilder
 import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.model.GBFeatureRefreshEvent
-import com.sdk.growthbook.model.GBFeatureRefreshSource
+import com.sdk.growthbook.model.GBFeatureRefreshOutcome
 import com.sdk.growthbook.utils.GBError
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.take
@@ -13,6 +13,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -45,15 +46,16 @@ class FeatureRefreshFlowTest {
 
         // The payload path is internal to :GrowthBook, so the failure path — public on the SDK —
         // drives the events here. What is under test is the relay, not the event's content.
+        val secondError = GBError(Exception("cache unreadable"))
         sdk.featuresFetchFailed(refreshError, isRemote = true)
-        sdk.featuresFetchFailed(refreshError, isRemote = false)
+        sdk.featuresFetchFailed(secondError, isRemote = false)
         job.join()
 
         assertEquals(2, collected.size)
-        assertEquals(GBFeatureRefreshSource.Network, collected[0].source)
-        assertEquals(GBFeatureRefreshSource.Cache, collected[1].source)
-        assertTrue(collected.none { it.success })
-        assertTrue(collected.all { it.error === refreshError })
+        assertTrue(collected.all { it.outcome == GBFeatureRefreshOutcome.Failed })
+        // In order, and each event carrying its own error.
+        assertSame(refreshError, collected[0].error)
+        assertSame(secondError, collected[1].error)
     }
 
     @Test
