@@ -135,7 +135,7 @@ class GrowthBookSDKReactiveTests {
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun refreshCacheSuspendTrueOnNotModifiedWithLoadedPayload() = runTest {
-        // A seed makes hasFeaturesPayload true, so a subsequent 304 means the loaded payload is
+        // A seed loads definitions (origin Provided), so a subsequent 304 means the loaded payload is
         // still valid and must be reported as success.
         val seed = encryptToFeaturesDataModel("""{"seedflag":{"defaultValue":true}}""")!!
         val sdk = builder(MockNetworkClient(null, null, notModified = true), testScheduler)

@@ -4,6 +4,7 @@ import com.sdk.growthbook.GBSDKBuilder
 import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.model.GBContextualBandit
+import com.sdk.growthbook.model.GBDefinitionsOrigin
 import com.sdk.growthbook.utils.GBCacheRefreshHandler
 import com.sdk.growthbook.utils.GBError
 import com.sdk.growthbook.utils.GBFeatures
@@ -20,11 +21,13 @@ import com.sdk.growthbook.sandbox.CachingJvm
 import com.sdk.growthbook.sandbox.GBCachingLayer
 import com.sdk.growthbook.serializable_model.SerializableFeaturesDataModel
 import com.sdk.growthbook.stickybucket.GBStickyBucketServiceImp
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import java.util.concurrent.CountDownLatch
@@ -508,7 +511,9 @@ class GrowthBookSDKBuilderTests {
             trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
             networkDispatcher = MockNetworkClient(MockResponse.successResponse, null),
             remoteEval = false,
-        ).initialize()
+        )
+            .setCoroutineContext(Dispatchers.Unconfined)
+            .initialize()
 
         val threadCount = 8
         val perThread = 200
@@ -659,13 +664,13 @@ class GrowthBookSDKBuilderTests {
 
     @Test
     fun test_payloadFetchedSuccessfully_updatesSavedGroups() = runTest {
-        val sdk = buildSdkWithHandler()
+        val sdk = buildSdkWithHandler(networkResponse = null)
         val jsonGroups = buildJsonObject {
             put("premium", JsonPrimitive(true))
             put("beta", JsonPrimitive("yes"))
         }
 
-        sdk.payloadFetchedSuccessfully(
+        sdk.invokeLegacyPayloadFetchedSuccessfully(
             features = null,
             savedGroups = jsonGroups,
             contextualBandits = null,
@@ -687,7 +692,7 @@ class GrowthBookSDKBuilderTests {
             handlerError = error
         })
 
-        sdk.payloadFetchedSuccessfully(
+        sdk.invokeLegacyPayloadFetchedSuccessfully(
             features = null,
             savedGroups = buildJsonObject { put("g1", JsonPrimitive(1)) },
             contextualBandits = null,
@@ -704,7 +709,7 @@ class GrowthBookSDKBuilderTests {
         val sdk = buildSdkWithHandler(refreshHandler = { _, _ -> handlerCallCount++ })
         val countAfterInit = handlerCallCount
 
-        sdk.payloadFetchedSuccessfully(
+        sdk.invokeLegacyPayloadFetchedSuccessfully(
             features = null,
             savedGroups = buildJsonObject { put("g1", JsonPrimitive(1)) },
             contextualBandits = null,
@@ -716,9 +721,9 @@ class GrowthBookSDKBuilderTests {
 
     @Test
     fun test_payloadFetchedSuccessfully_withEmptyJson_setEmptySavedGroups() = runTest {
-        val sdk = buildSdkWithHandler()
+        val sdk = buildSdkWithHandler(networkResponse = null)
 
-        sdk.payloadFetchedSuccessfully(
+        sdk.invokeLegacyPayloadFetchedSuccessfully(
             features = null,
             savedGroups = buildJsonObject { },
             contextualBandits = null,
@@ -736,7 +741,7 @@ class GrowthBookSDKBuilderTests {
         val features: GBFeatures = mapOf("feat" to GBFeature(defaultValue = GBBoolean(true)))
         val bandits = mapOf("cb_1" to GBContextualBandit(banditVersion = 7))
 
-        sdk.payloadFetchedSuccessfully(
+        sdk.invokeLegacyPayloadFetchedSuccessfully(
             features = features,
             savedGroups = buildJsonObject { put("premium", JsonPrimitive(true)) },
             contextualBandits = bandits,
@@ -752,8 +757,8 @@ class GrowthBookSDKBuilderTests {
 
     @Test
     fun test_payloadFetchedSuccessfully_withAbsentFields_keepsPreviousValues() = runTest {
-        val sdk = buildSdkWithHandler()
-        sdk.payloadFetchedSuccessfully(
+        val sdk = buildSdkWithHandler(networkResponse = null)
+        sdk.invokeLegacyPayloadFetchedSuccessfully(
             features = mapOf("old" to GBFeature(defaultValue = GBBoolean(true))),
             savedGroups = buildJsonObject { put("premium", JsonPrimitive(true)) },
             contextualBandits = mapOf("cb_1" to GBContextualBandit(banditVersion = 1)),
@@ -761,7 +766,7 @@ class GrowthBookSDKBuilderTests {
         )
 
         // A payload carrying only features must not drop the bandits/saved groups already applied.
-        sdk.payloadFetchedSuccessfully(
+        sdk.invokeLegacyPayloadFetchedSuccessfully(
             features = mapOf("new" to GBFeature(defaultValue = GBBoolean(true))),
             savedGroups = null,
             contextualBandits = null,
@@ -773,6 +778,36 @@ class GrowthBookSDKBuilderTests {
         assertFalse(snapshot.features.containsKey("old"))
         assertTrue(snapshot.savedGroups?.containsKey("premium") == true)
         assertEquals(1, snapshot.contextualBandits?.get("cb_1")?.banditVersion)
+    }
+
+    @Test
+    fun legacyPayloadBridgeIsHiddenAndPreservesNetworkDefinitions() = runTest {
+        assertTrue(legacyPayloadFetchedSuccessfully.isSynthetic)
+        val sdkMethods = GrowthBookSDK::class.java.methods.filter { it.name == legacyPayloadFetchedSuccessfully.name }
+        assertEquals(listOf(legacyPayloadFetchedSuccessfully), sdkMethods)
+
+        val sdk = buildSdkWithHandler(networkResponse = null)
+        try {
+            sdk.invokeLegacyPayloadFetchedSuccessfully(
+                features = mapOf("network" to GBFeature(defaultValue = GBBoolean(true))),
+                savedGroups = buildJsonObject { put("networkGroup", JsonPrimitive(true)) },
+                contextualBandits = mapOf("networkBandit" to GBContextualBandit(banditVersion = 1)),
+                isRemote = true,
+            )
+            val networkSnapshot = sdk.getGBContext().evalSnapshot()
+            assertEquals(GBDefinitionsOrigin.Network, networkSnapshot.definitionsSource)
+
+            sdk.invokeLegacyPayloadFetchedSuccessfully(
+                features = mapOf("cached" to GBFeature(defaultValue = GBBoolean(false))),
+                savedGroups = buildJsonObject { put("cachedGroup", JsonPrimitive(true)) },
+                contextualBandits = mapOf("cachedBandit" to GBContextualBandit(banditVersion = 2)),
+                isRemote = false,
+            )
+
+            assertEquals(networkSnapshot, sdk.getGBContext().evalSnapshot())
+        } finally {
+            sdk.close()
+        }
     }
 
     @Test
@@ -994,6 +1029,7 @@ class GrowthBookSDKBuilderTests {
             ),
         )
             .setInitialFeatures(bundledFeatures)
+            .setCachingLayer(FakeCachingLayer())
             .setRefreshHandler { success, _ ->
                 refreshCalled = true
                 refreshSuccess = success
@@ -1089,6 +1125,24 @@ class GrowthBookSDKBuilderTests {
 //
 //    }
 
+}
+
+private val legacyPayloadFetchedSuccessfully = GrowthBookSDK::class.java.getMethod(
+    "payloadFetchedSuccessfully",
+    Map::class.java,
+    JsonObject::class.java,
+    Map::class.java,
+    java.lang.Boolean.TYPE,
+)
+
+// Exercise the original JVM signature, which is hidden from newly compiled callers.
+internal fun GrowthBookSDK.invokeLegacyPayloadFetchedSuccessfully(
+    features: GBFeatures?,
+    savedGroups: JsonObject?,
+    contextualBandits: Map<String, GBContextualBandit>?,
+    isRemote: Boolean,
+) {
+    legacyPayloadFetchedSuccessfully.invoke(this, features, savedGroups, contextualBandits, isRemote)
 }
 
 class FakeCachingLayer: GBCachingLayer {

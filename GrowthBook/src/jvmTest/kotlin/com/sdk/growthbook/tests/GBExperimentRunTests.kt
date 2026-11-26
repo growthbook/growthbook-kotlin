@@ -82,8 +82,7 @@ class GBExperimentRunTests {
                     savedGroups = testContext.savedGroups.jsonObject.mapValues { GBValue.from(it.value) },
                 )
 
-                gbContext.features = testContext.features
-                    .mapValues { it.value.gbDeserialize() }
+                gbContext.setProvidedFeatures(testContext.features.mapValues { it.value.gbDeserialize() })
 
                 val testScopeEvaluationContext = EvaluationContext(
                     enabled = gbContext.enabled,
