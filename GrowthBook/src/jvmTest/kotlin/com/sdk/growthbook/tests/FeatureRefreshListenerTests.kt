@@ -3,6 +3,8 @@ package com.sdk.growthbook.tests
 import com.sdk.growthbook.GBSDKBuilder
 import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.model.GBBoolean
+import com.sdk.growthbook.model.GBContextualBandit
+import com.sdk.growthbook.model.GBDefinitionsOrigin
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeature
@@ -18,6 +20,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -79,6 +82,29 @@ class FeatureRefreshListenerTests {
     }
 
     /** Registers a recorder and returns the list it fills; the subscription is returned too. */
+    /**
+     * Feeds a payload through the SDK's fetch delegate the way FeaturesViewModel does: the origin
+     * follows from where the payload came from, and a stale-if-error fallback carries its error.
+     */
+    private fun GrowthBookSDK.deliverPayload(
+        features: GBFeatures?,
+        savedGroups: JsonObject?,
+        contextualBandits: Map<String, GBContextualBandit>?,
+        isRemote: Boolean,
+        staleError: GBError? = null,
+    ) = featuresViewModel.delegate.payloadFetchedSuccessfully(
+        features = features,
+        savedGroups = savedGroups,
+        contextualBandits = contextualBandits,
+        isRemote = isRemote,
+        definitionsSource = when {
+            staleError != null -> GBDefinitionsOrigin.Stale
+            isRemote -> GBDefinitionsOrigin.Network
+            else -> GBDefinitionsOrigin.Cache
+        },
+        staleError = staleError,
+    )
+
     private fun GrowthBookSDK.record(): Pair<MutableList<GBFeatureRefreshEvent>, GBFeatureRefreshSubscription> {
         val events = mutableListOf<GBFeatureRefreshEvent>()
         return events to addFeatureRefreshListener { events.add(it) }
@@ -89,7 +115,7 @@ class FeatureRefreshListenerTests {
         val sdk = buildSdk()
         val (events, _) = sdk.record()
 
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
 
         assertEquals(1, events.size)
         assertEquals(GBFeatureRefreshSource.Network, events[0].source)
@@ -105,7 +131,7 @@ class FeatureRefreshListenerTests {
         val (events, _) = sdk.record()
         val callsBefore = handlerCalls
 
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = false)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = false)
 
         assertEquals(1, events.size)
         assertEquals(GBFeatureRefreshSource.Cache, events[0].source)
@@ -122,7 +148,7 @@ class FeatureRefreshListenerTests {
 
         // What FeaturesViewModel dispatches for stale-if-error: a non-authoritative payload plus
         // the failure that forced it.
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = false, staleError = cause)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = false, staleError = cause)
 
         assertEquals(1, events.size)
         assertEquals(GBFeatureRefreshSource.Stale, events[0].source)
@@ -190,7 +216,7 @@ class FeatureRefreshListenerTests {
         val sdk = buildSdk()
         val (events, _) = sdk.record()
 
-        sdk.payloadFetchedSuccessfully(
+        sdk.deliverPayload(
             features = newFeatures,
             savedGroups = buildJsonObject { put("premium", JsonPrimitive(true)) },
             contextualBandits = null,
@@ -206,7 +232,7 @@ class FeatureRefreshListenerTests {
         val sdk = buildSdk()
         val (events, _) = sdk.record()
 
-        sdk.payloadFetchedSuccessfully(
+        sdk.deliverPayload(
             features = null,
             savedGroups = buildJsonObject { put("premium", JsonPrimitive(true)) },
             contextualBandits = null,
@@ -222,7 +248,7 @@ class FeatureRefreshListenerTests {
         val sdk = buildSdk()
         val (events, _) = sdk.record()
 
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
 
         assertEquals(sdk.getFeatures(), events[0].features)
     }
@@ -234,7 +260,7 @@ class FeatureRefreshListenerTests {
         val (second, _) = sdk.record()
 
         firstSub.cancel()
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
 
         assertEquals(0, first.size)
         assertEquals(1, second.size)
@@ -247,7 +273,7 @@ class FeatureRefreshListenerTests {
 
         sub.cancel()
         sub.cancel()
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
 
         assertEquals(0, events.size)
     }
@@ -261,12 +287,12 @@ class FeatureRefreshListenerTests {
         val first = sdk.addFeatureRefreshListener(listener)
         sdk.addFeatureRefreshListener(listener)
 
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
         assertEquals(2, events.size, "both registrations should fire")
 
         // Cancelling one handle must not take the other registration of the same lambda with it.
         first.cancel()
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
         assertEquals(3, events.size)
     }
 
@@ -277,7 +303,7 @@ class FeatureRefreshListenerTests {
         sdk.addFeatureRefreshListener { throw IllegalStateException("listener blew up") }
         sdk.addFeatureRefreshListener { seen.add(it) }
 
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
 
         assertEquals(1, seen.size)
         assertNotNull(sdk.getFeatures()["f2"], "the payload must still be applied")
@@ -299,7 +325,7 @@ class FeatureRefreshListenerTests {
         // initialize() already applied the mock payload, throwing once on the way.
         val callsBefore = changeHandlerCalls
 
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
 
         assertEquals(callsBefore + 1, changeHandlerCalls, "the handler must still be called")
         assertEquals(1, events.size, "a throwing handler must not swallow the listener event")
@@ -320,8 +346,8 @@ class FeatureRefreshListenerTests {
 
         // Iterating a snapshot is what makes this safe: mutating the registry mid-notification
         // must neither throw nor skip the listeners after it.
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
 
         assertEquals(1, seen.size, "the self-cancelling listener hears only the first event")
         assertEquals(2, other.size)
@@ -334,7 +360,7 @@ class FeatureRefreshListenerTests {
         val (second, _) = sdk.record()
 
         sdk.clearFeatureRefreshListeners()
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
 
         assertEquals(0, first.size)
         assertEquals(0, second.size)
@@ -346,7 +372,7 @@ class FeatureRefreshListenerTests {
         val (events, _) = sdk.record()
 
         sdk.close()
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
 
         assertEquals(0, events.size)
     }
@@ -362,7 +388,7 @@ class FeatureRefreshListenerTests {
         assertTrue(sdk.isClosed)
 
         val (events, _) = sdk.record()
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
 
         assertEquals(0, events.size)
     }
@@ -376,7 +402,7 @@ class FeatureRefreshListenerTests {
         sdk.clearFeatureRefreshListeners()
         assertFalse(sdk.isClosed)
         val (afterClear, _) = sdk.record()
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
 
         assertEquals(1, afterClear.size)
     }
@@ -394,7 +420,7 @@ class FeatureRefreshListenerTests {
         sdk.addFeatureRefreshListener { throw CancellationException("listener's own cancellation") }
         sdk.addFeatureRefreshListener { seen.add(it) }
 
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
 
         assertEquals(1, seen.size, "the next listener must still be called")
         assertNotNull(sdk.getFeatures()["f2"], "the payload must still be applied")

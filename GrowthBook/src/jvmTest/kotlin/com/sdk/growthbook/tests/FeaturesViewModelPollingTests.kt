@@ -5,6 +5,7 @@ import com.sdk.growthbook.features.FeaturesDataSource
 import com.sdk.growthbook.features.FeaturesFlowDelegate
 import com.sdk.growthbook.features.FeaturesViewModel
 import com.sdk.growthbook.model.GBContext
+import com.sdk.growthbook.model.GBDefinitionsOrigin
 import com.sdk.growthbook.model.GBContextualBandit
 import com.sdk.growthbook.model.GBOptions
 import com.sdk.growthbook.sandbox.CachingLayer
@@ -52,8 +53,8 @@ class FeaturesViewModelPollingTests {
             savedGroups: JsonObject?,
             contextualBandits: Map<String, GBContextualBandit>?,
             isRemote: Boolean,
+            definitionsSource: GBDefinitionsOrigin,
             staleError: GBError?,
-            fromCache: Boolean,
         ) = Unit
         override suspend fun onPayloadReady(model: FeaturesDataModel) = Unit
         override fun featuresFetchFailed(error: GBError, isRemote: Boolean) = Unit
@@ -321,8 +322,8 @@ class FeaturesViewModelPollingTests {
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
                 isRemote: Boolean,
+                definitionsSource: GBDefinitionsOrigin,
                 staleError: GBError?,
-                fromCache: Boolean,
             ) {
                 if (!isRemote) record()
             }
@@ -399,8 +400,8 @@ class FeaturesViewModelPollingTests {
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
                 isRemote: Boolean,
+                definitionsSource: GBDefinitionsOrigin,
                 staleError: GBError?,
-                fromCache: Boolean,
             ) {
                 applications++
                 seenStaleError = staleError
@@ -493,8 +494,8 @@ class FeaturesViewModelPollingTests {
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
                 isRemote: Boolean,
+                definitionsSource: GBDefinitionsOrigin,
                 staleError: GBError?,
-                fromCache: Boolean,
             ) {
                 if (!isRemote) appliedFromCache = true
             }

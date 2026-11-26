@@ -15,6 +15,17 @@
 - **Use your existing event tracking (GA, Segment, Mixpanel, custom)**
 - **Adjust variation weights and targeting without deploying new code**
 
+## Requirements
+
+The JVM and Android artifacts are compiled to **Java 17 bytecode (class file 61)** with a pinned JDK
+17 toolchain, so **Java 17 is the minimum runtime** on the JVM and Android targets. Running them on an
+older runtime (e.g. Java 11) fails at class load with `UnsupportedClassVersionError`.
+
+- **Android:** `minSdk 21`; desugaring/toolchains that emit Java 17-compatible bytecode.
+- **JVM:** Java 17 or newer.
+- Releases before the toolchain was pinned have no guaranteed floor: their bytecode version
+  tracked whatever JDK published them (issue #250).
+
 See [CHANGELOG.md](CHANGELOG.md) for version history.
 
 ## Setup
@@ -164,6 +175,39 @@ var sdkInstance: GrowthBookSDK = GBSDKBuilder(
 ```
 
 Values are opaque JSON strings keyed by filename — persist and return them verbatim. When set, the custom layer replaces the built-in cache for both feature definitions and sticky-bucket storage. It may be called in any order relative to the sticky-bucket setters.
+
+#### Feature definition source
+
+Use `getFeaturesStatus()` to inspect the origin and count of the loaded definitions.
+`featureWithSource(id)` evaluates the flag and reads its definition origin and presence
+from the same snapshot, even if a refresh finishes concurrently.
+
+On Android, call `initialize()` on a background dispatcher such as `Dispatchers.IO`.
+Initialization reads the disk cache synchronously on the calling thread. Use the app's
+fallback until the SDK instance is available, then read flags from that instance on the
+main thread. Flag reads use the in-memory snapshot while the network fetch runs in the background.
+
+```kotlin
+val evaluation = sdk.featureWithSource("checkout-button")
+val missing = !evaluation.definitionPresent &&
+    evaluation.result.source == GBFeatureSource.unknownFeature
+val checkoutEnabled = if (missing) appDefault else evaluation.result.on
+```
+
+`definitionPresent` is also true when evaluation of a loaded flag fails. A forced
+override can produce a value with `definitionPresent == false`. Apps can use
+`result.source` to decide how to handle either case.
+
+The definition origin describes the active feature map. A partial payload that updates
+saved groups or bandits while leaving the feature map intact preserves its origin.
+`Cache` includes regular cache preloads during revalidation. `Stale` means an expired cache
+was applied after a network error with `setServeStaleOnError(true)`.
+
+HTTP 304 confirms freshness without supplying new definitions. The active origin
+therefore stays `Cache` if the definitions came from disk or `Network` if they were
+already fetched. Use the refresh handler to observe a successful revalidation.
+The built-in Ktor and OkHttp dispatchers keep ETags in memory, so a cold process
+start normally receives a full response on the first network fetch.
 
 #### Cache freshness window (`setCacheMaxAge`)
 
@@ -690,7 +734,7 @@ framework. iOS consumers use `addFeatureRefreshListener` directly.
 
 `GrowthBookOpenFeature` is an [OpenFeature](https://openfeature.dev) provider for the
 [OpenFeature Kotlin SDK](https://github.com/open-feature/kotlin-sdk) 0.9.x, for Android and the JVM.
-It requires Java 11.
+It requires Java 17, like the rest of the SDK.
 
 ```groovy
 implementation 'io.growthbook.sdk:GrowthBookOpenFeature:1.0.0'
@@ -788,6 +832,77 @@ made any time a user attribute or other dependency changes — specifically on `
 
 > If you would like to implement Sticky Bucketing while using Remote Evaluation, you must configure your remote evaluation
 > backend to support Sticky Bucketing. You will not need to provide a StickyBucketService instance to the client side SDK.
+
+## Saved Groups
+
+A saved group is a reusable audience defined once in GrowthBook and targeted from many rules — either an **ID list**
+(a set of attribute values) or a **condition group** (a targeting condition). Nothing needs to be enabled in code:
+groups arrive in the features payload alongside `features`, plain or encrypted, and the SDK resolves them while
+evaluating targeting.
+
+How they reach the SDK depends on the **Saved Groups** setting on the SDK Connection, which is negotiated against the
+capabilities of the SDK version registered for that connection — a format the SDK cannot read steps down to the next
+one. There are three:
+
+- **Inline** — no `savedGroups` field; the group's contents are copied into every rule that uses it.
+- **References (ID lists only)** — rules carry `$inGroup` / `$notInGroup`, and `savedGroups` holds one shared array
+  per group. Condition groups are still inlined.
+- **References (all types)** — every group travels by reference, through a single `$savedGroup` operator.
+
+The third is the one added in 10.2.0. Its `savedGroups` entries are typed, and rules point at them by id:
+
+```json
+{
+  "savedGroups": {
+    "grp_beta": { "type": "list", "attributeKey": "id", "values": ["u_1", "u_2"] },
+    "grp_pro":  { "type": "condition", "condition": { "plan": "pro" } }
+  },
+  "features": {
+    "new-checkout": {
+      "defaultValue": false,
+      "rules": [
+        { "condition": { "$and": [ { "$savedGroup": { "id": "grp_pro" } }, { "country": "US" } ] }, "force": true }
+      ]
+    }
+  }
+}
+```
+
+Unlike `$inGroup`, `$savedGroup` is not attached to an attribute — it sits alongside `$and` / `$or` / `$not` — so the
+entry decides what membership means. A condition group is evaluated in full and may reference further groups; an
+optional `attributeKey` on the reference overrides the attribute a list entry names.
+
+Reference resolution is deliberately conservative. A reference the SDK cannot make sense of — an id absent from the
+payload, a group type introduced after your SDK version, a malformed entry — matches nobody rather than throwing, so
+a payload may safely be newer than the SDK reading it. A group that references itself, directly or around a cycle,
+resolves the same way instead of recursing.
+
+Reference formats reduce payload size by shipping each group once instead of per rule. They do **not** keep a group's
+members off the client: the contents still travel in the payload. Only [Remote Evaluation](#remote-evaluation) and
+remote saved groups do that.
+
+### Remote saved groups
+
+A **remote** saved group keeps its members outside the payload, for lists too large to ship (millions of ids). The
+payload only says which attribute the group is about, `{"type": "remote", "attributeKey": "account_id"}`, so the SDK
+can't work out membership itself: your app resolves the user's groups, typically from its own back end, and passes
+their ids.
+
+```kotlin
+val sdk = GBSDKBuilder(/* ... */)
+    .setRemoteGroupIds(listOf("grp_vip"))
+    .initialize()
+
+// Later, when the user or their groups change
+sdk.setRemoteGroupIds(listOf("grp_vip", "grp_beta"))
+```
+
+Conditions read the ids as the `__gb_remoteGroupIds` attribute, and remote evaluation sends them too. Setting them
+here wins over an attribute of that name, which also works on its own.
+
+Leave the ids unset (or pass `null`) while they are unresolved: rules that use remote groups then fail, including
+"not in group" rules, and one warning is logged when logging is enabled. Pass an empty list only when the user is in
+no group, because that is what lets "not in group" rules match.
 
 ## Contextual Bandits
 

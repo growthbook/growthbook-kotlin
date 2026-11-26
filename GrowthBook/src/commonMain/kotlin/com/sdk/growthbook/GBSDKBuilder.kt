@@ -8,6 +8,7 @@ import com.sdk.growthbook.model.EvalSnapshot
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBContextualBandit
+import com.sdk.growthbook.model.GBDefinitionsOrigin
 import com.sdk.growthbook.model.GBOptions
 import com.sdk.growthbook.features.DecodedPayload
 import com.sdk.growthbook.features.FeaturePayloadDecoder
@@ -129,6 +130,7 @@ class GBSDKBuilder(
     private var featureUsageCallback: GBFeatureUsageCallback? = null
     private var eventLogger: GBEventLogger? = null
     private var plugins: List<GrowthBookPlugin>? = null
+    private var remoteGroupIds: List<String>? = null
     private var initialFeatures: GBFeatures? = null
     private var initialPayloadJson: String? = null
     private var cacheMaxAge: Long? = null
@@ -398,6 +400,15 @@ class GBSDKBuilder(
     }
 
     /**
+     * Sets the remote saved groups the user is in, resolved by the app. See
+     * [GrowthBookSDK.setRemoteGroupIds]; leave unset while they are unresolved.
+     */
+    fun setRemoteGroupIds(remoteGroupIds: List<String>): GBSDKBuilder {
+        this.remoteGroupIds = remoteGroupIds
+        return this
+    }
+
+    /**
      * Opt-in background polling interval in milliseconds.
      *
      * When set, [GrowthBookSDK.startPolling] launches a coroutine on the SDK's background scope
@@ -543,6 +554,7 @@ class GBSDKBuilder(
                 ?: stickyBucketServiceFactory?.invoke(resolveCachingLayer()),
             plugins = plugins,
             eventLogger = eventLogger,
+            remoteGroupIds = remoteGroupIds,
         )
 
     private inner class WaitForCallCaseHelper(
@@ -617,10 +629,11 @@ class GBSDKBuilder(
                     features = it.features,
                     savedGroups = it.savedGroups?.mapValues { (_, value) -> GBValue.from(value) },
                     contextualBandits = it.contextualBandits,
+                    definitionsSource = GBDefinitionsOrigin.Provided,
                 )
             }
         }
-        initialFeatures?.let { gbContext.features = it }
+        initialFeatures?.let(gbContext::setProvidedFeatures)
     }
 
     private fun resolveCachingLayer(): CachingLayer =

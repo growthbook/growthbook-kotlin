@@ -2,11 +2,9 @@ package com.sdk.growthbook.ext
 
 import com.sdk.growthbook.GBSDKBuilder
 import com.sdk.growthbook.GrowthBookSDK
-import com.sdk.growthbook.model.GBBoolean
-import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.model.GBFeatureRefreshEvent
 import com.sdk.growthbook.model.GBFeatureRefreshSource
-import com.sdk.growthbook.utils.GBFeatures
+import com.sdk.growthbook.utils.GBError
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
@@ -24,7 +22,7 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class FeatureRefreshFlowTest {
 
-    private val features: GBFeatures = mapOf("f1" to GBFeature(defaultValue = GBBoolean(true)))
+    private val refreshError = GBError(Exception("offline"))
 
     private fun sdk(): GrowthBookSDK = GBSDKBuilder(
         apiKey = "",
@@ -45,14 +43,17 @@ class FeatureRefreshFlowTest {
             sdk.featureRefreshFlow().take(2).toList(collected)
         }
 
-        sdk.payloadFetchedSuccessfully(features, null, null, isRemote = true)
-        sdk.payloadFetchedSuccessfully(features, null, null, isRemote = false)
+        // The payload path is internal to :GrowthBook, so the failure path — public on the SDK —
+        // drives the events here. What is under test is the relay, not the event's content.
+        sdk.featuresFetchFailed(refreshError, isRemote = true)
+        sdk.featuresFetchFailed(refreshError, isRemote = false)
         job.join()
 
         assertEquals(2, collected.size)
         assertEquals(GBFeatureRefreshSource.Network, collected[0].source)
         assertEquals(GBFeatureRefreshSource.Cache, collected[1].source)
-        assertTrue(collected.all { it.success })
+        assertTrue(collected.none { it.success })
+        assertTrue(collected.all { it.error === refreshError })
     }
 
     @Test
@@ -63,14 +64,14 @@ class FeatureRefreshFlowTest {
         val job = launch(UnconfinedTestDispatcher(testScheduler)) {
             sdk.featureRefreshFlow().collect { collected.add(it) }
         }
-        sdk.payloadFetchedSuccessfully(features, null, null, isRemote = true)
+        sdk.featuresFetchFailed(refreshError, isRemote = true)
         assertEquals(1, collected.size)
 
         job.cancel()
         job.join()
 
         // awaitClose must have cancelled the listener: further refreshes reach nobody.
-        sdk.payloadFetchedSuccessfully(features, null, null, isRemote = true)
+        sdk.featuresFetchFailed(refreshError, isRemote = true)
         assertEquals(1, collected.size)
     }
 
@@ -101,14 +102,14 @@ class FeatureRefreshFlowTest {
             sdk.featureRefreshFlow().collect { second.add(it) }
         }
 
-        sdk.payloadFetchedSuccessfully(features, null, null, isRemote = true)
+        sdk.featuresFetchFailed(refreshError, isRemote = true)
         assertEquals(1, first.size)
         assertEquals(1, second.size)
 
         // Each collector owns its own registration, so one ending leaves the other collecting.
         firstJob.cancel()
         firstJob.join()
-        sdk.payloadFetchedSuccessfully(features, null, null, isRemote = true)
+        sdk.featuresFetchFailed(refreshError, isRemote = true)
 
         assertEquals(1, first.size)
         assertEquals(2, second.size)

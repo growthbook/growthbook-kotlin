@@ -4,6 +4,7 @@ package com.sdk.growthbook.features
 
 import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.GBContextualBandit
+import com.sdk.growthbook.model.GBDefinitionsOrigin
 import com.sdk.growthbook.sandbox.CachingImpl
 import com.sdk.growthbook.sandbox.CachingLayer
 import com.sdk.growthbook.sandbox.getData
@@ -64,11 +65,11 @@ internal interface FeaturesFlowDelegate {
      * @param isRemote true when the result is authoritative (network / SSE / cache still inside the
      *   freshness window) and so may unblock suspendFeature()/initialize{}; false for the cache
      *   pre-load that precedes a network round, which must not be reported as a refresh result.
-     * @param fromCache where the payload physically came from, independent of [isRemote]: a cache
-     *   entry still inside its freshness window is served as authoritative (`isRemote = true`) with
-     *   no network call at all, so the two cannot be collapsed into one flag.
-     * @param staleError non-null only for the stale-if-error fallback
-     *   ([com.sdk.growthbook.GBSDKBuilder.setServeStaleOnError]): the payload is an expired cache
+     * @param definitionsSource where the payload physically came from, independent of [isRemote]: a
+     *   cache entry still inside its freshness window is served as authoritative (`isRemote = true`)
+     *   with no network call at all, so the two cannot be collapsed into one flag.
+     * @param staleError non-null only when [definitionsSource] is
+     *   [GBDefinitionsOrigin.Stale] ([com.sdk.growthbook.GBSDKBuilder.setServeStaleOnError]): the payload is an expired cache
      *   served because the network round failed with this error. The refresh handler still stays
      *   silent for it — its (Boolean, GBError?) contract cannot say "stale fallback served" — but
      *   feature refresh listeners report it as
@@ -79,8 +80,8 @@ internal interface FeaturesFlowDelegate {
         savedGroups: JsonObject?,
         contextualBandits: Map<String, GBContextualBandit>?,
         isRemote: Boolean,
+        definitionsSource: GBDefinitionsOrigin,
         staleError: GBError? = null,
-        fromCache: Boolean = false,
     )
 
     /**
@@ -127,7 +128,7 @@ internal class FeaturesViewModel(
      * (success, failure, 304-not-modified, saved groups) so the owning SDK can
      * apply the features to its context and fire the refresh handler.
      */
-    private val delegate: FeaturesFlowDelegate,
+    internal val delegate: FeaturesFlowDelegate,
     /**
      * Performs the actual fetches, independent of caching: network GET (with
      * 304 handling), remote-eval POST, and the SSE stream. This view model adds
@@ -522,7 +523,7 @@ internal class FeaturesViewModel(
                             dispatch(
                                 FetchOutcome.Ready(
                                     onErrorFallback,
-                                    source = Source.CACHE,
+                                    source = Source.STALE,
                                     authoritative = false,
                                     staleError = GBError(it),
                                 )
@@ -715,8 +716,12 @@ internal class FeaturesViewModel(
                 savedGroups = outcome.payload.savedGroups,
                 contextualBandits = outcome.payload.contextualBandits,
                 isRemote = outcome.authoritative,
+                definitionsSource = when (outcome.source) {
+                    Source.CACHE -> GBDefinitionsOrigin.Cache
+                    Source.STALE -> GBDefinitionsOrigin.Stale
+                    Source.NETWORK -> GBDefinitionsOrigin.Network
+                },
                 staleError = outcome.staleError,
-                fromCache = outcome.source == Source.CACHE
             )
         }
 
