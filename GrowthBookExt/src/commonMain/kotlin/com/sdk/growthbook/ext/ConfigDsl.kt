@@ -11,6 +11,7 @@ import com.sdk.growthbook.plugin.tracking.GrowthBookPlugin
 import com.sdk.growthbook.sandbox.GBCachingLayer
 import com.sdk.growthbook.stickybucket.GBStickyBucketService
 import com.sdk.growthbook.utils.GBCacheRefreshHandler
+import com.sdk.growthbook.utils.GBFeatureRefreshListener
 import com.sdk.growthbook.utils.GBFeatures
 import com.sdk.growthbook.utils.GBFeaturesChangeHandler
 import kotlinx.coroutines.CoroutineScope
@@ -93,6 +94,13 @@ class GrowthBookConfigBuilder {
      * addition to [featureUsageCallback], [trackingCallback] and [plugins], never instead of them.
      */
     var eventLogger: GBEventLogger? = null
+
+    /**
+     * Observers of every refresh attempt, registered before the instance exists so they also see
+     * the cache load served from inside `initialize()` — which a listener added afterwards has
+     * already missed. Defaults to none.
+     */
+    var featureRefreshListeners: List<GBFeatureRefreshListener> = emptyList()
 
     /**
      * Plugins receiving lifecycle callbacks (init / experiment viewed / feature evaluated /
@@ -196,6 +204,7 @@ class GrowthBookConfigBuilder {
         initialFeatures?.let { builder.setInitialFeatures(it) }
         refreshHandler?.let { builder.setRefreshHandler(it) }
         featuresChangeHandler?.let { builder.setFeaturesChangeHandler(it) }
+        featureRefreshListeners.forEach { builder.addFeatureRefreshListener(it) }
         featureUsageCallback?.let { builder.setFeatureUsageCallback(it) }
         eventLogger?.let { builder.setEventLogger(it) }
         cacheMaxAge?.let { builder.setCacheMaxAge(it) }

@@ -339,6 +339,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 contextualBandits: Map<String, GBContextualBandit>?,
                 isRemote: Boolean,
                 definitionsSource: GBDefinitionsOrigin,
+                staleError: GBError?,
             ) {
                 appliedFeatures = features
             }
@@ -439,6 +440,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 contextualBandits: Map<String, GBContextualBandit>?,
                 isRemote: Boolean,
                 definitionsSource: GBDefinitionsOrigin,
+                staleError: GBError?,
             ) {
                 features?.keys?.firstOrNull()?.let { appliedOrder.add(it) }
             }
@@ -512,6 +514,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 contextualBandits: Map<String, GBContextualBandit>?,
                 isRemote: Boolean,
                 definitionsSource: GBDefinitionsOrigin,
+                staleError: GBError?,
             ) {
                 features?.keys?.firstOrNull()?.let { committed.add(it) }
             }
@@ -588,6 +591,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 contextualBandits: Map<String, GBContextualBandit>?,
                 isRemote: Boolean,
                 definitionsSource: GBDefinitionsOrigin,
+                staleError: GBError?,
             ) = Unit
             override suspend fun onPayloadReady(model: FeaturesDataModel) = Unit
             override fun featuresFetchFailed(error: GBError, isRemote: Boolean) { failed = true }
@@ -807,7 +811,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 gbContext, testGbOptions,
             ),
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
-            cachingEnabled = false,
+            cachingEnabled = true,
             cachingLayer = cacheLayer,
             coroutineContext = UnconfinedTestDispatcher(testScheduler),
         )
@@ -833,7 +837,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 gbContext, testGbOptions,
             ),
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
-            cachingEnabled = false,
+            cachingEnabled = true,
             cachingLayer = cacheLayer,
             coroutineContext = UnconfinedTestDispatcher(testScheduler),
         )
@@ -857,7 +861,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 MockNetworkClient(null, Throwable("Network error")),
                 gbContext, testGbOptions,
             ),
-            cachingEnabled = false,
+            cachingEnabled = true,
             cachingLayer = cacheLayer,
             coroutineContext = UnconfinedTestDispatcher(testScheduler),
         )
@@ -936,7 +940,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             delegate = this@FeaturesViewModelTests,
             dataSource = FeaturesDataSource(mockClient, gbContext, testGbOptions),
             encryptionKey = "3tfeoyW0wlo47bDnbWDkxg==",
-            cachingEnabled = false,
+            cachingEnabled = true,
             cachingLayer = cacheLayer,
             cacheMaxAge = 48 * 60 * 60 * 1000L,
             coroutineContext = UnconfinedTestDispatcher(testScheduler)
@@ -1044,6 +1048,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 contextualBandits: Map<String, GBContextualBandit>?,
                 isRemote: Boolean,
                 definitionsSource: GBDefinitionsOrigin,
+                staleError: GBError?,
             ) = Unit
             override fun featuresFetchFailed(error: GBError, isRemote: Boolean) = Unit
             override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) = Unit
@@ -1175,6 +1180,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 contextualBandits: Map<String, GBContextualBandit>?,
                 isRemote: Boolean,
                 definitionsSource: GBDefinitionsOrigin,
+                staleError: GBError?,
             ) {
                 events += "featuresApplied"
             }
@@ -1298,6 +1304,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 contextualBandits: Map<String, GBContextualBandit>?,
                 isRemote: Boolean,
                 definitionsSource: GBDefinitionsOrigin,
+                staleError: GBError?,
             ) {
                 docsAtApplyTime = ctx.stickyBucketAssignmentDocs
             }
@@ -1341,6 +1348,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         contextualBandits: Map<String, GBContextualBandit>?,
         isRemote: Boolean,
         definitionsSource: GBDefinitionsOrigin,
+        staleError: GBError?,
     ) {
         isSuccess = true
         isError = false

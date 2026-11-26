@@ -24,6 +24,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 
@@ -53,6 +54,7 @@ class FeaturesViewModelPollingTests {
             contextualBandits: Map<String, GBContextualBandit>?,
             isRemote: Boolean,
             definitionsSource: GBDefinitionsOrigin,
+            staleError: GBError?,
         ) = Unit
         override suspend fun onPayloadReady(model: FeaturesDataModel) = Unit
         override fun featuresFetchFailed(error: GBError, isRemote: Boolean) = Unit
@@ -105,7 +107,7 @@ class FeaturesViewModelPollingTests {
         delegate = delegate,
         dataSource = FeaturesDataSource(client, gbContext, testGbOptions),
         encryptionKey = encryptionKey,
-        cachingEnabled = false,
+        cachingEnabled = true,
         cachingLayer = cachingLayer,
         cacheMaxAge = cacheMaxAge,
         staleTtl = staleTtl,
@@ -321,6 +323,7 @@ class FeaturesViewModelPollingTests {
                 contextualBandits: Map<String, GBContextualBandit>?,
                 isRemote: Boolean,
                 definitionsSource: GBDefinitionsOrigin,
+                staleError: GBError?,
             ) {
                 if (!isRemote) record()
             }
@@ -382,6 +385,53 @@ class FeaturesViewModelPollingTests {
 
         assertEquals(1, client.getCount, "Expired cache must still attempt the network first")
         assertTrue(appliedFromCache, "On network failure with serveStaleOnError, the expired cache must be served as fallback")
+    }
+
+    @Test
+    fun testStaleFallbackCarriesTheNetworkErrorToTheDelegate() = runTest {
+        // The stale-if-error payload must be distinguishable from an ordinary cache read: it is
+        // dispatched with the failure that forced it, which is what GrowthBookSDK turns into a
+        // Failed refresh event with a Stale origin. An ordinary cache read carries no error.
+        var seenStaleError: GBError? = null
+        var seenOrigin: GBDefinitionsOrigin? = null
+        var applications = 0
+        val recordingDelegate = object : FeaturesFlowDelegate {
+            override fun payloadFetchedSuccessfully(
+                features: GBFeatures?,
+                savedGroups: JsonObject?,
+                contextualBandits: Map<String, GBContextualBandit>?,
+                isRemote: Boolean,
+                definitionsSource: GBDefinitionsOrigin,
+                staleError: GBError?,
+            ) {
+                applications++
+                seenStaleError = staleError
+                seenOrigin = definitionsSource
+            }
+            override suspend fun onPayloadReady(model: FeaturesDataModel) = Unit
+            override fun featuresFetchFailed(error: GBError, isRemote: Boolean) = Unit
+            override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) = Unit
+            override fun featuresNotModified() = Unit
+        }
+        val fiftyHoursAgo = Clock.System.now().toEpochMilliseconds() - (50 * 60 * 60 * 1000L)
+        val viewModel = buildViewModel(
+            CountingClient(response = null, error = Throwable("offline")),
+            testScheduler,
+            cachingLayer = MockCachingLayer.fromApiResponse(
+                MockResponse.successResponse,
+                cachedAt = fiftyHoursAgo
+            ),
+            cacheMaxAge = 48 * 60 * 60 * 1000L,
+            staleTtl = 60 * 60 * 1000L,
+            serveStaleOnError = true,
+            delegate = recordingDelegate,
+        )
+
+        viewModel.fetchFeatures()
+
+        assertEquals(1, applications, "the expired cache is applied exactly once, as the fallback")
+        assertNotNull(seenStaleError, "the fallback must carry the network failure that caused it")
+        assertEquals(GBDefinitionsOrigin.Stale, seenOrigin)
     }
 
     @Test
@@ -448,6 +498,7 @@ class FeaturesViewModelPollingTests {
                 contextualBandits: Map<String, GBContextualBandit>?,
                 isRemote: Boolean,
                 definitionsSource: GBDefinitionsOrigin,
+                staleError: GBError?,
             ) {
                 if (!isRemote) appliedFromCache = true
             }
