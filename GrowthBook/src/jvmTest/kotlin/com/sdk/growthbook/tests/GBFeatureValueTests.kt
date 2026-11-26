@@ -55,8 +55,7 @@ class GBFeatureValueTests {
                     }, encryptionKey = "",
                 )
                 if (testData.features != null) {
-                    gbContext.features = testData.features
-                        .mapValues { it.value.gbDeserialize() }
+                    gbContext.setProvidedFeatures(testData.features.mapValues { it.value.gbDeserialize() })
                 }
                 if (testData.forcedVariations != null) {
                     gbContext.forcedVariations = testData.forcedVariations
@@ -149,10 +148,12 @@ class GBFeatureValueTests {
             trackingCallback = { _, _ -> },
         ).initialize()
 
-        sdk.getGBContext().features = mapOf(
-            "bool-feature" to GBFeature(
-                GBBoolean(true)
-            )
+        sdk.getGBContext().setProvidedFeatures(
+            mapOf(
+                "bool-feature" to GBFeature(
+                    GBBoolean(true)
+                )
+            ),
         )
 
         val result = sdk.featureValue<Boolean>("bool-feature")
@@ -169,10 +170,12 @@ class GBFeatureValueTests {
             trackingCallback = { _, _ -> },
         ).initialize()
 
-        sdk.getGBContext().features = mapOf(
-            "str-feature" to GBFeature(
-                GBString("hello")
-            )
+        sdk.getGBContext().setProvidedFeatures(
+            mapOf(
+                "str-feature" to GBFeature(
+                    GBString("hello")
+                )
+            ),
         )
 
         val result = sdk.featureValue<String>("str-feature")

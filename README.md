@@ -178,6 +178,39 @@ Values are opaque JSON strings keyed by filename — persist and return them ver
 
 On the JVM, [Caffeine cache adapter](#caffeine-cache-adapter-jvm) ships a ready-made bounded in-memory layer instead of writing to disk.
 
+#### Feature definition source
+
+Use `getFeaturesStatus()` to inspect the origin and count of the loaded definitions.
+`featureWithSource(id)` evaluates the flag and reads its definition origin and presence
+from the same snapshot, even if a refresh finishes concurrently.
+
+On Android, call `initialize()` on a background dispatcher such as `Dispatchers.IO`.
+Initialization reads the disk cache synchronously on the calling thread. Use the app's
+fallback until the SDK instance is available, then read flags from that instance on the
+main thread. Flag reads use the in-memory snapshot while the network fetch runs in the background.
+
+```kotlin
+val evaluation = sdk.featureWithSource("checkout-button")
+val missing = !evaluation.definitionPresent &&
+    evaluation.result.source == GBFeatureSource.unknownFeature
+val checkoutEnabled = if (missing) appDefault else evaluation.result.on
+```
+
+`definitionPresent` is also true when evaluation of a loaded flag fails. A forced
+override can produce a value with `definitionPresent == false`. Apps can use
+`result.source` to decide how to handle either case.
+
+The definition origin describes the active feature map. A partial payload that updates
+saved groups or bandits while leaving the feature map intact preserves its origin.
+`Cache` includes regular cache preloads during revalidation. `Stale` means an expired cache
+was applied after a network error with `setServeStaleOnError(true)`.
+
+HTTP 304 confirms freshness without supplying new definitions. The active origin
+therefore stays `Cache` if the definitions came from disk or `Network` if they were
+already fetched. Use the refresh handler to observe a successful revalidation.
+The built-in Ktor and OkHttp dispatchers keep ETags in memory, so a cold process
+start normally receives a full response on the first network fetch.
+
 #### Cache freshness window (`setCacheMaxAge`)
 
 By default the SDK refetches features from the network on every `initialize()`. Pass `setCacheMaxAge(<ms>)` to define a freshness window: while the cached features are younger than that window, the network call on the next fetch is skipped and the cache is served as the authoritative result. Once the cache is older, the SDK refetches. This is a staleness gate evaluated on the next fetch, not a background polling mechanism.
