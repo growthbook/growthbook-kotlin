@@ -1099,7 +1099,9 @@ sdk.setFeatureUsageCallback { featureKey, result -> analytics.featureUsed(featur
 
 The next evaluation reports to the new callback; `setFeatureUsageCallback(null)` removes the feature-usage sink. An
 exposure already delivered to the previous callback is not repeated to the new one — the SDK reports each unique
-exposure once per instance. A callback that throws is logged and ignored rather than breaking evaluation.
+exposure once per instance. Feature usage works the same way: it is reported when a feature's value changes, so a
+feature already reported to the previous callback reaches the new one only once its value changes or the user changes.
+A callback that throws is logged and ignored rather than breaking evaluation.
 
 ### Reusing one instance across users
 

@@ -15,6 +15,7 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 internal typealias FeatureUsageFuncCallback = (String, GBFeatureResult) -> Unit
 internal typealias StickyBucketAssignmentDocsType = Map<GBStickyAttributeKey, GBStickyAssignmentsDocument>
+
 /**
  * Immutable snapshot of the evaluation-input state shared across threads.
  *

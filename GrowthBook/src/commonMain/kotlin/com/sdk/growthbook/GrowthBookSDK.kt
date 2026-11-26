@@ -386,6 +386,10 @@ class GrowthBookSDK internal constructor(
     /**
      * Replaces the feature-usage callback set via [GBSDKBuilder.setFeatureUsageCallback], or
      * removes it with null. The next [feature] evaluation reports to [callback].
+     *
+     * Usage is reported on a value change, not on every evaluation, and that history is kept per
+     * instance rather than per callback: a feature already reported to the previous callback
+     * reaches [callback] only once its value changes, or after a user change resets the history.
      */
     fun setFeatureUsageCallback(callback: GBFeatureUsageCallback?) {
         gbContext.onFeatureUsage = callback
