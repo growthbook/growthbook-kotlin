@@ -3,11 +3,13 @@ package com.sdk.growthbook.tests
 import com.sdk.growthbook.GBSDKBuilder
 import com.sdk.growthbook.GrowthBookSDK
 import com.sdk.growthbook.model.GBBoolean
+import com.sdk.growthbook.model.GBContextualBandit
+import com.sdk.growthbook.model.GBDefinitionsOrigin
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBExperimentResult
 import com.sdk.growthbook.model.GBFeature
 import com.sdk.growthbook.model.GBFeatureRefreshEvent
-import com.sdk.growthbook.model.GBFeatureRefreshSource
+import com.sdk.growthbook.model.GBFeatureRefreshOutcome
 import com.sdk.growthbook.model.GBFeaturesDiff
 import com.sdk.growthbook.sandbox.CachingJvm
 import com.sdk.growthbook.sandbox.GBCachingLayer
@@ -18,6 +20,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -79,54 +82,114 @@ class FeatureRefreshListenerTests {
     }
 
     /** Registers a recorder and returns the list it fills; the subscription is returned too. */
+    /**
+     * Feeds a payload through the SDK's fetch delegate the way FeaturesViewModel does: the origin
+     * follows from where the payload came from, and a stale-if-error fallback carries its error.
+     */
+    private fun GrowthBookSDK.deliverPayload(
+        features: GBFeatures?,
+        savedGroups: JsonObject?,
+        contextualBandits: Map<String, GBContextualBandit>?,
+        isRemote: Boolean,
+        staleError: GBError? = null,
+    ) = featuresViewModel.delegate.payloadFetchedSuccessfully(
+        features = features,
+        savedGroups = savedGroups,
+        contextualBandits = contextualBandits,
+        isRemote = isRemote,
+        definitionsSource = when {
+            staleError != null -> GBDefinitionsOrigin.Stale
+            isRemote -> GBDefinitionsOrigin.Network
+            else -> GBDefinitionsOrigin.Cache
+        },
+        staleError = staleError,
+    )
+
     private fun GrowthBookSDK.record(): Pair<MutableList<GBFeatureRefreshEvent>, GBFeatureRefreshSubscription> {
         val events = mutableListOf<GBFeatureRefreshEvent>()
         return events to addFeatureRefreshListener { events.add(it) }
     }
 
     @Test
-    fun remotePayload_emitsNetworkSuccess() = runTest {
+    fun remotePayload_emitsUpdatedFromNetwork() = runTest {
         val sdk = buildSdk()
         val (events, _) = sdk.record()
 
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
 
         assertEquals(1, events.size)
-        assertEquals(GBFeatureRefreshSource.Network, events[0].source)
-        assertTrue(events[0].success)
+        assertEquals(GBFeatureRefreshOutcome.Updated, events[0].outcome)
+        assertEquals(GBDefinitionsOrigin.Network, events[0].definitionsSource)
         assertNull(events[0].error)
         assertNotNull(events[0].features["f2"])
     }
 
     @Test
-    fun cachePayload_emitsCacheEvent_whileRefreshHandlerStaysSilent() = runTest {
+    fun cachePayload_emitsUpdatedFromCache_whileRefreshHandlerStaysSilent() = runTest {
         var handlerCalls = 0
-        val sdk = buildSdk(refreshHandler = { _, _ -> handlerCalls++ })
+        // No network definitions yet, so the cache load is what evaluation starts with.
+        val sdk = buildSdk(
+            networkResponse = null,
+            networkError = Exception("offline"),
+            refreshHandler = { _, _ -> handlerCalls++ },
+        )
         val (events, _) = sdk.record()
         val callsBefore = handlerCalls
 
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = false)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = false)
 
         assertEquals(1, events.size)
-        assertEquals(GBFeatureRefreshSource.Cache, events[0].source)
-        assertTrue(events[0].success)
+        assertEquals(GBFeatureRefreshOutcome.Updated, events[0].outcome)
+        assertEquals(GBDefinitionsOrigin.Cache, events[0].definitionsSource)
+        assertNotNull(events[0].features["f2"])
         // The whole point of the listener API: a cache load is invisible to the refresh handler.
         assertEquals(callsBefore, handlerCalls)
     }
 
     @Test
-    fun staleFallback_emitsStaleEventCarryingTheNetworkError() = runTest {
+    fun cachePayloadAfterNetworkDefinitions_isNotAppliedAndEmitsNothing() = runTest {
+        // buildSdk() has already applied network definitions. A later cache payload (the pre-load
+        // in front of every refreshCache()) is refused by GBContext.applyPayload, so it is not a
+        // refresh result and must not be reported as an update.
         val sdk = buildSdk()
+        val (events, _) = sdk.record()
+
+        sdk.deliverPayload(newFeatures, null, null, isRemote = false)
+
+        assertEquals(0, events.size)
+        assertNull(sdk.getFeatures()["f2"], "the cache payload must not replace network definitions")
+    }
+
+    @Test
+    fun staleFallback_emitsFailedWithStaleOriginAndTheNetworkError() = runTest {
+        val sdk = buildSdk(networkResponse = null, networkError = Exception("offline"))
         val (events, _) = sdk.record()
         val cause = GBError(Exception("network down"))
 
         // What FeaturesViewModel dispatches for stale-if-error: a non-authoritative payload plus
         // the failure that forced it.
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = false, staleError = cause)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = false, staleError = cause)
 
         assertEquals(1, events.size)
-        assertEquals(GBFeatureRefreshSource.Stale, events[0].source)
-        assertEquals(false, events[0].success)
+        assertEquals(GBFeatureRefreshOutcome.Failed, events[0].outcome)
+        assertEquals(GBDefinitionsOrigin.Stale, events[0].definitionsSource)
+        assertSame(cause, events[0].error)
+        assertNotNull(events[0].features["f2"], "the expired cache is what evaluation now uses")
+    }
+
+    @Test
+    fun staleFallbackAfterNetworkDefinitions_stillReportsTheFailure() = runTest {
+        // The expired cache is not applied over network definitions, but the refresh did fail —
+        // listeners must hear that, with the origin that is actually in effect.
+        val sdk = buildSdk()
+        val (events, _) = sdk.record()
+        val cause = GBError(Exception("network down"))
+
+        sdk.deliverPayload(newFeatures, null, null, isRemote = false, staleError = cause)
+
+        assertEquals(1, events.size)
+        assertEquals(GBFeatureRefreshOutcome.Failed, events[0].outcome)
+        assertEquals(GBDefinitionsOrigin.Network, events[0].definitionsSource)
         assertSame(cause, events[0].error)
     }
 
@@ -138,13 +201,14 @@ class FeatureRefreshListenerTests {
         sdk.featuresNotModified()
 
         assertEquals(1, events.size)
-        assertEquals(GBFeatureRefreshSource.NotModified, events[0].source)
-        assertTrue(events[0].success)
+        assertEquals(GBFeatureRefreshOutcome.NotModified, events[0].outcome)
+        // A 304 confirms what is loaded; it does not change where it came from.
+        assertEquals(GBDefinitionsOrigin.Network, events[0].definitionsSource)
         assertNull(events[0].error)
     }
 
     @Test
-    fun notModifiedBeforeAnyPayload_emitsFailedNetworkEvent() = runTest {
+    fun notModifiedBeforeAnyPayload_emitsFailedEvent() = runTest {
         // A dispatcher that only fails leaves the instance without features, so the 304 cannot be
         // trusted to mean "what you have is current".
         val sdk = buildSdk(networkResponse = null, networkError = Exception("offline"))
@@ -153,8 +217,8 @@ class FeatureRefreshListenerTests {
         sdk.featuresNotModified()
 
         assertEquals(1, events.size)
-        assertEquals(GBFeatureRefreshSource.Network, events[0].source)
-        assertEquals(false, events[0].success)
+        assertEquals(GBFeatureRefreshOutcome.Failed, events[0].outcome)
+        assertEquals(GBDefinitionsOrigin.None, events[0].definitionsSource)
         assertNotNull(events[0].error)
     }
 
@@ -168,9 +232,9 @@ class FeatureRefreshListenerTests {
         sdk.featuresFetchFailed(error, isRemote = false)
 
         assertEquals(2, events.size)
-        assertEquals(GBFeatureRefreshSource.Network, events[0].source)
-        assertEquals(GBFeatureRefreshSource.Cache, events[1].source)
-        assertTrue(events.none { it.success })
+        assertTrue(events.all { it.outcome == GBFeatureRefreshOutcome.Failed })
+        // A failure keeps the definitions — and their origin — that were in effect.
+        assertTrue(events.all { it.definitionsSource == GBDefinitionsOrigin.Network })
         assertTrue(events.all { it.error === error })
     }
 
@@ -190,7 +254,7 @@ class FeatureRefreshListenerTests {
         val sdk = buildSdk()
         val (events, _) = sdk.record()
 
-        sdk.payloadFetchedSuccessfully(
+        sdk.deliverPayload(
             features = newFeatures,
             savedGroups = buildJsonObject { put("premium", JsonPrimitive(true)) },
             contextualBandits = null,
@@ -206,7 +270,7 @@ class FeatureRefreshListenerTests {
         val sdk = buildSdk()
         val (events, _) = sdk.record()
 
-        sdk.payloadFetchedSuccessfully(
+        sdk.deliverPayload(
             features = null,
             savedGroups = buildJsonObject { put("premium", JsonPrimitive(true)) },
             contextualBandits = null,
@@ -222,7 +286,7 @@ class FeatureRefreshListenerTests {
         val sdk = buildSdk()
         val (events, _) = sdk.record()
 
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
 
         assertEquals(sdk.getFeatures(), events[0].features)
     }
@@ -234,7 +298,7 @@ class FeatureRefreshListenerTests {
         val (second, _) = sdk.record()
 
         firstSub.cancel()
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
 
         assertEquals(0, first.size)
         assertEquals(1, second.size)
@@ -247,7 +311,7 @@ class FeatureRefreshListenerTests {
 
         sub.cancel()
         sub.cancel()
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
 
         assertEquals(0, events.size)
     }
@@ -261,12 +325,12 @@ class FeatureRefreshListenerTests {
         val first = sdk.addFeatureRefreshListener(listener)
         sdk.addFeatureRefreshListener(listener)
 
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
         assertEquals(2, events.size, "both registrations should fire")
 
         // Cancelling one handle must not take the other registration of the same lambda with it.
         first.cancel()
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
         assertEquals(3, events.size)
     }
 
@@ -277,7 +341,7 @@ class FeatureRefreshListenerTests {
         sdk.addFeatureRefreshListener { throw IllegalStateException("listener blew up") }
         sdk.addFeatureRefreshListener { seen.add(it) }
 
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
 
         assertEquals(1, seen.size)
         assertNotNull(sdk.getFeatures()["f2"], "the payload must still be applied")
@@ -299,11 +363,11 @@ class FeatureRefreshListenerTests {
         // initialize() already applied the mock payload, throwing once on the way.
         val callsBefore = changeHandlerCalls
 
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
 
         assertEquals(callsBefore + 1, changeHandlerCalls, "the handler must still be called")
         assertEquals(1, events.size, "a throwing handler must not swallow the listener event")
-        assertTrue(events[0].success)
+        assertEquals(GBFeatureRefreshOutcome.Updated, events[0].outcome)
         assertNotNull(sdk.getFeatures()["f2"], "the payload must still be applied")
     }
 
@@ -320,8 +384,8 @@ class FeatureRefreshListenerTests {
 
         // Iterating a snapshot is what makes this safe: mutating the registry mid-notification
         // must neither throw nor skip the listeners after it.
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
 
         assertEquals(1, seen.size, "the self-cancelling listener hears only the first event")
         assertEquals(2, other.size)
@@ -334,7 +398,7 @@ class FeatureRefreshListenerTests {
         val (second, _) = sdk.record()
 
         sdk.clearFeatureRefreshListeners()
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
 
         assertEquals(0, first.size)
         assertEquals(0, second.size)
@@ -346,7 +410,7 @@ class FeatureRefreshListenerTests {
         val (events, _) = sdk.record()
 
         sdk.close()
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
 
         assertEquals(0, events.size)
     }
@@ -362,7 +426,7 @@ class FeatureRefreshListenerTests {
         assertTrue(sdk.isClosed)
 
         val (events, _) = sdk.record()
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
 
         assertEquals(0, events.size)
     }
@@ -376,7 +440,7 @@ class FeatureRefreshListenerTests {
         sdk.clearFeatureRefreshListeners()
         assertFalse(sdk.isClosed)
         val (afterClear, _) = sdk.record()
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
 
         assertEquals(1, afterClear.size)
     }
@@ -394,7 +458,7 @@ class FeatureRefreshListenerTests {
         sdk.addFeatureRefreshListener { throw CancellationException("listener's own cancellation") }
         sdk.addFeatureRefreshListener { seen.add(it) }
 
-        sdk.payloadFetchedSuccessfully(newFeatures, null, null, isRemote = true)
+        sdk.deliverPayload(newFeatures, null, null, isRemote = true)
 
         assertEquals(1, seen.size, "the next listener must still be called")
         assertNotNull(sdk.getFeatures()["f2"], "the payload must still be applied")
@@ -408,8 +472,8 @@ class FeatureRefreshListenerTests {
         sdk.refreshCache()
 
         assertEquals(1, events.size)
-        assertEquals(GBFeatureRefreshSource.Network, events[0].source)
-        assertTrue(events[0].success)
+        assertEquals(GBFeatureRefreshOutcome.Updated, events[0].outcome)
+        assertEquals(GBDefinitionsOrigin.Network, events[0].definitionsSource)
         assertNotNull(events[0].features["f1"])
     }
 
@@ -451,7 +515,8 @@ class FeatureRefreshListenerTests {
         // The cache is served synchronously from inside initialize(), so only a listener attached
         // on the builder can observe it — which is the whole reason that entry point exists.
         assertTrue(events.isNotEmpty(), "the cold-start cache load must reach a builder listener")
-        assertEquals(GBFeatureRefreshSource.Cache, events.first().source)
+        assertEquals(GBFeatureRefreshOutcome.Updated, events.first().outcome)
+        assertEquals(GBDefinitionsOrigin.Cache, events.first().definitionsSource)
         assertNotNull(events.first().features["cached-flag"])
     }
 
@@ -479,7 +544,7 @@ class FeatureRefreshListenerTests {
             .initialize()
 
         assertEquals(1, events.size, "a fresh cache skips the network, so there is exactly one event")
-        assertEquals(GBFeatureRefreshSource.Cache, events[0].source)
-        assertTrue(events[0].success)
+        assertEquals(GBFeatureRefreshOutcome.Updated, events[0].outcome)
+        assertEquals(GBDefinitionsOrigin.Cache, events[0].definitionsSource)
     }
 }

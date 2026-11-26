@@ -8,9 +8,8 @@ internal sealed interface FetchOutcome {
      * Usable payload.
      * @param authoritative true when this result unblocks suspendFeature()/initialize{}
      *   (network, or cache still fresh within the TTL); maps to delegate's isRemote.
-     * @param staleError set only on the stale-if-error fallback: the payload is an expired cache
-     *   served because the revalidating network round failed with this error. Non-null is what
-     *   tells the delegate this Ready is a fallback rather than an ordinary cache read.
+     * @param staleError set only on the stale-if-error fallback ([Source.STALE]): the network error
+     *   that forced the expired cache to be served, passed through to feature refresh listeners.
      */
     data class Ready(
         val payload: DecodedPayload,
@@ -32,8 +31,11 @@ internal sealed interface FetchOutcome {
     data object NotModified : FetchOutcome
 }
 
-/** Where a [FetchOutcome] came from. Note a cache read can fail too, hence [FetchOutcome.Failed]'s source. */
-internal enum class Source { CACHE, NETWORK }
+/**
+ * Where a [FetchOutcome] came from. Note a cache read can fail too, hence [FetchOutcome.Failed]'s
+ * source. [STALE] is an expired cache served as the stale-if-error fallback.
+ */
+internal enum class Source { CACHE, STALE, NETWORK }
 
 /**
  * What [FeaturesViewModel.serveCache] did, and therefore whether the caller still needs the

@@ -43,9 +43,11 @@ class PluginIntegrationTest {
         networkDispatcher = MockNetworkClient(null, null),
     ).setPlugins(plugins).initialize().also { sdk ->
         // Inject features directly since network is mocked to return nothing.
-        sdk.getGBContext().features = hashMapOf(
-            "flag-a" to GBFeature(defaultValue = GBBoolean(true)),
-            "flag-b" to GBFeature(defaultValue = GBString("x")),
+        sdk.getGBContext().setProvidedFeatures(
+            hashMapOf(
+                "flag-a" to GBFeature(defaultValue = GBBoolean(true)),
+                "flag-b" to GBFeature(defaultValue = GBString("x")),
+            ),
         )
     }
 
@@ -280,9 +282,11 @@ class PluginIntegrationTest {
     ).setEventLogger { name, properties, attrs ->
         sink.add(RecordedEvent(name, properties, attrs))
     }.initialize().also { sdk ->
-        sdk.getGBContext().features = hashMapOf(
-            "flag-a" to GBFeature(defaultValue = GBBoolean(true)),
-            "flag-b" to GBFeature(defaultValue = GBString("x")),
+        sdk.getGBContext().setProvidedFeatures(
+            hashMapOf(
+                "flag-a" to GBFeature(defaultValue = GBBoolean(true)),
+                "flag-b" to GBFeature(defaultValue = GBString("x")),
+            ),
         )
     }
 
@@ -352,7 +356,7 @@ class PluginIntegrationTest {
             .setEventLogger { name, properties, attrs -> seen.add(RecordedEvent(name, properties, attrs)) }
             .setPlugins(listOf(plugin))
             .initialize()
-        sdk.getGBContext().features = hashMapOf("flag-a" to GBFeature(defaultValue = GBBoolean(true)))
+        sdk.getGBContext().setProvidedFeatures(hashMapOf("flag-a" to GBFeature(defaultValue = GBBoolean(true))))
 
         sdk.feature("flag-a")
         sdk.close()
@@ -386,9 +390,11 @@ class PluginIntegrationTest {
             .setFeatureUsageCallback { key, _ -> usageKeys.add(key) }
             .setPlugins(listOf(plugin))
             .initialize()
-        sdk.getGBContext().features = hashMapOf(
-            "flag-a" to GBFeature(defaultValue = GBBoolean(true)),
-            "flag-b" to GBFeature(defaultValue = GBString("x")),
+        sdk.getGBContext().setProvidedFeatures(
+            hashMapOf(
+                "flag-a" to GBFeature(defaultValue = GBBoolean(true)),
+                "flag-b" to GBFeature(defaultValue = GBString("x")),
+            ),
         )
         sdk.setForcedFeatures(mapOf("flag-a" to GBBoolean(false)))
 
@@ -441,8 +447,7 @@ class PluginIntegrationTest {
                 }
                 .initialize()
                 .also { sdk ->
-                    sdk.getGBContext().features =
-                        hashMapOf("flag-a" to GBFeature(defaultValue = GBString("a")))
+                    sdk.getGBContext().setProvidedFeatures(hashMapOf("flag-a" to GBFeature(defaultValue = GBString("a"))))
                 }
     }
 
@@ -481,7 +486,7 @@ class PluginIntegrationTest {
                 })
             )
             .initialize()
-        sdk.getGBContext().features = hashMapOf("flag-a" to GBFeature(defaultValue = GBString("a")))
+        sdk.getGBContext().setProvidedFeatures(hashMapOf("flag-a" to GBFeature(defaultValue = GBString("a"))))
 
         val result = sdk.feature("flag-a")
         sdk.feature("flag-a")
@@ -519,30 +524,32 @@ class PluginIntegrationTest {
                 })
             )
             .initialize()
-        sdk.getGBContext().features = hashMapOf(
-            "remote-flag" to GBFeature(
-                rules = listOf(
-                    GBFeatureRule(
-                        id = "remote-rule",
-                        force = GBString("forced"),
-                        tracks = arrayListOf(
-                            GBTrackData(
-                                experiment = GBExperiment(
-                                    key = "remote-exp",
-                                    variations = listOf(GBString("A"), GBString("B")),
-                                ),
-                                result = GBExperimentResult(
-                                    inExperiment = true,
-                                    variationId = 1,
-                                    value = GBString("B"),
-                                    hashAttribute = "id",
-                                    hashValue = "u1",
-                                ),
-                            )
-                        ),
+        sdk.getGBContext().setProvidedFeatures(
+            hashMapOf(
+                "remote-flag" to GBFeature(
+                    rules = listOf(
+                        GBFeatureRule(
+                            id = "remote-rule",
+                            force = GBString("forced"),
+                            tracks = arrayListOf(
+                                GBTrackData(
+                                    experiment = GBExperiment(
+                                        key = "remote-exp",
+                                        variations = listOf(GBString("A"), GBString("B")),
+                                    ),
+                                    result = GBExperimentResult(
+                                        inExperiment = true,
+                                        variationId = 1,
+                                        value = GBString("B"),
+                                        hashAttribute = "id",
+                                        hashValue = "u1",
+                                    ),
+                                )
+                            ),
+                        )
                     )
                 )
-            )
+            ),
         )
 
         val result = sdk.feature("remote-flag")
@@ -559,7 +566,7 @@ class PluginIntegrationTest {
         val sdk = sinks.build()
 
         sdk.feature("flag-a")
-        sdk.getGBContext().features = hashMapOf("flag-a" to GBFeature(defaultValue = GBString("b")))
+        sdk.getGBContext().setProvidedFeatures(hashMapOf("flag-a" to GBFeature(defaultValue = GBString("b"))))
         sdk.feature("flag-a")
         sdk.feature("flag-a")
         sdk.close()
@@ -664,7 +671,7 @@ class PluginIntegrationTest {
             trackingCallback = { _, _ -> },
             networkDispatcher = MockNetworkClient(null, null),
         ).setEventLogger { _, _, _ -> throw RuntimeException("consumer blew up") }.initialize()
-        sdk.getGBContext().features = hashMapOf("flag-a" to GBFeature(defaultValue = GBBoolean(true)))
+        sdk.getGBContext().setProvidedFeatures(hashMapOf("flag-a" to GBFeature(defaultValue = GBBoolean(true))))
 
         val result = sdk.feature("flag-a")
         sdk.close()

@@ -9,6 +9,7 @@ import com.sdk.growthbook.features.FeaturesFlowDelegate
 import com.sdk.growthbook.features.FeaturesViewModel
 import com.sdk.growthbook.features.FetchResult
 import com.sdk.growthbook.model.GBBoolean
+import com.sdk.growthbook.model.GBDefinitionsOrigin
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBContextualBandit
 import com.sdk.growthbook.model.GBNumber
@@ -337,8 +338,8 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
                 isRemote: Boolean,
+                definitionsSource: GBDefinitionsOrigin,
                 staleError: GBError?,
-                fromCache: Boolean,
             ) {
                 appliedFeatures = features
             }
@@ -438,8 +439,8 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
                 isRemote: Boolean,
+                definitionsSource: GBDefinitionsOrigin,
                 staleError: GBError?,
-                fromCache: Boolean,
             ) {
                 features?.keys?.firstOrNull()?.let { appliedOrder.add(it) }
             }
@@ -512,8 +513,8 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
                 isRemote: Boolean,
+                definitionsSource: GBDefinitionsOrigin,
                 staleError: GBError?,
-                fromCache: Boolean,
             ) {
                 features?.keys?.firstOrNull()?.let { committed.add(it) }
             }
@@ -589,8 +590,8 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
                 isRemote: Boolean,
+                definitionsSource: GBDefinitionsOrigin,
                 staleError: GBError?,
-                fromCache: Boolean,
             ) = Unit
             override suspend fun onPayloadReady(model: FeaturesDataModel) = Unit
             override fun featuresFetchFailed(error: GBError, isRemote: Boolean) { failed = true }
@@ -1046,8 +1047,8 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
                 isRemote: Boolean,
+                definitionsSource: GBDefinitionsOrigin,
                 staleError: GBError?,
-                fromCache: Boolean,
             ) = Unit
             override fun featuresFetchFailed(error: GBError, isRemote: Boolean) = Unit
             override fun savedGroupsFetchFailed(error: GBError, isRemote: Boolean) = Unit
@@ -1178,8 +1179,8 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
                 isRemote: Boolean,
+                definitionsSource: GBDefinitionsOrigin,
                 staleError: GBError?,
-                fromCache: Boolean,
             ) {
                 events += "featuresApplied"
             }
@@ -1302,8 +1303,8 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
                 isRemote: Boolean,
+                definitionsSource: GBDefinitionsOrigin,
                 staleError: GBError?,
-                fromCache: Boolean,
             ) {
                 docsAtApplyTime = ctx.stickyBucketAssignmentDocs
             }
@@ -1346,8 +1347,8 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         savedGroups: JsonObject?,
         contextualBandits: Map<String, GBContextualBandit>?,
         isRemote: Boolean,
+        definitionsSource: GBDefinitionsOrigin,
         staleError: GBError?,
-        fromCache: Boolean,
     ) {
         isSuccess = true
         isError = false

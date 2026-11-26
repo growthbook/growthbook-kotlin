@@ -15,6 +15,17 @@
 - **Use your existing event tracking (GA, Segment, Mixpanel, custom)**
 - **Adjust variation weights and targeting without deploying new code**
 
+## Requirements
+
+The JVM and Android artifacts are compiled to **Java 17 bytecode (class file 61)** with a pinned JDK
+17 toolchain, so **Java 17 is the minimum runtime** on the JVM and Android targets. Running them on an
+older runtime (e.g. Java 11) fails at class load with `UnsupportedClassVersionError`.
+
+- **Android:** `minSdk 21`; desugaring/toolchains that emit Java 17-compatible bytecode.
+- **JVM:** Java 17 or newer.
+- Releases before the toolchain was pinned have no guaranteed floor: their bytecode version
+  tracked whatever JDK published them (issue #250).
+
 See [CHANGELOG.md](CHANGELOG.md) for version history.
 
 ## Setup
@@ -165,6 +176,39 @@ var sdkInstance: GrowthBookSDK = GBSDKBuilder(
 
 Values are opaque JSON strings keyed by filename — persist and return them verbatim. When set, the custom layer replaces the built-in cache for both feature definitions and sticky-bucket storage. It may be called in any order relative to the sticky-bucket setters.
 
+#### Feature definition source
+
+Use `getFeaturesStatus()` to inspect the origin and count of the loaded definitions.
+`featureWithSource(id)` evaluates the flag and reads its definition origin and presence
+from the same snapshot, even if a refresh finishes concurrently.
+
+On Android, call `initialize()` on a background dispatcher such as `Dispatchers.IO`.
+Initialization reads the disk cache synchronously on the calling thread. Use the app's
+fallback until the SDK instance is available, then read flags from that instance on the
+main thread. Flag reads use the in-memory snapshot while the network fetch runs in the background.
+
+```kotlin
+val evaluation = sdk.featureWithSource("checkout-button")
+val missing = !evaluation.definitionPresent &&
+    evaluation.result.source == GBFeatureSource.unknownFeature
+val checkoutEnabled = if (missing) appDefault else evaluation.result.on
+```
+
+`definitionPresent` is also true when evaluation of a loaded flag fails. A forced
+override can produce a value with `definitionPresent == false`. Apps can use
+`result.source` to decide how to handle either case.
+
+The definition origin describes the active feature map. A partial payload that updates
+saved groups or bandits while leaving the feature map intact preserves its origin.
+`Cache` includes regular cache preloads during revalidation. `Stale` means an expired cache
+was applied after a network error with `setServeStaleOnError(true)`.
+
+HTTP 304 confirms freshness without supplying new definitions. The active origin
+therefore stays `Cache` if the definitions came from disk or `Network` if they were
+already fetched. Use the refresh handler to observe a successful revalidation.
+The built-in Ktor and OkHttp dispatchers keep ETags in memory, so a cold process
+start normally receives a full response on the first network fetch.
+
 #### Cache freshness window (`setCacheMaxAge`)
 
 By default the SDK refetches features from the network on every `initialize()`. Pass `setCacheMaxAge(<ms>)` to define a freshness window: while the cached features are younger than that window, the network call on the next fetch is skipped and the cache is served as the authoritative result. Once the cache is older, the SDK refetches. This is a staleness gate evaluated on the next fetch, not a background polling mechanism.
@@ -216,7 +260,7 @@ By default the expired (third) tier *fails closed*: past `cacheMaxAge` nothing s
 
 While the network is reachable the freshness ceiling still holds (fresh data is never bypassed); the stale fallback applies purely to network failure. Prefer the default (fail-closed) for kill-switch-style flags that must never be stale.
 
-> **Observability caveat:** when the stale fallback is served, it is applied as a non-authoritative payload and your `GBCacheRefreshHandler` is **not** invoked — neither as success nor as failure. The handler's `(Boolean, GBError?)` contract cannot express "stale fallback served", so signalling either side would mislead. Treat `setServeStaleOnError` as a best-effort offline safety net, not something you can observe through the refresh handler.
+> **Observability caveat:** when the stale fallback is served, it is applied as a non-authoritative payload and your `GBCacheRefreshHandler` is **not** invoked — neither as success nor as failure. The handler's `(Boolean, GBError?)` contract cannot express "stale fallback served", so signalling either side would mislead. Treat `setServeStaleOnError` as a best-effort offline safety net, not something you can observe through the refresh handler. To observe it, register a feature refresh listener: it reports the fallback as a `Failed` event with the network `error` and `definitionsSource == GBDefinitionsOrigin.Stale`.
 
 > **Scope:** the fallback covers *automatic* refreshes (startup, background polling, the stale-while-revalidate round). An explicit `refreshCache()` does not serve an expired cache — it reports the failure through your refresh handler instead. The freshness ceiling itself holds on every path: nothing older than `cacheMaxAge` is ever applied, including on `refreshCache()`.
 
@@ -320,14 +364,13 @@ not of the requested type.
 
   ```kotlin
   val subscription = sdk.addFeatureRefreshListener { event ->
-      when (event.source) {
-          GBFeatureRefreshSource.Network     -> render(event.features)  // fetched from the API
-          GBFeatureRefreshSource.Cache       -> render(event.features)  // loaded from the cache
-          GBFeatureRefreshSource.NotModified -> Unit                    // 304: nothing changed
-          GBFeatureRefreshSource.Stale       -> showOutdatedBanner()    // expired cache after a
-                                                                       // failed refresh
+      when (event.outcome) {
+          GBFeatureRefreshOutcome.Updated     -> render(event.features)  // from the API or the cache
+          GBFeatureRefreshOutcome.NotModified -> Unit                    // 304: nothing changed
+          GBFeatureRefreshOutcome.Failed      -> log(event.error)        // kept what was in effect
       }
-      if (!event.success) log(event.error)
+      // Where the definitions in effect came from — the same value getFeaturesStatus() reports.
+      if (event.definitionsSource == GBDefinitionsOrigin.Stale) showOutdatedBanner()
   }
 
   // later — e.g. in onCleared(); cancelling one subscription never affects another
@@ -348,7 +391,11 @@ not of the requested type.
 
   ```kotlin
   val sdk = GBSDKBuilder(/* ... */)
-      .addFeatureRefreshListener { event -> if (event.source == GBFeatureRefreshSource.Cache) warmStart(event.features) }
+      .addFeatureRefreshListener { event ->
+          if (event.outcome == GBFeatureRefreshOutcome.Updated && event.definitionsSource == GBDefinitionsOrigin.Cache) {
+              warmStart(event.features)
+          }
+      }
       .initialize()
   ```
 
@@ -357,13 +404,17 @@ not of the requested type.
   fun addFeatureRefreshListener(listener: GBFeatureRefreshListener): GBFeatureRefreshSubscription
   fun clearFeatureRefreshListeners()
   // GBFeatureRefreshListener = (GBFeatureRefreshEvent) -> Unit
-  // GBFeatureRefreshEvent(success, source, features, error)
-  // GBFeatureRefreshSource = Network | Cache | NotModified | Stale
+  // GBFeatureRefreshEvent(outcome, definitionsSource, features, error)
+  // GBFeatureRefreshOutcome = Updated | NotModified | Failed
+  // definitionsSource: GBDefinitionsOrigin, as reported by getFeaturesStatus()
   ```
 
-  `Stale` is the only source that arrives with `success = false` **and** applied features: it means
-  `setServeStaleOnError(true)` served an expired cache because the refresh failed, and `error`
-  carries that failure.
+  The two axes are independent: `outcome` says what this attempt did, `definitionsSource` where the
+  definitions now in effect came from; `features` and `definitionsSource` are read from one
+  snapshot. A failed refresh keeps the origin it had, except under `setServeStaleOnError(true)`:
+  then the expired cache is served, the event is `Failed` with the network `error`, and
+  `definitionsSource` is `Stale`. A cache pre-load that is not applied because network definitions
+  are already loaded raises no event — the network round that follows does.
 
 - method for set prefix of filename in cache directory GrowthBook-KMM.
 
@@ -666,7 +717,7 @@ coroutine instead of a handle you have to cancel by hand:
 ```kotlin
 viewModelScope.launch {
     sdk.featureRefreshFlow()
-        .filter { it.success }
+        .filter { it.outcome == GBFeatureRefreshOutcome.Updated }
         .collect { event -> render(event.features) }
 }
 ```
@@ -690,7 +741,7 @@ framework. iOS consumers use `addFeatureRefreshListener` directly.
 
 `GrowthBookOpenFeature` is an [OpenFeature](https://openfeature.dev) provider for the
 [OpenFeature Kotlin SDK](https://github.com/open-feature/kotlin-sdk) 0.9.x, for Android and the JVM.
-It requires Java 11.
+It requires Java 17, like the rest of the SDK.
 
 ```groovy
 implementation 'io.growthbook.sdk:GrowthBookOpenFeature:1.0.0'
@@ -788,6 +839,77 @@ made any time a user attribute or other dependency changes — specifically on `
 
 > If you would like to implement Sticky Bucketing while using Remote Evaluation, you must configure your remote evaluation
 > backend to support Sticky Bucketing. You will not need to provide a StickyBucketService instance to the client side SDK.
+
+## Saved Groups
+
+A saved group is a reusable audience defined once in GrowthBook and targeted from many rules — either an **ID list**
+(a set of attribute values) or a **condition group** (a targeting condition). Nothing needs to be enabled in code:
+groups arrive in the features payload alongside `features`, plain or encrypted, and the SDK resolves them while
+evaluating targeting.
+
+How they reach the SDK depends on the **Saved Groups** setting on the SDK Connection, which is negotiated against the
+capabilities of the SDK version registered for that connection — a format the SDK cannot read steps down to the next
+one. There are three:
+
+- **Inline** — no `savedGroups` field; the group's contents are copied into every rule that uses it.
+- **References (ID lists only)** — rules carry `$inGroup` / `$notInGroup`, and `savedGroups` holds one shared array
+  per group. Condition groups are still inlined.
+- **References (all types)** — every group travels by reference, through a single `$savedGroup` operator.
+
+The third is the one added in 10.2.0. Its `savedGroups` entries are typed, and rules point at them by id:
+
+```json
+{
+  "savedGroups": {
+    "grp_beta": { "type": "list", "attributeKey": "id", "values": ["u_1", "u_2"] },
+    "grp_pro":  { "type": "condition", "condition": { "plan": "pro" } }
+  },
+  "features": {
+    "new-checkout": {
+      "defaultValue": false,
+      "rules": [
+        { "condition": { "$and": [ { "$savedGroup": { "id": "grp_pro" } }, { "country": "US" } ] }, "force": true }
+      ]
+    }
+  }
+}
+```
+
+Unlike `$inGroup`, `$savedGroup` is not attached to an attribute — it sits alongside `$and` / `$or` / `$not` — so the
+entry decides what membership means. A condition group is evaluated in full and may reference further groups; an
+optional `attributeKey` on the reference overrides the attribute a list entry names.
+
+Reference resolution is deliberately conservative. A reference the SDK cannot make sense of — an id absent from the
+payload, a group type introduced after your SDK version, a malformed entry — matches nobody rather than throwing, so
+a payload may safely be newer than the SDK reading it. A group that references itself, directly or around a cycle,
+resolves the same way instead of recursing.
+
+Reference formats reduce payload size by shipping each group once instead of per rule. They do **not** keep a group's
+members off the client: the contents still travel in the payload. Only [Remote Evaluation](#remote-evaluation) and
+remote saved groups do that.
+
+### Remote saved groups
+
+A **remote** saved group keeps its members outside the payload, for lists too large to ship (millions of ids). The
+payload only says which attribute the group is about, `{"type": "remote", "attributeKey": "account_id"}`, so the SDK
+can't work out membership itself: your app resolves the user's groups, typically from its own back end, and passes
+their ids.
+
+```kotlin
+val sdk = GBSDKBuilder(/* ... */)
+    .setRemoteGroupIds(listOf("grp_vip"))
+    .initialize()
+
+// Later, when the user or their groups change
+sdk.setRemoteGroupIds(listOf("grp_vip", "grp_beta"))
+```
+
+Conditions read the ids as the `__gb_remoteGroupIds` attribute, and remote evaluation sends them too. Setting them
+here wins over an attribute of that name, which also works on its own.
+
+Leave the ids unset (or pass `null`) while they are unresolved: rules that use remote groups then fail, including
+"not in group" rules, and one warning is logged when logging is enabled. Pass an empty list only when the user is in
+no group, because that is what lets "not in group" rules match.
 
 ## Contextual Bandits
 
