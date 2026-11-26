@@ -1,6 +1,6 @@
 package com.sdk.growthbook.ext
 
-import com.sdk.growthbook.GrowthBookSDK
+import com.sdk.growthbook.IGrowthBookSDK
 import kotlin.properties.ReadOnlyProperty
 
 /**
@@ -27,7 +27,7 @@ import kotlin.properties.ReadOnlyProperty
  *
  * @param key unique feature identifier
  */
-fun GrowthBookSDK.featureFlag(key: String): ReadOnlyProperty<Any?, Boolean> {
+fun IGrowthBookSDK.featureFlag(key: String): ReadOnlyProperty<Any?, Boolean> {
     val sdk = this
     return ReadOnlyProperty {_, _ -> sdk.isOn(key)}
 }
@@ -45,7 +45,7 @@ fun GrowthBookSDK.featureFlag(key: String): ReadOnlyProperty<Any?, Boolean> {
  * @param key unique feature identifier
  * @param fallbackStrategy strategy for the unknown-feature case
  */
-fun GrowthBookSDK.featureFlag(key: String, fallbackStrategy: FallbackStrategy): ReadOnlyProperty<Any?, Boolean> {
+fun IGrowthBookSDK.featureFlag(key: String, fallbackStrategy: FallbackStrategy): ReadOnlyProperty<Any?, Boolean> {
     val sdk = this
     return ReadOnlyProperty {_, _ -> sdk.isEnabled(key, fallbackStrategy)}
 }
@@ -72,7 +72,7 @@ fun GrowthBookSDK.featureFlag(key: String, fallbackStrategy: FallbackStrategy): 
  * @param flag typed feature flag bundling key, value type and per-feature default
  * @throws IllegalArgumentException on first read if the flag's value type is unsupported
  */
-fun <T: Any> GrowthBookSDK.featureFlag(flag: Flag<T>): ReadOnlyProperty<Any?, T> {
+fun <T: Any> IGrowthBookSDK.featureFlag(flag: Flag<T>): ReadOnlyProperty<Any?, T> {
     val sdk = this
     return ReadOnlyProperty { _, _ -> sdk.resolveFlag(flag) }
 }
