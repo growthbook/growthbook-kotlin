@@ -17,6 +17,7 @@ class GBEventSourceListener(
         if (enableLogging) {
             println("GrowthBook SSE (OkHttp): Connection opened, status: ${response.code}")
         }
+        handler.onOpen()
     }
 
     override fun onEvent(eventSource: EventSource, id: String?, type: String?, data: String) {
