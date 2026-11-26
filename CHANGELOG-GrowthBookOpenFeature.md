@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.1](https://github.com/growthbook/growthbook-kotlin/compare/GrowthBookOpenFeature-1.0.0...GrowthBookOpenFeature-1.0.1) (2026-11-17)
+
+
+### Bug Fixes
+
+* pin JVM toolchain to JDK 17 so published bytecode is Java 17 ([#251](https://github.com/growthbook/growthbook-kotlin/issues/251)) ([baf0317](https://github.com/growthbook/growthbook-kotlin/commit/baf0317642eb865de9b2c7154524e65006c77780))
+
 ## [1.0.0] - 2026-11-06
 
 ### Added

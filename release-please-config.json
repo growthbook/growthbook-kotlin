@@ -27,7 +27,6 @@
       ]
     },
     "GrowthBook": {
-      "component": "GrowthBook",
       "changelog-path": "/CHANGELOG.md",
       "extra-files": [
         {

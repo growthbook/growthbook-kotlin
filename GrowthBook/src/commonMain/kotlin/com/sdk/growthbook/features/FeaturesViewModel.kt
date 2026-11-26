@@ -4,6 +4,7 @@ package com.sdk.growthbook.features
 
 import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.GBContextualBandit
+import com.sdk.growthbook.model.GBDefinitionsOrigin
 import com.sdk.growthbook.sandbox.CachingImpl
 import com.sdk.growthbook.sandbox.CachingLayer
 import com.sdk.growthbook.sandbox.getData
@@ -63,6 +64,7 @@ internal interface FeaturesFlowDelegate {
         savedGroups: JsonObject?,
         contextualBandits: Map<String, GBContextualBandit>?,
         isRemote: Boolean,
+        definitionsSource: GBDefinitionsOrigin,
     )
 
     suspend fun onPayloadReady(model: FeaturesDataModel)
@@ -474,7 +476,7 @@ internal class FeaturesViewModel(
                             // signalling either side would mislead. Documented on
                             // GBSDKBuilder.setServeStaleOnError; revisit if the handler ever grows a
                             // dedicated stale signal.
-                            dispatch(FetchOutcome.Ready(onErrorFallback, source = Source.CACHE, authoritative = false))
+                            dispatch(FetchOutcome.Ready(onErrorFallback, source = Source.STALE, authoritative = false))
                         } else {
                             dispatch(FetchOutcome.Failed(GBError(it), source = Source.NETWORK))
                         }
@@ -662,7 +664,12 @@ internal class FeaturesViewModel(
                 features = outcome.payload.features,
                 savedGroups = outcome.payload.savedGroups,
                 contextualBandits = outcome.payload.contextualBandits,
-                isRemote = outcome.authoritative
+                isRemote = outcome.authoritative,
+                definitionsSource = when (outcome.source) {
+                    Source.CACHE -> GBDefinitionsOrigin.Cache
+                    Source.STALE -> GBDefinitionsOrigin.Stale
+                    Source.NETWORK -> GBDefinitionsOrigin.Network
+                }
             )
         }
 

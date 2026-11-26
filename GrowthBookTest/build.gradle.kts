@@ -11,9 +11,13 @@ plugins {
 
 group = "io.growthbook.sdk"
 // Required: release-please bumps this version using the marker comment. Don't remove it.
-version = "4.0.0" // x-release-please-version
+version = "4.0.1" // x-release-please-version
 
 kotlin {
+    // Pin every JVM-based compilation (incl. tests) to JDK 17 so the published -jvm
+    // bytecode is Java 17 (class 61), not whatever JDK built it.
+    jvmToolchain(17)
+
     androidTarget {
         publishLibraryVariants("release")
     }
