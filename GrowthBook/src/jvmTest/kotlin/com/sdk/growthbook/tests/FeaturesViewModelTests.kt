@@ -12,6 +12,7 @@ import com.sdk.growthbook.model.GBBoolean
 import com.sdk.growthbook.model.GBDefinitionsOrigin
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBContextualBandit
+import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBOptions
 import kotlinx.coroutines.CompletableDeferred
@@ -253,6 +254,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
             ),
             forcedFeatures = mapOf("demo-forced-flag" to GBBoolean(true)),
             forcedVariations = emptyMap(),
+            url = "https://example.com/home",
         )
         val viewModel = FeaturesViewModel(
             delegate = this@FeaturesViewModelTests,
@@ -279,6 +281,13 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         assertTrue(pair is JsonArray, "each forcedFeatures entry must be a [key, value] JsonArray")
         assertEquals(JsonPrimitive("demo-forced-flag"), pair[0])
         assertEquals(JsonPrimitive(true), pair[1])
+
+        // The remote evaluator matches urlPatterns, so the page URL is part of the body.
+        assertEquals("https://example.com/home", body["url"])
+
+        // …and it is always present: an unset URL goes out as "", mirroring sdk-js's getUrl().
+        viewModel.fetchFeatures(payload = payload.copy(url = null))
+        assertEquals("", assertNotNull(client.lastBodyParams)["url"])
     }
 
     @Test
@@ -337,6 +346,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 features: GBFeatures?,
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
+                experiments: List<GBExperiment>?,
                 isRemote: Boolean,
                 definitionsSource: GBDefinitionsOrigin,
             ) {
@@ -437,6 +447,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 features: GBFeatures?,
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
+                experiments: List<GBExperiment>?,
                 isRemote: Boolean,
                 definitionsSource: GBDefinitionsOrigin,
             ) {
@@ -510,6 +521,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 features: GBFeatures?,
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
+                experiments: List<GBExperiment>?,
                 isRemote: Boolean,
                 definitionsSource: GBDefinitionsOrigin,
             ) {
@@ -586,6 +598,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 features: GBFeatures?,
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
+                experiments: List<GBExperiment>?,
                 isRemote: Boolean,
                 definitionsSource: GBDefinitionsOrigin,
             ) = Unit
@@ -1042,6 +1055,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 features: GBFeatures?,
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
+                experiments: List<GBExperiment>?,
                 isRemote: Boolean,
                 definitionsSource: GBDefinitionsOrigin,
             ) = Unit
@@ -1173,6 +1187,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 features: GBFeatures?,
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
+                experiments: List<GBExperiment>?,
                 isRemote: Boolean,
                 definitionsSource: GBDefinitionsOrigin,
             ) {
@@ -1296,6 +1311,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
                 features: GBFeatures?,
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
+                experiments: List<GBExperiment>?,
                 isRemote: Boolean,
                 definitionsSource: GBDefinitionsOrigin,
             ) {
@@ -1339,6 +1355,7 @@ class FeaturesViewModelTests : FeaturesFlowDelegate {
         features: GBFeatures?,
         savedGroups: JsonObject?,
         contextualBandits: Map<String, GBContextualBandit>?,
+        experiments: List<GBExperiment>?,
         isRemote: Boolean,
         definitionsSource: GBDefinitionsOrigin,
     ) {

@@ -135,6 +135,7 @@ class GBSDKBuilder(
     private var refreshInterval: Long? = null
     private var staleTtl: Long? = null
     private var serveStaleOnError: Boolean = false
+    private var url: String? = null
 
     // Dispatcher used to process fetched payloads. Defaults to the platform IO dispatcher in
     // production; tests inject a deterministic dispatcher (e.g. Dispatchers.Unconfined or a
@@ -313,6 +314,20 @@ class GBSDKBuilder(
     fun setCacheMaxAge(cacheMaxAge: Long): GBSDKBuilder {
         require(cacheMaxAge > 0) { "cacheMaxAge must be positive, was $cacheMaxAge" }
         this.cacheMaxAge = cacheMaxAge
+        return this
+    }
+
+    /**
+     * Sets the page URL that `experiment.urlPatterns` is matched against, and that supplies the
+     * original query string when a redirect experiment sets `persistQueryString`.
+     *
+     * An experiment without `urlPatterns` is unaffected, so leaving this unset only opts out of URL
+     * targeting. Update it later with [GrowthBookSDK.setUrl] when the route changes, or pass the
+     * URL straight to [GrowthBookSDK.getUrlRedirects] when resolving a redirect for one specific
+     * address.
+     */
+    fun setUrl(url: String?): GBSDKBuilder {
+        this.url = url
         return this
     }
 
@@ -498,6 +513,7 @@ class GBSDKBuilder(
             encryptionKey = encryptionKey,
             remoteEval = remoteEval,
             enableLogging = enableLogging,
+            url = url,
             // Resolve the caching layer now, so a custom layer set via setCachingLayer() is
             // honoured regardless of whether it was set before or after the sticky-bucket setter.
             stickyBucketService = stickyBucketService
@@ -578,6 +594,7 @@ class GBSDKBuilder(
                     features = it.features,
                     savedGroups = it.savedGroups?.mapValues { (_, value) -> GBValue.from(value) },
                     contextualBandits = it.contextualBandits,
+                    experiments = it.experiments,
                     definitionsSource = GBDefinitionsOrigin.Provided,
                 )
             }

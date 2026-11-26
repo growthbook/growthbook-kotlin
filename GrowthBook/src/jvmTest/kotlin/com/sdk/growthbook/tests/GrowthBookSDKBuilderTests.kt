@@ -606,6 +606,57 @@ class GrowthBookSDKBuilderTests {
     }
 
     @Test
+    fun test_setUrl_withRemoteEval_triggersRemoteRefreshCarryingTheUrl() = runTest {
+        // urlPatterns are matched by the remote evaluator, not here, so the URL has to reach it —
+        // and a route change has to re-evaluate, exactly like an attribute change does.
+        val client = CapturingPostNetworkClient(MockResponse.successResponse)
+        val sdk = GBSDKBuilder(
+            testApiKey,
+            testHostURL,
+            attributes = mapOf("id" to GBString("1")),
+            encryptionKey = null,
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
+            networkDispatcher = client,
+            remoteEval = true,
+        ).setCoroutineContext(UnconfinedTestDispatcher(testScheduler)).initialize()
+
+        // Never absent from the body: unset is sent as "", as sdk-js does with getUrl().
+        assertEquals("", assertNotNull(client.lastBodyParams)["url"])
+
+        sdk.setUrl("https://example.com/pricing")
+
+        assertEquals(
+            "https://example.com/pricing",
+            assertNotNull(client.lastBodyParams)["url"]
+        )
+    }
+
+    @Test
+    fun test_setUrl_withAnUnchangedUrl_doesNotRefresh() = runTest {
+        // Navigation code tends to set the URL unconditionally; a redundant call must not cost a
+        // remote-eval round trip. Mirrors the reference SDK's `if (url === this._options.url) return`.
+        val client = CountingPostNetworkClient(MockResponse.successResponse)
+        val sdk = GBSDKBuilder(
+            testApiKey,
+            testHostURL,
+            attributes = mapOf("id" to GBString("1")),
+            encryptionKey = null,
+            trackingCallback = { _: GBExperiment, _: GBExperimentResult? -> },
+            networkDispatcher = client,
+            remoteEval = true,
+        ).setUrl("https://example.com/home")
+            .setCoroutineContext(UnconfinedTestDispatcher(testScheduler))
+            .initialize()
+
+        val countAfterInit = client.postCount
+        sdk.setUrl("https://example.com/home")
+        assertEquals(countAfterInit, client.postCount)
+
+        sdk.setUrl("https://example.com/pricing")
+        assertTrue(client.postCount > countAfterInit)
+    }
+
+    @Test
     fun test_savedGroupsFetchFailed_isRemoteTrue_callsRefreshHandlerWithFalse() = runTest {
         var handlerSuccess: Boolean? = null
         val sdk = buildSdkWithHandler(refreshHandler = { success, _ -> handlerSuccess = success })

@@ -5,6 +5,7 @@ package com.sdk.growthbook.integration
 // import com.sdk.growthbook.GrowthBookSDK
 // import com.sdk.growthbook.model.GBNumber
 import com.sdk.growthbook.model.GBBoolean
+import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBFeature
 // import com.sdk.growthbook.model.GBFeatureResult
 // import com.sdk.growthbook.model.GBFeatureSource

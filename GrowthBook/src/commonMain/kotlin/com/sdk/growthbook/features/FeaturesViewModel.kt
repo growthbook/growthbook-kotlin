@@ -5,6 +5,7 @@ package com.sdk.growthbook.features
 import com.sdk.growthbook.logger.GB
 import com.sdk.growthbook.model.GBContextualBandit
 import com.sdk.growthbook.model.GBDefinitionsOrigin
+import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.sandbox.CachingImpl
 import com.sdk.growthbook.sandbox.CachingLayer
 import com.sdk.growthbook.sandbox.getData
@@ -63,6 +64,7 @@ internal interface FeaturesFlowDelegate {
         features: GBFeatures?,
         savedGroups: JsonObject?,
         contextualBandits: Map<String, GBContextualBandit>?,
+        experiments: List<GBExperiment>?,
         isRemote: Boolean,
         definitionsSource: GBDefinitionsOrigin,
     )
@@ -617,6 +619,8 @@ internal class FeaturesViewModel(
                     encryptedSavedGroups = null,
                     contextualBandits = decoded.contextualBandits,
                     encryptedContextualBandits = null,
+                    experiments = decoded.experiments,
+                    encryptedExperiments = null,
                 )
             )
 
@@ -664,6 +668,7 @@ internal class FeaturesViewModel(
                 features = outcome.payload.features,
                 savedGroups = outcome.payload.savedGroups,
                 contextualBandits = outcome.payload.contextualBandits,
+                experiments = outcome.payload.experiments,
                 isRemote = outcome.authoritative,
                 definitionsSource = when (outcome.source) {
                     Source.CACHE -> GBDefinitionsOrigin.Cache

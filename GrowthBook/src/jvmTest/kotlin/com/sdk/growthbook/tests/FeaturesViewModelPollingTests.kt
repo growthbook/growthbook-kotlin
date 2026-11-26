@@ -7,6 +7,7 @@ import com.sdk.growthbook.features.FeaturesViewModel
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBDefinitionsOrigin
 import com.sdk.growthbook.model.GBContextualBandit
+import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBOptions
 import com.sdk.growthbook.sandbox.CachingLayer
 import com.sdk.growthbook.utils.GBError
@@ -51,6 +52,7 @@ class FeaturesViewModelPollingTests {
             features: GBFeatures?,
             savedGroups: JsonObject?,
             contextualBandits: Map<String, GBContextualBandit>?,
+            experiments: List<GBExperiment>?,
             isRemote: Boolean,
             definitionsSource: GBDefinitionsOrigin,
         ) = Unit
@@ -319,6 +321,7 @@ class FeaturesViewModelPollingTests {
                 features: GBFeatures?,
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
+                experiments: List<GBExperiment>?,
                 isRemote: Boolean,
                 definitionsSource: GBDefinitionsOrigin,
             ) {
@@ -446,6 +449,7 @@ class FeaturesViewModelPollingTests {
                 features: GBFeatures?,
                 savedGroups: JsonObject?,
                 contextualBandits: Map<String, GBContextualBandit>?,
+                experiments: List<GBExperiment>?,
                 isRemote: Boolean,
                 definitionsSource: GBDefinitionsOrigin,
             ) {

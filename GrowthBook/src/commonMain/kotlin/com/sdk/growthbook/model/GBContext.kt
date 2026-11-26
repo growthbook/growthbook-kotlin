@@ -65,7 +65,9 @@ internal data class EvalSnapshot(
      * it a fresh instance per user change would re-fire an exposure the previous history correctly
      * remembered (A -> B -> A).
      */
-    val featureUsageHelper: GBFeatureUsageHelper = GBFeatureUsageHelper()
+    val featureUsageHelper: GBFeatureUsageHelper = GBFeatureUsageHelper(),
+    val url: String? = null,
+    val experiments: List<GBExperiment>? = null,
 ) {
     /** Whether [savedGroups] has a remote entry. Computed once per snapshot, not per evaluation. */
     val hasRemoteSavedGroups: Boolean by lazy {
@@ -162,6 +164,13 @@ class GBContext internal constructor(
     savedGroups: Map<String, GBValue>? = null,
 
     /**
+     * The page URL evaluated against `experiment.urlPatterns`. Normally set via
+     * [com.sdk.growthbook.GBSDKBuilder.setUrl] and updated with
+     * [com.sdk.growthbook.GrowthBookSDK.setUrl] when the route changes.
+     */
+    url: String? = null,
+
+    /**
      * Plugins registered with the GrowthBook. See
      * [GrowthBookPlugin] and
      * [com.sdk.growthbook.plugin.tracking.GrowthBookTrackingPlugin].
@@ -195,6 +204,7 @@ class GBContext internal constructor(
             stickyBucketAssignmentDocs = stickyBucketAssignmentDocs,
             stickyBucketIdentifierAttributes = stickyBucketIdentifierAttributes,
             savedGroups = savedGroups,
+            url = url,
             remoteGroupIds = remoteGroupIds,
         )
     )
@@ -353,13 +363,14 @@ class GBContext internal constructor(
      *
      * Absent fields keep their current values. The origin changes only when features are supplied.
      * When [preserveNetworkDefinitions] is true and the snapshot holds network definitions,
-     * ignore the entire cache payload, including saved groups and bandits. This keeps the
+     * ignore the entire cache payload, including saved groups, bandits and experiments. This keeps the
      * in-memory payload even when a different instance or process has written a newer cache entry.
      */
     internal fun applyPayload(
         features: GBFeatures?,
         savedGroups: Map<String, GBValue>? = null,
         contextualBandits: Map<String, GBContextualBandit>? = null,
+        experiments: List<GBExperiment>? = null,
         definitionsSource: GBDefinitionsOrigin,
         preserveNetworkDefinitions: Boolean = false,
     ) = mutate {
@@ -369,6 +380,7 @@ class GBContext internal constructor(
             definitionsSource = if (features == null) it.definitionsSource else definitionsSource,
             savedGroups = savedGroups ?: it.savedGroups,
             contextualBandits = contextualBandits ?: it.contextualBandits,
+            experiments = experiments ?: it.experiments,
         )
     }
 
@@ -395,6 +407,17 @@ class GBContext internal constructor(
     var stickyBucketIdentifierAttributes: List<String>?
         get() = state.load().stickyBucketIdentifierAttributes
         set(value) = mutate { it.copy(stickyBucketIdentifierAttributes = value) }
+
+    /**
+     * The page URL matched against `experiment.urlPatterns`, and the source of the original query
+     * string when a redirect experiment sets `persistQueryString`.
+     *
+     * Shared state, like [attributes] — this SDK has no per-user scoped instance, so it is not a
+     * per-request value.
+     */
+    var url: String?
+        get() = state.load().url
+        set(value) = mutate { it.copy(url = value) }
 
     /**
      * Saved groups used by feature/experiment conditions
@@ -425,6 +448,15 @@ class GBContext internal constructor(
     internal var contextualBandits: Map<String, GBContextualBandit>?
         get() = state.load().contextualBandits
         set(value) = mutate { it.copy(contextualBandits = value) }
+
+    /**
+     * Auto-experiments from the payload — URL-redirect experiments for this SDK. Published by the
+     * payload pipeline alongside [features]; read through
+     * [com.sdk.growthbook.GrowthBookSDK.getExperiments].
+     */
+    internal var experiments: List<GBExperiment>?
+        get() = state.load().experiments
+        set(value) = mutate { it.copy(experiments = value) }
 }
 
 /**

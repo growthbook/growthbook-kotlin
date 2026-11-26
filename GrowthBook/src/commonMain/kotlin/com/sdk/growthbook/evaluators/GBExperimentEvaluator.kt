@@ -11,6 +11,8 @@ import com.sdk.growthbook.plugin.fireExperimentViewed
 import com.sdk.growthbook.utils.GBUtils
 import com.sdk.growthbook.kotlinx.serialization.from
 import com.sdk.growthbook.utils.GBUtils.Companion.getAttributes
+import com.sdk.growthbook.utils.url.getQueryStringOverride
+import com.sdk.growthbook.utils.url.isUrlTargeted
 import kotlinx.coroutines.launch
 
 /**
@@ -42,6 +44,50 @@ internal class GBExperimentEvaluator(
                 featureId = featureId,
                 experiment = experiment,
                 variationIndex = -1,
+                hashUsed = false,
+                attributeOverrides = attributeOverrides
+            )
+        }
+
+        /**
+         * 2.6. If the experiment carries URL targeting and the context URL is not targeted by it,
+         * return immediately (not in experiment, variationId 0).
+         *
+         * Ordering matters: this sits ahead of the forced-variation check, as it does in the
+         * reference SDK. Checking it later would let a forced variation enrol a user — and fire an
+         * exposure — on a page the experiment was never meant to run on.
+         */
+        val urlPatterns = experiment.urlPatterns
+        if (urlPatterns != null && !isUrlTargeted(evaluationContext.userContext.url, urlPatterns)) {
+            if (evaluationContext.loggingEnabled) {
+                GB.log("GBExperimentEvaluator: skip because of url targeting ${experiment.key}")
+            }
+            return getExperimentResult(
+                featureId = featureId,
+                experiment = experiment,
+                variationIndex = -1,
+                hashUsed = false,
+                attributeOverrides = attributeOverrides
+            )
+        }
+
+        /**
+         * 2.7. If a variation is forced from the URL's query string (`?my-experiment=1`), return it.
+         * Ahead of the context's forced variations, as in the reference SDK — a QA link wins.
+         */
+        val queryStringOverride = getQueryStringOverride(
+            id = experiment.key,
+            url = evaluationContext.userContext.url,
+            numVariations = experiment.variations.size,
+        )
+        if (queryStringOverride != null) {
+            if (evaluationContext.loggingEnabled) {
+                GB.log("GBExperimentEvaluator: force via querystring $queryStringOverride")
+            }
+            return getExperimentResult(
+                featureId = featureId,
+                experiment = experiment,
+                variationIndex = queryStringOverride,
                 hashUsed = false,
                 attributeOverrides = attributeOverrides
             )
