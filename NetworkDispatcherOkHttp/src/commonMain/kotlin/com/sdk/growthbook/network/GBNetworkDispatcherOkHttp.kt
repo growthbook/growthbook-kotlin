@@ -95,19 +95,46 @@ class GBNetworkDispatcherOkHttp(
         onError: (Throwable) -> Unit,
         onNotModified: (() -> Unit)
     ): Job =
-        handleGetRequest(request, onSuccess, onError, onNotModified)
+        handleGetRequest(request, emptyMap(), onSuccess, onError, onNotModified)
+
+    override fun consumeGETRequestWithNotModified(
+        request: String,
+        headers: Map<String, String>,
+        onSuccess: (String) -> Unit,
+        onError: (Throwable) -> Unit,
+        onNotModified: () -> Unit
+    ): Job = handleGetRequest(request, headers, onSuccess, onError, onNotModified)
 
     override fun consumeGETRequest(
         request: String,
         onSuccess: (String) -> Unit,
         onError: (Throwable) -> Unit
-    ): Job = handleGetRequest(request, onSuccess, onError)
+    ): Job = handleGetRequest(request, emptyMap(), onSuccess, onError)
+
+    override fun consumeGETRequest(
+        request: String,
+        headers: Map<String, String>,
+        onSuccess: (String) -> Unit,
+        onError: (Throwable) -> Unit
+    ): Job = handleGetRequest(request, headers, onSuccess, onError)
 
     /**
      * Method that make POST request to server for remote feature evaluation
      */
     override fun consumePOSTRequest(
         url: String,
+        bodyParams: Map<String, Any>,
+        onSuccess: (String) -> Unit,
+        onError: (Throwable) -> Unit
+    ) = consumePOSTRequest(url, emptyMap(), bodyParams, onSuccess, onError)
+
+    /**
+     * Same as [consumePOSTRequest], with consumer-supplied [headers] (typically
+     * `apiHostRequestHeaders`) applied to the remote-evaluation request.
+     */
+    override fun consumePOSTRequest(
+        url: String,
+        headers: Map<String, String>,
         bodyParams: Map<String, Any>,
         onSuccess: (String) -> Unit,
         onError: (Throwable) -> Unit
@@ -120,8 +147,11 @@ class GBNetworkDispatcherOkHttp(
 
                 val postRequest = Request.Builder()
                     .url(url)
-                    .addHeader("Content-Type", "application/json")
-                    .addHeader("Accept", "application/json")
+                    .applyCustomHeaders(headers)
+                    // header(), not addHeader(): the SDK-managed values replace any
+                    // consumer-supplied ones instead of adding a second header value.
+                    .header("Content-Type", "application/json")
+                    .header("Accept", "application/json")
                     .post(requestBody)
                     .build()
 
@@ -157,24 +187,39 @@ class GBNetworkDispatcherOkHttp(
 
     private fun handleGetRequest(
         request: String,
+        headers: Map<String, String>,
         onSuccess: (String) -> Unit,
         onError: (Throwable) -> Unit,
         onNotModified: (() -> Unit)? = null
     ): Job {
         return CoroutineScope(PlatformDependentIODispatcher).launch {
-            val getRequest = Request.Builder()
-                .url(request)
-                .addHeader("Cache-Control", "max-age=3600")
-                .apply {
-                    // Only add If-None-Match header if URL matches featuresPathPattern
-                    if (featuresPathPattern.matches(request)) {
-                        // Add If-None-Match header if ETag is present
-                        eTagCache.get(request)?.let {
-                            header("If-None-Match", it)
+            val getRequest = try {
+                Request.Builder()
+                    .url(request)
+                    .applyCustomHeaders(headers)
+                    // header(), not addHeader(): the SDK-managed cache directive replaces any
+                    // consumer-supplied one instead of adding a second, conflicting value.
+                    .header("Cache-Control", "max-age=3600")
+                    .apply {
+                        // Only add If-None-Match header if URL matches featuresPathPattern
+                        if (featuresPathPattern.matches(request)) {
+                            // Add If-None-Match header if ETag is present
+                            eTagCache.get(request)?.let {
+                                header("If-None-Match", it)
+                            }
                         }
                     }
-                }
-                .build()
+                    .build()
+            } catch (t: Throwable) {
+                // Building the request can throw before the call is ever enqueued — a malformed
+                // header value, or a `request` without a scheme, makes Request.Builder raise
+                // IllegalArgumentException. Inside launch, not around it: `launch` returns before
+                // the body runs, so a `try` around the call would never see this. Deliberately not
+                // logged — the message embeds the offending header value, which may be a credential.
+                onError(t)
+                return@launch
+            }
+
             fetchClient.newCall(getRequest).enqueue(object : Callback {
                 override fun onFailure(call: Call, e: IOException) {
                     onError(e)
@@ -232,6 +277,17 @@ class GBNetworkDispatcherOkHttp(
     override fun consumeSSEConnection(
         url: String,
         sseController: SSEConnectionController?
+    ): Flow<Resource<String>> = consumeSSEConnection(url, emptyMap(), sseController)
+
+    /**
+     * Same as [consumeSSEConnection], with consumer-supplied [headers] (typically
+     * `streamingHostRequestHeaders`) applied to the streaming request. The request is built once
+     * and reused, so the headers are re-sent on every reconnection attempt.
+     */
+    override fun consumeSSEConnection(
+        url: String,
+        headers: Map<String, String>,
+        sseController: SSEConnectionController?
     ): Flow<Resource<String>> {
         val sseHttpClient = OkHttpClient.Builder()
             .retryOnConnectionFailure(true)
@@ -241,15 +297,30 @@ class GBNetworkDispatcherOkHttp(
             .pingInterval(30, TimeUnit.SECONDS)
             .build()
 
-        val request = Request.Builder()
-            .url(url)
-            .header("Accept", "text/event-stream")
-            .header("Cache-Control", "no-cache")
-            .header("Connection", "keep-alive")
-            .build()
-
         return callbackFlow {
             var eventSource: EventSource? = null
+
+            // Built inside the flow, not around it: a malformed header value or a scheme-less
+            // `url` makes Request.Builder raise IllegalArgumentException, and outside the flow
+            // that throw would propagate synchronously out of the public
+            // GrowthBookSDK.autoRefreshFeatures() instead of being reported as Resource.Error
+            // like every other SSE failure.
+            val request = try {
+                Request.Builder()
+                    .url(url)
+                    .applyCustomHeaders(headers)
+                    .header("Accept", "text/event-stream")
+                    .header("Cache-Control", "no-cache")
+                    .header("Connection", "keep-alive")
+                    .build()
+            } catch (t: Throwable) {
+                // Not logged — the message embeds the offending header value.
+                trySend(Resource.Error(t as? Exception ?: Exception(t)))
+                close()
+                awaitClose { }
+                return@callbackFlow
+            }
+
             val retryManager = SSERetryManager(maxRetries, initialRetryDelayMs, maxRetryDelayMs)
             val controller = sseController ?: SSEConnectionController()
 
@@ -413,5 +484,16 @@ class GBNetworkDispatcherOkHttp(
 
     fun setLoggingEnabled(enabled: Boolean) {
         enableLogging = enabled
+    }
+
+    /**
+     * Applies consumer-supplied headers to a request, dropping the SDK-managed names
+     * ([GBRequestHeaders.RESERVED]). Called before the SDK sets its own headers, so those always
+     * take priority. Header values may contain credentials and are never logged.
+     */
+    private fun Request.Builder.applyCustomHeaders(
+        headers: Map<String, String>
+    ): Request.Builder = apply {
+        GBRequestHeaders.sanitize(headers).forEach { (name, value) -> header(name, value) }
     }
 }
