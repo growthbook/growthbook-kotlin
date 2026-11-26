@@ -369,6 +369,33 @@ class GrowthBookSDK internal constructor(
     }
 
     /**
+     * Replaces the tracking callback given to [GBSDKBuilder] (parity with the reference JS SDK's
+     * `setTrackingCallback`). The next [feature] / [run] reports to [callback]; an evaluation
+     * already in flight finishes with the callback it started with.
+     *
+     * Only exposures not yet tracked are offered: the SDK reports each unique exposure once per
+     * instance, so one already delivered to the previous callback is not repeated to the new one.
+     *
+     * Unlike the JS SDK this flushes nothing: a tracking callback is required at construction, so
+     * there is never a moment without one and no exposure is ever buffered waiting for it.
+     */
+    fun setTrackingCallback(callback: GBTrackingCallback) {
+        gbContext.trackingCallback = callback
+    }
+
+    /**
+     * Replaces the feature-usage callback set via [GBSDKBuilder.setFeatureUsageCallback], or
+     * removes it with null. The next [feature] evaluation reports to [callback].
+     *
+     * Usage is reported on a value change, not on every evaluation, and that history is kept per
+     * instance rather than per callback: a feature already reported to the previous callback
+     * reaches [callback] only once its value changes, or after a user change resets the history.
+     */
+    fun setFeatureUsageCallback(callback: GBFeatureUsageCallback?) {
+        gbContext.onFeatureUsage = callback
+    }
+
+    /**
      * Get Cached Features
      */
     fun getFeatures(): GBFeatures {
