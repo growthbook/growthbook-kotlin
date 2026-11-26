@@ -1,8 +1,10 @@
 package com.sdk.growthbook.ext
 
 import com.sdk.growthbook.model.GBFeature
+import com.sdk.growthbook.model.GBFeatureRefreshEvent
 import com.sdk.growthbook.model.GBFeatureRule
 import com.sdk.growthbook.model.GBString
+import com.sdk.growthbook.utils.GBError
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -22,6 +24,27 @@ class ConfigDslTest {
             cachingEnabled = false
         }
         assertFalse(sdk.isEnabled("nope"))
+    }
+
+    @Test
+    fun `featureRefreshListeners are registered before the first load`() {
+        val events = mutableListOf<GBFeatureRefreshEvent>()
+
+        val sdk = growthBook {
+            apiKey = "key"
+            apiHost = "host"
+            networkDispatcher = MockNetworkDispatcher()
+            cachingEnabled = false
+            featureRefreshListeners = listOf({ event: GBFeatureRefreshEvent -> events.add(event) })
+        }
+
+        // Init itself may already have produced an event (the JVM cache directory is shared), so
+        // count the delta rather than the total — either way, an unregistered listener would see
+        // nothing at all.
+        val before = events.size
+        sdk.featuresFetchFailed(GBError(Exception("offline")), isRemote = true)
+
+        assertEquals(before + 1, events.size)
     }
 
     @Test

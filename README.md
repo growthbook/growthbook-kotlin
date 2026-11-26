@@ -260,7 +260,7 @@ By default the expired (third) tier *fails closed*: past `cacheMaxAge` nothing s
 
 While the network is reachable the freshness ceiling still holds (fresh data is never bypassed); the stale fallback applies purely to network failure. Prefer the default (fail-closed) for kill-switch-style flags that must never be stale.
 
-> **Observability caveat:** when the stale fallback is served, it is applied as a non-authoritative payload and your `GBCacheRefreshHandler` is **not** invoked — neither as success nor as failure. The handler's `(Boolean, GBError?)` contract cannot express "stale fallback served", so signalling either side would mislead. Treat `setServeStaleOnError` as a best-effort offline safety net, not something you can observe through the refresh handler.
+> **Observability caveat:** when the stale fallback is served, it is applied as a non-authoritative payload and your `GBCacheRefreshHandler` is **not** invoked — neither as success nor as failure. The handler's `(Boolean, GBError?)` contract cannot express "stale fallback served", so signalling either side would mislead. Treat `setServeStaleOnError` as a best-effort offline safety net, not something you can observe through the refresh handler. To observe it, register a feature refresh listener: it reports the fallback as a `Failed` event with the network `error` and `definitionsSource == GBDefinitionsOrigin.Stale`.
 
 > **Scope:** the fallback covers *automatic* refreshes (startup, background polling, the stale-while-revalidate round). An explicit `refreshCache()` does not serve an expired cache — it reports the failure through your refresh handler instead. The freshness ceiling itself holds on every path: nothing older than `cacheMaxAge` is ever applied, including on `refreshCache()`.
 
@@ -350,6 +350,71 @@ not of the requested type.
   ```kotlin
   fun setRefreshHandler(handler: () -> Unit)
   ```
+
+- subscribe to refresh attempts at runtime, as many times as you like. Unlike the single refresh
+  handler above — which is fixed at build time and reports remote results only — listeners can be
+  added and cancelled at any point, and they **also hear the cache loads** the SDK starts a session
+  with. Exactly one event per payload, raised after everything that payload changed is applied, so
+  a listener may read back from the SDK. One that throws is logged and skipped without affecting
+  the others or the refresh. **No thread is guaranteed** — most events arrive on the SDK's
+  payload-processing dispatcher (a background thread, so marshal back to the UI thread yourself),
+  but a cache read is delivered synchronously on the thread calling `initialize()` / `refreshCache()`
+  and an SSE failure on the dispatcher collecting `startAutoRefreshFeatures()`. Keep the listener to
+  a cheap hand-off and never block in it.
+
+  ```kotlin
+  val subscription = sdk.addFeatureRefreshListener { event ->
+      when (event.outcome) {
+          GBFeatureRefreshOutcome.Updated     -> render(event.features)  // from the API or the cache
+          GBFeatureRefreshOutcome.NotModified -> Unit                    // 304: nothing changed
+          GBFeatureRefreshOutcome.Failed      -> log(event.error)        // kept what was in effect
+      }
+      // Where the definitions in effect came from — the same value getFeaturesStatus() reports.
+      if (event.definitionsSource == GBDefinitionsOrigin.Stale) showOutdatedBanner()
+  }
+
+  // later — e.g. in onCleared(); cancelling one subscription never affects another
+  subscription.cancel()
+
+  // or drop every registration at once, leaving the instance usable
+  sdk.clearFeatureRefreshListeners()
+  ```
+
+  `close()` also drops every registration, but it is terminal: `addFeatureRefreshListener` is a
+  no-op afterwards, and `sdk.isClosed` tells you so — useful when you hold an SDK whose lifetime
+  you do not own and would otherwise wait forever on a registration that can never fire.
+
+  **Register on the builder to catch the cold start.** The cached payload is applied
+  *synchronously from inside* `initialize()`, so a listener added right after it has already missed
+  that first load. `GBSDKBuilder.addFeatureRefreshListener { }` attaches before the instance exists
+  and therefore sees it; use the instance method for subscriptions tied to a screen's lifetime.
+
+  ```kotlin
+  val sdk = GBSDKBuilder(/* ... */)
+      .addFeatureRefreshListener { event ->
+          if (event.outcome == GBFeatureRefreshOutcome.Updated && event.definitionsSource == GBDefinitionsOrigin.Cache) {
+              warmStart(event.features)
+          }
+      }
+      .initialize()
+  ```
+
+  ```kotlin
+  fun GBSDKBuilder.addFeatureRefreshListener(listener: GBFeatureRefreshListener): GBSDKBuilder
+  fun addFeatureRefreshListener(listener: GBFeatureRefreshListener): GBFeatureRefreshSubscription
+  fun clearFeatureRefreshListeners()
+  // GBFeatureRefreshListener = (GBFeatureRefreshEvent) -> Unit
+  // GBFeatureRefreshEvent(outcome, definitionsSource, features, error)
+  // GBFeatureRefreshOutcome = Updated | NotModified | Failed
+  // definitionsSource: GBDefinitionsOrigin, as reported by getFeaturesStatus()
+  ```
+
+  The two axes are independent: `outcome` says what this attempt did, `definitionsSource` where the
+  definitions now in effect came from; `features` and `definitionsSource` are read from one
+  snapshot. A failed refresh keeps the origin it had, except under `setServeStaleOnError(true)`:
+  then the expired cache is served, the event is `Failed` with the network `error`, and
+  `definitionsSource` is `Stale`. A cache pre-load that is not applied because network definitions
+  are already loaded raises no event — the network round that follows does.
 
 - method for set prefix of filename in cache directory GrowthBook-KMM.
 
@@ -624,7 +689,8 @@ builder: `streamingHost`, `encryptionKey`, `enableLogging`, `remoteEval`, `qaMod
 `enabled`, `forceVariations`, `trackingCallback`, `refreshHandler`,
 `featuresChangeHandler`, `featureUsageCallback`, `initialFeatures`, `plugins`,
 `cachingEnabled`, `cacheMaxAge`, `cachingLayer`, and sticky bucketing via either
-`stickyBucketService` or `stickyBucketScope` (+ optional `stickyBucketPrefix`).
+`stickyBucketService` or `stickyBucketScope` (+ optional `stickyBucketPrefix`), and
+`featureRefreshListeners`.
 
 ```kotlin
 val sdk = growthBook {
@@ -642,6 +708,34 @@ val sdk = growthBook {
     stickyBucketScope = viewModelScope
 }
 ```
+
+### Refresh events as a Flow
+
+`featureRefreshFlow()` wraps `addFeatureRefreshListener` so the subscription follows the collecting
+coroutine instead of a handle you have to cancel by hand:
+
+```kotlin
+viewModelScope.launch {
+    sdk.featureRefreshFlow()
+        .filter { it.outcome == GBFeatureRefreshOutcome.Updated }
+        .collect { event -> render(event.features) }
+}
+```
+
+Cold and per-collector: each collection registers its own listener and removes it when the
+coroutine ends, for any reason. Nothing is replayed, and collection necessarily starts after
+`initialize()` has applied the cached payload, so the cold-start load is never in the stream —
+read `sdk.getFeatures()` for the state at start, or register on the builder when you must observe
+that first load. Events are emitted on whichever thread the SDK reports them from (see
+`addFeatureRefreshListener` above); add your own `flowOn` to move them. A slow collector never
+blocks a refresh: the producer only offers, and the buffer keeps only the latest event.
+
+Collecting an already-closed SDK completes immediately. Closing one *while* a collector is attached
+does not end the flow — there is no termination signal to deliver — so scope the collection
+(`viewModelScope`, a `SupervisorJob` you cancel) rather than relying on it to complete on its own.
+
+Kotlin-only — `Flow` has no usable Objective-C representation, so it is hidden from the iOS
+framework. iOS consumers use `addFeatureRefreshListener` directly.
 
 ## OpenFeature (GrowthBookOpenFeature)
 
