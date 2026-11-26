@@ -8,6 +8,7 @@ import com.sdk.growthbook.model.EvalSnapshot
 import com.sdk.growthbook.model.GBValue
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBContextualBandit
+import com.sdk.growthbook.model.GBDefinitionsOrigin
 import com.sdk.growthbook.model.GBOptions
 import com.sdk.growthbook.features.DecodedPayload
 import com.sdk.growthbook.features.FeaturePayloadDecoder
@@ -577,10 +578,11 @@ class GBSDKBuilder(
                     features = it.features,
                     savedGroups = it.savedGroups?.mapValues { (_, value) -> GBValue.from(value) },
                     contextualBandits = it.contextualBandits,
+                    definitionsSource = GBDefinitionsOrigin.Provided,
                 )
             }
         }
-        initialFeatures?.let { gbContext.features = it }
+        initialFeatures?.let(gbContext::setProvidedFeatures)
     }
 
     private fun resolveCachingLayer(): CachingLayer =
