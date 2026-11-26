@@ -24,6 +24,7 @@ import kotlin.test.assertEquals
 import com.sdk.growthbook.features.FeaturesViewModel
 import com.sdk.growthbook.features.FetchResult
 import com.sdk.growthbook.kotlinx.serialization.gbSerialize
+import com.sdk.growthbook.tests.invokeLegacyPayloadFetchedSuccessfully
 
 internal class VerifySDKReturnFeatureValues {
 
@@ -183,7 +184,6 @@ internal class VerifySDKReturnFeatureValues {
 
         delay(100) // cancel only after 100 millis of waiting
         job.cancel()
-        // or gbSdk.payloadFetchedSuccessfully(emptyMap(), null, null, true)
 
         coVerify { mockedFeaturesViewModel.awaitRefresh() }
     }
@@ -198,7 +198,7 @@ internal class VerifySDKReturnFeatureValues {
         val gbSdk = buildSDK(json = "{}", attributes = emptyMap())
 
         // A stale value is currently in context and the in-flight round is in the Failed/retry state.
-        gbSdk.getGBContext().features = mapOf("flag" to GBFeature(GBBoolean(false)))
+        gbSdk.getGBContext().setProvidedFeatures(mapOf("flag" to GBFeature(GBBoolean(false))))
         gbSdk.featuresFetchFailed(GBError(null), true) // remoteSourceFeaturesFetchResult = Failed
 
         val mockedFeaturesViewModel: FeaturesViewModel = mockk {
@@ -206,12 +206,11 @@ internal class VerifySDKReturnFeatureValues {
             //    must `continue`, NOT return the stale value.
             // 2nd awaitRefresh(): the newer round lands, applies the FRESH features and reports success.
             coEvery { awaitRefresh() } returns FetchResult.Superseded andThenAnswer {
-                gbSdk.getGBContext().features = mapOf("flag" to GBFeature(GBBoolean(true)))
-                gbSdk.payloadFetchedSuccessfully(
+                gbSdk.getGBContext().setProvidedFeatures(mapOf("flag" to GBFeature(GBBoolean(true))))
+                gbSdk.invokeLegacyPayloadFetchedSuccessfully(
                     features = gbSdk.getGBContext().features,
                     savedGroups = null,
                     contextualBandits = null,
-                    experiments = null,
                     isRemote = true
                 )
                 FetchResult.Success

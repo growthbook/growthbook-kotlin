@@ -5,6 +5,7 @@ import com.sdk.growthbook.features.FeaturesDataSource
 import com.sdk.growthbook.features.FeaturesFlowDelegate
 import com.sdk.growthbook.features.FeaturesViewModel
 import com.sdk.growthbook.model.GBContext
+import com.sdk.growthbook.model.GBDefinitionsOrigin
 import com.sdk.growthbook.model.GBContextualBandit
 import com.sdk.growthbook.model.GBExperiment
 import com.sdk.growthbook.model.GBOptions
@@ -53,6 +54,7 @@ class FeaturesViewModelPollingTests {
             contextualBandits: Map<String, GBContextualBandit>?,
             experiments: List<GBExperiment>?,
             isRemote: Boolean,
+            definitionsSource: GBDefinitionsOrigin,
         ) = Unit
         override suspend fun onPayloadReady(model: FeaturesDataModel) = Unit
         override fun featuresFetchFailed(error: GBError, isRemote: Boolean) = Unit
@@ -321,6 +323,7 @@ class FeaturesViewModelPollingTests {
                 contextualBandits: Map<String, GBContextualBandit>?,
                 experiments: List<GBExperiment>?,
                 isRemote: Boolean,
+                definitionsSource: GBDefinitionsOrigin,
             ) {
                 if (!isRemote) record()
             }
@@ -448,6 +451,7 @@ class FeaturesViewModelPollingTests {
                 contextualBandits: Map<String, GBContextualBandit>?,
                 experiments: List<GBExperiment>?,
                 isRemote: Boolean,
+                definitionsSource: GBDefinitionsOrigin,
             ) {
                 if (!isRemote) appliedFromCache = true
             }

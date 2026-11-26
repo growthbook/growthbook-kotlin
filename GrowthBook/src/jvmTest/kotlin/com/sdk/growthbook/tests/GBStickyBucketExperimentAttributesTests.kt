@@ -1,5 +1,6 @@
 package com.sdk.growthbook.tests
 
+import com.sdk.growthbook.model.GBDefinitionsOrigin
 import com.sdk.growthbook.features.FeaturesDataModel
 import com.sdk.growthbook.model.GBContext
 import com.sdk.growthbook.model.GBExperiment
@@ -97,6 +98,7 @@ class GBStickyBucketExperimentAttributesTests {
             savedGroups = null,
             contextualBandits = null,
             experiments = listOf(redirectExperiment()),
+            definitionsSource = GBDefinitionsOrigin.Network,
         )
 
         runBlocking {

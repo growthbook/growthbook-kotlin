@@ -26,6 +26,7 @@ internal typealias StickyBucketAssignmentDocsType = Map<GBStickyAttributeKey, GB
  */
 internal data class EvalSnapshot(
     val features: GBFeatures = HashMap(),
+    val definitionsSource: GBDefinitionsOrigin = GBDefinitionsOrigin.None,
     val attributes: Map<String, GBValue> = emptyMap(),
     val forcedVariations: Map<String, Number> = emptyMap(),
     val forcedFeatures: Map<String, GBValue> = emptyMap(),
@@ -360,17 +361,23 @@ class GBContext internal constructor(
      * reader landing between the writes would otherwise see new features paired with the previous
      * generation's bandit definitions or saved groups.
      *
-     * A null argument means "absent from this payload, keep the current value", matching the
-     * per-field dispatch it replaces.
+     * Absent fields keep their current values. The origin changes only when features are supplied.
+     * When [preserveNetworkDefinitions] is true and the snapshot holds network definitions,
+     * ignore the entire cache payload, including saved groups, bandits and experiments. This keeps the
+     * in-memory payload even when a different instance or process has written a newer cache entry.
      */
     internal fun applyPayload(
         features: GBFeatures?,
-        savedGroups: Map<String, GBValue>?,
-        contextualBandits: Map<String, GBContextualBandit>?,
+        savedGroups: Map<String, GBValue>? = null,
+        contextualBandits: Map<String, GBContextualBandit>? = null,
         experiments: List<GBExperiment>? = null,
+        definitionsSource: GBDefinitionsOrigin,
+        preserveNetworkDefinitions: Boolean = false,
     ) = mutate {
+        if (preserveNetworkDefinitions && it.definitionsSource == GBDefinitionsOrigin.Network) return@mutate it
         it.copy(
             features = features ?: it.features,
+            definitionsSource = if (features == null) it.definitionsSource else definitionsSource,
             savedGroups = savedGroups ?: it.savedGroups,
             contextualBandits = contextualBandits ?: it.contextualBandits,
             experiments = experiments ?: it.experiments,
@@ -426,11 +433,11 @@ class GBContext internal constructor(
         get() = state.load().remoteGroupIds
         set(value) = mutate { it.copy(remoteGroupIds = value) }
 
-    // Keys are unique identifiers for the features and the values are Feature objects.
-    // Feature definitions - To be pulled from API / Cache.
-    internal var features: GBFeatures
+    internal val features: GBFeatures
         get() = state.load().features
-        set(value) = mutate { it.copy(features = value) }
+
+    internal fun setProvidedFeatures(features: GBFeatures) =
+        applyPayload(features = features, definitionsSource = GBDefinitionsOrigin.Provided)
 
     /**
      * Contextual bandit definitions keyed by bandit ref, pulled from the payload alongside
