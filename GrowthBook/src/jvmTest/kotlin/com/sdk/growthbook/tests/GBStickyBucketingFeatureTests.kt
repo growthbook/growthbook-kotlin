@@ -63,8 +63,7 @@ class GBStickyBucketingFeatureTests {
                 )
 
                 if (testData.features != null) {
-                    gbContext.features = testData.features
-                        .mapValues { it.value.gbDeserialize() }
+                    gbContext.setProvidedFeatures(testData.features.mapValues { it.value.gbDeserialize() })
                 }
 
                 // Seed the service with the input docs, then let getAllAssignments filter
