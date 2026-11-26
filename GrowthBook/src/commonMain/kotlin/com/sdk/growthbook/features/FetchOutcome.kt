@@ -13,7 +13,7 @@ internal sealed interface FetchOutcome {
     data class Failed(val error: GBError, val source: Source) : FetchOutcome
     data object NotModified : FetchOutcome
 }
-internal enum class Source { CACHE, NETWORK }
+internal enum class Source { CACHE, STALE, NETWORK }
 
 internal sealed interface CacheOutcome {
     object ServedFresh: CacheOutcome
