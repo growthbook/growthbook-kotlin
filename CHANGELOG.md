@@ -6,6 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [10.3.0](https://github.com/growthbook/growthbook-kotlin/compare/10.2.0...10.3.0) (2026-11-26)
+
+
+### Features
+
+* improve flags source info and SDK features status ([#296](https://github.com/growthbook/growthbook-kotlin/issues/296)) ([a9394bf](https://github.com/growthbook/growthbook-kotlin/commit/a9394bf4722ce574402c2dd7f30d516345016f35))
+
+## [10.2.0](https://github.com/growthbook/growthbook-kotlin/compare/10.1.2...10.2.0) (2026-11-17)
+
+
+### Features
+
+* add remote saved groups (savedGroupReferencesRemote) ([#283](https://github.com/growthbook/growthbook-kotlin/issues/283)) ([4b86495](https://github.com/growthbook/growthbook-kotlin/commit/4b8649545bed656645c161c5e50d800e844b17a1))
+* add saved group references v2 ($savedGroup) ([#281](https://github.com/growthbook/growthbook-kotlin/issues/281)) ([7d937ba](https://github.com/growthbook/growthbook-kotlin/commit/7d937bacefabf32d14439e9cc3d6aca5889247f6))
+
+
+### Bug Fixes
+
+* pin JVM toolchain to JDK 17 so published bytecode is Java 17 ([#251](https://github.com/growthbook/growthbook-kotlin/issues/251)) ([baf0317](https://github.com/growthbook/growthbook-kotlin/commit/baf0317642eb865de9b2c7154524e65006c77780))
+
+## [10.1.2](https://github.com/growthbook/growthbook-kotlin/compare/10.1.1...10.1.2) (2026-11-17)
+
+
+### Miscellaneous Chores
+
+* release GrowthBook with GrowthBookKotlinxSerialization 2.0.1 ([#295](https://github.com/growthbook/growthbook-kotlin/issues/295)) ([852a9ee](https://github.com/growthbook/growthbook-kotlin/commit/852a9eebc098f7857bf82b74f88a77c6076a6914))
+
+## [10.1.1](https://github.com/growthbook/growthbook-kotlin/compare/10.1.0...10.1.1) (2026-11-12)
+
+
+### Bug Fixes
+
+* avoid quadratic regex when stripping version build metadata ([#291](https://github.com/growthbook/growthbook-kotlin/issues/291)) ([0545ab0](https://github.com/growthbook/growthbook-kotlin/commit/0545ab0502eeb1b54f37cd27d9df5f03be0a9286))
+
 ## [10.1.0] - 2026-11-06
 
 No changes to the core SDK. This release publishes the new `GrowthBookOpenFeature` module; the other modules

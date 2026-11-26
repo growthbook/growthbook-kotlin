@@ -25,6 +25,7 @@ internal typealias StickyBucketAssignmentDocsType = Map<GBStickyAttributeKey, GB
  */
 internal data class EvalSnapshot(
     val features: GBFeatures = HashMap(),
+    val definitionsSource: GBDefinitionsOrigin = GBDefinitionsOrigin.None,
     val attributes: Map<String, GBValue> = emptyMap(),
     val forcedVariations: Map<String, Number> = emptyMap(),
     val forcedFeatures: Map<String, GBValue> = emptyMap(),
@@ -33,6 +34,13 @@ internal data class EvalSnapshot(
     val stickyBucketIdentifierAttributes: List<String>? = null,
     val savedGroups: Map<String, GBValue>? = null,
     val contextualBandits: Map<String, GBContextualBandit>? = null,
+    /**
+     * The ids of the remote saved groups the user is in, resolved by the app. Evaluation reads them as
+     * the [com.sdk.growthbook.utils.Constants.REMOTE_GROUP_IDS_ATTRIBUTE] attribute, over any value the
+     * attributes set for it. Null means unresolved, which is not the same as no groups: see
+     * [com.sdk.growthbook.GrowthBookSDK.setRemoteGroupIds].
+     */
+    val remoteGroupIds: List<String>? = null,
     /**
      * Per-feature usage history for the user these [attributes] describe.
      *
@@ -57,7 +65,14 @@ internal data class EvalSnapshot(
      * remembered (A -> B -> A).
      */
     val featureUsageHelper: GBFeatureUsageHelper = GBFeatureUsageHelper()
-)
+) {
+    /** Whether [savedGroups] has a remote entry. Computed once per snapshot, not per evaluation. */
+    val hasRemoteSavedGroups: Boolean by lazy {
+        savedGroups?.values?.any { entry ->
+            entry is GBJson && (entry["type"] as? GBString)?.value == "remote"
+        } == true
+    }
+}
 
 /**
  * Defines the GrowthBook context.
@@ -163,6 +178,12 @@ class GBContext internal constructor(
      * [com.sdk.growthbook.GBSDKBuilder.setEventLogger].
      */
     val eventLogger: GBEventLogger? = null,
+
+    /**
+     * The ids of the remote saved groups the user is in. Set via
+     * [com.sdk.growthbook.GBSDKBuilder.setRemoteGroupIds].
+     */
+    remoteGroupIds: List<String>? = null,
 ) {
 
     // Single source of truth for all cross-thread-shared evaluation inputs.
@@ -172,7 +193,8 @@ class GBContext internal constructor(
             forcedVariations = forcedVariations,
             stickyBucketAssignmentDocs = stickyBucketAssignmentDocs,
             stickyBucketIdentifierAttributes = stickyBucketIdentifierAttributes,
-            savedGroups = savedGroups
+            savedGroups = savedGroups,
+            remoteGroupIds = remoteGroupIds,
         )
     )
 
@@ -351,16 +373,22 @@ class GBContext internal constructor(
      * reader landing between the writes would otherwise see new features paired with the previous
      * generation's bandit definitions or saved groups.
      *
-     * A null argument means "absent from this payload, keep the current value", matching the
-     * per-field dispatch it replaces.
+     * Absent fields keep their current values. The origin changes only when features are supplied.
+     * When [preserveNetworkDefinitions] is true and the snapshot holds network definitions,
+     * ignore the entire cache payload, including saved groups and bandits. This keeps the
+     * in-memory payload even when a different instance or process has written a newer cache entry.
      */
     internal fun applyPayload(
         features: GBFeatures?,
-        savedGroups: Map<String, GBValue>?,
-        contextualBandits: Map<String, GBContextualBandit>?,
+        savedGroups: Map<String, GBValue>? = null,
+        contextualBandits: Map<String, GBContextualBandit>? = null,
+        definitionsSource: GBDefinitionsOrigin,
+        preserveNetworkDefinitions: Boolean = false,
     ) = mutate {
+        if (preserveNetworkDefinitions && it.definitionsSource == GBDefinitionsOrigin.Network) return@mutate it
         it.copy(
             features = features ?: it.features,
+            definitionsSource = if (features == null) it.definitionsSource else definitionsSource,
             savedGroups = savedGroups ?: it.savedGroups,
             contextualBandits = contextualBandits ?: it.contextualBandits,
         )
@@ -397,11 +425,18 @@ class GBContext internal constructor(
         get() = state.load().savedGroups
         set(value) = mutate { it.copy(savedGroups = value) }
 
-    // Keys are unique identifiers for the features and the values are Feature objects.
-    // Feature definitions - To be pulled from API / Cache.
-    internal var features: GBFeatures
+    /**
+     * The ids of the remote saved groups the user is in, or null while unresolved
+     */
+    internal var remoteGroupIds: List<String>?
+        get() = state.load().remoteGroupIds
+        set(value) = mutate { it.copy(remoteGroupIds = value) }
+
+    internal val features: GBFeatures
         get() = state.load().features
-        set(value) = mutate { it.copy(features = value) }
+
+    internal fun setProvidedFeatures(features: GBFeatures) =
+        applyPayload(features = features, definitionsSource = GBDefinitionsOrigin.Provided)
 
     /**
      * Contextual bandit definitions keyed by bandit ref, pulled from the payload alongside
