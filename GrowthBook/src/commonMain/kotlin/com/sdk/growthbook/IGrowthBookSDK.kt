@@ -12,13 +12,24 @@ import com.sdk.growthbook.model.GBString
 import com.sdk.growthbook.model.GBValue
 
 interface IGrowthBookSDK {
-
     fun isOn(featureId: String): Boolean
     fun feature(id: String): GBFeatureResult
     suspend fun suspendFeature(id: String): GBFeatureResult
     fun run(experiment: GBExperiment): GBExperimentResult
     fun setAttributes(attributes: Map<String, GBValue>)
     suspend fun setAttributesSync(attributes: Map<String, GBValue>)
+
+    /**
+     * Registers [callback] to be notified when an experiment assignment changes. See
+     * [GrowthBookSDK.subscribe] for the full contract and for how it differs from the tracking
+     * callback.
+     *
+     * Defaulted to a no-op so that adding it stays source- and binary-compatible for existing Kotlin
+     * and Java implementors. Note that Kotlin interfaces export to Objective-C with every member
+     * `@required`, so a Swift type conforming to this interface does **not** inherit the default and
+     * must implement it.
+     */
+    fun subscribe(callback: GBExperimentRunCallback): GBSubscription = GBSubscription {}
 }
 
 /**
